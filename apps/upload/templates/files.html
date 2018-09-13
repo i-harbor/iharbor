@@ -1,0 +1,56 @@
+{% extends "base_upload.html" %}
+{% load static %}
+
+{% block title %}
+	文件列表
+{%endblock%}
+
+
+{% block head %}
+	<link rel="stylesheet" type="text/css" href="{% static 'upload/files.css' %}">
+{% endblock %}
+
+
+{% block boby %}
+	<div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+                {#文件上传表单#}
+                <form method="POST" action="{{ action_url }}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <p class="text-danger">{{ field.errors.as_text }}</p>
+                        {{ field.label_tag }} {{ field }}
+                    {% endfor %}
+                    <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
+                    <div class="clearfix"></div>
+                    <button type="submit" class="btn btn-primary pull-right">{{ submit_text }}</button>
+                </form>
+                {% block form_extend %}{% endblock %}
+            </div>
+        </div>
+		<div class="row">
+			<div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+            {#文件列表#}
+                <table class="table table-bordered">
+                    <tr class="success">
+                        <th>UUID</th>
+                        <th>文件名</th>
+                        <th>上传时间</th>
+                        <th>文件大小</th>
+                    </tr>
+                    {% for file in files %}
+                        <tr class="info file-list-item">
+                            <td>{{ file.uuid }}</td>
+                            <td>{{ file.filename }}</td>
+                            <td>{{ file.add_time }}</td>
+                            <td>{{ file.size }}</td>
+                        </tr>
+				    {% endfor %}
+                </table>
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+
