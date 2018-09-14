@@ -33,7 +33,7 @@ ALLOWED_HOSTS = ['*',]
 # Application definition
 
 INSTALLED_APPS = [
-    # 'django.contrib.admin',
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     #自定义apps
-    'upload',
+    'apps.upload',
+    'apps.users.apps.UsersConfig'
 ]
 
 MIDDLEWARE = [
@@ -59,7 +60,9 @@ ROOT_URLCONF = 'webserver.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -79,39 +82,11 @@ WSGI_APPLICATION = 'webserver.wsgi.application'
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
 
 DATABASES = {
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.sqlite3',
-    #     'NAME': 'db.sqlite3',
-    # }
-
-    # 'default': {
-    #     'ENGINE': 'djongo',
-    #     'NAME': 'defaultdb',
-    #     'HOST': '10.0.86.213',  #需改为自己主机地址
-    #     'PORT': 27017,
-    #     # 'USER': 'root',
-    #     # 'PASSWORD': 'xxxx',
-    #     # 'AUTH_SOURCE': 'admin',
-    #     # 'AUTH_MECHANISM': 'SCRAM-SHA-1',
-    #     # 'ENFORCE_SCHEMA': True,
-    #     # 'REPLICASET': 'replicaset',
-    #     # 'SSL': 'ssl',
-    #     # 'SSL_CERTFILE': 'ssl_certfile',
-    #     # 'SSL_CA_CERTS': 'ssl_ca_certs',
-    #     # 'READ_PREFERENCE': 'read_preference'
-    # },
-    # 'uploaddb': {
-    #     'ENGINE': 'djongo',
-    #     'NAME': 'uploaddb',
-    #     'HOST': '10.0.86.213',  #需改为自己主机地址
-    #     'PORT': 27017,
-    #     # 'USER': 'root',
-    #     # 'PASSWORD': 'xxxx',
-    #     # 'AUTH_SOURCE': 'admin',
-    #     # 'AUTH_MECHANISM': 'SCRAM-SHA-1',
-    # }
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'db.sqlite3',
+    }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -165,7 +140,8 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True #True：关闭浏览器，则Cookie失效
 # SESSION_COOKIE_AGE=60*30   #30分钟
 
 #自定义用户模型
-# AUTH_USER_MODEL = 'users.UserProfile'
+AUTH_USER_MODEL = 'users.UserProfile'
+
 
 #mongodb数据库连接
 from mongoengine import connect
@@ -180,5 +156,8 @@ connect(
     # authentication_source='admin'
 )
 connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
-connect(alias='db3', db='testdb3', host='10.0.86.213', port=27017)
+
+
+#登陆url
+LOGIN_URL = '/users/login/'
 

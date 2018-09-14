@@ -19,14 +19,14 @@ def file_list(request):
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
             handleUploadFile(request)
-            return redirect(reverse('file_list'))
+            return redirect(reverse('upload:file_list'))
     else:
         form = UploadFileForm()
 
     content = {}
-    content['form_title'] = '上传文件'
+    # content['form_title'] = '上传文件'
     content['submit_text'] = '上传'
-    content['action_url'] = reverse('file_list')
+    content['action_url'] = reverse('upload:file_list')
     content['form'] = form
     with switch_db(UploadFileInfo, 'db2'):
         content['files'] = UploadFileInfo.objects.all()

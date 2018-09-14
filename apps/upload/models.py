@@ -2,7 +2,6 @@ from datetime import datetime
 
 from mongoengine import Document
 from mongoengine import fields
-from mongoengine.context_managers import switch_db
 
 # Create your models here.
 
@@ -15,13 +14,12 @@ class UploadFileInfo(Document):
 	add_time = fields.DateTimeField(default=datetime.utcnow)
 	size = fields.IntField()
 
-	meta = {'db_alias': 'default'}
+	meta = {
+		#db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(UploadFileInfo, 'db2')临时改变对应的数据库连接
+		'db_alias': 'default',
+	}
 
 
-# switch到testdb2连接
-# with switch_db(UploadFileInfo, 'testdb2'):
-# 	finfo = UploadFileInfo()
-# 	finfo.save()
 
 
 
