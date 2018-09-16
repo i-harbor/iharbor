@@ -45,6 +45,8 @@
                             <td>{{ file.filename }}</td>
                             <td>{{ file.add_time }}</td>
                             <td>{{ file.size }}</td>
+                            <td><a class="btn btn-info" id="file-item-download" href="{% url 'upload:download' file.uuid %}">下载</a></td>
+                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'upload:delete' file.uuid %}">删除</a></td>
                         </tr>
 				    {% endfor %}
                 </table>
