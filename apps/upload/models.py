@@ -1,7 +1,13 @@
 from datetime import datetime
 
+from django.db import models
+from django.contrib.auth import get_user_model
 from mongoengine import Document
 from mongoengine import fields
+
+
+#获取用户模型
+User = get_user_model()
 
 # Create your models here.
 
@@ -25,6 +31,12 @@ class UploadFileInfo(Document):
 	}
 
 
-
-
+class Bucket(models.Model):
+	'''
+	存储桶bucket类
+	'''
+	name = models.CharField(max_length=50, db_index=True, unique=True, verbose_name='bucket名称')#bucket名称唯一
+	user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
+	created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+	collection_name = models.CharField(max_length=50, verbose_name='存储桶对应的集合表名')
 

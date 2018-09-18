@@ -1,14 +1,13 @@
 from django.conf.urls import url
+from django.contrib.auth.decorators import login_required
 
 from . import views
 
 urlpatterns = [
-    url(r'^$', views.file_list, name='file_list'),
-    url(r'^download/(?P<uuid>[\w-]{32,36})', views.download, name='download'),
-    url(r'^delete/(?P<uuid>[\w-]{32,36})', views.delete, name='delete'),
-    # path('<int:blog_id>/', views.BlogDetailView.as_view(), name='blog_detail'),
-    # url(r'^(?P<blog_id>\d+)/$', views.BlogDetailView.as_view(), name='blog_detail'),
-    # url(r'^add/$', views.blog_add, name='blog_add')
+    url(r'^bucket/(?P<bucket_name>[\w-]{3,50})', views.file_list, name='file_list'),
+    url(r'^$', login_required(views.BucketView.as_view()), name='bucket_view'),
+    url(r'^download/(?P<uuid>[\w-]{32,36})/', views.download, name='download'),
+    url(r'^delete/(?P<uuid>[\w-]{32,36})/', views.delete, name='delete'),
 ]
 
 

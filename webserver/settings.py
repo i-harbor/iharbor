@@ -41,8 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     #自定义apps
-    'apps.upload',
-    'apps.users.apps.UsersConfig'
+    'upload',
+    'users.apps.UsersConfig'
 ]
 
 MIDDLEWARE = [
@@ -148,14 +148,14 @@ from mongoengine import connect
 
 connect(
     alias='default',
-    db='testdb1',
+    db='metadata',
     host='10.0.86.213',
     port=27017,
     # username='root',
     # password='pwd123',
     # authentication_source='admin'
 )
-connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
+# connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
 
 
 #登陆url

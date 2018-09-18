@@ -13,6 +13,24 @@
 
 {% block boby %}
 	<div class="container-fluid">
+{#        目录导航栏#}
+        <div class="row">
+            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+                <a href="{% url 'upload:bucket_view' %}">Home</a>
+{#                如果dir_links为空，现在在bucket根路径下#}
+                {% if not dir_links %}
+                    <span>></span>
+                    <span>{{ bucket_name }}</span>
+                {% else %}
+                    <span>></span>
+                    <a href="{% url 'upload:file_list' bucket_name=bucket_name %}">{{ bucket_name }}</a>
+                    {% for link in dir_links %}
+                        <a href="{% url 'upload:file_list' bucket_name=bucket_name %}"></a>
+                        <span>></span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
         <div class="row">
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
                 {#文件上传表单#}
@@ -45,8 +63,10 @@
                             <td>{{ file.filename }}</td>
                             <td>{{ file.add_time }}</td>
                             <td>{{ file.size }}</td>
-                            <td><a class="btn btn-info" id="file-item-download" href="{% url 'upload:download' file.uuid %}">下载</a></td>
-                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'upload:delete' file.uuid %}">删除</a></td>
+                            <td><a class="btn btn-info" id="file-item-download"
+                                   href="{% url 'upload:download' uuid=file.uuid %}?bucket_name={{ bucket_name }}">下载</a></td>
+                            <td><a class="btn btn-danger" id="file-item-delete"
+                                   href="{% url 'upload:delete' uuid=file.uuid %}?bucket_name={{ bucket_name }}">删除</a></td>
                         </tr>
 				    {% endfor %}
                 </table>

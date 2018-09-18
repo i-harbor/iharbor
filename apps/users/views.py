@@ -21,7 +21,7 @@ def register_user(request):
 
             #从定向到登陆界面，登陆通过后导航到next地址
             logout(request)#登出用户（确保当前没有用户登陆）
-            return redirect_to_login(next=reverse('web_index'), login_url=reverse('users:login'))
+            return redirect_to_login(next=reverse('bucket_view'), login_url=reverse('users:login'))
     else:
         form = UserRegisterForm()
 
@@ -43,7 +43,7 @@ def login_user(request):
             user = form.cleaned_data['user']
             #登陆用户
             login(request, user)
-            next = request.session.get('next', reverse('web_index'))
+            next = request.session.get('next', reverse('upload:bucket_view'))
             return redirect(to=next)
     else:
         #保存登陆后跳转地址，如果存在的话
@@ -66,7 +66,7 @@ def logout_user(request):
     注销用户
     '''
     logout(request)
-    return redirect(to=request.GET.get('next', reverse('web_index')))
+    return redirect(to=request.GET.get('next', reverse('upload:bucket_view')))
 
 
 @login_required

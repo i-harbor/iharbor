@@ -15,16 +15,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.conf.urls import url, include
-from django.shortcuts import redirect, reverse
-from django.contrib.auth.decorators import login_required
-
-@login_required
-def index(request):
-    return redirect(to=reverse('upload:file_list'))
+# from django.shortcuts import redirect, reverse
+# from django.contrib.auth.decorators import login_required
+#
+# @login_required
+# def index(request):
+#     return redirect(to=reverse('upload:file_list'))
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^$', index, name='web_index'),
-    url(r'^upload/', include('upload.urls', namespace='upload')),
+    # url(r'^$', index, name='web_index'),
+    url(r'', include('upload.urls', namespace='upload')),
     url(r'^users/', include('users.urls', namespace='users')),
 ]
