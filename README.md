@@ -20,7 +20,7 @@ from mongoengine import connect
 
 connect(
     alias='default',
-    db='testdb1',
+    db='metadata',
     host='10.0.86.213',
     port=27017,
     # username='root',

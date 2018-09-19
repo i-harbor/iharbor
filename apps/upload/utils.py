@@ -2,11 +2,10 @@ import os
 import uuid
 
 from django.conf import settings
-from django.http import Http404, StreamingHttpResponse, FileResponse
-from mongoengine.context_managers import switch_collection, switch_db
+from django.http import FileResponse
+from mongoengine.context_managers import switch_collection
 
-from .models import UploadFileInfo, Bucket
-
+from .models import BucketFileInfo
 
 
 class FileSystemHandlerBackend():
@@ -19,18 +18,18 @@ class FileSystemHandlerBackend():
     ACTION_DOWNLOAD = 3 #下载
 
 
-    def __init__(self, request, action, bucket_name, uuid=None, *args, **kwargs):
+    def __init__(self, request, action, bucket_name, id=None, *args, **kwargs):
         '''
-        @ uuid:要操作的文件uuid,上传文件时参数uuid不需要传值
+        @ id:要操作的文件id,上传文件时参数id不需要传值
         @ action:操作类型
         '''
-        #文件对应uuid
-        self.uuid = uuid if uuid else self._get_new_uuid()
+        #文件对应id
+        self.id = id
         #文件存储的目录
         self.base_dir = os.path.join(settings.MEDIA_ROOT, 'upload')
         self.request = request
         self._action = action #处理方式
-        self._collection_name = self.request.user.username + '_' + bucket_name #每个存储桶对应的集合表名==用户名_存储桶名称
+        self._collection_name = get_collection_name(self.request.user.username, bucket_name)
 
 
     def file_storage(self):
@@ -47,18 +46,25 @@ class FileSystemHandlerBackend():
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
 
+        # 保存对应文件记录到指定集合
+        # with switch_collection(UploadFileInfo, self._collection_name) as FileInfo:
+        info = BucketFileInfo(
+            na=file_obj.name, #文件名
+            fod=True, #true:文件；false:目录
+            si=file_obj.size,
+            # did=None#父节点id,属于存储桶根目录时
+        )
+        info.switch_collection(self._collection_name)
+        info.save()
+        self.id = str(info.id)
+
         #保存文件
         full_path_filename = self.get_full_path_filename()
         with open(full_path_filename, 'wb') as f:
             for chunk in file_obj.chunks():
                 f.write(chunk)
 
-        #保存对应文件记录到指定集合
-        with switch_collection(UploadFileInfo, self._collection_name) as FileInfo:
-            UploadFileInfo(uuid=self.uuid, filename=file_obj.name, size=file_obj.size).save()
-
         return True
-
 
 
     def file_detele(self):
@@ -76,8 +82,9 @@ class FileSystemHandlerBackend():
             pass
 
         #切换到对应集合
-        with switch_collection(UploadFileInfo, self.get_collection_name()):
-            finfo.delete()
+        # with switch_collection(UploadFileInfo, self.get_collection_name()):
+        finfo.switch_collection(self._collection_name)
+        finfo.delete()
 
         return True
 
@@ -96,7 +103,7 @@ class FileSystemHandlerBackend():
         # response = StreamingHttpResponse(file_read_iterator(full_path_filename)) 
         response = FileResponse(self.file_read_iterator(full_path_filename))
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment;filename="{finfo.filename}"'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f'attachment;filename="{finfo.na}"'  # 注意filename 这个是下载后的名字
         return response
 
             
@@ -134,13 +141,13 @@ class FileSystemHandlerBackend():
 
     def get_full_path_filename(self):
         '''文件绝对路径'''
-        return os.path.join(self.base_dir, self.uuid) 
+        return os.path.join(self.base_dir, self.id)
 
     def get_file_info(self):
         '''是否存在uuid对应文件记录'''
         # 切换到指定集合查询对应文件记录
-        with switch_collection(UploadFileInfo, self.get_collection_name()):
-            finfos = UploadFileInfo.objects(uuid=self.uuid)
+        with switch_collection(BucketFileInfo, self.get_collection_name()):
+            finfos = BucketFileInfo.objects(id=self.id)
             if finfos:
                 finfo = finfos.first()
                 return True, finfo
@@ -159,5 +166,11 @@ class FileSystemHandlerBackend():
 
 
 def get_collection_name(username, bucket_name):
-    '''获得当前用户存储桶Bucket对应集合名称'''
+    '''
+    获得当前用户存储桶Bucket对应集合名称
+    每个存储桶对应的集合表名==用户名_存储桶名称
+    '''
     return f'{username}_{bucket_name}'
+
+
+

@@ -1,61 +1,130 @@
 from django.shortcuts import render, reverse, redirect
 from django.http import Http404
 from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 from django.views import View
-from django.db.models import Q
+from django.db.models import Q as dQ
 
-from mongoengine.context_managers import switch_collection, switch_db
+from mongoengine.context_managers import switch_collection
+from mongoengine.queryset.visitor import Q as mQ
+from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
 from .forms import UploadFileForm, BucketForm
-from .models import UploadFileInfo, Bucket
+from .models import BucketFileInfo, Bucket
 from .utils import FileSystemHandlerBackend, get_collection_name
 
 # Create your views here.
 
 @login_required
-def file_list(request, bucket_name=None):
+def file_list(request, bucket_name=None, path=None):
     '''
     文件列表函数视图
     '''
     # bucket是否属于当前用户
-    if not Bucket.objects.filter(Q(user=request.user) & Q(name=bucket_name)).exists():
+    if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
         raise Http404('存储桶Bucket不存在')
 
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
-            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name, action=FileSystemHandlerBackend.ACTION_STORAGE)
+            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name,
+                                                    action=FileSystemHandlerBackend.ACTION_STORAGE)
             file_handler.do_action()
-            return redirect(reverse('upload:file_list', kwargs={'bucket_name': bucket_name}))
+            return redirect(reverse('upload:file_list', kwargs={'bucket_name': bucket_name, 'path': path }))
     else:
         form = UploadFileForm()
 
-    content = {}
-    content['submit_text'] = '上传'
-    content['action_url'] = reverse('upload:file_list', kwargs={'bucket_name': bucket_name})
+    content = get_content(request, bucket_name=bucket_name, path=path)
     content['form'] = form
-    content['bucket_name'] = bucket_name
-    with switch_collection(UploadFileInfo, get_collection_name(username=request.user.username, bucket_name=bucket_name)):
-        content['files'] = UploadFileInfo.objects.all()
-
-    content['dir_links'] = {}
     return render(request, 'files.html', content)
 
 
+def get_content(request, bucket_name, path):
+    '''
+    要返回的内容
+    :return:
+    '''
+    content = {}
+    content['submit_text'] = '上传'
+    content['action_url'] = reverse('upload:file_list', kwargs={
+                                                            'bucket_name': bucket_name,
+                                                            'path': path })
+    content['bucket_name'] = bucket_name
+    with switch_collection(BucketFileInfo, get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+        if path:
+            # 获得当前目录节点id
+            cur_dir_id = get_cur_dir_id(path)
+            content['files'] = get_cur_dir_files(cur_dir_id)
+        else:
+            content['files'] = get_cur_dir_files(None)
+    for f in content['files']:
+        pass
+    content['path_links'] = get_dir_link_paths(path)
+    return content
+
+
+def get_dir_link_paths(path):
+    '''
+    目录路径导航连接路径path
+    :return: {dir_name: dir_full_path}
+    '''
+    dir_link_paths = {}
+    if path == '':
+        return dir_link_paths
+    if path.endswith('/'):
+        path = path.rstrip('/')
+    dirs = path.split('/')
+    for i, key in enumerate(dirs):
+        dir_link_paths[key] = '/'.join(dirs[0:i+1])
+    return dir_link_paths
+
+
+def get_cur_dir_id(path):
+    '''
+    获得当前目录节点id
+    @ return: 正常返回path目录的id；未找到记录返回None，即参数有误
+    '''
+    path = path.strip()
+    if path.endswith('/'):
+        path = path.rstrip('/')
+    if not path:
+        return None # path参数有误
+    try:
+        dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
+    except DoesNotExist as e:
+        raise e
+    except MultipleObjectsReturned as e:
+        raise e
+
+    return dir.id if dir else None  # None->未找到对应目录
+
+
+def get_cur_dir_files(cur_dir_id):
+    '''
+    获得当前目录下的文件或文件夹记录
+
+    :param cur_dir_id: 目录id;
+    :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
+    '''
+    if cur_dir_id:
+        files = BucketFileInfo.objects(did=cur_dir_id).all()
+    else:
+        files = BucketFileInfo.objects(did__exists=False).all()  # did不存在表示是存储桶下顶层目录
+    return files
+
+
 @login_required
-def download(request, uuid=None):
+def download(request, id=None):
     '''
     下载文件函数视图
     '''
     if request.method == 'GET':
         #获取要下载的文件的uuid
-        file_uuid = uuid
+        file_id = id
         bucket_name = request.GET.get('bucket_name', None)
-        if not file_uuid or not bucket_name:
+        if not file_id or not bucket_name:
             raise Http404('要下载的文件不存在')
 
-        file_handler = FileSystemHandlerBackend(request, uuid=file_uuid, bucket_name=bucket_name,
+        file_handler = FileSystemHandlerBackend(request, id=file_id, bucket_name=bucket_name,
                                                 action=FileSystemHandlerBackend.ACTION_DOWNLOAD)
         response = file_handler.do_action()
         if not response:
@@ -64,22 +133,24 @@ def download(request, uuid=None):
 
 
 @login_required
-def delete(request, uuid=None):
+def delete(request, id=None):
     '''
     删除文件函数视图
     '''
     if request.method == 'GET':
         #获取要下载的文件的uuid
-        file_uuid = uuid
+        file_id = id
         bucket_name = request.GET.get('bucket_name', None)
-        if not file_uuid or not bucket_name:
+        if not file_id or not bucket_name:
             raise Http404('要下载的文件不存在')
-
-        file_handler = FileSystemHandlerBackend(request, uuid=file_uuid, bucket_name=bucket_name,
+        path = request.GET.get('path', '')
+        file_handler = FileSystemHandlerBackend(request, id=file_id, bucket_name=bucket_name,
                                                 action=FileSystemHandlerBackend.ACTION_DELETE)
         if not file_handler.do_action():
             raise Http404('要删除的文件不存在')
-        return redirect(to=request.META.get('HTTP_REFERER', reverse('upload:file_list', kwargs={'bucket_name': bucket_name})))
+        return redirect(to=request.META.get('HTTP_REFERER', reverse('upload:file_list', kwargs={'bucket_name': bucket_name,
+                                                                                                'path': path
+                                                                                                })))
 
 
 
