@@ -2,7 +2,7 @@ $form_new_bucket = $('#form-new-bucket');
 $form_new_bucket.on('submit', function (event) {
     event.preventDefault();
     $.ajax({
-        url: $form_new_bucket.attr('action'),//'{% url 'upload: bucket_view' %}',
+        url: $form_new_bucket.attr('action'),
         type: 'post',
         data: $form_new_bucket.serialize(),
         success: function (data) {

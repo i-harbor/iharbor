@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'upload/bucket.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
 {% endblock %}
 
 {% block boby %}
@@ -53,13 +53,13 @@
                         <tr class="">
                             <td><input type="checkbox"></td>
                             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a
-                                    href="{% url 'upload:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
+                                    href="{% url 'buckets:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
                             </td>
                             <td>{{ bucket.collection_name }}</td>
                             <td>{{ bucket.created_time | date:"Y/m/d H:i:s" }}</td>
                             <td>{{ bucket.user.username }}</td>
-{#                            <td><a class="btn btn-info" href="{% url 'upload:bucket_view' %}?bk={{ bucket.name }}">下载</a></td>#}
-{#                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'upload:delete' file.uuid %}">删除</a></td>#}
+{#                            <td><a class="btn btn-info" href="{% url 'buckets:bucket_view' %}?bk={{ bucket.name }}">下载</a></td>#}
+{#                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'buckets:delete' file.uuid %}">删除</a></td>#}
                         </tr>
                     {% endfor %}
                 </table>
@@ -69,6 +69,6 @@
 {% endblock %}
 
 {% block script %}
-    <script type="text/javascript" src="{% static 'upload/bucket-home.js' %}"></script>
+    <script type="text/javascript" src="{% static 'buckets/bucket-home.js' %}"></script>
 {% endblock %}
 

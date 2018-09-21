@@ -9,7 +9,7 @@
 
 
 {% block head %}
-	<link rel="stylesheet" type="text/css" href="{% static 'upload/bucket.css' %}">
+	<link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
 {% endblock %}
 
 
@@ -18,17 +18,17 @@
 {#        目录导航栏#}
         <div class="row">
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
-                <a href="{% url 'upload:bucket_view' %}">Home</a>
+                <a href="{% url 'buckets:bucket_view' %}">Home</a>
 {#                如果dir_links为空，现在在bucket根路径下#}
                 {% if not path_links %}
                     <span>></span>
                     <span>{{ bucket_name }}</span>
                 {% else %}
                     <span>></span>
-                    <a href="{% url 'upload:file_list' bucket_name=bucket_name path='' %}">{{ bucket_name }}</a>
+                    <a href="{% url 'buckets:file_list' bucket_name=bucket_name path='' %}">{{ bucket_name }}</a>
                     {% for dir_name, path in path_links.items %}
                         <span>/</span>
-                        <a href="{% url 'upload:file_list' bucket_name=bucket_name path=path %}">{{ dir_name }}</a>
+                        <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=path %}">{{ dir_name }}</a>
                     {% endfor %}
                 {% endif %}
             </div>
@@ -75,15 +75,15 @@
                             {% else %}
                                 <td>
                                     <span class="glyphicon glyphicon-folder-open"></span>
-                                    <a href="{% url 'upload:file_list' bucket_name=bucket_name path=file.na %}"><strong>{{ file.na | name_from_path }}</strong></a>
+                                    <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}"><strong>{{ file.na | name_from_path }}</strong></a>
                                 </td>
                                 <td>{{ file.ult | date:"Y/m/d H:i:s" }}</td>
                                 <td>--</td>
                             {% endif %}
                             <td><a class="btn btn-info" id="file-item-download"
-                                   href="{% url 'upload:download' id=file.id|to_str %}?bucket_name={{ bucket_name }}">下载</a></td>
+                                   href="{% url 'buckets:download' id=file.id|to_str %}?bucket_name={{ bucket_name }}">下载</a></td>
                             <td><a class="btn btn-danger" id="file-item-delete"
-                                   href="{% url 'upload:delete' id=file.id|to_str %}?bucket_name={{ bucket_name }}">删除</a></td>
+                                   href="{% url 'buckets:delete' id=file.id|to_str %}?bucket_name={{ bucket_name }}">删除</a></td>
                         </tr>
 				    {% endfor %}
                 </table>

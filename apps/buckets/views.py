@@ -29,7 +29,7 @@ def file_list(request, bucket_name=None, path=None):
             file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name,
                                                     action=FileSystemHandlerBackend.ACTION_STORAGE)
             file_handler.do_action()
-            return redirect(reverse('upload:file_list', kwargs={'bucket_name': bucket_name, 'path': path }))
+            return redirect(reverse('buckets:file_list', kwargs={'bucket_name': bucket_name, 'path': path }))
     else:
         form = UploadFileForm()
 
@@ -45,7 +45,7 @@ def get_content(request, bucket_name, path):
     '''
     content = {}
     content['submit_text'] = '上传'
-    content['action_url'] = reverse('upload:file_list', kwargs={
+    content['action_url'] = reverse('buckets:file_list', kwargs={
                                                             'bucket_name': bucket_name,
                                                             'path': path })
     content['bucket_name'] = bucket_name
@@ -148,7 +148,7 @@ def delete(request, id=None):
                                                 action=FileSystemHandlerBackend.ACTION_DELETE)
         if not file_handler.do_action():
             raise Http404('要删除的文件不存在')
-        return redirect(to=request.META.get('HTTP_REFERER', reverse('upload:file_list', kwargs={'bucket_name': bucket_name,
+        return redirect(to=request.META.get('HTTP_REFERER', reverse('buckets:file_list', kwargs={'bucket_name': bucket_name,
                                                                                                 'path': path
                                                                                                 })))
 
@@ -177,10 +177,10 @@ class BucketView(View):
             if request.is_ajax():
                 data = {
                     'code': 200,
-                    'redirect_to': reverse('upload:bucket_view') # 前端重定向地址
+                    'redirect_to': reverse('buckets:bucket_view') # 前端重定向地址
                 }
                 return JsonResponse(data=data)
-            return redirect(to=reverse('upload:bucket_view'))
+            return redirect(to=reverse('buckets:bucket_view'))
 
         #表单验证有误
         if request.is_ajax(): # ajax请求
@@ -198,7 +198,7 @@ class BucketView(View):
     def get_content(self, request, form):
         content = {}
         content['submit_text'] = '创建'
-        content['action_url'] = reverse('upload:bucket_view')
+        content['action_url'] = reverse('buckets:bucket_view')
         content['form'] = form
         content['buckets'] = Bucket.objects.filter(user=request.user).all()
         return content
