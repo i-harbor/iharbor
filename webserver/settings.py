@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     #自定义apps
-    'buckets',
+    'buckets.apps.BucketsConfig',
     'users.apps.UsersConfig'
 ]
 

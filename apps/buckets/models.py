@@ -20,6 +20,10 @@ class Bucket(models.Model):
 	created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
 	collection_name = models.CharField(max_length=50, verbose_name='存储桶对应的集合表名')
 
+	class Meta:
+		verbose_name = '存储桶'
+		verbose_name_plural = verbose_name
+
 
 class BucketFileInfo(DynamicDocument):
 	'''

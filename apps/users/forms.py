@@ -9,7 +9,7 @@ class UserRegisterForm(forms.Form):
     用户注册表单
     '''
     username = forms.CharField( label='用户名',
-                                min_length=6,
+                                min_length=5,
                                 max_length=20,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
@@ -64,7 +64,7 @@ class LoginForm(forms.Form):
     用户登陆表单
     '''
     username = forms.CharField( label='用户名',
-                                min_length=6,
+                                min_length=5,
                                 max_length=20,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',

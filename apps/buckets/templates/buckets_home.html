@@ -17,8 +17,8 @@
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
                 <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
                 </button>
-                <button class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
-                <button class="btn btn-warning">清空存储桶</button>
+                <button class="btn btn-danger disabled" id="btn-del-bucket"><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
+                <button class="btn btn-warning disabled">清空存储桶</button>
             </div>
         </div>
         <div class="row" id="new-bucket-div" hidden>
@@ -41,17 +41,17 @@
         <div class="row">
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
                 {#存储桶列表#}
-                <table class="table table-bordered">
+                <table class="table table-hover">
                     <tr class="success">
-                        <th></th>
+                        <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                         <th>存储桶名称</th>
                         <th>集合名称</th>
                         <th>创建时间</th>
                         <th>所属用户</th>
                     </tr>
                     {% for bucket in buckets %}
-                        <tr class="">
-                            <td><input type="checkbox"></td>
+                        <tr class="active">
+                            <td><input type="checkbox" class="item-checkbox"></td>
                             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a
                                     href="{% url 'buckets:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
                             </td>
