@@ -1,5 +1,5 @@
 from django.shortcuts import render, reverse, redirect
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from django.db.models import Q as dQ
@@ -35,7 +35,7 @@ def file_list(request, bucket_name=None, path=None):
 
     content = get_content(request, bucket_name=bucket_name, path=path)
     content['form'] = form
-    return render(request, 'files.html', content)
+    return render(request, 'bucket.html', content)
 
 
 def get_content(request, bucket_name, path):
@@ -158,12 +158,10 @@ class BucketView(View):
     '''
     存储桶类视图
     '''
-
-
     def get(self, request):
         form = BucketForm()
         content = self.get_content(request=request, form=form)
-        return render(request, 'buckets.html', context=content)
+        return render(request, 'buckets_home.html', context=content)
 
 
     def post(self, request):
@@ -175,11 +173,22 @@ class BucketView(View):
             user = request.user
             collection_name = get_collection_name(username=user.username, bucket_name=bucket_name)
             Bucket(name=bucket_name, user=user, collection_name=collection_name).save()
+            # ajax请求
+            if request.is_ajax():
+                data = {
+                    'code': 200,
+                    'redirect_to': reverse('upload:bucket_view') # 前端重定向地址
+                }
+                return JsonResponse(data=data)
             return redirect(to=reverse('upload:bucket_view'))
 
         #表单验证有误
+        if request.is_ajax(): # ajax请求
+            data = {'code': 401, 'status': 'ERROR'}
+            data['error_text'] = form.errors.as_text()
+            return JsonResponse(data=data)
         content = self.get_content(request=request, form=form)
-        return render(request, 'buckets.html', context=content)
+        return render(request, 'buckets_home.html', context=content)
 
 
     def delete(self, request):

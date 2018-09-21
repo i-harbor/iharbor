@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+    存储桶列表
+{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" type="text/css" href="{% static 'upload/bucket.css' %}">
+{% endblock %}
+
+{% block boby %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+                <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
+                </button>
+                <button class="btn btn-danger"><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
+                <button class="btn btn-warning">清空存储桶</button>
+            </div>
+        </div>
+        <div class="row" id="new-bucket-div" hidden>
+            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+                {#文件上传表单#}
+                <form id="form-new-bucket" method="POST" action="{{ action_url }}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <p class="text-danger">{{ field.errors.as_text }}</p>
+                        {{ field.label_tag }} {{ field }}
+                    {% endfor %}
+                    <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
+                    <div class="clearfix"></div>
+                    <button type="submit" class="btn btn-primary pull-left">{{ submit_text }}</button>
+                </form>
+                <button class="btn btn-info pull-right" id="btn-cancel">取消</button>
+                {% block form_extend %}{% endblock %}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+                {#存储桶列表#}
+                <table class="table table-bordered">
+                    <tr class="success">
+                        <th></th>
+                        <th>存储桶名称</th>
+                        <th>集合名称</th>
+                        <th>创建时间</th>
+                        <th>所属用户</th>
+                    </tr>
+                    {% for bucket in buckets %}
+                        <tr class="">
+                            <td><input type="checkbox"></td>
+                            <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a
+                                    href="{% url 'upload:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
+                            </td>
+                            <td>{{ bucket.collection_name }}</td>
+                            <td>{{ bucket.created_time | date:"Y/m/d H:i:s" }}</td>
+                            <td>{{ bucket.user.username }}</td>
+{#                            <td><a class="btn btn-info" href="{% url 'upload:bucket_view' %}?bk={{ bucket.name }}">下载</a></td>#}
+{#                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'upload:delete' file.uuid %}">删除</a></td>#}
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script type="text/javascript" src="{% static 'upload/bucket-home.js' %}"></script>
+{% endblock %}
+

@@ -21,7 +21,7 @@ def register_user(request):
 
             #从定向到登陆界面，登陆通过后导航到next地址
             logout(request)#登出用户（确保当前没有用户登陆）
-            return redirect_to_login(next=reverse('bucket_view'), login_url=reverse('users:login'))
+            return redirect_to_login(next=reverse('upload:bucket_view'), login_url=reverse('users:login'))
     else:
         form = UserRegisterForm()
 

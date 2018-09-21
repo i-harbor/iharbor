@@ -27,7 +27,6 @@ connect(
     # password='pwd123',
     # authentication_source='admin'
 )
-connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
 ```
 
 ## 2 运行webserver
