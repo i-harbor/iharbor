@@ -1,5 +1,5 @@
 from django.shortcuts import render, reverse, redirect
-from django.http import Http404, JsonResponse
+from django.http import Http404, JsonResponse, QueryDict
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from django.db.models import Q as dQ
@@ -26,7 +26,7 @@ def file_list(request, bucket_name=None, path=None):
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
-            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name,
+            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name, cur_path=path,
                                                     action=FileSystemHandlerBackend.ACTION_STORAGE)
             file_handler.do_action()
             return redirect(reverse('buckets:file_list', kwargs={'bucket_name': bucket_name, 'path': path }))
@@ -192,7 +192,16 @@ class BucketView(View):
 
 
     def delete(self, request):
-        pass
+        '''删除存储桶'''
+        delete = QueryDict(request.body)
+        ids = delete.getlist('ids')
+        if ids:
+            Bucket.objects.filter(id__in=ids).delete()
+        data = {
+            'code': 200,
+            'code_text': '存储桶删除成功'
+        }
+        return JsonResponse(data=data)
 
 
     def get_content(self, request, form):

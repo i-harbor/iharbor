@@ -4,6 +4,8 @@ import uuid
 from django.conf import settings
 from django.http import FileResponse
 from mongoengine.context_managers import switch_collection
+from mongoengine.queryset.visitor import Q as mQ
+from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
 from .models import BucketFileInfo
 
@@ -18,7 +20,7 @@ class FileSystemHandlerBackend():
     ACTION_DOWNLOAD = 3 #下载
 
 
-    def __init__(self, request, action, bucket_name, id=None, *args, **kwargs):
+    def __init__(self, request, action, bucket_name, cur_path, id=None, *args, **kwargs):
         '''
         @ id:要操作的文件id,上传文件时参数id不需要传值
         @ action:操作类型
@@ -30,6 +32,7 @@ class FileSystemHandlerBackend():
         self.request = request
         self._action = action #处理方式
         self._collection_name = get_collection_name(self.request.user.username, bucket_name)
+        self.cur_path = cur_path
 
 
     def file_storage(self):
@@ -54,6 +57,9 @@ class FileSystemHandlerBackend():
             si=file_obj.size,
             # did=None#父节点id,属于存储桶根目录时
         )
+        p_id = self.get_cur_dir_id() # 父节点id
+        if p_id:
+            info.did = p_id
         info.switch_collection(self._collection_name)
         info.save()
         self.id = str(info.id)
@@ -162,7 +168,27 @@ class FileSystemHandlerBackend():
         '''获得当前用户存储桶Bucket对应集合名称'''
         return self._collection_name
 
+    def get_cur_dir_id(self, path=None):
+        '''
+        获得当前目录节点id
+        @ return: 正常返回path目录的id；未找到记录返回None，即参数有误
+        '''
+        path = path if path else self.cur_path
+        path = path.strip()
+        if path.endswith('/'):
+            path = path.rstrip('/')
+        if not path:
+            return None  # path参数有误
 
+        with switch_collection(BucketFileInfo, self.get_collection_name()):
+            try:
+                dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
+            except DoesNotExist as e:
+                raise e
+            except MultipleObjectsReturned as e:
+                raise e
+
+        return dir.id if dir else None  # None->未找到对应目录
 
 
 def get_collection_name(username, bucket_name):

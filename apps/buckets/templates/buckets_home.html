@@ -15,33 +15,34 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
-                <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
-                </button>
-                <button class="btn btn-danger disabled" id="btn-del-bucket"><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
-                <button class="btn btn-warning disabled">清空存储桶</button>
-            </div>
-        </div>
-        <div class="row" id="new-bucket-div" hidden>
-            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
-                {#文件上传表单#}
-                <form id="form-new-bucket" method="POST" action="{{ action_url }}" enctype="multipart/form-data">
+                <div>
+                    <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
+                    </button>
+                    <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" value="{% url 'buckets:bucket_view' %}"><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
+                    <button class="btn btn-warning disabled">清空存储桶</button>
                     {% csrf_token %}
-                    {% for field in form %}
-                        <p class="text-danger">{{ field.errors.as_text }}</p>
-                        {{ field.label_tag }} {{ field }}
-                    {% endfor %}
-                    <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
-                    <div class="clearfix"></div>
-                    <button type="submit" class="btn btn-primary pull-left">{{ submit_text }}</button>
-                </form>
-                <button class="btn btn-info pull-right" id="btn-cancel">取消</button>
-                {% block form_extend %}{% endblock %}
+                </div>
+                <div id="new-bucket-div" hidden>
+                    {#文件上传表单#}
+                    <form id="form-new-bucket" method="POST" action="{{ action_url }}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <p class="text-danger">{{ field.errors.as_text }}</p>
+                            {{ field.label_tag }} {{ field }}
+                        {% endfor %}
+                        <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
+                        <div class="clearfix"></div>
+                        <button type="submit" class="btn btn-primary pull-left">{{ submit_text }}</button>
+                    </form>
+                    <button class="btn btn-info pull-right" id="btn-cancel">取消</button>
+                    {% block form_extend %}{% endblock %}
+                </div>
             </div>
         </div>
         <div class="row">
             <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
                 {#存储桶列表#}
-                <table class="table table-hover">
+                <table class="table table-hover" id="bucket-table">
                     <tr class="success">
                         <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                         <th>存储桶名称</th>
@@ -50,8 +51,8 @@
                         <th>所属用户</th>
                     </tr>
                     {% for bucket in buckets %}
-                        <tr class="active">
-                            <td><input type="checkbox" class="item-checkbox"></td>
+                        <tr class="active" id="bucket-list-item">
+                            <td><input type="checkbox" class="item-checkbox" value="{{ bucket.pk }}"></td>
                             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a
                                     href="{% url 'buckets:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
                             </td>
