@@ -20,7 +20,7 @@ class FileSystemHandlerBackend():
     ACTION_DOWNLOAD = 3 #下载
 
 
-    def __init__(self, request, action, bucket_name, cur_path, id=None, *args, **kwargs):
+    def __init__(self, request, action, bucket_name, cur_path='', id=None, *args, **kwargs):
         '''
         @ id:要操作的文件id,上传文件时参数id不需要传值
         @ action:操作类型
@@ -184,7 +184,7 @@ class FileSystemHandlerBackend():
             try:
                 dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
             except DoesNotExist as e:
-                raise e
+                pass
             except MultipleObjectsReturned as e:
                 raise e
 

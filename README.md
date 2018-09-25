@@ -41,6 +41,5 @@ python manage.py migrate
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```python manage.py runserver 0.0.0.0:8000```   
 如果一切正常，打开浏览器输入url(主机IP:8000, 如：127.0.0.1：8000)即可查看站点;
-从网页上可以上传文件，上传的文件记录会展示在下方的表格，上传的文件保存在webserver工程根目录下的media/upload目录下，文件名已改为对应的UUID。
 
 

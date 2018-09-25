@@ -91,7 +91,7 @@ def get_cur_dir_id(path):
     try:
         dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
     except DoesNotExist as e:
-        raise e
+        pass
     except MultipleObjectsReturned as e:
         raise e
 

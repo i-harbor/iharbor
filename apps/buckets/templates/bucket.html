@@ -16,7 +16,7 @@
 {% block boby %}
 	<div class="container-fluid">
         <div class="row">
-            <div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+            <div class="col-sm-offset-1 col-xs-12 col-sm-10 file-list">
             {#目录导航栏#}
                 <div>
                     <div>
@@ -57,34 +57,46 @@
             </div>
         </div>
 		<div class="row">
-			<div class="col-sm-offset-2 col-xs-12 col-sm-8 file-list">
+			<div class="col-sm-offset-1 col-xs-12 col-sm-10 file-list table-responsive">
             {#文件列表#}
-                <table class="table table-hover">
+                <table class="table">
                     <tr class="success">
+                        <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                         <th>名称</th>
                         <th>上传时间</th>
                         <th>大小</th>
                         <th></th>
-                        <th></th>
                     </tr>
                     {% for file in files %}
-                        <tr class="">
+                        <tr class="bucket-files-table-item">
+                            <td><input type="checkbox" class="item-checkbox" value=""></td>
                             {% if file.fod %}{# 文件 #}
-                                <td><span class="glyphicon glyphicon-file"></span> {{ file.na | name_from_path }}</td>
+                                <td class="bucket-files-table-item"><span class="glyphicon glyphicon-file"></span> {{ file.na | name_from_path }}</td>
                                 <td>{{ file.ult | date:"Y/m/d h:m:s"  }}</td>
                                 <td>{{ file.si | format_size }}</td>
                             {% else %}
                                 <td>
                                     <span class="glyphicon glyphicon-folder-open"></span>
-                                    <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}"><strong>{{ file.na | name_from_path }}</strong></a>
+                                    <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}"><strong class="bucket-files-table-item">{{ file.na | name_from_path }}</strong></a>
                                 </td>
                                 <td>{{ file.ult | date:"Y/m/d H:i:s" }}</td>
                                 <td>--</td>
                             {% endif %}
-                            <td><a class="btn btn-info" id="file-item-download"
-                                   href="{% url 'buckets:download' id=file.id|to_str %}?bucket_name={{ bucket_name }}">下载</a></td>
-                            <td><a class="btn btn-danger" id="file-item-delete"
-                                   href="{% url 'buckets:delete' id=file.id|to_str %}?bucket_name={{ bucket_name }}">删除</a></td>
+                            <td>
+                                <li class="dropdown btn">
+                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                               aria-expanded="false">操作<span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        {% if not file.fod %}{# 目录 #}
+                                            <li class="btn-info"><a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}">打开</a></li>
+                                        {% endif %}
+                                        <li class="btn-success"><a id="file-item-download"
+                                               href="{% url 'buckets:download' id=file.id|to_str %}?bucket_name={{ bucket_name }}">下载</a></li>
+                                        <li class="btn-danger"><a id="file-item-delete"
+                                        href="{% url 'buckets:delete' id=file.id|to_str %}?bucket_name={{ bucket_name }}">删除</a></li>
+                                    </ul>
+                                </li>
+                            </td>
                         </tr>
 				    {% endfor %}
                 </table>
@@ -94,15 +106,5 @@
 {% endblock %}
 
 {% block script %}
-    <script>
-        $("#btn-upload-file").on("click",
-            function () {
-                $("#div-upload-file").show();
-            }
-        );
-
-        $("#btn-cancel").on("click", function () {
-            $("#div-upload-file").hide();
-        })
-    </script>
+    <script type="text/javascript" src="{% static 'buckets/bucket.js' %}"></script>
 {% endblock %}

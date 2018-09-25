@@ -10,6 +10,19 @@
     /*min-height: 600px;*/
 }
 
+.bucket-files-table-item {
+	overflow: hidden;
+	text-overflow:ellipsis;
+	white-space: nowrap;
+	/*word-wrap: break-word;*/
+	/*word-break: break-all;*/
+}
+
+.bucket-files-table-item:hover{
+	background-color: #97dffd;
+}
+
+
 .text_center {
 	text-align: center;
 }
@@ -28,10 +41,6 @@
 	background-color: #97dffd;
 }
 
-.blog-text {
-	word-wrap: break-word;
-	word-break: break-all;
-}
 
 div .blog-text img {
 	max-width: 100%;
