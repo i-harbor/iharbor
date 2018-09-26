@@ -40,9 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    # 第三方apps
+    'rest_framework',
+
     #自定义apps
     'buckets.apps.BucketsConfig',
-    'users.apps.UsersConfig'
+    'users.apps.UsersConfig',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -161,3 +165,10 @@ connect(
 #登陆url
 LOGIN_URL = '/users/login/'
 
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+            # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
+    ]
+}
