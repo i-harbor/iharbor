@@ -10,7 +10,7 @@ from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
 from .forms import UploadFileForm, BucketForm
 from .models import BucketFileInfo, Bucket
-from .utils import FileSystemHandlerBackend, get_collection_name
+from .utils import FileSystemHandlerBackend, get_collection_name, BucketFileManagement
 
 # Create your views here.
 
@@ -49,67 +49,17 @@ def get_content(request, bucket_name, path):
                                                             'bucket_name': bucket_name,
                                                             'path': path })
     content['bucket_name'] = bucket_name
+    bfm = BucketFileManagement(path=path)
     with switch_collection(BucketFileInfo, get_collection_name(username=request.user.username, bucket_name=bucket_name)):
-        if path:
-            # 获得当前目录节点id
-            cur_dir_id = get_cur_dir_id(path)
-            content['files'] = get_cur_dir_files(cur_dir_id)
+        ok, files = bfm.get_cur_dir_files()
+        if ok:
+            content['files'] = files
         else:
-            content['files'] = get_cur_dir_files(None)
-    for f in content['files']:
-        pass
-    content['path_links'] = get_dir_link_paths(path)
+            raise Http404('参数有误，未找到相关记录')
+    # for f in content['files']:
+    #     pass
+    content['path_links'] = bfm.get_dir_link_paths()
     return content
-
-
-def get_dir_link_paths(path):
-    '''
-    目录路径导航连接路径path
-    :return: {dir_name: dir_full_path}
-    '''
-    dir_link_paths = {}
-    if path == '':
-        return dir_link_paths
-    if path.endswith('/'):
-        path = path.rstrip('/')
-    dirs = path.split('/')
-    for i, key in enumerate(dirs):
-        dir_link_paths[key] = '/'.join(dirs[0:i+1])
-    return dir_link_paths
-
-
-def get_cur_dir_id(path):
-    '''
-    获得当前目录节点id
-    @ return: 正常返回path目录的id；未找到记录返回None，即参数有误
-    '''
-    path = path.strip()
-    if path.endswith('/'):
-        path = path.rstrip('/')
-    if not path:
-        return None # path参数有误
-    try:
-        dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
-    except DoesNotExist as e:
-        pass
-    except MultipleObjectsReturned as e:
-        raise e
-
-    return dir.id if dir else None  # None->未找到对应目录
-
-
-def get_cur_dir_files(cur_dir_id):
-    '''
-    获得当前目录下的文件或文件夹记录
-
-    :param cur_dir_id: 目录id;
-    :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
-    '''
-    if cur_dir_id:
-        files = BucketFileInfo.objects(did=cur_dir_id).all()
-    else:
-        files = BucketFileInfo.objects(did__exists=False).all()  # did不存在表示是存储桶下顶层目录
-    return files
 
 
 @login_required

@@ -2,8 +2,9 @@ from datetime import datetime
 
 from django.db import models
 from django.contrib.auth import get_user_model
-from mongoengine import DynamicDocument
+from mongoengine import DynamicDocument, EmbeddedDocument
 from mongoengine import fields
+from mongoengine.base.datastructures import EmbeddedDocumentList
 
 
 #获取用户模型
@@ -25,6 +26,18 @@ class Bucket(models.Model):
 		verbose_name_plural = verbose_name
 
 
+
+class FileChunkInfo(EmbeddedDocument):
+	'''
+	文件块信息模型
+	'''
+	bm = fields.IntField(required=True) # 文件块编号
+	uuid = fields.StringField(required=True) # 文件快唯一标识
+	md5 = fields.StringField(required=True, max_length=32, min_length=32) # 文件块MD5码
+	up = fields.BooleanField(default=False) # 文件快是否已上传完成，True->已上传完成
+
+
+
 class BucketFileInfo(DynamicDocument):
 	'''
 	存储桶bucket文件信息模型
@@ -44,6 +57,13 @@ class BucketFileInfo(DynamicDocument):
 	@ sst: share_start_time，允许共享且有时间限制，则sst为该文件的共享起始时间，若该doc代表目录，则sst为空;
 	@ set: share_end_time，  允许共享且有时间限制，则set为该文件的共享终止时间，若该doc代表目录，则set为空;
 	'''
+	# UPLOADING = 1
+	# COMPLETE = 2
+	# STATUS_CHOICES = (
+	# 	(UPLOADING, 'Incomplete'),
+	# 	(COMPLETE, 'Complete'),
+	# )
+
 	na = fields.StringField(required=True) # name,文件名或目录名
 	fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
 	did = fields.ObjectIdField() #父节点objectID字符串
@@ -59,6 +79,11 @@ class BucketFileInfo(DynamicDocument):
 	sst = fields.DateTimeField() # share_start_time, 该文件的共享起始时间
 	set = fields.DateTimeField() # share_end_time,该文件的共享终止时间
 
+	# fcc = fields.IntField()  # file chunk count 文件的文件块数量，为空或0表示此文件未分块或者此记录为目录
+	# fcil = fields.EmbeddedDocumentListField(FileChunkInfo) # FileChunkInfo列表，目录时fcil为空
+	# fst = fields.IntField(choices=STATUS_CHOICES, default=UPLOADING) # file status,标记文件状态
+	# fmd5 = fields.StringField(required=True, max_length=32, min_length=32)  # 文件MD5码
+
 	meta = {
 		#db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
 		'db_alias': 'default',
@@ -68,3 +93,10 @@ class BucketFileInfo(DynamicDocument):
 		# 'max_documents': 10000, #集合存储文档最大数量
 		# 'max_size': 2000000, #集合的最大字节数
 	}
+
+	# def get_fcil_manager(self):
+	# 	return EmbeddedDocumentList(list_items=self.fcil, instance=self, name='fcil')
+
+
+
+

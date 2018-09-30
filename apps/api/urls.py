@@ -7,7 +7,9 @@ from . import views
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet, base_name='user')
 router.register(r'buckets', views.BucketViewSet, base_name='bucket')
-
+router.register(r'upload', views.UploadFileViewSet, base_name='upload')
+router.register(r'delete', views.DeleteFileViewSet, base_name='delete')
+router.register(r'download', views.DownloadFileViewSet, base_name='download')
 
 urlpatterns = [
     # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),

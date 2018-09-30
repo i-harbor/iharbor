@@ -199,4 +199,146 @@ def get_collection_name(username, bucket_name):
     return f'{username}_{bucket_name}'
 
 
+class BucketFileManagement():
+    '''
+    存储桶相关的操作方法类
+    '''
+    def __init__(self, path='', *args, **kwargs):
+        self._path = path
+        self.cur_dir_id = None
 
+    def _hand_path(self, path):
+        '''去除path字符串两边可能的空白和/'''
+        return path.strip(' /')
+
+    def get_dir_link_paths(self, dir_path=None):
+        '''
+        目录路径导航连接路径path
+        :return: {dir_name: dir_full_path}
+        '''
+        dir_link_paths = {}
+        path = dir_path if dir_path  else self._path
+        if path == '':
+            return dir_link_paths
+        path = self._hand_path(path)
+        dirs = path.split('/')
+        for i, key in enumerate(dirs):
+            dir_link_paths[key] = '/'.join(dirs[0:i+1])
+        return dir_link_paths
+
+
+    def get_cur_dir_id(self, dir_path=None):
+        '''
+        获得当前目录节点id
+        @ return: (ok, id)，ok指示是否有错误(路径参数错误)
+            正常返回(True, path目录的id)；未找到记录返回(False, None)，即参数有误
+        '''
+        if self.cur_dir_id:
+            return (True, self.cur_dir_id)
+
+        path = dir_path if dir_path else self._path
+        # path为空，根目录为存储桶
+        if path == '':
+            return (True, None)
+
+        path = self._hand_path(path)
+        if not path:
+            return (False, None) # path参数有误
+
+        try:
+            dir = BucketFileInfo.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
+        except DoesNotExist as e:
+            return (False, None)  # path参数有误,未找到对应目录信息
+        except MultipleObjectsReturned as e:
+            raise e
+        if dir:
+            self.cur_dir_id = dir.id
+        return (True, self.cur_dir_id)  # None->未找到对应目录
+
+
+    def get_cur_dir_files(self, cur_dir_id=None):
+        '''
+        获得当前目录下的文件或文件夹记录
+
+        :param cur_dir_id: 目录id;
+        :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
+        '''
+        if cur_dir_id:
+            dir_id = cur_dir_id
+            return True, BucketFileInfo.objects(did=dir_id).all()
+
+        if self._path:
+            ok, dir_id = self.get_cur_dir_id()
+
+            # path路径有误
+            if not ok:
+                return False, None
+
+            if dir_id:
+                return True, BucketFileInfo.objects(did=dir_id).all()
+
+        #存储桶下文件目录
+        return True, BucketFileInfo.objects(did__exists=False).all()  # did不存在表示是存储桶下的文件目录
+
+    def get_file_exists(self, file_name):
+        '''
+        通过文件名获取当前目录下的文件信息
+        :param file_name:
+        :return: 如果存在返回文件记录，否则None
+        '''
+        ok, did = self.get_cur_dir_id()
+        if not ok:
+            return False, None
+
+        if did:
+            bfis = BucketFileInfo.objects(mQ(na=file_name) & mQ(did=did) & mQ(fod=True))# 目录下是否存在给定文件名的文件
+        else:
+            bfis = BucketFileInfo.objects(mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True))  # 存储桶下是否存在给定文件名的文件
+
+        bfi = bfis.first()
+
+        return True, bfi if bfi else None
+
+
+
+class FileStorage():
+    '''
+    基于文件系统的文件存储
+    '''
+    def __init__(self, file_id):
+        self._file_id = file_id
+
+    def write(self,chunk,     #要写入的文件块
+            chunk_size, # 文件块大小，字节数
+            offset = 0  # 数据写入偏移量
+            ):
+        if chunk.size != chunk_size:
+            return False
+
+        try:
+            with open(self._file_id, 'wb') as f:
+                f.seek(offset, 0) # 文件的开头作为移动字节的参考位置
+                for chunk in chunk.chunks():
+                    f.write(chunk)
+        except:
+            return False
+        return True
+
+    def read(self, read_size, offset=0):
+        # 检查文件是否存在
+        if not os.path.exists(self._file_id):
+            return False
+        try:
+            with open(self._file_id, 'rb') as f:
+                f.seek(offset, 0) # 文件的开头作为移动字节的参考位置
+                data = f.read(read_size)
+        except:
+            return False
+        return data
+
+    def size(self):
+        try:
+            fsize = os.path.getsize(self._file_id)
+        except FileNotFoundError:
+            return -1
+        return fsize
