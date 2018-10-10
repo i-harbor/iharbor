@@ -48,6 +48,7 @@ def get_content(request, bucket_name, path):
     content['action_url'] = reverse('buckets:file_list', kwargs={
                                                             'bucket_name': bucket_name,
                                                             'path': path })
+    content['ajax_upload_url'] = reverse('api:upload-list', kwargs={})
     content['bucket_name'] = bucket_name
     bfm = BucketFileManagement(path=path)
     with switch_collection(BucketFileInfo, get_collection_name(username=request.user.username, bucket_name=bucket_name)):

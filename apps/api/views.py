@@ -3,6 +3,7 @@ from mongoengine.context_managers import switch_collection
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
+from rest_framework.authentication import SessionAuthentication
 
 from buckets.utils import get_collection_name, FileStorage
 from .models import User, Bucket, BucketFileInfo
@@ -157,14 +158,14 @@ class UploadFileViewSet(viewsets.GenericViewSet):
     # serializer_class = serializers.BucketCreateSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.response_data, status=status.HTTP_201_CREATED)
 
 
     def update(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -181,6 +182,13 @@ class UploadFileViewSet(viewsets.GenericViewSet):
             return serializers.ChunkedUploadCreateSerializer
         return serializers.ChunkedUploadUpdateSerializer
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        context = super(UploadFileViewSet, self).get_serializer_context()
+        context['kwargs'] = self.kwargs
+        return context
 
 
 class DeleteFileViewSet(viewsets.GenericViewSet):
