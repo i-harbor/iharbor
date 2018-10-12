@@ -286,7 +286,9 @@ class BucketFileManagement():
         '''
         通过文件名获取当前目录下的文件信息
         :param file_name:
-        :return: 如果存在返回文件记录，否则None
+        :return:
+            第一个返回值表示是否有错去发生
+            第二个返回值，如果存在返回文件记录对象，否则None
         '''
         ok, did = self.get_cur_dir_id()
         if not ok:
@@ -300,6 +302,7 @@ class BucketFileManagement():
         bfi = bfis.first()
 
         return True, bfi if bfi else None
+
 
 
 

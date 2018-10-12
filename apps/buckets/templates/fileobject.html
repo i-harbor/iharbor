@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+	文件对象
+{%endblock%}
+
+
+{% block boby %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-offset-1 col-xs-12 col-sm-10">
+                {#目录导航栏#}
+                <div>
+                    <div>
+                        <a href="{% url 'buckets:bucket_view' %}">Home</a>
+                        {#                如果dir_links为空，现在在bucket根路径下#}
+                        {% if not path_links %}
+                            <span>></span>
+                            <span>{{ bucket_name }}</span>
+                        {% else %}
+                            <span>></span>
+                            <a href="{% url 'buckets:file_list' bucket_name=bucket_name path='' %}">{{ bucket_name }}</a>
+                            {% for dir_name, path in path_links.items %}
+                                <span>/</span>
+                                <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=path %}">{{ dir_name }}</a>
+                            {% endfor %}
+                        {% endif %}
+                        <hr/>
+                        <p><h3>{{ file.na }}</h3></p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>
+            <div class="col-sm-offset-1 col-xs-12 col-sm-10 file-list">
+                <div>
+                    <a class="btn btn-info" href="{{ object_link }}">下载</a>
+                </div>
+                {# 文件对象信息 #}
+                <hr/>
+                <div>
+                    <strong>文件标识ID</strong>
+                    <p>{{ file.id }}</p>
+                    <strong>文件名称</strong>
+                    <p>{{ file.na }}</p>
+                    <strong>文件大小</strong>
+                    <p>{{ file.si }}</p>
+                    <strong>创建日期</strong>
+                    <p>{{ file.ult | date:"Y/m/d H:i:s"}}</p>
+                    <strong>修改日期</strong>
+                    <p>{{ file.upt | default:file.ult | date:"Y/m/d H:i:s" }}</p>
+                    <strong>下载次数</strong>
+                    <p>{{ file.dlc | default:"0" }}</p>
+                    <strong>权限</strong>
+                    {% if file.sh %}
+                        <p>公开</p>
+                    {% else %}
+                        <p>私有</p>
+                    {% endif %}
+                    <strong>下载连接</strong>
+                    <p><a href="{{ object_link }}">{{ object_link }}</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -178,10 +178,66 @@ class FileView(View):
                 raise Http404('参数有误，未找到相关记录')
 
         content['path_links'] = bfm.get_dir_link_paths()
+        content['cur_path'] = path
         return content
 
     def check_user_own_bucket(self, request, bucket_name):
         # bucket是否属于当前用户
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
             raise Http404('您不存在一个存储桶'+ bucket_name)
+
+
+class FileObjectView(View):
+    '''
+    文件对象信息类视图
+    '''
+    def get(self, request, *args, **kwargs):
+        '''文件对象信息'''
+        bucket_name = kwargs.get('bucket_name')
+        path = kwargs.get('path')
+        object_name = kwargs.get('object_name')
+
+        bfm = BucketFileManagement(path=path)
+        content = {}
+        with switch_collection(BucketFileInfo,
+                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+            ok, file = bfm.get_file_exists(object_name)
+            if ok:
+                content['file'] = file
+            else:
+                raise Http404('参数有误，未找到相关记录')
+
+        content['bucket_name'] = bucket_name
+        content['path_links'] = bfm.get_dir_link_paths()
+        content['object_link'] = request.build_absolute_uri(reverse('buckets:get_object_view',
+                                         kwargs={'bucket_name': bucket_name, 'path': path, 'object_name': object_name}))
+        return render(request, 'fileobject.html', content)
+
+    def delete(self, request, *args, **kwargs):
+        '''删除文件对象'''
+        pass
+
+
+class GetFileObjectView(View):
+    '''
+    文件对象下载类视图
+    '''
+    def get(self, request, *args, **kwargs):
+        bucket_name = kwargs.get('bucket_name')
+        path = kwargs.get('path')
+        object_name = kwargs.get('object_name')
+
+        bfm = BucketFileManagement(path=path)
+        with switch_collection(BucketFileInfo,
+                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+            ok, file = bfm.get_file_exists(object_name)
+            if not ok or not file:
+                raise Http404('参数有误，未找到相关记录')
+
+            file_handler = FileSystemHandlerBackend(request, id=str(file.id), bucket_name=bucket_name,
+                                                    action=FileSystemHandlerBackend.ACTION_DOWNLOAD)
+            response = file_handler.do_action()
+            if not response:
+                raise Http404('要下载的文件不存在')
+        return response
 
