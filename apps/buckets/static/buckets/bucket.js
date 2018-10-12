@@ -24,7 +24,7 @@
         } else {
             $(this).parents('tr').removeClass('danger');
         }
-    })
+    });
 
 
     //
@@ -33,12 +33,27 @@
     function setProgressBar(obj_bar, width, hide=false){
         width = Math.floor(width);
         var $bar = $(obj_bar);
-        $bar.children().attr({"style": "min-width: 2em;width: " + width + "%;"});
-        if (hide)
+        percent = width + '%';
+        $bar.children().attr({"style": "min-width: 2em;width: " + percent + ";"});
+        $bar.children().text(percent);
+        if (hide === true)
             $bar.hide();
         else
             $bar.show();
     }
+
+    //
+    // 文件上传进度条
+    //
+    function fileUploadProgressBar(now, total, hide=false) {
+        var percent = 100 * now / total;
+        if (percent > 100) {
+            percent = 100;
+        }
+        setProgressBar($("#upload-progress-bar"), percent, hide);
+    }
+    fileUploadProgressBar(0, 1, true);
+
 
     //
     // 上传文件按钮
@@ -55,25 +70,12 @@
     $("#btn-cancel").on("click", function () {
         $("#div-upload-file>form>:file").val('');
         $("#div-upload-file").hide();
-    })
+    });
 
 
-    // function toByteArray(arr) {
-    //     var n = arr.length;
-    //     if (typeof(n) === 'undefined') {
-    //         // if IE 10+, arr is ArrayBuffer
-    //         n = arr.byteLength;
-    //         return new Uint8Array(arr, 0, n);
-    //     }
-    //     var b = new Uint8Array(n);
-    //     for (var i = 0; i < n; i++) {
-    //         b[i] = arr[i].charCodeAt(0);
-    //     }
-    //     arr = null;
-    //     return b;
-    // }
-
-
+    //
+    // 文件上传按钮点击事件处理
+    //
     function onUploadFile(e) {
         e.preventDefault();
         let $form = $("#div-upload-file>form").first();
@@ -99,7 +101,7 @@
         } else {
             alert('当前url有误');
         }
-        let csrfmiddlewaretoken = $("[name='csrfmiddlewaretoken']").first().val();
+        let csrfmiddlewaretoken = getCsrfMiddlewareToken();
         uploadFileCreate(url, bucket_name, dir_path, $file[0].files[0], csrfmiddlewaretoken);
     }
 
@@ -143,55 +145,52 @@
     }
 
     //
-    //文件上传
-    //
-    function uploadFile(put_url, bucket_name, dir_path, file, csrf_code, offset = 0) {
-        let file_size = file.size;
-        let chunk_size = 2 * 1024 * 1024;//2MB
-        let start = offset;
-        let end = start;
-        let res;
-        let $rogressbar = $("#upload-progress-bar");
-        for (; ;) {
-            if (start < file_size) {
-                if ((start + chunk_size) > file_size) {
-                    end = file_size;
-                } else {
-                    end = start + chunk_size;
-                }
-            } else if (start >= file_size) {
-                alert('文件上传完成');
-                break;
+    // 文件块结束字节偏移量
+    //-1: 文件上传完成
+    function get_file_chunk_end(offset, file_size, chunk_size) {
+        let end = null;
+        if (offset < file_size) {
+            if ((offset + chunk_size) > file_size) {
+                end = file_size;
+            } else {
+                end = offset + chunk_size;
             }
-            var chunk = file.slice(start, end);
-            console.log(chunk);
-            res = uploadFileChunk(put_url, bucket_name, offset = start, chunk = chunk, chunk_size = chunk.size);
-            console.log(res);
-            //文件块上传失败
-            if (!res.ok) {
-                alert('文件上传发生错误');
-                break;
-            }
-            start = end;
-            //进度条
-            var percent = 100 * end / file_size;
-            if (percent > 100) {
-                percent = 100;
-            }
-            setProgressBar($rogressbar, percent, true);
+        } else if (offset >= file_size) {
+            end = -1;
         }
+        return end
     }
 
     //
-    //上传一个文件数据块
+    //文件上传
     //
-    function uploadFileChunk(url, bucket_name, offset, chunk, chunk_size) {
+    function uploadFile(put_url, bucket_name, dir_path, file, csrf_code, offset = 0) {
+        // 断点续传记录检查
+
+        // 分片上传文件
+        uploadFileChunk(put_url, bucket_name, file, offset);
+    }
+
+    //
+    //分片上传文件
+    //
+    function uploadFileChunk(url, bucket_name, file, offset) {
+        let chunk_size = 2 * 1024 * 1024;//2MB
+        let end = get_file_chunk_end(offset, file.size, chunk_size);
+        //进度条
+        fileUploadProgressBar(offset, file.size);
+        if (end === -1){
+            //进度条
+            fileUploadProgressBar(0, 1, true);
+            return;
+        }
+        var chunk = file.slice(offset, end);
         var formData = new FormData();
         formData.append("bucket_name", bucket_name);
         formData.append("chunk_offset", offset);
         formData.append("chunk", chunk);
-        formData.append("chunk_size", chunk_size);
-        var res = null;
+        formData.append("chunk_size", chunk.size);
+
         $.ajax({
             url: url,
             type: "PUT",
@@ -205,14 +204,13 @@
                 }
             },
             success: function (data) {
-                res = {'ok': true, 'data': data};
+                offset = end;
+                uploadFileChunk(url, bucket_name, file, offset);
             },
             error: function (err) {
-                res = {'ok': false, 'data': err};
+                alert('上传文件发生错误');
             },
-            async: false
-        });
-        return res;
+        })
     }
 
     function getCsrfMiddlewareToken() {
@@ -222,11 +220,11 @@
 
 function getCookie(name) {
     var cookieValue = null;
-    if (document.cookie && document.cookie != '') {
+    if (document.cookie && document.cookie !== '') {
         var cookies = document.cookie.split(';');
         for (var i = 0; i < cookies.length; i++) {
             var cookie = jQuery.trim(cookies[i]);
-            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                 break;
             }

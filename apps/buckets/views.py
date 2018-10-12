@@ -14,54 +14,6 @@ from .utils import FileSystemHandlerBackend, get_collection_name, BucketFileMana
 
 # Create your views here.
 
-@login_required
-def file_list(request, bucket_name=None, path=None):
-    '''
-    文件列表函数视图
-    '''
-    # bucket是否属于当前用户
-    if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-        raise Http404('存储桶Bucket不存在')
-
-    if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name, cur_path=path,
-                                                    action=FileSystemHandlerBackend.ACTION_STORAGE)
-            file_handler.do_action()
-            return redirect(reverse('buckets:file_list', kwargs={'bucket_name': bucket_name, 'path': path }))
-    else:
-        form = UploadFileForm()
-
-    content = get_content(request, bucket_name=bucket_name, path=path)
-    content['form'] = form
-    return render(request, 'bucket.html', content)
-
-
-def get_content(request, bucket_name, path):
-    '''
-    要返回的内容
-    :return:
-    '''
-    content = {}
-    content['submit_text'] = '上传'
-    content['action_url'] = reverse('buckets:file_list', kwargs={
-                                                            'bucket_name': bucket_name,
-                                                            'path': path })
-    content['ajax_upload_url'] = reverse('api:upload-list', kwargs={})
-    content['bucket_name'] = bucket_name
-    bfm = BucketFileManagement(path=path)
-    with switch_collection(BucketFileInfo, get_collection_name(username=request.user.username, bucket_name=bucket_name)):
-        ok, files = bfm.get_cur_dir_files()
-        if ok:
-            content['files'] = files
-        else:
-            raise Http404('参数有误，未找到相关记录')
-    # for f in content['files']:
-    #     pass
-    content['path_links'] = bfm.get_dir_link_paths()
-    return content
-
 
 @login_required
 def download(request, id=None):
@@ -163,4 +115,73 @@ class BucketView(View):
         content['buckets'] = Bucket.objects.filter(user=request.user).all()
         return content
 
+
+class FileView(View):
+    '''
+    存储桶文件类视图
+    '''
+    def get(self, request, *args, **kwargs):
+        '''
+        文件列表函数视图
+        '''
+        bucket_name = kwargs.get('bucket_name')
+        path = kwargs.get('path')
+
+        # bucket是否属于当前用户
+        self.check_user_own_bucket(request, bucket_name)
+
+        content = self.get_content(request, bucket_name=bucket_name, path=path)
+        content['form'] = UploadFileForm()
+        return render(request, 'bucket.html', content)
+
+    def post(self, request, *args, **kwargs):
+        '''
+        文件上传表单提交
+        '''
+        bucket_name = kwargs.get('bucket_name')
+        path = kwargs.get('path')
+
+        # bucket是否属于当前用户
+        self.check_user_own_bucket(request, bucket_name)
+
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name, cur_path=path,
+                                                    action=FileSystemHandlerBackend.ACTION_STORAGE)
+            file_handler.do_action()
+            return redirect(reverse('buckets:file_list', kwargs={'bucket_name': bucket_name, 'path': path}))
+
+        content = self.get_content(request, bucket_name=bucket_name, path=path)
+        content['form'] = form
+        return render(request, 'bucket.html', content)
+
+
+    def get_content(self, request, bucket_name, path):
+        '''
+        要返回的内容
+        :return:
+        '''
+        content = {}
+        content['submit_text'] = '上传'
+        content['action_url'] = reverse('buckets:file_list', kwargs={
+            'bucket_name': bucket_name,
+            'path': path})
+        content['ajax_upload_url'] = reverse('api:upload-list', kwargs={})
+        content['bucket_name'] = bucket_name
+        bfm = BucketFileManagement(path=path)
+        with switch_collection(BucketFileInfo,
+                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+            ok, files = bfm.get_cur_dir_files()
+            if ok:
+                content['files'] = files
+            else:
+                raise Http404('参数有误，未找到相关记录')
+
+        content['path_links'] = bfm.get_dir_link_paths()
+        return content
+
+    def check_user_own_bucket(self, request, bucket_name):
+        # bucket是否属于当前用户
+        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
+            raise Http404('您不存在一个存储桶'+ bucket_name)
 

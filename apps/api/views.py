@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.authentication import SessionAuthentication
 
-from buckets.utils import get_collection_name, FileStorage
+from buckets.utils import get_collection_name
+from utils.storagers import FileStorage
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
 
@@ -251,7 +252,7 @@ class DownloadFileViewSet(viewsets.GenericViewSet):
             if not bfi:
                 return Response({'id': '未找到id对应文件'}, status=status.HTTP_404_NOT_FOUND)
 
-        # 存储文件块
+        # 读文件块
         fstorage = FileStorage(str(bfi.id))
         chunk = fstorage.read(chunk_size, offset=chunk_offset)
 

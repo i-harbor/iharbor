@@ -7,8 +7,9 @@ from rest_framework import serializers
 from mongoengine.context_managers import switch_collection
 from rest_framework.exceptions import APIException
 
-from buckets.utils import BucketFileManagement, get_collection_name, FileStorage
-from .models import User, Bucket, BucketFileInfo, FileChunkInfo
+from buckets.utils import BucketFileManagement, get_collection_name
+from .models import User, Bucket, BucketFileInfo
+from utils.storagers import FileStorage
 
 
 class UserDeitalSerializer(serializers.ModelSerializer):
@@ -110,11 +111,11 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
 
         with switch_collection(BucketFileInfo, _collection_name):
             if bfinfo:
-                bfinfo.si = 1 # 文件大小
+                bfinfo.si = 0 # 文件大小
             else:
                 bfinfo = BucketFileInfo(na=file_name,# 文件名
                                         fod = True, # 文件
-                                        si = 1 )# 文件大小
+                                        si = 0 )# 文件大小
                 # 有父节点
                 if did:
                     bfinfo.did = ObjectId(did)
