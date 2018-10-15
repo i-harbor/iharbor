@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block boby %}
+    <div class="col-sm-2">
+        <ul class="nav nav-pills nav-stacked">
+            <li role="presentation" class="active">
+            <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
+                <h5>对象存储<span class="glyphicon glyphicon-chevron-down right"></span></h5>
+            </li>
+            <ul class="nav nav-pills nav-stacked bg-info" id="oos-nav-list-group">
+                <li><a href="{% url 'buckets:bucket_view' %}">存储桶</a></li>
+                <li><a>预留</a></li>
+            </ul>
+            </li>
+            <li role="presentation">
+            <li class="nav-list-toggle" data-toggle="collapse" data-target="#cloud-nav-list-group">
+                <h5>云主机<span class="glyphicon glyphicon-chevron-down right"></span></h5>
+            </li>
+            <ul class="nav nav-pills nav-stacked bg-info" id="cloud-nav-list-group">
+                <li><a>预留</a></li>
+                <li><a>预留</a></li>
+            </ul>
+            </li>
+            <li role="presentation">
+            <li class="nav-list-toggle" data-toggle="collapse" data-target="#vpn-nav-list-group">
+                <h5>VPN<span class="glyphicon glyphicon-chevron-down right"></span></h5>
+            </li>
+            <ul class="nav nav-pills nav-stacked bg-info" id="vpn-nav-list-group">
+                <li><a>预留</a></li>
+                <li><a>预留</a></li>
+            </ul>
+            </li>
+        </ul>
+    </div>
+    <div class="col-sm-10">
+        {% block content %}{% endblock %}
+    </div>
+{% endblock %}

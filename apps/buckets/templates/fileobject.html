@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_with_sidebar.html" %}
 {% load static %}
 {# 加载自定义过滤器 #}
 {% load custom_filters %}
@@ -8,10 +8,10 @@
 {%endblock%}
 
 
-{% block boby %}
+{% block content %}
     <div class="container-fluid">
         <div class="row">
-            <div class="col-sm-offset-1 col-xs-12 col-sm-10">
+            <div class="col-xs-12 col-sm-12">
                 {#目录导航栏#}
                 <div>
                     <div>
@@ -34,7 +34,7 @@
                 </div>
             </div>
             <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>
-            <div class="col-sm-offset-1 col-xs-12 col-sm-10 file-list">
+            <div class="col-xs-12 col-sm-12">
                 <div>
                     <a class="btn btn-info" href="{{ object_link }}">下载</a>
                 </div>

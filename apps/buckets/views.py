@@ -78,7 +78,11 @@ class BucketView(View):
         delete = QueryDict(request.body)
         ids = delete.getlist('ids')
         if ids:
-            Bucket.objects.filter(id__in=ids).delete()
+            buckets = Bucket.objects.filter(id__in=ids)
+            for bucket in buckets:
+                with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
+                    BucketFileInfo.drop_collection()
+            buckets.delete()
         data = {
             'code': 200,
             'code_text': '存储桶删除成功'
@@ -219,4 +223,5 @@ class GetFileObjectView(View):
             if not response:
                 raise Http404('要下载的文件不存在')
         return response
+
 

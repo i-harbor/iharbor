@@ -60,35 +60,44 @@
     //
     $("#btn-upload-file").on("click",
         function () {
-            $("#div-upload-file").show();
+            // $("#div-upload-file").show();
+            (async function getImage () {
+                const {value: file} = await swal({
+                    title: 'Select image',
+                    input: 'file',
+                    showCancelButton: true,
+                    inputAttributes: {
+                        'accept': 'image/*',
+                        'aria-label': 'Upload your profile picture'
+                    }
+                });
+                if (file) {
+                    const reader = new FileReader;
+                    reader.onload = (e) => {
+                        uploadOneFile(file);//上传文件
+                    };
+                    reader.readAsDataURL(file);
+                }
+                else if(file === null){
+                    swal("没有选择文件，请先选择一个文件");
+                }
+            })();
         }
     );
 
+
     //
-    // 取消上传文件按钮
+    // 关闭上传文件表单
     //
     $("#btn-cancel").on("click", function () {
         $("#div-upload-file>form>:file").val('');
         $("#div-upload-file").hide();
     });
 
-
     //
-    // 文件上传按钮点击事件处理
+    // 从当前路径url中获取存储桶名和目录路径
     //
-    function onUploadFile(e) {
-        e.preventDefault();
-        let $form = $("#div-upload-file>form").first();
-        let url = $form.attr('ajax_upload_url');
-        if (!url) {
-            alert('获取文件上传url失败，请刷新网页后重试');
-            return;
-        }
-        let $file = $form.children(":file");
-        if (!$file.val()) {
-            alert('请先选择上传的文件');
-            return;
-        }
+    function get_bucket_name_and_path_from_location_path(){
         let pathname = window.location.pathname;
         let bucket_name = '';
         let dir_path = '';
@@ -101,8 +110,56 @@
         } else {
             alert('当前url有误');
         }
+        return {
+            'bucket_name': bucket_name,
+            'dir_path': dir_path
+        }
+    }
+
+
+    //
+    // 上传一个文件
+    //
+    function uploadOneFile(file) {
+        let $form = $("#div-upload-file>form").first();
+        let url = $form.attr('ajax_upload_url');
+        if (!url) {
+            alert('获取文件上传url失败，请刷新网页后重试');
+            return;
+        }
+        let obj = get_bucket_name_and_path_from_location_path();
+        let bucket_name = obj.bucket_name;
+        let dir_path = obj.dir_path;
+
         let csrfmiddlewaretoken = getCsrfMiddlewareToken();
-        uploadFileCreate(url, bucket_name, dir_path, $file[0].files[0], csrfmiddlewaretoken);
+        uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
+    }
+
+    //
+    // 文件上传按钮点击事件处理
+    //
+    function onUploadFile(e) {
+        e.preventDefault();
+        let $form = $("#div-upload-file>form").first();
+        let url = $form.attr('ajax_upload_url');
+        if (!url) {
+            alert('获取文件上传url失败，请刷新网页后重试');
+            return;
+        }
+
+        let $file = $form.children(":file");
+        if (!$file.val()) {
+            alert('请先选择上传的文件');
+            return;
+        }
+        let file = $file[0].files[0];
+
+        let obj = get_bucket_name_and_path_from_location_path();
+        let bucket_name = obj.bucket_name;
+        let dir_path = obj.dir_path;
+
+        let csrfmiddlewaretoken = getCsrfMiddlewareToken();
+        uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
     }
 
 
