@@ -3,7 +3,7 @@ from mongoengine.context_managers import switch_collection
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.versioning import URLPathVersioning
 
 from buckets.utils import get_collection_name
 from utils.storagers import FileStorage
@@ -21,8 +21,7 @@ class IsSuperUser(BasePermission):
 
 
 
-class UserViewSet( mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
+class UserViewSet( mixins.RetrieveModelMixin,
                    mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):

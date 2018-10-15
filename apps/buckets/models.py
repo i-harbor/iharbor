@@ -16,10 +16,18 @@ class Bucket(models.Model):
 	'''
 	存储桶bucket类
 	'''
+	PUBLIC = 1
+	PRIVATE = 2
+	ACCESS_PERMISSION_CHOICES = (
+		(PUBLIC, '私有'),
+		(PRIVATE, '公有'),
+	)
+
 	name = models.CharField(max_length=50, db_index=True, unique=True, verbose_name='bucket名称')#bucket名称唯一
 	user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
 	created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
 	collection_name = models.CharField(max_length=50, verbose_name='存储桶对应的集合表名')
+	access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
 
 	class Meta:
 		verbose_name = '存储桶'

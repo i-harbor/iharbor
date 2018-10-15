@@ -148,7 +148,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
             raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(username=request.user.username, bucket_name=bucket_name)
+        _collection_name = get_collection_name(bucket_name=bucket_name)
         with switch_collection(BucketFileInfo, _collection_name):
             bfm = BucketFileManagement(path=dir_path)
             # 当前目录下是否已存在同文件名文件
@@ -209,7 +209,7 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
             raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(username=request.user.username, bucket_name=bucket_name)
+        _collection_name = get_collection_name(bucket_name=bucket_name)
         with switch_collection(BucketFileInfo, _collection_name):
             bfi = BucketFileInfo.objects(id=file_id).first()
             if not bfi:
@@ -247,7 +247,7 @@ class FileDeleteSerializer(serializers.Serializer):
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
             raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(username=request.user.username, bucket_name=bucket_name)
+        _collection_name = get_collection_name(bucket_name=bucket_name)
         data['_collection_name'] = _collection_name
 
         return data
@@ -291,7 +291,7 @@ class FileDownloadSerializer(serializers.Serializer):
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
             raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(username=request.user.username, bucket_name=bucket_name)
+        _collection_name = get_collection_name(bucket_name=bucket_name)
         data['_collection_name'] = _collection_name
 
         return data

@@ -47,9 +47,9 @@
                     <tr class="success">
                         <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                         <th>存储桶名称</th>
-                        <th>集合名称</th>
                         <th>创建时间</th>
                         <th>所属用户</th>
+                        <th>访问权限</th>
                     </tr>
                     {% for bucket in buckets %}
                         <tr class="active" id="bucket-list-item">
@@ -57,11 +57,9 @@
                             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a
                                     href="{% url 'buckets:file_list' bucket_name=bucket.name path='' %}">{{ bucket.name }}</a>
                             </td>
-                            <td>{{ bucket.collection_name }}</td>
                             <td>{{ bucket.created_time | date:"Y/m/d H:i:s" }}</td>
                             <td>{{ bucket.user.username }}</td>
-{#                            <td><a class="btn btn-info" href="{% url 'buckets:bucket_view' %}?bk={{ bucket.name }}">下载</a></td>#}
-{#                            <td><a class="btn btn-danger" id="file-item-delete" href="{% url 'buckets:delete' file.uuid %}">删除</a></td>#}
+                            <td>{{ bucket.get_access_permission_display }}</td>
                         </tr>
                     {% endfor %}
                 </table>

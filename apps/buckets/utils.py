@@ -31,7 +31,7 @@ class FileSystemHandlerBackend():
         self.base_dir = os.path.join(settings.MEDIA_ROOT, 'upload')
         self.request = request
         self._action = action #处理方式
-        self._collection_name = get_collection_name(self.request.user.username, bucket_name)
+        self._collection_name = get_collection_name(bucket_name)
         self.cur_path = cur_path
 
 
@@ -191,12 +191,12 @@ class FileSystemHandlerBackend():
         return dir.id if dir else None  # None->未找到对应目录
 
 
-def get_collection_name(username, bucket_name):
+def get_collection_name(bucket_name):
     '''
     获得当前用户存储桶Bucket对应集合名称
     每个存储桶对应的集合表名==用户名_存储桶名称
     '''
-    return f'{username}_{bucket_name}'
+    return f'bucket_{bucket_name}'
 
 
 class BucketFileManagement():

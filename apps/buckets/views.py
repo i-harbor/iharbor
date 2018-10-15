@@ -14,27 +14,6 @@ from .utils import FileSystemHandlerBackend, get_collection_name, BucketFileMana
 
 # Create your views here.
 
-
-@login_required
-def download(request, id=None):
-    '''
-    下载文件函数视图
-    '''
-    if request.method == 'GET':
-        #获取要下载的文件的uuid
-        file_id = id
-        bucket_name = request.GET.get('bucket_name', None)
-        if not file_id or not bucket_name:
-            raise Http404('要下载的文件不存在')
-
-        file_handler = FileSystemHandlerBackend(request, id=file_id, bucket_name=bucket_name,
-                                                action=FileSystemHandlerBackend.ACTION_DOWNLOAD)
-        response = file_handler.do_action()
-        if not response:
-            raise Http404('要下载的文件不存在')
-        return response
-
-
 @login_required
 def delete(request, id=None):
     '''
@@ -74,7 +53,7 @@ class BucketView(View):
             #创建存储桶bucket
             bucket_name = form.cleaned_data['name']
             user = request.user
-            collection_name = get_collection_name(username=user.username, bucket_name=bucket_name)
+            collection_name = get_collection_name(bucket_name=bucket_name)
             Bucket(name=bucket_name, user=user, collection_name=collection_name).save()
             # ajax请求
             if request.is_ajax():
@@ -166,11 +145,11 @@ class FileView(View):
         content['action_url'] = reverse('buckets:file_list', kwargs={
             'bucket_name': bucket_name,
             'path': path})
-        content['ajax_upload_url'] = reverse('api:upload-list', kwargs={})
+        content['ajax_upload_url'] = reverse('api:upload-list', kwargs={'version': 'v1'})
         content['bucket_name'] = bucket_name
         bfm = BucketFileManagement(path=path)
         with switch_collection(BucketFileInfo,
-                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+                               get_collection_name(bucket_name=bucket_name)):
             ok, files = bfm.get_cur_dir_files()
             if ok:
                 content['files'] = files
@@ -200,7 +179,7 @@ class FileObjectView(View):
         bfm = BucketFileManagement(path=path)
         content = {}
         with switch_collection(BucketFileInfo,
-                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+                               get_collection_name(bucket_name=bucket_name)):
             ok, file = bfm.get_file_exists(object_name)
             if ok:
                 content['file'] = file
@@ -229,7 +208,7 @@ class GetFileObjectView(View):
 
         bfm = BucketFileManagement(path=path)
         with switch_collection(BucketFileInfo,
-                               get_collection_name(username=request.user.username, bucket_name=bucket_name)):
+                               get_collection_name(bucket_name=bucket_name)):
             ok, file = bfm.get_file_exists(object_name)
             if not ok or not file:
                 raise Http404('参数有误，未找到相关记录')

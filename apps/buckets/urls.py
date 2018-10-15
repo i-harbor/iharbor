@@ -11,7 +11,6 @@ urlpatterns = [
     url(r'^get/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)/(?P<object_name>.*)', login_required(
         views.GetFileObjectView.as_view()), name='get_object_view'),
     url(r'^$', login_required(views.BucketView.as_view()), name='bucket_view'),
-    url(r'^download/(?P<id>[\w-]{24,32})/', views.download, name='download'),
     url(r'^delete/(?P<id>[\w-]{24,32})/', views.delete, name='delete'),
 ]
 

@@ -5,11 +5,11 @@ from . import views
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()
-router.register(r'users', views.UserViewSet, base_name='user')
-router.register(r'buckets', views.BucketViewSet, base_name='bucket')
-router.register(r'upload', views.UploadFileViewSet, base_name='upload')
-router.register(r'delete', views.DeleteFileViewSet, base_name='delete')
-router.register(r'download', views.DownloadFileViewSet, base_name='download')
+router.register(r'(?P<version>(v1|v2))/users', views.UserViewSet, base_name='user')
+router.register(r'(?P<version>(v1|v2))/bucket', views.BucketViewSet, base_name='bucket')
+router.register(r'(?P<version>(v1|v2))/upload', views.UploadFileViewSet, base_name='upload')
+router.register(r'(?P<version>(v1|v2))/delete', views.DeleteFileViewSet, base_name='delete')
+router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
 
 urlpatterns = [
     # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),
