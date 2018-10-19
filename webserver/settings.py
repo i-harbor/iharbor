@@ -21,9 +21,6 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'tbfpk*ax#48#^_qzr-cg07&z9&+8j68=x41w5lzv^wsv7xax=v'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -81,17 +78,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'webserver.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/1.11/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'db.sqlite3',
-    }
-}
-
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
 
@@ -147,21 +133,6 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True #True：关闭浏览器，则Cookie失效
 AUTH_USER_MODEL = 'users.UserProfile'
 
 
-#mongodb数据库连接
-from mongoengine import connect
-
-connect(
-    alias='default',
-    db='metadata',
-    host='10.0.86.213',
-    port=27017,
-    # username='root',
-    # password='pwd123',
-    # authentication_source='admin'
-)
-# connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
-
-
 #登陆url
 LOGIN_URL = '/users/login/'
 
@@ -169,7 +140,7 @@ REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
     'DEFAULT_PERMISSION_CLASSES': [
-            # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
+        # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.BasicAuthentication',
@@ -182,3 +153,45 @@ REST_FRAMEWORK = {
     'ALLOWED_VERSIONS': ('v1', ),
     'VERSION_PARAM': 'version',
 }
+
+# Ceph rados settings
+CEPH_RADOS = {
+    'CLUSTER_NAME': 'ceph',
+    'USER_NAME': 'client.objstore',
+    'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
+    'POOL_NAME': 'objstore',
+    'RADOS_DLL_PATH': 'rados.so'
+}
+
+# 导入安全相关的settings
+from .security_settings import *
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = 'tbfpk*ax#48#^_qzr-cg07&z9&+8j68=x41w5lzv^wsv7xax=v'
+
+# # Database
+# # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
+#
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': 'db.sqlite3',
+#     }
+# }
+
+#mongodb数据库连接
+# from mongoengine import connect
+#
+# connect(
+#     alias='default',
+#     db='metadata',
+#     host='10.0.86.213',
+#     port=27017,
+#     # username='root',
+#     # password='pwd123',
+#     # authentication_source='admin'
+# )
+# connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
+
+
+

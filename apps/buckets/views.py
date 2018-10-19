@@ -59,6 +59,8 @@ class BucketView(View):
             if request.is_ajax():
                 data = {
                     'code': 200,
+                    'code_text': '创建存储桶“{0}”成功'.format(bucket_name),
+                    'bucket_name': bucket_name,
                     'redirect_to': reverse('buckets:bucket_view') # 前端重定向地址
                 }
                 return JsonResponse(data=data)
@@ -80,9 +82,10 @@ class BucketView(View):
         if ids:
             buckets = Bucket.objects.filter(id__in=ids)
             for bucket in buckets:
-                with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
-                    BucketFileInfo.drop_collection()
-            buckets.delete()
+                # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
+                #     BucketFileInfo.drop_collection()
+                bucket.do_soft_delete() # 软删除
+
         data = {
             'code': 200,
             'code_text': '存储桶删除成功'
@@ -95,7 +98,7 @@ class BucketView(View):
         content['submit_text'] = '创建'
         content['action_url'] = reverse('buckets:bucket_view')
         content['form'] = form
-        content['buckets'] = Bucket.objects.filter(user=request.user).all()
+        content['buckets'] = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all()
         return content
 
 

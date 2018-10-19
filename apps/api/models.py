@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from buckets.models import Bucket, BucketFileInfo, FileChunkInfo
+from buckets.models import Bucket, BucketFileInfo
 
 # Create your models here.
 

@@ -4,4 +4,5 @@
 *.sqlite3
 *__pycache__/
 /media/
+/webserver/security_settings.py
 

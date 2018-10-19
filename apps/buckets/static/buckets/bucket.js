@@ -59,29 +59,28 @@
     // 上传文件按钮
     //
     $("#btn-upload-file").on("click",
-        function () {
+        async function () {
             // $("#div-upload-file").show();
-            (async function getImage () {
-                const {value: file} = await swal({
-                    title: 'Select image',
-                    input: 'file',
-                    showCancelButton: true,
-                    inputAttributes: {
-                        'accept': 'image/*',
-                        'aria-label': 'Upload your profile picture'
-                    }
-                });
-                if (file) {
-                    const reader = new FileReader;
-                    reader.onload = (e) => {
-                        uploadOneFile(file);//上传文件
-                    };
-                    reader.readAsDataURL(file);
+
+            const {value: file} = await swal({
+                title: 'Select image',
+                input: 'file',
+                showCancelButton: true,
+                inputAttributes: {
+                    'accept': 'image/*',
+                    'aria-label': 'Upload your profile picture'
                 }
-                else if(file === null){
-                    swal("没有选择文件，请先选择一个文件");
-                }
-            })();
+            });
+            if (file) {
+                const reader = new FileReader;
+                reader.onload = (e) => {
+                    uploadOneFile(file);//上传文件
+                };
+                reader.readAsDataURL(file);
+            }
+            else if(file === null){
+                swal("没有选择文件，请先选择一个文件");
+            }
         }
     );
 
@@ -265,7 +264,7 @@
                 uploadFileChunk(url, bucket_name, file, offset);
             },
             error: function (err) {
-                alert('上传文件发生错误');
+                alert('上传文件发生错误，上传文件可能不完整，请重新上传');
             },
         })
     }
