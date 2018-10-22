@@ -94,9 +94,9 @@
                                             <li class="btn-info"><a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}">打开</a></li>
                                         {% endif %}
                                         <li class="btn-success"><a id="file-item-download"
-                                               href="{% url 'buckets:get_object_view' bucket_name=bucket_name path=cur_path object_name=file.na %}?bucket_name={{ bucket_name }}">下载</a></li>
-                                        <li class="btn-danger"><a id="file-item-delete"
-                                        href="{% url 'buckets:delete' id=file.id|to_str %}?bucket_name={{ bucket_name }}">删除</a></li>
+                                               href="{% url 'buckets:get_object_view' bucket_name=bucket_name path=cur_path object_name=file.na %}">下载</a></li>
+                                        <li class="btn-danger"><a id="file-item-delete" href="#"
+                                         file-delete-url="{% url 'buckets:object_view' bucket_name=bucket_name path=cur_path object_name=file.na %}">删除</a></li>
                                     </ul>
                                 </li>
                             </td>

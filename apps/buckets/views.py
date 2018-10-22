@@ -14,27 +14,6 @@ from .utils import FileSystemHandlerBackend, get_collection_name, BucketFileMana
 
 # Create your views here.
 
-@login_required
-def delete(request, id=None):
-    '''
-    删除文件函数视图
-    '''
-    if request.method == 'GET':
-        #获取要下载的文件的uuid
-        file_id = id
-        bucket_name = request.GET.get('bucket_name', None)
-        if not file_id or not bucket_name:
-            raise Http404('要下载的文件不存在')
-        path = request.GET.get('path', '')
-        file_handler = FileSystemHandlerBackend(request, id=file_id, bucket_name=bucket_name,
-                                                action=FileSystemHandlerBackend.ACTION_DELETE)
-        if not file_handler.do_action():
-            raise Http404('要删除的文件不存在')
-        return redirect(to=request.META.get('HTTP_REFERER', reverse('buckets:file_list', kwargs={'bucket_name': bucket_name,
-                                                                                                'path': path
-                                                                                                })))
-
-
 
 class BucketView(View):
     '''
@@ -185,14 +164,10 @@ class FileObjectView(View):
 
         bfm = BucketFileManagement(path=path)
         content = {}
-        with switch_collection(BucketFileInfo,
-                               get_collection_name(bucket_name=bucket_name)):
-            ok, file = bfm.get_file_exists(object_name)
-            if ok:
-                content['file'] = file
-            else:
-                raise Http404('参数有误，未找到相关记录')
-
+        file = self.get_file_obj(bfm, bucket_name, object_name)
+        if not file:
+            raise Http404('文件不存在')
+        content['file'] = file
         content['bucket_name'] = bucket_name
         content['path_links'] = bfm.get_dir_link_paths()
         content['object_link'] = request.build_absolute_uri(reverse('buckets:get_object_view',
@@ -201,7 +176,43 @@ class FileObjectView(View):
 
     def delete(self, request, *args, **kwargs):
         '''删除文件对象'''
-        pass
+        bucket_name = kwargs.get('bucket_name')
+        path = kwargs.get('path')
+        object_name = kwargs.get('object_name')
+
+        bfm = BucketFileManagement(path=path)
+        file = self.get_file_obj(bfm, bucket_name, object_name)
+        if file:
+            # do rados delete object
+            file.switch_collection(get_collection_name(bucket_name=bucket_name))
+            file.delete()
+            data = {
+                'code': 200,
+                'code_text': '文件删除成功'
+            }
+        else:
+            data = {
+                'code': 404,
+                'code_text': '文件不存在'
+            }
+        return JsonResponse(data=data)
+
+    def get_file_obj(self, bfm, bucket_name, object_name):
+        '''
+        获取文件对象
+        :param bucket_name: 存储桶名
+        :param path: 目录路径
+        :param object_name: 对象名
+        :return:
+            文件存在：文件对象BucketFileInfo
+            不存在：None
+        '''
+        with switch_collection(BucketFileInfo,
+                               get_collection_name(bucket_name=bucket_name)):
+            ok, file = bfm.get_file_exists(object_name)
+            if ok:
+                return file
+        raise None
 
 
 class GetFileObjectView(View):

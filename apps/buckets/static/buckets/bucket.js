@@ -185,7 +185,6 @@
             contentType: false,
             processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
             success: function (data) {
-                console.log(data);
                 if (data.id) {
                     let put_url = url + data.id + '/';
                     uploadFile(put_url, bucket_name, dir_path, file, csrf_code);
@@ -194,7 +193,6 @@
                 }
             },
             error: function (err) {
-                console.log(err);
                 alert('创建文件对象失败');
             }
         });
@@ -271,6 +269,79 @@
 
     function getCsrfMiddlewareToken() {
         return $("[name='csrfmiddlewaretoken']").first().val();
+    }
+
+    //
+    // 删除文件对象点击时间处理
+    //
+    $("[id=file-item-delete]").on("click", function (e) {
+        e.preventDefault();
+
+        const swalWithBootstrapButtons = swal.mixin({
+            confirmButtonClass: 'btn btn-success',
+            cancelButtonClass: 'btn btn-danger',
+            buttonsStyling: false,
+        });
+
+        swalWithBootstrapButtons({
+            title: '确认删除?',
+            text: "文件将会被删除!",
+            type: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '删除',
+            cancelButtonText: '取消',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.value) {
+                let url = $(this).attr('file-delete-url');
+                let ret = delete_file_object(url);
+                if(ret){
+                    swalWithBootstrapButtons(
+                    '已删除!',
+                    '您选择的文件已经被删除',
+                    'success'
+                    )
+                }else{
+                    swal('删除文件失败！');
+                }
+            } else if (result.dismiss === swal.DismissReason.cancel) {// Read more about handling dismissals
+                swalWithBootstrapButtons(
+                    '取消',
+                    '您已取消删除文件 :)',
+                    'error'
+                )
+            }
+        })
+    });
+
+    //
+    // 删除一个文件对象(ajax)
+    //
+    function delete_file_object(url) {
+        let result = false;
+        $.ajax({
+            url: url,
+            type: "DELETE",
+            timeout: 10000,
+            async: false,
+            beforeSend: function (xhr, settings) {//set csrf cookie
+                var csrftoken = getCookie('csrftoken');
+                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                }
+            },
+            success: function (data) {
+                if (data.code === 200) {
+                    result = true;
+                } else {
+                    result = false;
+                }
+            },
+            error: function (err) {
+                result = false;
+            }
+        });
+        return result;
     }
 }());
 
