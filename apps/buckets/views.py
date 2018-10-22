@@ -228,3 +228,9 @@ class GetFileObjectView(View):
         return response
 
 
+class DirectoryView(View):
+    '''
+    目录类视图
+    '''
+    def post(self, request, *args, **kwargs):
+        pass

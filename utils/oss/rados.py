@@ -6,6 +6,11 @@ from django.conf import settings
 
 rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', ''))
 
+# Return type for rados_dll interfaces.
+class BaseReturnType(ctypes.Structure):
+    _fields_ = [('ok', ctypes.c_bool),('data', ctypes.c_char_p)]
+
+
 class CephRadosObject():
     '''
     文件对象读写接口
@@ -25,23 +30,22 @@ class CephRadosObject():
 
         :param offset: 偏移位置
         :param size: 读取长度
-        :return:
-            正常时：bytes
-            错误时：None
+        :return: Tuple
+            正常时：(True, bytes) bytes是读取的数据
+            错误时：(False, bytes) bytes是错误描述
         '''
         if offset < 0 or size < 0:
             return None
 
-        bytes_read, ret = self._rados_dll.FromObj(self._cluster_name,
+        self._rados_dll.FromObj.restype = BaseReturnType  # declare the expected type returned
+        result = self._rados_dll.FromObj(self._cluster_name,
                                           self._user_name,
                                           self._conf_file,
                                           self._pool_name,
                                           size,
                                           self._obj_id,
-                                          offset)  # return. type:bytes
-        if ret < 0:
-            return None
-        return bytes_read
+                                          offset)
+        return (result.ok, result.data)
 
     def write(self, offset, data_block):
         '''
@@ -49,77 +53,75 @@ class CephRadosObject():
 
         :param offset: 偏移量
         :param data_block: 数据块
-        :return:
-            正常时：写入的数据长度
-            错误时：None
+        :return: Tuple
+            正常时：(True, bytes) bytes是正常结果描述
+            错误时：(False, bytes) bytes是错误描述
         '''
         if offset < 0 or not isinstance(data_block, bytes):
             return None
 
-        result = self._rados_dll.WriteToObj(self._cluster_name,
+        self._rados_dll.ToObj.restype = BaseReturnType # declare the expected type returned
+        result = self._rados_dll.ToObj(self._cluster_name,
                                            self._user_name,
                                            self._conf_file,
                                            self._pool_name,
-                                           self._obj_id, data_block, offset)  # return. type:bytes
-        if result < 0:
-            return None
-        return result
+                                           self._obj_id, data_block, 'w', offset)
+        return (result.ok, result.data)
 
     def overwrite(self, data_block):
         '''
-        重写对象，创建新对象并写入数据块，如果对象已存在，会删除就对象
+        重写对象，创建新对象并写入数据块，如果对象已存在，会删除旧对象
 
         :param data_block: 数据块
-        :return:
-            正常时：写入的数据长度
-            错误时：None
+        :return: Tuple
+            正常时：(True, bytes) bytes是正常结果描述
+            错误时：(False, bytes) bytes是错误描述
         '''
         if not isinstance(data_block, bytes):
             return None
 
-        result = self._rados_dll.WriteFullToObj(self._cluster_name,
+        self._rados_dll.ToObj.restype = BaseReturnType  # declare the expected type returned
+        result = self._rados_dll.ToObj(self._cluster_name,
                                                self._user_name,
                                                self._conf_file,
                                                self._pool_name,
-                                               self._obj_id, data_block)  # return. type:bytes
-        # if not result:
-        #     return None
-        return result
+                                               self._obj_id, 'wf', data_block)
+        return (result.ok, result.data)
 
     def append(self, data_block):
         '''
         向对象追加数据
 
         :param data_block: 数据块
-        :return:
-            正常时：写入的数据长度
-            错误时：-1
+        :return: Tuple
+            正常时：(True, bytes) bytes是正常结果描述
+            错误时：(False, bytes) bytes是错误描述
         '''
         if not isinstance(data_block, bytes):
             return None
 
-        result = self._rados_dll.AppendToObj(self._cluster_name,
+        self._rados_dll.ToObj.restype = BaseReturnType  # declare the expected type returned
+        result = self._rados_dll.ToObj(self._cluster_name,
                                            self._user_name,
                                            self._conf_file,
                                            self._pool_name,
-                                           self._obj_id, data_block)  # return. type:bytes
-        if result < 0:
-            return -1
-        return result
+                                           self._obj_id, 'wa',data_block)
+        return (result.ok, result.data)
 
     def delete(self):
         '''
         删除对象
-        :return:
+        :return: Tuple
+            成功时：(True, bytes) bytes是成功结果描述
+            错误时：(False, bytes) bytes是错误描述
         '''
+        self._rados_dll.DelObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.DelObj(self._cluster_name,
                                        self._user_name,
                                        self._conf_file,
                                        self._pool_name,
-                                       self._obj_id)  # return. type:bytes
-        if result < 0:
-            return False
-        return True
+                                       self._obj_id)
+        return (result.ok, result.data)
 
     def read_iterator(self, offset=0, block_size=2*1024**2):
         '''
@@ -127,8 +129,8 @@ class CephRadosObject():
         '''
         offset = offset
         while True:
-            data_block = self.read(offset=offset, size=block_size)
-            if data_block:
+            ok, data_block = self.read(offset=offset, size=block_size)
+            if ok and data_block:
                 offset = offset + data_block.size
                 yield data_block
             else:
