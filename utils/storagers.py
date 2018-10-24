@@ -58,3 +58,27 @@ class FileStorage():
         except FileNotFoundError:
             pass
 
+    def get_file_generator(self, chunk_size=2*1024*1024):
+            '''
+            获取读取文件生成器
+            :param chunk_size: 每次迭代返回的数据块大小，type: int
+            :return:
+                success: a generator function to read file
+                error: None
+            '''
+            if chunk_size <= 0:
+                chunk_size = 2 * 1024 * 1024 #2MB
+
+            # 文件是否存在
+            if not os.path.exists(self._file_absolute_path):
+                return None
+
+            def file_generator(size=chunk_size):
+                with open(self._file_absolute_path, 'rb') as f:
+                    while True:
+                        chunk = f.read(size)
+                        if chunk:
+                            yield chunk
+                        else:
+                            break
+            return file_generator

@@ -1,5 +1,5 @@
 from django.shortcuts import render, reverse, redirect
-from django.http import Http404, JsonResponse, QueryDict
+from django.http import Http404, JsonResponse, QueryDict, FileResponse
 from django.contrib.auth.decorators import login_required
 from django.views import View
 from django.db.models import Q as dQ
@@ -10,7 +10,8 @@ from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
 from .forms import UploadFileForm, BucketForm
 from .models import BucketFileInfo, Bucket
-from .utils import FileSystemHandlerBackend, get_collection_name, BucketFileManagement
+from .utils import get_collection_name, BucketFileManagement
+from utils.storagers import FileStorage
 
 # Create your views here.
 
@@ -97,27 +98,6 @@ class FileView(View):
 
         content = self.get_content(request, bucket_name=bucket_name, path=path)
         content['form'] = UploadFileForm()
-        return render(request, 'bucket.html', content)
-
-    def post(self, request, *args, **kwargs):
-        '''
-        文件上传表单提交
-        '''
-        bucket_name = kwargs.get('bucket_name')
-        path = kwargs.get('path')
-
-        # bucket是否属于当前用户
-        self.check_user_own_bucket(request, bucket_name)
-
-        form = UploadFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            file_handler = FileSystemHandlerBackend(request, bucket_name=bucket_name, cur_path=path,
-                                                    action=FileSystemHandlerBackend.ACTION_STORAGE)
-            file_handler.do_action()
-            return redirect(reverse('buckets:file_list', kwargs={'bucket_name': bucket_name, 'path': path}))
-
-        content = self.get_content(request, bucket_name=bucket_name, path=path)
-        content['form'] = form
         return render(request, 'bucket.html', content)
 
 
@@ -231,11 +211,29 @@ class GetFileObjectView(View):
             if not ok or not file:
                 raise Http404('参数有误，未找到相关记录')
 
-            file_handler = FileSystemHandlerBackend(request, id=str(file.id), bucket_name=bucket_name,
-                                                    action=FileSystemHandlerBackend.ACTION_DOWNLOAD)
-            response = file_handler.do_action()
+            response = self.get_file_download_response(str(file.id), file.na)
             if not response:
                 raise Http404('要下载的文件不存在')
+        return response
+
+    def get_file_download_response(self, file_id, filename):
+        '''
+        获取文件下载返回对象
+        :param file_id: 文件Id, type: str
+        :filename: 文件名， type: str
+        :return:
+            success：http返回对象，type: dict；
+            error: None
+        '''
+        fs = FileStorage(file_id)
+        file_generator = fs.get_file_generator()
+        if not file_generator:
+            return None
+
+        # response = StreamingHttpResponse(file_read_iterator(full_path_filename))
+        response = FileResponse(file_generator())
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Disposition'] = f'attachment;filename="{filename}"'  # 注意filename 这个是下载后的名字
         return response
 
 

@@ -146,7 +146,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
+            raise serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
 
         _collection_name = get_collection_name(bucket_name=bucket_name)
         with switch_collection(BucketFileInfo, _collection_name):
@@ -155,7 +155,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
             ok, finfo = bfm.get_file_exists(file_name)
             #
             if not ok:
-                raise serializers.ValidationError(detail={'dir_path': '路径有误，路径不存在'})
+                raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
 
             if finfo:
                 # 同名文件覆盖上传
@@ -167,7 +167,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
                     fs = FileStorage(str(finfo.id))
                     fs.delete()
                 else:
-                    raise serializers.ValidationError(detail={'file_name': '已存在同名文件'})
+                    raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
 
             _, did = bfm.get_cur_dir_id()
             data['_did'] = did

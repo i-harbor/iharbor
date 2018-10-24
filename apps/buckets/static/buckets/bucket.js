@@ -86,14 +86,6 @@
 
 
     //
-    // 关闭上传文件表单
-    //
-    $("#btn-cancel").on("click", function () {
-        $("#div-upload-file>form>:file").val('');
-        $("#div-upload-file").hide();
-    });
-
-    //
     // 从当前路径url中获取存储桶名和目录路径
     //
     function get_bucket_name_and_path_from_location_path(){
@@ -134,35 +126,32 @@
         uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
     }
 
+    // //
+    // // 文件上传按钮点击事件处理
+    // //
+    // function onUploadFile(e) {
+    //     e.preventDefault();
+    //     let $form = $("#div-upload-file>form").first();
+    //     let url = $form.attr('ajax_upload_url');
+    //     if (!url) {
+    //         alert('获取文件上传url失败，请刷新网页后重试');
+    //         return;
+    //     }
     //
-    // 文件上传按钮点击事件处理
+    //     let $file = $form.children(":file");
+    //     if (!$file.val()) {
+    //         alert('请先选择上传的文件');
+    //         return;
+    //     }
+    //     let file = $file[0].files[0];
     //
-    function onUploadFile(e) {
-        e.preventDefault();
-        let $form = $("#div-upload-file>form").first();
-        let url = $form.attr('ajax_upload_url');
-        if (!url) {
-            alert('获取文件上传url失败，请刷新网页后重试');
-            return;
-        }
-
-        let $file = $form.children(":file");
-        if (!$file.val()) {
-            alert('请先选择上传的文件');
-            return;
-        }
-        let file = $file[0].files[0];
-
-        let obj = get_bucket_name_and_path_from_location_path();
-        let bucket_name = obj.bucket_name;
-        let dir_path = obj.dir_path;
-
-        let csrfmiddlewaretoken = getCsrfMiddlewareToken();
-        uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
-    }
-
-
-    $('#upload_submit').on('click', onUploadFile);
+    //     let obj = get_bucket_name_and_path_from_location_path();
+    //     let bucket_name = obj.bucket_name;
+    //     let dir_path = obj.dir_path;
+    //
+    //     let csrfmiddlewaretoken = getCsrfMiddlewareToken();
+    //     uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
+    // }
 
 
     //
@@ -175,7 +164,7 @@
         formData.append("file_name", file.name);
         formData.append("file_size", file.size);
         formData.append("file_md5", file_md5);
-        formData.append("overwrite", true);
+        formData.append("overwrite", false);
         formData.append("csrfmiddlewaretoken", csrf_code);
 
         $.ajax({
@@ -189,11 +178,11 @@
                     let put_url = url + data.id + '/';
                     uploadFile(put_url, bucket_name, dir_path, file, csrf_code);
                 } else {
-                    alert('创建文件对象失败');
+                    swal('创建文件对象失败');
                 }
             },
             error: function (err) {
-                alert('创建文件对象失败');
+                swal('创建文件对象失败,'+ err.responseJSON.error_text);
             }
         });
     }
@@ -233,9 +222,18 @@
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
         fileUploadProgressBar(offset, file.size);
+
+        //文件上传完成
         if (end === -1){
             //进度条
             fileUploadProgressBar(0, 1, true);
+            swal({
+                position: 'top-end',
+                type: 'success',
+                title: '文件已成功上传',
+                showConfirmButton: false,
+                timer: 1500
+            });
             return;
         }
         var chunk = file.slice(offset, end);
@@ -272,7 +270,7 @@
     }
 
     //
-    // 删除文件对象点击时间处理
+    // 删除文件对象点击事件处理
     //
     $("[id=file-item-delete]").on("click", function (e) {
         e.preventDefault();
@@ -300,7 +298,8 @@
                     '已删除!',
                     '您选择的文件已经被删除',
                     'success'
-                    )
+                    );
+                    $(this).parents(".bucket-files-table-item")[0].remove();
                 }else{
                     swal('删除文件失败！');
                 }

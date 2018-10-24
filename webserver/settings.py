@@ -187,8 +187,8 @@ from .security_settings import *
 #     db='metadata',
 #     host='10.0.86.213',
 #     port=27017,
-#     # username='root',
-#     # password='pwd123',
+#     # username='***',
+#     # password='***',
 #     # authentication_source='admin'
 # )
 # connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
