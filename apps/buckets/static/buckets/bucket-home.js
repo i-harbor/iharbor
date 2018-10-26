@@ -1,28 +1,39 @@
 ;(function() {
+    $form_new_bucket = $('#form-new-bucket');
     //
     // 创建新存储桶表单异步提交
     //
-    $form_new_bucket = $('#form-new-bucket');
-    $form_new_bucket.on('submit', function (event) {
-        event.preventDefault();
-        $.ajax({
-            url: $form_new_bucket.attr('action'),
-            type: 'post',
-            data: $form_new_bucket.serialize(),
-            success: function (data) {
-                if (data.code === 200)
-                    location.href = data.redirect_to;//创建成功跳转
-                else
-                    $('#tip_text').text(data.error_text);
-            },
-            error: function (err) {
-                $('#tip_text').text(err.status+':'+err.statusText);
-            },
-            headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
-            clearForm: false,//禁止清除表单
-            resetForm: false //禁止重置表单
-        });
-    });
+    // $form_new_bucket.on('submit', function (event) {
+    //     event.preventDefault();
+    //     $.ajax({
+    //         url: $form_new_bucket.attr('action'),
+    //         type: 'post',
+    //         data: $form_new_bucket.serialize(),
+    //         success: function (data) {
+    //             if (data.code === 200)
+    //                 location.href = data.redirect_to;//创建成功跳转
+    //             else
+    //                 $('#tip_text').text(data.error_text);
+    //         },
+    //         error: function (err) {
+    //             $('#tip_text').text(err.status+':'+err.statusText);
+    //         },
+    //         headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
+    //         clearForm: false,//禁止清除表单
+    //         resetForm: false //禁止重置表单
+    //     });
+    // });
+
+
+    //
+    // 创建存储桶按钮
+    //
+    $("#btn-new-bucket").on("click",
+        function () {
+            // $("#new-bucket-div").show();//
+            on_create_bucket();//对话框方式
+        }
+    );
 
     //
     //form 表单获取所有数据 封装方法
@@ -49,7 +60,7 @@
     //
     function on_create_bucket(){
         swal({
-            title: '请输入一个新的存储桶名称',
+            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小字写)、数字和-',
             input: 'text',
             inputAttributes: {
                 autocapitalize: 'off'
@@ -98,29 +109,20 @@
                 }
              },
             (error) => {
-                swal(`Request failed:发生错误，创建失败！`);
+                swal(`3Request failed:发生错误，创建失败！`);
             }
         )
     }
 
-    //
-    // 创建存储桶按钮
-    //
-    $("#btn-new-bucket").on("click",
-        function () {
-            // $("#new-bucket-div").show();//
-            on_create_bucket();//对话框方式
-        }
-    );
 
     //
     // 取消创建存储桶按钮
     //
-    $("#btn-cancel").on("click", function () {
-        $("#form-new-bucket input[name='name']").val('');
-        $('#tip_text').text('');
-        $("#new-bucket-div").hide();
-    })
+    // $("#btn-cancel").on("click", function () {
+    //     $("#form-new-bucket input[name='name']").val('');
+    //     $('#tip_text').text('');
+    //     $("#new-bucket-div").hide();
+    // });
 
 
     //
@@ -178,45 +180,56 @@
     //
     $('#btn-del-bucket').click(function () {
         if(!is_exists_checked()){
-            alert('请先选择要删除的存储桶');
+            show_warning_dialog('请先选择要删除的存储桶');
             return;
         }
-        if(!confirm("确认删除选中的存储桶？"))
-            return;
-        //获取选中的存储桶的id
-        var arr = new Array();
-        let bucket_list_checked = $("#bucket-table #bucket-list-item :checkbox:checked");
-        bucket_list_checked.each(function (i) {
-            arr[i] = $(this).val();
-        });
+        swal({
+            title: '确认删除选中的存储桶？',
+            text: "此操作是不可逆的",
+            type: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: '删除',
+            cancelButtonText: '取消'
+        }).then((result) => {
+            if (result.value) {
+                //获取选中的存储桶的id
+                var arr = new Array();
+                let bucket_list_checked = $("#bucket-table #bucket-list-item :checkbox:checked");
+                bucket_list_checked.each(function (i) {
+                    arr[i] = $(this).val();
+                });
 
-        let csrf_code = $(':input[name=csrfmiddlewaretoken]').val();
-        if (arr.length > 0){
-            $.ajax({
-                url: $(this).val(),
-                type: 'delete',
-                data: {
-                    'ids': arr,// 存储桶id数组
-                },
-                traditional: true,//传递数组时需要设为true
-                success: function (data) {
-                    if (data.code === 200) {
-                        bucket_list_checked.parents('tr').remove();
-                        alert('已删除:' + data.code_text);
-                    }
-                    else
-                        alert('删除失败:' + data.error_text);
-                },
-                error: function (err) {
-                    alert('删除失败，' + err.status + ':' + err.statusText);
-                },
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': csrf_code,
-                },
-            })
-        }
-    })
+                let csrf_code = $(':input[name=csrfmiddlewaretoken]').val();
+                if (arr.length > 0) {
+                    $.ajax({
+                        url: $(this).val(),
+                        type: 'delete',
+                        data: {
+                            'ids': arr,// 存储桶id数组
+                        },
+                        traditional: true,//传递数组时需要设为true
+                        success: function (data) {
+                            if (data.code === 200) {
+                                bucket_list_checked.parents('tr').remove();
+                                show_auto_close_warning_dialog('已删除:' + data.code_text, 'error', 'top-end');
+                            }
+                            else
+                                show_auto_close_warning_dialog('删除失败,' + data.error_text, 'error');
+                        },
+                        error: function (err) {
+                            show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
+                        },
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': csrf_code,
+                        },
+                    })
+                }
+            }
+        });
+    });
 })();
 
 

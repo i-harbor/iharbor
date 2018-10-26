@@ -5,4 +5,5 @@
 *__pycache__/
 /media/
 /webserver/security_settings.py
+*.so
 

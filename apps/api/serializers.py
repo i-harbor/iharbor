@@ -10,6 +10,7 @@ from rest_framework.exceptions import APIException
 from buckets.utils import BucketFileManagement, get_collection_name
 from .models import User, Bucket, BucketFileInfo
 from utils.storagers import FileStorage
+from utils.oss.rados_interfaces import CephRadosObject
 
 
 class UserDeitalSerializer(serializers.ModelSerializer):
@@ -216,8 +217,11 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(detail={'id': '文件id有误，未找到文件'})
 
              # 存储文件块
-            fstorage = FileStorage(str(bfi.id))
-            if fstorage.write(chunk, chunk_size, offset=chunk_offset):
+            # fstorage = FileStorage(str(bfi.id))
+            # if fstorage.write(chunk, chunk_size, offset=chunk_offset):
+            rados = CephRadosObject(str(bfi.id))
+            ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
+            if ok:
                 # 更新文件修改时间
                 bfi.upt = datetime.utcnow()
                 bfi.si = max(chunk_offset+chunk.size, bfi.si if bfi.si else 0) # 更新文件大小（只增不减）

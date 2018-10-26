@@ -2,12 +2,12 @@
 
 {% block boby %}
     <div class="col-sm-2">
-        <ul class="nav nav-pills nav-stacked">
+        <ul class="nav nav-tabs nav-stacked">
             <li role="presentation" class="active">
             <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
                 <h5>对象存储<span class="glyphicon glyphicon-chevron-down right"></span></h5>
             </li>
-            <ul class="nav nav-pills nav-stacked bg-info" id="oos-nav-list-group">
+            <ul class="nav nav-pills nav-stacked bg-info collapse in" id="oos-nav-list-group">
                 <li><a href="{% url 'buckets:bucket_view' %}">存储桶</a></li>
                 <li><a>预留</a></li>
             </ul>
@@ -16,7 +16,7 @@
             <li class="nav-list-toggle" data-toggle="collapse" data-target="#cloud-nav-list-group">
                 <h5>云主机<span class="glyphicon glyphicon-chevron-down right"></span></h5>
             </li>
-            <ul class="nav nav-pills nav-stacked bg-info" id="cloud-nav-list-group">
+            <ul class="nav nav-pills nav-stacked bg-info collapse" id="cloud-nav-list-group">
                 <li><a>预留</a></li>
                 <li><a>预留</a></li>
             </ul>
@@ -25,7 +25,7 @@
             <li class="nav-list-toggle" data-toggle="collapse" data-target="#vpn-nav-list-group">
                 <h5>VPN<span class="glyphicon glyphicon-chevron-down right"></span></h5>
             </li>
-            <ul class="nav nav-pills nav-stacked bg-info" id="vpn-nav-list-group">
+            <ul class="nav nav-pills nav-stacked bg-info collapse" id="vpn-nav-list-group">
                 <li><a>预留</a></li>
                 <li><a>预留</a></li>
             </ul>

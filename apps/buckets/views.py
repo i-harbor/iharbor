@@ -12,6 +12,7 @@ from .forms import UploadFileForm, BucketForm
 from .models import BucketFileInfo, Bucket
 from .utils import get_collection_name, BucketFileManagement
 from utils.storagers import FileStorage
+from utils.oss.rados_interfaces import CephRadosObject
 
 # Create your views here.
 
@@ -163,13 +164,22 @@ class FileObjectView(View):
         bfm = BucketFileManagement(path=path)
         file = self.get_file_obj(bfm, bucket_name, object_name)
         if file:
-            # do rados delete object
-            file.switch_collection(get_collection_name(bucket_name=bucket_name))
-            file.delete()
-            data = {
-                'code': 200,
-                'code_text': '文件删除成功'
-            }
+            # ceph中删除文件对象数据
+            cro = CephRadosObject(str(file.id))
+            ok, data = cro.delete()
+            if ok:
+                # 删除文件对象信息
+                file.switch_collection(get_collection_name(bucket_name=bucket_name))
+                file.delete()
+                data = {
+                    'code': 200,
+                    'code_text': '文件删除成功'
+                }
+            else:
+                data = {
+                    'code': 500,
+                    'code_text': '删除文件对象错误'
+                }
         else:
             data = {
                 'code': 404,
@@ -212,6 +222,7 @@ class GetFileObjectView(View):
                 raise Http404('参数有误，未找到相关记录')
 
             response = self.get_file_download_response(str(file.id), file.na)
+            # response = self.get_file_download_response("5bd16ba246ab4cb98b953ea2", file.na)
             if not response:
                 raise Http404('要下载的文件不存在')
         return response
@@ -225,21 +236,16 @@ class GetFileObjectView(View):
             success：http返回对象，type: dict；
             error: None
         '''
-        fs = FileStorage(file_id)
-        file_generator = fs.get_file_generator()
+        # fs = FileStorage(file_id)
+        # file_generator = fs.get_file_generator()
+        cro = CephRadosObject(file_id)
+        file_generator = cro.read_obj_generator
         if not file_generator:
             return None
 
         # response = StreamingHttpResponse(file_read_iterator(full_path_filename))
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment;filename="{filename}"'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
         return response
 
-
-class DirectoryView(View):
-    '''
-    目录类视图
-    '''
-    def post(self, request, *args, **kwargs):
-        pass

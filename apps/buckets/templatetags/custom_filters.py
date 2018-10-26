@@ -1,3 +1,5 @@
+import math
+
 from django import template
 from django.template.defaultfilters import stringfilter
 
@@ -30,7 +32,7 @@ def format_size(size):
     :return:
     '''
     if 0 <= size < 1024**3:
-        return f'{round(size/1024)} KB'
+        return f'{math.ceil(size/1024)} KB'
     elif size < 1024**4:
         return f'{(size/(1024**3)):.4} GB'
     else:

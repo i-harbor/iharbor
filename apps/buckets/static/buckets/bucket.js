@@ -63,12 +63,12 @@
             // $("#div-upload-file").show();
 
             const {value: file} = await swal({
-                title: 'Select image',
+                title: '选择文件',
                 input: 'file',
                 showCancelButton: true,
                 inputAttributes: {
-                    'accept': 'image/*',
-                    'aria-label': 'Upload your profile picture'
+                    'accept': '*',
+                    'aria-label': 'Upload your select file'
                 }
             });
             if (file) {
@@ -79,7 +79,7 @@
                 reader.readAsDataURL(file);
             }
             else if(file === null){
-                swal("没有选择文件，请先选择一个文件");
+                show_warning_dialog("没有选择文件，请先选择一个文件");
             }
         }
     );
@@ -99,7 +99,7 @@
             l.splice(0, 2);
             dir_path = l.join('/');
         } else {
-            alert('当前url有误');
+            show_warning_dialog('当前url有误');
         }
         return {
             'bucket_name': bucket_name,
@@ -115,7 +115,7 @@
         let $form = $("#div-upload-file>form").first();
         let url = $form.attr('ajax_upload_url');
         if (!url) {
-            alert('获取文件上传url失败，请刷新网页后重试');
+            show_warning_dialog('获取文件上传url失败，请刷新网页后重试');
             return;
         }
         let obj = get_bucket_name_and_path_from_location_path();
@@ -178,11 +178,11 @@
                     let put_url = url + data.id + '/';
                     uploadFile(put_url, bucket_name, dir_path, file, csrf_code);
                 } else {
-                    swal('创建文件对象失败');
+                    show_warning_dialog('创建文件对象失败');
                 }
             },
             error: function (err) {
-                swal('创建文件对象失败,'+ err.responseJSON.error_text);
+                show_warning_dialog('创建文件对象失败,'+ err.responseJSON.error_text);
             }
         });
     }
@@ -227,13 +227,7 @@
         if (end === -1){
             //进度条
             fileUploadProgressBar(0, 1, true);
-            swal({
-                position: 'top-end',
-                type: 'success',
-                title: '文件已成功上传',
-                showConfirmButton: false,
-                timer: 1500
-            });
+            show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
             return;
         }
         var chunk = file.slice(offset, end);
@@ -260,7 +254,7 @@
                 uploadFileChunk(url, bucket_name, file, offset);
             },
             error: function (err) {
-                alert('上传文件发生错误，上传文件可能不完整，请重新上传');
+                show_warning_dialog('上传文件发生错误，上传文件可能不完整，请重新上传');
             },
         })
     }
@@ -292,17 +286,14 @@
         }).then((result) => {
             if (result.value) {
                 let url = $(this).attr('file-delete-url');
-                let ret = delete_file_object(url);
-                if(ret){
+                delete_file_object(url, () => {
                     swalWithBootstrapButtons(
                     '已删除!',
                     '您选择的文件已经被删除',
                     'success'
                     );
                     $(this).parents(".bucket-files-table-item")[0].remove();
-                }else{
-                    swal('删除文件失败！');
-                }
+                });
             } else if (result.dismiss === swal.DismissReason.cancel) {// Read more about handling dismissals
                 swalWithBootstrapButtons(
                     '取消',
@@ -316,13 +307,10 @@
     //
     // 删除一个文件对象(ajax)
     //
-    function delete_file_object(url) {
-        let result = false;
-        $.ajax({
+    function delete_file_object(url, success) {
+        return $.ajax({
             url: url,
             type: "DELETE",
-            timeout: 10000,
-            async: false,
             beforeSend: function (xhr, settings) {//set csrf cookie
                 var csrftoken = getCookie('csrftoken');
                 if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
@@ -331,37 +319,17 @@
             },
             success: function (data) {
                 if (data.code === 200) {
-                    result = true;
+                   success();
                 } else {
-                    result = false;
+                    show_warning_dialog('删除文件失败！');
                 }
             },
             error: function (err) {
-                result = false;
-            }
+                show_warning_dialog('删除文件失败！', 'error');
+            },
         });
-        return result;
     }
 }());
 
-function getCookie(name) {
-    var cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        var cookies = document.cookie.split(';');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = jQuery.trim(cookies[i]);
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function csrfSafeMethod(method) {
-    // these HTTP methods do not require CSRF protection
-    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
-}
 
 

@@ -32,6 +32,7 @@ class BucketForm(forms.Form):
             raise forms.ValidationError('存储桶bucket名称不能以“-”开头或结尾')
 
         DNSStringValidator(bucket_name)
+        self.cleaned_data['name'] = bucket_name.lower() #
 
         if Bucket.objects.filter(name=bucket_name).exists():
             raise forms.ValidationError('存储桶名已存在，请重新输入')

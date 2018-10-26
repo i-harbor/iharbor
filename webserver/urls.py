@@ -16,8 +16,10 @@ Including another URLconf
 from django.contrib import admin
 from django.conf.urls import url, include
 from rest_framework.documentation import include_docs_urls
+from django.contrib.staticfiles.views import serve
 
 urlpatterns = [
+    url(r'favicon.ico', view=serve, kwargs={'path': 'icon/favicon.ico'}),
     url(r'^admin/', admin.site.urls),
     url(r'', include('buckets.urls', namespace='buckets')),
     url(r'^users/', include('users.urls', namespace='users')),
