@@ -10,7 +10,7 @@ rados_dll = ctypes.CDLL("utils/oss/rados.so")
 
 # Return type for rados_dll interfaces.
 class BaseReturnType(ctypes.Structure):
-    _fields_ = [('ok', ctypes.c_bool),('data', ctypes.c_char_p)]
+    _fields_ = [('ok', ctypes.c_bool), ('data_ptr', ctypes.c_void_p), ('data_len', ctypes.c_int)]
 
 
 class CephRadosObject():
@@ -47,7 +47,8 @@ class CephRadosObject():
                                           size,
                                           self._obj_id.encode('utf-8'),
                                          ctypes.c_ulonglong(offset))
-        return (result.ok, result.data)
+        data = ctypes.string_at(result.data_ptr, result.data_len)
+        return (result.ok, data)
 
     def write(self, offset, data_block):
         '''
@@ -105,9 +106,10 @@ class CephRadosObject():
                                        self._conf_file.encode('utf-8'),
                                        self._pool_name.encode('utf-8'),
                                        self._obj_id.encode('utf-8'))
-        return (result.ok, result.data)
+        data = ctypes.string_at(result.data_ptr, result.data_len)
+        return (result.ok, data)
 
-    def read_obj_generator(self, offset=0, block_size=10*1024):
+    def read_obj_generator(self, offset=0, block_size=10*1024**2):
         '''
         读取对象生成器
         :param offset: 读起始偏移量；type: int
@@ -155,10 +157,12 @@ class CephRadosObject():
                                                self._pool_name.encode('utf-8'),
                                                self._obj_id.encode('utf-8'),
                                                chunk,
+                                               len(chunk),
                                                mode.encode('utf-8'),
                                                ctypes.c_ulonglong(offset))
+                data = ctypes.string_at(result.data_ptr, result.data_len)
                 if not result.ok:
-                    return (False, result.data)
+                    return (False, data)
                 start += len(chunk)
                 end = start + chunk_size
 
