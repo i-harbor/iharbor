@@ -100,16 +100,14 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    swal({
-                        title: `创建存储桶“${result.value.bucket_name}”成功`,
-                    }).then(() => {
+                    show_warning_dialog(`创建存储桶“${result.value.bucket_name}”成功`).then(() => {
                         // location.reload(true);// 刷新当前页面
                         location.reload(result.value.redirect_to);// 重定向
                     } )
                 }
              },
             (error) => {
-                swal(`3Request failed:发生错误，创建失败！`);
+                show_warning_dialog(`Request failed:发生错误，创建失败！`);
             }
         )
     }

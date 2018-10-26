@@ -306,5 +306,42 @@ class FileDownloadSerializer(serializers.Serializer):
         return super(FileDownloadSerializer, self).data
 
 
+class DirectoryCreateSerializer(serializers.Serializer):
+    '''
+    创建目录序列化器
+    '''
+    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称')
+    dir_path = serializers.CharField(label='目录路径', required=False, help_text='存储桶下的目录路径，指定创建目录的父目录')
+    dir_name = serializers.CharField(label='目录名', required=True, help_text='要创建的目录名称')
 
+    def validate(self, data):
+        '''校验参数'''
+        bucket_name = data.get('bucket_name', '')
+        dir_path = data.get('dir_path', '')
+        dir_name = data.get('dir_name', '')
 
+        if not bucket_name or not dir_name:
+            return serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
+
+        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+            bfm = BucketFileManagement(path=dir_path)
+            ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+            if not ok:
+                return serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
+            # 目录已存在
+            if dir:
+                return serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+            data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+
+            return data
+
+    @property
+    def data(self):
+        self.instance = None
+        # data = self.validated_data
+        data = super(DirectoryCreateSerializer, self).data
+        return {
+            'data': data,
+            'code': 200,
+            'code_text': '创建文件夹成功'
+        }

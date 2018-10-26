@@ -14,23 +14,16 @@
             <div class="col-xs-12 col-sm-12">
                 {#目录导航栏#}
                 <div>
-                    <div>
+                    <ol class="breadcrumb">
                         <a href="{% url 'buckets:bucket_view' %}">Home</a>
-                        {#                如果dir_links为空，现在在bucket根路径下#}
-                        {% if not path_links %}
-                            <span>></span>
-                            <span>{{ bucket_name }}</span>
-                        {% else %}
-                            <span>></span>
-                            <a href="{% url 'buckets:file_list' bucket_name=bucket_name path='' %}">{{ bucket_name }}</a>
-                            {% for dir_name, path in path_links.items %}
-                                <span>/</span>
-                                <a href="{% url 'buckets:file_list' bucket_name=bucket_name path=path %}">{{ dir_name }}</a>
-                            {% endfor %}
-                        {% endif %}
-                        <hr/>
-                        <p><h3>{{ file.na }}</h3></p>
-                    </div>
+                        <span>></span>
+                        <li><a href="{% url 'buckets:file_list' bucket_name=bucket_name path='' %}">{{ bucket_name }}</a></li>
+                        {% for dir_name, path in path_links.items %}
+                            <li><a href="{% url 'buckets:file_list' bucket_name=bucket_name path=path %}">{{ dir_name }}</a></li>
+                        {% endfor %}
+                    </ol>
+                    <hr/>
+                    <p><h3>{{ file.na }}</h3></p>
                 </div>
             </div>
             <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>

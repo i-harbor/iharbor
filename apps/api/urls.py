@@ -10,6 +10,7 @@ router.register(r'(?P<version>(v1|v2))/bucket', views.BucketViewSet, base_name='
 router.register(r'(?P<version>(v1|v2))/upload', views.UploadFileViewSet, base_name='upload')
 router.register(r'(?P<version>(v1|v2))/delete', views.DeleteFileViewSet, base_name='delete')
 router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
+router.register(r'(?P<version>(v1|v2))/directory', views.DirectoryViewSet, base_name='directory')
 
 urlpatterns = [
     # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),

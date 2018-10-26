@@ -329,6 +329,80 @@
             },
         });
     }
+
+    $('#btn-new-directory').on('click', on_create_directory);
+
+    //
+    // 创建文件夹点击事件处理（对话框方式）
+    //
+    function on_create_directory(){
+        swal({
+            title: '请输入一个文件夹名称',
+            input: 'text',
+            inputAttributes: {
+                autocapitalize: 'off'
+            },
+            showCancelButton: true,
+            confirmButtonText: '创建',
+            showLoaderOnConfirm: true,
+            preConfirm: (input_name) => {
+                let obj = get_bucket_name_and_path_from_location_path();
+                let bucket_name = obj.bucket_name;
+                let dir_path = obj.dir_path;
+                let csrf_code = getCsrfMiddlewareToken();
+                var formdata = new FormData();
+                formdata.append('bucket_name', bucket_name);
+                formdata.append('dir_path', dir_path);
+                formdata.append('dir_name', input_name);
+                formdata.append("csrfmiddlewaretoken", csrf_code);
+                return $.ajax({
+                    url: '/api/v1/directory/',
+                    type: 'post',
+                    data: formdata,
+                    timeout: 10000,
+                    contentType: false,//必须false才会自动加上正确的Content-Type
+                    processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
+                    beforeSend: function (xhr, settings) {//set csrf cookie
+                        var csrftoken = getCookie('csrftoken');
+                        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                        }
+                    },
+                    success: (result) => {
+                        console.log(result);
+                        if (result.code === 200){
+                            return result;
+                        }else{
+                            swal.showValidationMessage(
+                            `Request failed: ${result.error_text}`
+                            );
+                        }
+                    },
+                    error: (error) => {
+                        swal.showValidationMessage(
+                            `Request failed: ${error.error_text}`
+                        );
+                    },
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
+                    clearForm: false,//禁止清除表单
+                    resetForm: false //禁止重置表单
+                });
+            },
+            allowOutsideClick: () => !swal.isLoading()
+        }).then(
+            (result) => {
+                if (result.value) {
+                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`).then(() => {
+                        location.reload(true);// 刷新当前页面
+                        // location.reload(result.value.redirect_to);// 重定向
+                    } )
+                }
+             },
+            (error) => {
+                show_warning_dialog(`Request failed:发生错误，创建失败！`);
+            }
+        )
+    }
 }());
 
 

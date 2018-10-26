@@ -42,6 +42,12 @@ class Bucket(models.Model):
         self.soft_delete = True
         self.save()
 
+    @classmethod
+    def check_user_own_bucket(self, request, bucket_name):
+        # bucket是否属于当前用户
+        return Bucket.objects.filter(models.Q(user=request.user) & models.Q(name=bucket_name)).exists()
+
+
 
 # class FileChunkInfo(EmbeddedDocument):
 # 	'''
@@ -82,7 +88,7 @@ class BucketFileInfo(DynamicDocument):
 
     na = fields.StringField(required=True) # name,文件名或目录名
     fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
-    did = fields.ObjectIdField() #父节点objectID字符串
+    did = fields.ObjectIdField() #父节点objectID
     si = fields.LongField() # 文件大小,字节数
     ult = fields.DateTimeField(default=datetime.utcnow) # 文件的上传时间，或目录的创建时间
     upt = fields.DateTimeField() # 文件的最近修改时间，目录，则upt为空

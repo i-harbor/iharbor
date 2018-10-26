@@ -65,7 +65,9 @@ class BucketView(View):
             for bucket in buckets:
                 # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
                 #     BucketFileInfo.drop_collection()
-                bucket.do_soft_delete() # 软删除
+                # 只删除用户自己的buckets
+                if buckets.user.id == request.user.id:
+                    bucket.do_soft_delete() # 软删除
 
         data = {
             'code': 200,
@@ -95,7 +97,8 @@ class FileView(View):
         path = kwargs.get('path')
 
         # bucket是否属于当前用户
-        self.check_user_own_bucket(request, bucket_name)
+        if not Bucket.check_user_own_bucket(request=request, bucket_name=bucket_name):
+            raise Http404('您不存在一个存储桶' + bucket_name)
 
         content = self.get_content(request, bucket_name=bucket_name, path=path)
         content['form'] = UploadFileForm()
@@ -126,11 +129,6 @@ class FileView(View):
         content['path_links'] = bfm.get_dir_link_paths()
         content['cur_path'] = path
         return content
-
-    def check_user_own_bucket(self, request, bucket_name):
-        # bucket是否属于当前用户
-        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise Http404('您不存在一个存储桶'+ bucket_name)
 
 
 class FileObjectView(View):

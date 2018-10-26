@@ -116,6 +116,29 @@ class BucketFileManagement():
 
         return True, bfi if bfi else None
 
+    def get_dir_exists(self, dir_name):
+        '''
+        通过目录名获取当前目录下的目录信息
+        :param dir_name: 目录名称（不含父路径），
+        :return:
+            第一个返回值：表示是否有错去发生，(可能错误：当前目录参数有误，对应目录不存在)
+            第二个返回值：如果存在返回文件记录对象，否则None
+        '''
+        # 先检测当前目录存在
+        ok, did = self.get_cur_dir_id()
+        if not ok:
+            return False, None
 
+        path = self._hand_path(self._path)
+        dir_path_name = path + '/' + dir_name
+
+        try:
+            dir = BucketFileInfo.objects.get(mQ(na=dir_path_name) & mQ(fod=False))  # 查找目录记录
+        except DoesNotExist as e:
+            return (True, None)  # 未找到对应目录信息
+        except MultipleObjectsReturned as e:
+            raise e
+
+        return True, dir
 
 

@@ -269,9 +269,55 @@ class DownloadFileViewSet(viewsets.GenericViewSet):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+class DirectoryViewSet(viewsets.GenericViewSet):
+    '''
+    目录视图集
 
+    create:
+    创建一个目录：
+    	Http Code: 状态码200：无异常时，返回数据：
+    	{
+            data: 客户端请求时，携带的数据,
+        }
+        Http Code: 状态码400：参数有误时，返回数据：
+        {
+            error_text: 对应参数错误信息;
+        }
+    '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    serializer_class = serializers.FileDownloadSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
 
+        validated_data = serializer.validated_data
+        bucket_name = validated_data.get('bucket_name', '')
+        dir_path = validated_data.get('dir_path', '')
+        dir_name = validated_data.get('dir_name', '')
+        did = validated_data.get('did', None)
+
+        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+            bfinfo = BucketFileInfo(na=dir_path + '/' + dir_name if dir_path else dir_name,  # 目录名
+                                    fod=False,  # 目录
+                                    )
+            # 有父节点
+            if did:
+                bfinfo.did = did
+            bfinfo.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        if self.action == 'create':
+            return serializers.DirectoryCreateSerializer
+        return serializers.DirectoryCreateSerializer
 
 
 

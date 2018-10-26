@@ -13,7 +13,7 @@ function show_auto_close_warning_dialog(title, type='warning', position='center'
         timer = 0;
         showBtn = true;
     }
-    swal({
+    return swal({
         position: position,
         type: type,
         title: title,
@@ -29,7 +29,7 @@ function show_auto_close_warning_dialog(title, type='warning', position='center'
 //position: 对话框弹出位置; can be 'top', 'top-start', 'top-end', 'center', 'center-start', 'center-end',
 //          'bottom', 'bottom-start', or 'bottom-end'
 function show_warning_dialog(title, type='warning', position='center') {
-    show_auto_close_warning_dialog(title, type, position, 0);
+    return show_auto_close_warning_dialog(title, type, position, 0);
 }
 
 
