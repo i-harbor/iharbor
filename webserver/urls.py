@@ -19,7 +19,7 @@ from rest_framework.documentation import include_docs_urls
 from django.contrib.staticfiles.views import serve
 
 urlpatterns = [
-    url(r'favicon.ico', view=serve, kwargs={'path': 'icon/favicon.ico'}),
+    url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
     url(r'^admin/', admin.site.urls),
     url(r'', include('buckets.urls', namespace='buckets')),
     url(r'^users/', include('users.urls', namespace='users')),

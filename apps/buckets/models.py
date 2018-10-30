@@ -78,13 +78,12 @@ class BucketFileInfo(DynamicDocument):
                 共享时间限制，若stl为False，则文件无共享时间限制，且sst，set等字段为空；若该doc代表目录，则stl为空;
     @ sst: share_start_time，允许共享且有时间限制，则sst为该文件的共享起始时间，若该doc代表目录，则sst为空;
     @ set: share_end_time，  允许共享且有时间限制，则set为该文件的共享终止时间，若该doc代表目录，则set为空;
+    @ sds: soft delete status,软删除,True->删除状态，get_sds_display()可获取可读值
     '''
-    # UPLOADING = 1
-    # COMPLETE = 2
-    # STATUS_CHOICES = (
-    # 	(UPLOADING, 'Incomplete'),
-    # 	(COMPLETE, 'Complete'),
-    # )
+    SOFT_DELETE_STATUS_CHOICES = (
+        (True, '删除'),
+        (False, '正常'),
+    )
 
     na = fields.StringField(required=True) # name,文件名或目录名
     fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
@@ -100,11 +99,7 @@ class BucketFileInfo(DynamicDocument):
     stl = fields.BooleanField() # True: 文件有共享时间限制; False: 则文件无共享时间限制
     sst = fields.DateTimeField() # share_start_time, 该文件的共享起始时间
     set = fields.DateTimeField() # share_end_time,该文件的共享终止时间
-
-    # fcc = fields.IntField()  # file chunk count 文件的文件块数量，为空或0表示此文件未分块或者此记录为目录
-    # fcil = fields.EmbeddedDocumentListField(FileChunkInfo) # FileChunkInfo列表，目录时fcil为空
-    # fst = fields.IntField(choices=STATUS_CHOICES, default=UPLOADING) # file status,标记文件状态
-    # fmd5 = fields.StringField(required=True, max_length=32, min_length=32)  # 文件MD5码
+    sds = fields.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
 
     meta = {
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
@@ -116,9 +111,8 @@ class BucketFileInfo(DynamicDocument):
         # 'max_size': 2000000, #集合的最大字节数
     }
 
-    # def get_fcil_manager(self):
-    # 	return EmbeddedDocumentList(list_items=self.fcil, instance=self, name='fcil')
-
-
-
+    def do_soft_delete(self):
+        '''软删除'''
+        self.sds = True
+        self.save()
 

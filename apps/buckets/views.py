@@ -111,10 +111,10 @@ class FileView(View):
         :return:
         '''
         content = {}
-        content['submit_text'] = '上传'
-        content['action_url'] = reverse('buckets:file_list', kwargs={
-            'bucket_name': bucket_name,
-            'path': path})
+        # content['submit_text'] = '上传'
+        # content['action_url'] = reverse('buckets:file_list', kwargs={
+        #     'bucket_name': bucket_name,
+        #     'path': path})
         content['ajax_upload_url'] = reverse('api:upload-list', kwargs={'version': 'v1'})
         content['bucket_name'] = bucket_name
         bfm = BucketFileManagement(path=path)
@@ -162,22 +162,22 @@ class FileObjectView(View):
         bfm = BucketFileManagement(path=path)
         file = self.get_file_obj(bfm, bucket_name, object_name)
         if file:
-            # ceph中删除文件对象数据
-            cro = CephRadosObject(str(file.id))
-            ok, data = cro.delete()
-            if ok:
-                # 删除文件对象信息
-                file.switch_collection(get_collection_name(bucket_name=bucket_name))
-                file.delete()
-                data = {
-                    'code': 200,
-                    'code_text': '文件删除成功'
-                }
-            else:
-                data = {
-                    'code': 500,
-                    'code_text': '删除文件对象错误'
-                }
+            # # ceph中删除文件对象数据
+            # cro = CephRadosObject(str(file.id))
+            # ok, data = cro.delete()
+            # if ok:
+            # 删除文件对象信息
+            file.switch_collection(get_collection_name(bucket_name=bucket_name))
+            file.do_soft_delete()
+            data = {
+                'code': 200,
+                'code_text': '文件删除成功'
+            }
+            # else:
+            #     data = {
+            #         'code': 500,
+            #         'code_text': '删除文件对象错误'
+            #     }
         else:
             data = {
                 'code': 404,

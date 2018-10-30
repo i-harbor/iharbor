@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.versioning import URLPathVersioning
 
-from buckets.utils import get_collection_name
+from buckets.utils import get_collection_name, BucketFileManagement
 from utils.storagers import FileStorage
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
@@ -286,7 +286,34 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
-    serializer_class = serializers.FileDownloadSerializer
+
+    def list(self, request, *args, **kwargs):
+        bucket_name = request.query_params.get('bucket_name')
+        dir_path = request.query_params.get('dir_path', '')
+
+        if not Bucket.check_user_own_bucket(request, bucket_name):
+            return Response({'code': 404, 'error_text': f'您不存在一个名称为“{bucket_name}”的存储桶'})
+
+        bfm = BucketFileManagement(path=dir_path)
+        with switch_collection(BucketFileInfo,
+                               get_collection_name(bucket_name=bucket_name)):
+            ok, files = bfm.get_cur_dir_files()
+            if not ok:
+                return Response({'code': 404, 'error_text': '参数有误，未找到相关记录'})
+
+            queryset = files
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            data = {
+                'files': serializer.data,
+                'bucket_name': bucket_name,
+                'dir_path': dir_path
+            }
+            return Response(data)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
@@ -317,7 +344,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         """
         if self.action == 'create':
             return serializers.DirectoryCreateSerializer
-        return serializers.DirectoryCreateSerializer
+        return serializers.DirectoryListSerializer
 
 
 
