@@ -90,10 +90,10 @@ class BucketFileManagement():
                 return False, None
 
             if dir_id:
-                return True, BucketFileInfo.objects(mQ(did=dir_id) & mQ(sds__exists=False) | mQ(sds=False)).all()
+                return True, BucketFileInfo.objects(mQ(did=dir_id) & (mQ(sds__exists=False) | mQ(sds=False))).all()
 
         #存储桶下文件目录
-        return True, BucketFileInfo.objects(mQ(did__exists=False) & mQ(sds__exists=False) | mQ(sds=False)).all()  # did不存在表示是存储桶下的文件目录
+        return True, BucketFileInfo.objects(mQ(did__exists=False) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
 
     def get_file_exists(self, file_name):
         '''
@@ -108,11 +108,11 @@ class BucketFileManagement():
             return False, None
 
         if did:
-            bfis = BucketFileInfo.objects(mQ(na=file_name) & mQ(did=did) & mQ(fod=True) & mQ(
-                                            sds__exists=False) | mQ(sds=False))# 目录下是否存在给定文件名的文件
+            bfis = BucketFileInfo.objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
+                                          (mQ(sds__exists=False) | mQ(sds=False)))# 目录下是否存在给定文件名的文件
         else:
-            bfis = BucketFileInfo.objects(mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True) & mQ(
-                                            sds__exists=False) | mQ(sds=False))  # 存储桶下是否存在给定文件名的文件
+            bfis = BucketFileInfo.objects((mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True)) &
+                                          (mQ(sds__exists=False) | mQ(sds=False)))  # 存储桶下是否存在给定文件名的文件
 
         bfi = bfis.first()
 

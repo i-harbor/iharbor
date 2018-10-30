@@ -146,7 +146,14 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
-
+    # 'DEFAULT_THROTTLE_CLASSES': (
+    #     'rest_framework.throttling.AnonRateThrottle',  # 未登陆认证的用户默认访问限制
+    #     'rest_framework.throttling.UserRateThrottle'  # 登陆认证的用户默认访问限制
+    # ),
+    # 'DEFAULT_THROTTLE_RATES': {
+    #     'anon': '5/minute',  # 未登陆认证的用户默认请求访问限制每分钟次数
+    #     'user': '20/minute'  # 登陆认证的用户默认请求访问限制每分钟次数
+    # },
     # api version settings
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
@@ -162,6 +169,61 @@ CEPH_RADOS = {
     'POOL_NAME': 'objstore',
     'RADOS_DLL_PATH': 'rados.so'
 }
+'''
+# 日志配置
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        # logging file settings
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/home/log/webserver.log',
+        },
+        # output to console settings
+        'console': {
+            'level': 'INFO',
+            'filters': ['require_debug_true'],# working with debug mode
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+        # 邮件通知
+        # 'mail_admins': {
+        #     'level': 'ERROR',
+        #     'class': 'django.utils.log.AdminEmailHandler',
+        #     'filters': ['special']
+        # }
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['file', 'console'],#'mail_admins'
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}'''
 
 # 导入安全相关的settings
 from .security_settings import *
