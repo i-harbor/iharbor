@@ -52,13 +52,35 @@
         }
         setProgressBar($("#upload-progress-bar"), percent, hide);
     }
-    fileUploadProgressBar(0, 1, true);
+    fileUploadProgressBar(0, 100, true);
 
+    //
+    // 开始上传文件前设置
+    //
+    function beforeFileUploading(){
+        // 进度条
+        fileUploadProgressBar(0, 100, false);
+        // 失能上传文件按钮
+        $btn_file_upload.addClass('disabled');
+        $btn_file_upload.attr('disabled',true);
+    }
+
+    //
+    // 上传文件完成或失败后设置
+    //
+    function endFileUploading(){
+         // 进度条
+        fileUploadProgressBar(0, 100, true);
+        // 失能上传文件按钮
+        $btn_file_upload.removeClass('disabled');
+        $btn_file_upload.attr('disabled',false);
+    }
 
     //
     // 上传文件按钮
     //
-    $("#btn-upload-file").on("click",
+    $btn_file_upload = $("#btn-upload-file");
+    $btn_file_upload.on("click",
         async function () {
             // $("#div-upload-file").show();
 
@@ -123,6 +145,7 @@
         let dir_path = obj.dir_path;
 
         let csrfmiddlewaretoken = getCsrfMiddlewareToken();
+        beforeFileUploading();
         uploadFileCreate(url, bucket_name, dir_path, file, csrfmiddlewaretoken);
     }
 
@@ -183,6 +206,7 @@
             },
             error: function (err) {
                 show_warning_dialog('创建文件对象失败,'+ err.responseJSON.error_text);
+                endFileUploading();
             }
         });
     }
@@ -228,6 +252,7 @@
             //进度条
             fileUploadProgressBar(0, 1, true);
             show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
+            endFileUploading();
             return;
         }
         var chunk = file.slice(offset, end);
@@ -255,6 +280,7 @@
             },
             error: function (err) {
                 show_warning_dialog('上传文件发生错误，上传文件可能不完整，请重新上传');
+                endFileUploading();
             },
         })
     }
@@ -359,7 +385,7 @@
                     url: '/api/v1/directory/',
                     type: 'post',
                     data: formdata,
-                    timeout: 10000,
+                    timeout: 200000,
                     contentType: false,//必须false才会自动加上正确的Content-Type
                     processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
                     beforeSend: function (xhr, settings) {//set csrf cookie
@@ -369,18 +395,17 @@
                         }
                     },
                     success: (result) => {
-                        console.log(result);
                         if (result.code === 200){
                             return result;
                         }else{
                             swal.showValidationMessage(
-                            `Request failed: ${result.error_text}`
+                            `Request failed: ${result.code_text.error_text}`
                             );
                         }
                     },
-                    error: (error) => {
+                    error: (error) => {console.log(error);
                         swal.showValidationMessage(
-                            `Request failed: ${error.error_text}`
+                            `Request failed: ${error.responseJSON.error_text}`
                         );
                     },
                     headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
@@ -399,7 +424,7 @@
                 }
              },
             (error) => {
-                show_warning_dialog(`Request failed:发生错误，创建失败！`);
+                show_warning_dialog(`发生错误，创建失败！`);
             }
         )
     }

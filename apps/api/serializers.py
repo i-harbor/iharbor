@@ -321,16 +321,16 @@ class DirectoryCreateSerializer(serializers.Serializer):
         dir_name = data.get('dir_name', '')
 
         if not bucket_name or not dir_name:
-            return serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
+            raise serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
 
         with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
             bfm = BucketFileManagement(path=dir_path)
             ok, dir = bfm.get_dir_exists(dir_name=dir_name)
             if not ok:
-                return serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
+                raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
             # 目录已存在
             if dir:
-                return serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+                raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
             data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
             return data

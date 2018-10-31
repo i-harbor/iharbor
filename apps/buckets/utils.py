@@ -132,10 +132,10 @@ class BucketFileManagement():
             return False, None
 
         path = self._hand_path(self._path)
-        dir_path_name = path + '/' + dir_name
+        dir_path_name = path + '/' + dir_name if path else dir_name
 
         try:
-            dir = BucketFileInfo.objects.get(mQ(na=dir_path_name) & mQ(fod=False))  # 查找目录记录
+            dir = BucketFileInfo.objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
         except DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:

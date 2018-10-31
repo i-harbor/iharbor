@@ -3,7 +3,8 @@ from mongoengine.context_managers import switch_collection
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
-from rest_framework.versioning import URLPathVersioning
+from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 
 from buckets.utils import get_collection_name, BucketFileManagement
 from utils.storagers import FileStorage
@@ -273,6 +274,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     目录视图集
 
+    list:
+    获取一个目录下的文件信息；
+     参数：bucket_name
+
     create:
     创建一个目录：
     	Http Code: 状态码200：无异常时，返回数据：
@@ -286,6 +291,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
+    lookup_field = 'dir_path'
+    lookup_value_regex = '.+'
 
     def list(self, request, *args, **kwargs):
         bucket_name = request.query_params.get('bucket_name')
@@ -317,7 +324,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid(raise_exception=False):
+            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_200_OK)
 
         validated_data = serializer.validated_data
         bucket_name = validated_data.get('bucket_name', '')
@@ -336,16 +344,53 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def destroy(self, request, *args, **kwargs):
+        dir_path = kwargs.get(self.lookup_field, '')
+        bucket_name = request.query_params.get('bucket_name', '')
+
+        path, dir_name = self.get_path_and_filename(dir_path)
+        if not bucket_name or not dir_name:
+            return Response(data={'code': 400, 'code_text': 'bucket_name or dir_name不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = self.get_dir_object(bucket_name, path, dir_path)
+        if not obj:
+            data = {'code': 404, 'code_text': '文件不存在'}
+        else:
+            with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+                obj.do_soft_delete()
+            data = {'code': 200, 'code_text': '已成功删除'}
+        return Response(data=data, status=status.HTTP_200_OK)
+
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action == 'create':
+        if self.action in ['create', 'delete']:
             return serializers.DirectoryCreateSerializer
         return serializers.DirectoryListSerializer
 
+    def get_dir_object(self, bucket_name, path, dir_name):
+        """
+        Returns the object the view is displaying.
+        """
+        bfm = BucketFileManagement(path=path)
+        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+            ok, obj = bfm.get_dir_exists(dir_name=dir_name)
+            if not ok:
+                return None
+            return obj
 
-
+    def get_path_and_filename(self, fullpath):
+        '''
+        分割一个绝对路径，获取文件名和父路径
+        :param fullpath: 绝对路径， type: str
+        :return: Tuple(path, filename)
+        '''
+        fullpath = fullpath.strip('/')
+        l = fullpath.rsplit('/', maxsplit=1)
+        filename = l[-1]
+        path = l[0] if len(l) == 2 else ''
+        return (path, filename)
 

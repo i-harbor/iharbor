@@ -12,6 +12,7 @@ router.register(r'(?P<version>(v1|v2))/delete', views.DeleteFileViewSet, base_na
 router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
 router.register(r'(?P<version>(v1|v2))/directory', views.DirectoryViewSet, base_name='directory')
 
+
 urlpatterns = [
     # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
