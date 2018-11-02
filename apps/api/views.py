@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.http import StreamingHttpResponse
 from mongoengine.context_managers import switch_collection
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from buckets.utils import get_collection_name, BucketFileManagement
 from utils.storagers import FileStorage
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
+from utils.oss.rados_interfaces import CephRadosObject
 
 # Create your views here.
 
@@ -128,14 +130,11 @@ class UploadFileViewSet(viewsets.GenericViewSet):
     上传文件视图集
 
     create:
-    文件上传请求，服务器会生成一条文件记录，并返回文件上传的方式：
+    文件上传请求，服务器会生成一条文件对象记录，并返回文件对象的id：
     	Http Code: 状态码201：无异常时，返回数据：
     	{
             data: 客户端请求时，携带的数据,
             id: 文件id，上传文件块时url中需要,
-            chunks:文件分片数量,
-            chunk_size:每个分片的大小；如20*1024*1024(20Mb)；最后一个分片除外,
-            chunk_start:上传分片起始编号，如上传一个新文件时，从0开始；断点续传时，指示续传的起始分片编号,
         }
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
@@ -144,9 +143,7 @@ class UploadFileViewSet(viewsets.GenericViewSet):
     文件块上传
         Http Code: 状态码201：上传成功无异常时，返回数据：
         {
-            data: 客户端请求时，携带的数据,
-            chunk_id: 上传成功的分片编号,
-            upload_status: 上传文件的状态，上传中(False)，上传完成(True),
+            data: 客户端请求时，携带的参数,不包含数据块；
         }
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
@@ -197,7 +194,7 @@ class DeleteFileViewSet(viewsets.GenericViewSet):
     删除或者取消上传文件视图集
 
     create:
-    通过文件id,删除一个文件，或者取消上传一个文件：
+    通过文件id,删除一个文件
     	Http Code: 状态码201：无异常时，返回数据：
     	{
             data: 客户端请求时，携带的数据,
@@ -221,13 +218,12 @@ class DownloadFileViewSet(viewsets.GenericViewSet):
     下载文件视图集
 
     create:
-    通过文件id,删除一个文件，或者取消上传一个文件：
-    	Http Code: 状态码200：无异常时，返回数据：
+    通过文件id,读取文件对象数据块；
+    	Http Code: 状态码200：无异常时，返回bytes数据流，其他信息通过标头headers传递：
     	{
-            data: 客户端请求时，携带的数据,
-            chunk: 文件快数据
-            chunk_size: 文件块大小
-            file_size: 文件总大小
+            evob_request_data: 客户端请求时，携带的数据,
+            evob_chunk_size: 返回文件块大小
+            evob_obj_size: 文件对象总大小
         }
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
@@ -252,22 +248,26 @@ class DownloadFileViewSet(viewsets.GenericViewSet):
             if not bfi:
                 return Response({'id': '未找到id对应文件'}, status=status.HTTP_404_NOT_FOUND)
 
-        # 读文件块
-        fstorage = FileStorage(str(bfi.id))
-        chunk = fstorage.read(chunk_size, offset=chunk_offset)
-
-        response_data = {'data': serializer.data}
-        if isinstance(chunk, bytes):
-            response_data['chunk'] = chunk # 文件快数据
-            response_data['chunk_size'] = chunk.count() # 文件块大小
-            response_data['file_size'] = bfi.si # 文件大小
+            # 读文件块
+            # fstorage = FileStorage(str(bfi.id))
+            # chunk = fstorage.read(chunk_size, offset=chunk_offset)
+            rados = CephRadosObject(str(bfi.id))
+            ok, chunk = rados.read(offset=chunk_offset, size=chunk_size)
+            if not ok:
+                response_data = {'data': serializer.data}
+                response_data['error_text'] = 'server error,文件块读取失败'
+                return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # 如果从0读文件就增加一次下载次数
             if chunk_offset == 0:
-                bfi.dlc = 1 + bfi.dlc if bfi.dlc else 0 # 下载次数+1
-            bfi.save()
+                bfi.dlc = (bfi.dlc or 0) + 1# 下载次数+1
+                bfi.save()
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        reponse = StreamingHttpResponse(chunk, content_type='application/octet-stream', status=status.HTTP_200_OK)
+        reponse['evob_request_data'] = serializer.data
+        reponse['evob_chunk_size'] = len(chunk)
+        reponse['evob_obj_size'] = bfi.si
+        return reponse
 
 
 class DirectoryViewSet(viewsets.GenericViewSet):

@@ -93,18 +93,21 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称')
-    dir_path = serializers.CharField(label='文件上传路径', required=False, help_text='存储桶下的目录路径，指定文件上传到那个目录下')
-    file_name = serializers.CharField(label='文件名', required=True, help_text='上传文件的文件名')
-    file_size = serializers.IntegerField(label='文件大小', required=True, min_value=1, help_text='上传文件的字节大小')
-    file_md5 = serializers.CharField(label='文件MD5码', required=False, min_length=32, max_length=32,
-                                     help_text='由文件内容生成的MD5码字符串')
-    overwrite = serializers.BooleanField(label='是否覆盖', help_text='存在同名文件时是否覆盖')
+    bucket_name = serializers.CharField(label='存储桶名称', required=True,
+                                        help_text='文件上传到的存储桶名称，类型string')
+    dir_path = serializers.CharField(label='文件上传路径', required=False,
+                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，类型string')
+    file_name = serializers.CharField(label='文件名', required=True, help_text='上传文件的文件名，类型string')
+    # file_size = serializers.IntegerField(label='文件大小', required=True, min_value=1, help_text='上传文件的字节大小')
+    # file_md5 = serializers.CharField(label='文件MD5码', required=False, min_length=32, max_length=32,
+    #                                  help_text='由文件内容生成的MD5码字符串')
+    overwrite = serializers.BooleanField(label='是否覆盖',
+                                         help_text='存在同名文件时是否覆盖，类型boolean,True(覆盖)，False(不覆盖)')
 
     def create(self, validated_data):
         file_name = validated_data.get('file_name')
-        file_size = validated_data.get('file_size')
-        file_md5 = validated_data.get('file_md5')
+        # file_size = validated_data.get('file_size')
+        # file_md5 = validated_data.get('file_md5')
 
         did = validated_data.get('_did')
         bfinfo = validated_data.get('finfo')
@@ -180,12 +183,14 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    #id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24, help_text='请求上传文件服务器返回的文件id')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称')
+    #id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
+    #                           help_text='请求上传文件服务器返回的文件id')
+    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称，类型string')
     chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='上传文件块在整个文件中的起始位置（bytes)')
-    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的块数据')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0, help_text='上传文件块的字节大小')
+                                            help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
+    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的块数据,如Blob对象')
+    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
+                                          help_text='上传文件块的字节大小，类型int')
 
     def validate(self, data):
         """
@@ -241,8 +246,10 @@ class FileDeleteSerializer(serializers.Serializer):
     '''
     文件取消上传或删除序列化器
     '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24, help_text='文件唯一标识id')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所属的存储桶名称')
+    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
+                               help_text='文件唯一标识id,类型string')
+    bucket_name = serializers.CharField(label='存储桶名称', required=True,
+                                        help_text='文件所属的存储桶名称,类型string')
 
     def validate(self, data):
         # bucket是否属于当前用户,检测存储桶名称是否存在
@@ -263,7 +270,7 @@ class FileDeleteSerializer(serializers.Serializer):
         with switch_collection(BucketFileInfo, collection_name):
             bfi = BucketFileInfo.objects(id=id).first()
             if bfi:
-                bfi.delete()
+                bfi.do_soft_delete()
                 return bfi
         # create必须要返回一个instance
         return True
@@ -281,12 +288,13 @@ class FileDownloadSerializer(serializers.Serializer):
     '''
     文件下载序列化器
     '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24, help_text='文件唯一标识id')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所属的存储桶名称')
+    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
+                               help_text='文件唯一标识id, 类型string')
+    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所属的存储桶名称, 类型string')
     chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='要读取的文件块在整个文件中的起始位置（bytes)')
+                                            help_text='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='要读取的文件块的字节大小, 服务器返回最大数据2MB(2*1024*1024)')
+                                          help_text='要读取的文件块的字节大小, 类型int')
 
     def validate(self, data):
         # bucket是否属于当前用户,检测存储桶名称是否存在

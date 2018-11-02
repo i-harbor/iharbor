@@ -256,6 +256,7 @@
             return;
         }
         var chunk = file.slice(offset, end);
+        console.log(chunk);
         var formData = new FormData();
         formData.append("bucket_name", bucket_name);
         formData.append("chunk_offset", offset);
@@ -274,7 +275,8 @@
                     xhr.setRequestHeader("X-CSRFToken", csrftoken);
                 }
             },
-            success: function (data) {
+            success: function (data, textStatus, request) {
+                // request.getResponseHeader('Server');
                 offset = end;
                 uploadFileChunk(url, bucket_name, file, offset);
             },
