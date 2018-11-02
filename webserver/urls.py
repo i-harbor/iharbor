@@ -24,5 +24,5 @@ urlpatterns = [
     url(r'', include('buckets.urls', namespace='buckets')),
     url(r'^users/', include('users.urls', namespace='users')),
     url(r'api/', include('api.urls', namespace='api')),
-    url(r'docs/', include_docs_urls(title='EVOBCloud API Docs')),
+    url(r'v1/docs/', include_docs_urls(title='EVOBCloud API Docs')),
 ]

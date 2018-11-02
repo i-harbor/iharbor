@@ -1,11 +1,13 @@
 from django.shortcuts import render
 from django.http import StreamingHttpResponse
 from mongoengine.context_managers import switch_collection
+import coreapi
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
+from rest_framework.schemas import AutoSchema
 
 from buckets.utils import get_collection_name, BucketFileManagement
 from utils.storagers import FileStorage
@@ -41,6 +43,15 @@ class UserViewSet( mixins.RetrieveModelMixin,
     '''
     queryset = User.objects.all()
     # permission_classes = [IsAuthenticated]
+    # schema = AutoSchema(
+    #     manual_fields=[
+    #         coreapi.Field(
+    #             name='date',
+    #             required=True,
+    #             location='query',
+    #             description='Flight date in "YYYY-MM-DD" format.'),
+    #     ]
+    # )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
