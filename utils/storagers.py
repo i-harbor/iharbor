@@ -82,3 +82,39 @@ class FileStorage():
                         else:
                             break
             return file_generator
+
+
+class PathParser():
+    '''
+    路径字符串解析
+    '''
+    def __init__(self, filepath, *args, **kwargs):
+        self._path = filepath
+
+    def get_path_and_filename(self):
+        '''
+        分割一个绝对路径，获取文件名和父路径
+        :param fullpath: 绝对路径， type: str
+        :return: Tuple(path, filename)
+        '''
+        fullpath = self._path.strip('/')
+        if not fullpath:
+            return ('', '')
+        l = fullpath.rsplit('/', maxsplit=1)
+        filename = l[-1]
+        path = l[0] if len(l) == 2 else ''
+        return (path, filename)
+
+    def get_bucket_path_and_filename(self):
+        '''
+       分割一个绝对路径，获取文件名和父路径
+       :param fullpath: 绝对路径， type: str
+       :return: Tuple(bucket_name, path, filename)
+       '''
+        bucket_path, filename = self.get_path_and_filename()
+        if not bucket_path:
+            return ('', '', filename)
+        l = bucket_path.split('/', maxsplit=1)
+        bucket_name = l[0]
+        path = l[-1] if len(l) == 2 else ''
+        return (bucket_name, path, filename)

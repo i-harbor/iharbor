@@ -1,11 +1,12 @@
-# import math
+import os
+
 from datetime import datetime
 from bson import ObjectId
 
 from django.db.models import Q as dQ
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 from mongoengine.context_managers import switch_collection
-from rest_framework.exceptions import APIException
 
 from buckets.utils import BucketFileManagement, get_collection_name
 from .models import User, Bucket, BucketFileInfo
@@ -49,6 +50,8 @@ class BucketSerializer(serializers.ModelSerializer):
     存储桶序列化器
     '''
     user = serializers.SerializerMethodField() # 自定义user字段内容
+    created_time = serializers.SerializerMethodField()  # 自定义字段内容
+
     class Meta:
         model = Bucket
         fields = ('id', 'name', 'user', 'created_time')
@@ -56,6 +59,9 @@ class BucketSerializer(serializers.ModelSerializer):
 
     def get_user(selfself, obj):
         return {'id': obj.user.id, 'username': obj.user.username}
+
+    def get_created_time(self, obj):
+        return obj.created_time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class BucketCreateSerializer(serializers.Serializer):
@@ -375,6 +381,7 @@ class DirectoryListSerializer(serializers.Serializer):
     # sst = serializers.DateTimeField()  # share_start_time, 该文件的共享起始时间
     # set = serializers.DateTimeField()  # share_end_time,该文件的共享终止时间
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
+    download_url = serializers.SerializerMethodField()
 
     def get_sds(self, obj):
         return obj.get_sds_display()
@@ -388,4 +395,18 @@ class DirectoryListSerializer(serializers.Serializer):
         if not obj.upt:
             return ''
         return obj.upt.strftime("%Y-%m-%d %H:%M:%S")
+
+    def get_download_url(self, obj):
+        # 目录
+        if not obj.fod:
+            return  ''
+        request = self.context.get('request', None)
+        bucket_name = self._context.get('bucket_name', '')
+        dir_path = self._context.get('dir_path', '')
+        filepath = os.path.join(bucket_name, dir_path, obj.na)
+        download_url = reverse('api:bucket-detail', kwargs={'version': 'v1', 'filepath': filepath})
+        if request:
+            download_url = request.build_absolute_uri(download_url)
+        return download_url
+
 

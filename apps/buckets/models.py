@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from mongoengine import DynamicDocument, EmbeddedDocument
 from mongoengine import fields
 from mongoengine.base.datastructures import EmbeddedDocumentList
+from rest_framework.reverse import reverse
 
 
 #获取用户模型

@@ -125,7 +125,6 @@ class FileView(View):
                 content['files'] = files
             else:
                 raise Http404('参数有误，未找到相关记录')
-
         content['path_links'] = bfm.get_dir_link_paths()
         content['cur_path'] = path
         return content

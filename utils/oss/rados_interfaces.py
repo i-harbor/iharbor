@@ -44,7 +44,7 @@ class CephRadosObject():
                                           self._user_name.encode('utf-8'),
                                           self._conf_file.encode('utf-8'),
                                           self._pool_name.encode('utf-8'),
-                                          size,
+                                         ctypes.c_int(size),
                                           self._obj_id.encode('utf-8'),
                                          ctypes.c_ulonglong(offset))
         data = ctypes.string_at(result.data_ptr, result.data_len)
@@ -157,7 +157,7 @@ class CephRadosObject():
                                                self._pool_name.encode('utf-8'),
                                                self._obj_id.encode('utf-8'),
                                                chunk,
-                                               len(chunk),
+                                               ctypes.c_int(len(chunk)),
                                                mode.encode('utf-8'),
                                                ctypes.c_ulonglong(offset))
                 data = ctypes.string_at(result.data_ptr, result.data_len)
