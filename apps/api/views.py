@@ -365,6 +365,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
             serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
             data = {
+                'code': 200,
                 'files': serializer.data,
                 'bucket_name': bucket_name,
                 'dir_path': dir_path,
@@ -458,7 +459,7 @@ class BucketFileViewSet(viewsets.GenericViewSet):
 
     destroy:
         通过文件绝对路径（以存储桶名开始）,下载文件对象；
-    	Http Code: 状态码204：无异常时，返回bytes数据流；
+    	Http Code: 状态码204：删除成功；
         Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
         Http Code: 状态码404：找不到资源;
         Http Code: 状态码500：服务器内部错误;

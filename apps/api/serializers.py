@@ -12,6 +12,7 @@ from buckets.utils import BucketFileManagement, get_collection_name
 from .models import User, Bucket, BucketFileInfo
 from utils.storagers import FileStorage
 from utils.oss.rados_interfaces import CephRadosObject
+from .validators import DNSStringValidator
 
 
 class UserDeitalSerializer(serializers.ModelSerializer):
@@ -68,8 +69,8 @@ class BucketCreateSerializer(serializers.Serializer):
     '''
     创建存储桶序列化器
     '''
-    name = serializers.CharField(label='存储桶名称', max_length=50,
-                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，由最多50个字母或数字组成')
+    name = serializers.CharField(label='存储桶名称', max_length=63,
+                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，不超过63个字符')
     # user = serializers.CharField(label='所属用户', help_text='所创建的存储桶的所属用户，可输入用户名或用户id')
 
     def validate(self, data):
@@ -77,6 +78,17 @@ class BucketCreateSerializer(serializers.Serializer):
         复杂验证
         """
         bucket_name = data['name']
+
+        if not bucket_name:
+            raise serializers.ValidationError('存储桶bucket名称不能为空')
+
+        if bucket_name.startswith('-') or bucket_name.endswith('-'):
+            raise serializers.ValidationError('存储桶bucket名称不能以“-”开头或结尾')
+
+        DNSStringValidator(bucket_name)
+        bucket_name = bucket_name.lower()
+        data['name'] = bucket_name
+
         if Bucket.objects.filter(name=bucket_name).exists():
             raise serializers.ValidationError("存储桶名称已存在")
         return data
