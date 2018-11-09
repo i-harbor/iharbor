@@ -66,7 +66,7 @@ class BucketView(View):
                 # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
                 #     BucketFileInfo.drop_collection()
                 # 只删除用户自己的buckets
-                if buckets.user.id == request.user.id:
+                if bucket.user.id == request.user.id:
                     bucket.do_soft_delete() # 软删除
 
         data = {

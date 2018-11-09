@@ -52,3 +52,17 @@ function csrfSafeMethod(method) {
     // these HTTP methods do not require CSRF protection
     return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
 }
+
+//
+// 动态修改浏览器url,而不刷新网页
+//
+function change_url_no_refresh(new_url, new_title) {
+    var state = {
+        title: document.title,
+        url: document.location.href,
+        otherkey: null
+    };
+    history.replaceState(state, new_title, new_url);
+}
+
+

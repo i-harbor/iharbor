@@ -1,5 +1,7 @@
-from django.http import StreamingHttpResponse, FileResponse, Http404
+from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
+from django.db.models import Q as dQ
 from mongoengine.context_managers import switch_collection
+from mongoengine.queryset.visitor import Q as mQ
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
@@ -79,10 +81,10 @@ class UserViewSet( mixins.RetrieveModelMixin,
         return [IsSuperUser()]
 
 
-class BucketViewSet(mixins.CreateModelMixin,
+class BucketViewSet(#mixins.CreateModelMixin,
                    mixins.RetrieveModelMixin,
-                   mixins.DestroyModelMixin,
-                   mixins.ListModelMixin,
+                   # mixins.DestroyModelMixin,
+                   # mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     '''
     存储桶视图
@@ -99,24 +101,75 @@ class BucketViewSet(mixins.CreateModelMixin,
     delete:
     delete a bucket
     '''
-    queryset = Bucket.objects.all()
+    queryset = Bucket.objects.filter(soft_delete=False).all()
     permission_classes = [IsAuthenticated]
     # serializer_class = serializers.BucketCreateSerializer
+
+    # api docs
+    schema = CustomAutoSchema(
+        manual_fields={
+            'DELETE': [
+                coreapi.Field(
+                    name='ids',
+                    required=False,
+                    location='body',
+                    schema=coreschema.String(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
+                ),
+            ]
+        }
+    )
 
     def list(self, request, *args, **kwargs):
         if IsSuperUser().has_permission(request, view=None):
             pass # superuser return all
         else:
-            self.queryset = Bucket.objects.filter(user=request.user).all() # user's own
+            self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
 
-        return super(BucketViewSet, self).list(request, *args, **kwargs)
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        data = {
+            'buckets': serializer.data,
+        }
+        return Response(data)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid(raise_exception=False):
+            data = {
+                'code': 400,
+                'code_text': serializer.errors['non_field_errors'],
+                'data': serializer.data,
+            }
+            return Response(data, status=status.HTTP_201_CREATED)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        data = {
+            'code': 200,
+            'code_text': '创建成功',
+            'data': serializer.data,
+            'bucket': serializers.BucketSerializer(serializer.instance).data
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
 
+    def destroy(self, request, *args, **kwargs):
+        id = kwargs.get(self.lookup_field, None)
+        ids = request.POST.getlist('ids')
+        if id and id not in ids:
+            ids.append(id)
+        if ids:
+            buckets = Bucket.objects.filter(id__in=ids)
+            if not buckets.exists():
+                return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+            for bucket in buckets:
+                # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
+                #     BucketFileInfo.drop_collection()
+                # 只删除用户自己的buckets
+                if bucket.user.id == request.user.id:
+                    bucket.do_soft_delete()  # 软删除
+
+            data = {'code': 200, 'code_text': '存储桶删除成功'}
+        else:
+            data = {'code': 404, 'code_text': '存储桶id为空'}
+        return Response(data=data, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         """
@@ -393,7 +446,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 bfinfo.did = did
             bfinfo.save()
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = {
+            'code': 200,
+            'code_text': '创建文件夹成功',
+            'data': serializer.data,
+            'dir': serializers.DirectoryListSerializer(bfinfo).data
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         dir_path = kwargs.get(self.lookup_field, '')
@@ -450,6 +509,9 @@ class BucketFileViewSet(viewsets.GenericViewSet):
     '''
     存储桶文件视图集
 
+    list:
+    获取文件对象详细信息；
+
     retrieve:
     通过文件绝对路径（以存储桶名开始）,下载文件对象；
     	Http Code: 状态码200：无异常时，返回bytes数据流；
@@ -466,7 +528,7 @@ class BucketFileViewSet(viewsets.GenericViewSet):
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
-    serializer_class = serializers.FileDownloadSerializer
+    # serializer_class = serializers.FileDownloadSerializer
     lookup_field = 'filepath'
     lookup_value_regex = '.+'
 
@@ -491,6 +553,10 @@ class BucketFileViewSet(viewsets.GenericViewSet):
             'DELETE': METHOD_FEILD,
         }
     )
+
+    def list(self, request, *args, **kwargs):
+
+        serializer = serializers.DirectoryListSerializer()
 
     def retrieve(self, request, *args, **kwargs):
         filepath = kwargs.get(self.lookup_field, '')

@@ -52,10 +52,11 @@ class BucketSerializer(serializers.ModelSerializer):
     '''
     user = serializers.SerializerMethodField() # 自定义user字段内容
     created_time = serializers.SerializerMethodField()  # 自定义字段内容
+    access_permission = serializers.SerializerMethodField()
 
     class Meta:
         model = Bucket
-        fields = ('id', 'name', 'user', 'created_time')
+        fields = ('id', 'name', 'user', 'created_time', 'access_permission')
         # depth = 1
 
     def get_user(selfself, obj):
@@ -63,6 +64,9 @@ class BucketSerializer(serializers.ModelSerializer):
 
     def get_created_time(self, obj):
         return obj.created_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    def get_access_permission(self, obj):
+        return obj.get_access_permission_display()
 
 
 class BucketCreateSerializer(serializers.Serializer):
@@ -366,15 +370,11 @@ class DirectoryCreateSerializer(serializers.Serializer):
         self.instance = None
         # data = self.validated_data
         data = super(DirectoryCreateSerializer, self).data
-        return {
-            'data': data,
-            'code': 200,
-            'code_text': '创建文件夹成功'
-        }
+        return data
 
 class DirectoryListSerializer(serializers.Serializer):
     '''
-    创建目录序列化器
+    目录下文件列表序列化器
     '''
     na = serializers.CharField(required=True, help_text='文件名或目录名')
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录

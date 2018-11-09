@@ -8,7 +8,7 @@
                     <h5><span class="glyphicon glyphicon-list"></span>  对象存储<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
                 <ul class="nav nav-pills nav-stacked collapse in" id="oos-nav-list-group">
-                    <li><a href="{% url 'buckets:bucket_view' %}">存储桶</a></li>
+                    <li><a href="#" id="nav-bucket-view">存储桶</a></li>
                     <li><a>预留</a></li>
                 </ul>
             </li>
@@ -32,7 +32,7 @@
             </li>
         </ul>
     </div>
-    <div class="col-xs-offset-2">
+    <div class="col-xs-offset-2" id="content-display-div">
         {% block content %}{% endblock %}
     </div>
 {% endblock %}
