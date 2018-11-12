@@ -12,7 +12,6 @@ router.register(r'(?P<version>(v1|v2))/delete', views.DeleteFileViewSet, base_na
 router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
 router.register(r'(?P<version>(v1|v2))/directory', views.DirectoryViewSet, base_name='directory')
 router.register(r'(?P<version>(v1|v2))/bucket', views.BucketFileViewSet, base_name='bucket')
-router.register(r'(?P<version>(v1|v2))/obj', views.FileObjViewSet, base_name='bucket')
 
 
 urlpatterns = [

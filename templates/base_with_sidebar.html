@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% load static %}
+
+{% block head %}
+    <link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+{% endblock %}
+
 {% block boby %}
     <div class="sidebar container col-xs-2">
         <ul class="nav nav-tabs nav-stacked">
@@ -36,3 +42,13 @@
         {% block content %}{% endblock %}
     </div>
 {% endblock %}
+
+{% block script %}
+    <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
+{#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
+    <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
+    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
+    <script type="text/javascript" src="{% static 'buckets/bucket.js' %}"></script>
+{#    jquery模板定义#}
+{% endblock %}
+

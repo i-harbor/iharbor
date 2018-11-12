@@ -40,6 +40,22 @@ class CustomAutoSchema(AutoSchema):
         return extra_fields
 
 
+class CustomGenericViewSet(viewsets.GenericViewSet):
+    '''
+    自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
+    '''
+    def get_serializer(self, *args, **kwargs):
+        """
+        Return the serializer instance that should be used for validating and
+        deserializing input, and for serializing output.
+        """
+        serializer_class = self.get_serializer_class()
+        context = self.get_serializer_context()
+        context.update(kwargs.get('context', {}))
+        kwargs['context'] = context
+        return serializer_class(*args, **kwargs)
+
+
 class UserViewSet( mixins.RetrieveModelMixin,
                    mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
@@ -401,14 +417,14 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         dir_path = request.query_params.get('dir_path', '')
 
         if not Bucket.check_user_own_bucket(request, bucket_name):
-            return Response({'code': 404, 'error_text': f'您不存在一个名称为“{bucket_name}”的存储桶'})
+            return Response({'code': 404, 'code_text': f'您不存在一个名称为“{bucket_name}”的存储桶'})
 
         bfm = BucketFileManagement(path=dir_path)
         with switch_collection(BucketFileInfo,
                                get_collection_name(bucket_name=bucket_name)):
             ok, files = bfm.get_cur_dir_files()
             if not ok:
-                return Response({'code': 404, 'error_text': '参数有误，未找到相关记录'})
+                return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'})
 
             queryset = files
             page = self.paginate_queryset(queryset)
@@ -423,6 +439,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 'bucket_name': bucket_name,
                 'dir_path': dir_path,
                 'ajax_upload_url': reverse('api:upload-list', kwargs={'version': 'v1'}),
+                'breadcrumb': bfm.get_dir_link_paths()
             }
             return Response(data)
 
@@ -509,18 +526,16 @@ class BucketFileViewSet(viewsets.GenericViewSet):
     '''
     存储桶文件视图集
 
-    list:
-    获取文件对象详细信息；
-
     retrieve:
-    通过文件绝对路径（以存储桶名开始）,下载文件对象；
-    	Http Code: 状态码200：无异常时，返回bytes数据流；
+    通过文件绝对路径（以存储桶名开始）,下载文件对象或文件对象详细信息；
+    	Http Code: 状态码200：无异常时,
+    	    query参数info=true时返回文件对象详细信息，否则返回bytes数据流；
         Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
         Http Code: 状态码404：找不到资源;
         Http Code: 状态码500：服务器内部错误;
 
     destroy:
-        通过文件绝对路径（以存储桶名开始）,下载文件对象；
+        通过文件绝对路径（以存储桶名开始）,删除文件对象；
     	Http Code: 状态码204：删除成功；
         Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
         Http Code: 状态码404：找不到资源;
@@ -546,6 +561,12 @@ class BucketFileViewSet(viewsets.GenericViewSet):
             location='path',
             schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
         ),
+        coreapi.Field(
+            name='info',
+            required=False,
+            location='query',
+            schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
+        ),
     ]
     schema = CustomAutoSchema(
         manual_fields = {
@@ -554,16 +575,31 @@ class BucketFileViewSet(viewsets.GenericViewSet):
         }
     )
 
-    def list(self, request, *args, **kwargs):
-
-        serializer = serializers.DirectoryListSerializer()
-
     def retrieve(self, request, *args, **kwargs):
+        info = request.query_params.get('info', None)
         filepath = kwargs.get(self.lookup_field, '')
         bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
         fileobj = self.get_file_obj_or_404(bucket_name, path, filename)
+
+        # 返回文件对象详细信息
+        if info == 'true':
+            bfm = BucketFileManagement(path=path)
+            serializer = serializers.DirectoryListSerializer(fileobj, context={'bucket_name': bucket_name, 'dir_path': path})
+            return Response(data={
+                                'code': 200,
+                                'bucket_name': bucket_name,
+                                'dir_path': path,
+                                'obj': serializer.data,
+                                'breadcrumb': bfm.get_dir_link_paths()
+                            })
+
+        # 增加一次下载次数
+        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+            fileobj.dlc = (fileobj.dlc or 0) + 1  # 下载次数+1
+            fileobj.save()
+
         response = self.get_file_download_response(str(fileobj.id), filename)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

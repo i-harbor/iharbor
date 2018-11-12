@@ -24,58 +24,58 @@ class BucketView(View):
     def get(self, request):
         form = BucketForm()
         content = self.get_content(request=request, form=form)
-        return render(request, 'buckets_home.html', context=content)
+        # return render(request, 'buckets_home.html', context=content)
+        return render(request, 'base_with_sidebar.html', context=content)
 
-
-    def post(self, request):
-        form = BucketForm(request.POST)
-        #验证表单
-        if form.is_valid():
-            #创建存储桶bucket
-            bucket_name = form.cleaned_data['name']
-            user = request.user
-            collection_name = get_collection_name(bucket_name=bucket_name)
-            Bucket(name=bucket_name, user=user, collection_name=collection_name).save()
-            # ajax请求
-            if request.is_ajax():
-                data = {
-                    'code': 200,
-                    'code_text': '创建存储桶“{0}”成功'.format(bucket_name),
-                    'bucket_name': bucket_name,
-                    'redirect_to': reverse('buckets:bucket_view') # 前端重定向地址
-                }
-                return JsonResponse(data=data)
-            return redirect(to=reverse('buckets:bucket_view'))
-
-        #表单验证有误
-        if request.is_ajax(): # ajax请求
-            data = {'code': 401, 'status': 'ERROR'}
-            data['error_text'] = form.errors.as_text()
-            return JsonResponse(data=data)
-        content = self.get_content(request=request, form=form)
-        return render(request, 'buckets_home.html', context=content)
-
-
-    def delete(self, request):
-        '''删除存储桶'''
-        delete = QueryDict(request.body)
-        ids = delete.getlist('ids')
-        if ids:
-            buckets = Bucket.objects.filter(id__in=ids)
-            for bucket in buckets:
-                # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
-                #     BucketFileInfo.drop_collection()
-                # 只删除用户自己的buckets
-                if bucket.user.id == request.user.id:
-                    bucket.do_soft_delete() # 软删除
-
-        data = {
-            'code': 200,
-            'code_text': '存储桶删除成功'
-        }
-        return JsonResponse(data=data)
-
-
+    # def post(self, request):
+    #     form = BucketForm(request.POST)
+    #     #验证表单
+    #     if form.is_valid():
+    #         #创建存储桶bucket
+    #         bucket_name = form.cleaned_data['name']
+    #         user = request.user
+    #         collection_name = get_collection_name(bucket_name=bucket_name)
+    #         Bucket(name=bucket_name, user=user, collection_name=collection_name).save()
+    #         # ajax请求
+    #         if request.is_ajax():
+    #             data = {
+    #                 'code': 200,
+    #                 'code_text': '创建存储桶“{0}”成功'.format(bucket_name),
+    #                 'bucket_name': bucket_name,
+    #                 'redirect_to': reverse('buckets:bucket_view') # 前端重定向地址
+    #             }
+    #             return JsonResponse(data=data)
+    #         return redirect(to=reverse('buckets:bucket_view'))
+    #
+    #     #表单验证有误
+    #     if request.is_ajax(): # ajax请求
+    #         data = {'code': 401, 'status': 'ERROR'}
+    #         data['error_text'] = form.errors.as_text()
+    #         return JsonResponse(data=data)
+    #     content = self.get_content(request=request, form=form)
+    #     return render(request, 'buckets_home.html', context=content)
+    #
+    #
+    # def delete(self, request):
+    #     '''删除存储桶'''
+    #     delete = QueryDict(request.body)
+    #     ids = delete.getlist('ids')
+    #     if ids:
+    #         buckets = Bucket.objects.filter(id__in=ids)
+    #         for bucket in buckets:
+    #             # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
+    #             #     BucketFileInfo.drop_collection()
+    #             # 只删除用户自己的buckets
+    #             if bucket.user.id == request.user.id:
+    #                 bucket.do_soft_delete() # 软删除
+    #
+    #     data = {
+    #         'code': 200,
+    #         'code_text': '存储桶删除成功'
+    #     }
+    #     return JsonResponse(data=data)
+    #
+    #
     def get_content(self, request, form):
         content = {}
         content['submit_text'] = '创建'
