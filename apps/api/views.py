@@ -92,8 +92,10 @@ class UserViewSet( mixins.RetrieveModelMixin,
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'create', 'delete']:
+        if self.action in ['list', 'delete']:
             return [IsSuperUser()]
+        elif self.action == 'create':
+            return []
         return [IsSuperUser()]
 
 

@@ -42,7 +42,7 @@ class UserCreateSerializer(serializers.Serializer):
         """
         username = validated_data['username']
         if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError('用户名已存在')
+            raise serializers.ValidationError(detail={'error_text': '用户名已存在'})
         return User.objects.create(**validated_data)
 
 
