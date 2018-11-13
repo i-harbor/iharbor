@@ -1,5 +1,6 @@
 from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_jwt.views import obtain_jwt_token
 
 from . import views
 
@@ -17,4 +18,5 @@ router.register(r'(?P<version>(v1|v2))/bucket', views.BucketFileViewSet, base_na
 urlpatterns = [
     # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
+    url(r'^auth', obtain_jwt_token),
 ]
