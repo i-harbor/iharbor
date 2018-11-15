@@ -19,10 +19,11 @@ from rest_framework.documentation import include_docs_urls
 from django.contrib.staticfiles.views import serve
 
 urlpatterns = [
-    url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
-    url(r'^admin/', admin.site.urls),
+    url(r'api/', include('api.urls', namespace='api')),
+    url(r'share/', include('share.urls', namespace='share')),
     url(r'', include('buckets.urls', namespace='buckets')),
     url(r'^users/', include('users.urls', namespace='users')),
-    url(r'api/', include('api.urls', namespace='api')),
+    url(r'^admin/', admin.site.urls),
+    url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
     url(r'v1/docs/', include_docs_urls(title='EVOBCloud API Docs')),
 ]

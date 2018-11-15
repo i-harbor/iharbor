@@ -588,7 +588,9 @@ class BucketFileViewSet(viewsets.GenericViewSet):
         # 返回文件对象详细信息
         if info == 'true':
             bfm = BucketFileManagement(path=path)
-            serializer = serializers.DirectoryListSerializer(fileobj, context={'bucket_name': bucket_name, 'dir_path': path})
+            serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
+                                                                               'bucket_name': bucket_name,
+                                                                               'dir_path': path})
             return Response(data={
                                 'code': 200,
                                 'bucket_name': bucket_name,

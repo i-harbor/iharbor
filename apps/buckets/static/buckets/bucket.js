@@ -379,7 +379,7 @@
                             </tr>
                         {{/each}}
                     </table>
-                    {{if files.length}}
+                    {{if files}}
                         {{if files.length === 0}}
                               <p class="text-info text_center">肚子空空如也哦 =^_^=</p>
                          {{/if}}

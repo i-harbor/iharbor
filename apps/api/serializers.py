@@ -434,4 +434,3 @@ class DirectoryListSerializer(serializers.Serializer):
             download_url = request.build_absolute_uri(download_url)
         return download_url
 
-

@@ -28,7 +28,7 @@ class Bucket(models.Model):
         (False, '正常'),
     )
 
-    name = models.CharField(max_length=50, db_index=True, unique=True, verbose_name='bucket名称')
+    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, verbose_name='存储桶对应的集合表名')
