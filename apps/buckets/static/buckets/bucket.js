@@ -1,6 +1,16 @@
 ;(function() {
 
     //
+    //所有ajax的请求的全局设置
+    //
+    $.ajaxSettings.beforeSend = function(xhr, settings){
+        var csrftoken = getCookie('csrftoken');
+        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+    };
+
+    //
     // 页面刷新时执行
     window.onload = function() {
         get_buckets_and_render();
@@ -57,12 +67,6 @@
                     type: 'post',
                     data: {'name': input_name},
                     timeout: 200000,
-                    beforeSend: function (xhr, settings) {//set csrf cookie
-                        var csrftoken = getCookie('csrftoken');
-                        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                        }
-                    },
                     success: (result) => {
                         if (result.code === 200){
                             return result;
@@ -175,12 +179,6 @@
                             'ids': arr,// 存储桶id数组
                         },
                         traditional: true,//传递数组时需要设为true
-                        beforeSend: function (xhr, settings) {//set csrf cookie
-                            var csrftoken = getCookie('csrftoken');
-                            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                                xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                            }
-                        },
                         success: function (data) {
                             if (data.code === 200) {
                                 bucket_list_checked.parents('tr').remove();
@@ -305,7 +303,7 @@
                     <!--{#目录导航栏#}-->
                     <div>
                         <ol class="breadcrumb">
-                            <a href="#" id="btn-path-bucket">Home</a>
+                            <a href="#" id="btn-path-bucket">Buckets</a>
                             <span>></span>
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{each breadcrumb}}
@@ -317,6 +315,7 @@
                     <div>
                         <button class="btn btn-info" id="btn-new-directory"><span class="glyphicon glyphicon-plus"></span>创建文件夹</button>
                         <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}">上传文件</button>
+                        <button class="btn btn-success" id="btn-path-item" bucket_name="{{ $data['bucket_name'] }}" dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-refresh"></span></button>
                         <div class="progress text-warning" id="upload-progress-bar" style="display: none;">
                             <div class="progress-bar"  role="progressbar" aria-valuenow="0" aria-valuemin="0"
                                  aria-valuemax="100" style="min-width: 2em;width: 0%;">
@@ -364,14 +363,12 @@
                                         <ul class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <li class="btn-info"><a href="{% url 'buckets:file_list' bucket_name=bucket_name path=file.na %}">打开</a></li>
+                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">打开</a></li>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
-                                                <li class="btn-success"><a id="file-item-download"
-                                                       href="{% url 'buckets:get_object_view' bucket_name=bucket_name path=cur_path object_name=file.na %}">下载</a></li>
-                                                <li class="btn-danger"><a id="file-item-delete" href="#"
-                                                 file-delete-url="{% url 'buckets:object_view' bucket_name=bucket_name path=cur_path object_name=file.na %}">删除</a></li>
+                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
+                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.na}}">删除</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
@@ -389,6 +386,48 @@
         </div>
      `);
 
+
+    //
+    // 存储桶文件删除事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-item-delete', function (e) {
+        e.preventDefault();
+        let list_item_dom = $(this).parents("tr.bucket-files-table-item");
+        filename = $(this).attr("filename");
+        obj = get_bucket_name_and_cur_path();
+        bucket_name = obj.bucket_name;
+        cur_path = obj.dir_path;
+
+        url = "/api/v1/bucket/" + bucket_name + "/" ;
+        if (cur_path){
+            url += cur_path + "/";
+        }
+        url += filename + "/";
+        delete_one_file_ajax(url, function () {
+            list_item_dom.remove();
+        });
+    });
+
+
+    //
+    // 删除一个文件文件
+    //
+    function delete_one_file_ajax(url, success_do){
+        swal.showLoading();
+        $.ajax({
+            type: 'delete',
+            url: url,
+            success: function(data,status,xhr){
+                swal.close();
+                success_do();
+                show_auto_close_warning_dialog('删除成功', type='success');
+            },
+            error: function (error) {
+                swal.close();
+                show_warning_dialog('删除失败！', type='error');
+            }
+        });
+    }
 
     //
     // 存储桶列表项点击进入事件处理
@@ -475,7 +514,7 @@
     }
 
     //
-    //存储桶文件列表视图渲染模板
+    //存储桶文件对象详细信息视图渲染模板
     //
     let render_file_obj_info_view = template.compile(`
         <div class="container-fluid">
@@ -590,12 +629,6 @@
             data: formData, //必须false才会自动加上正确的Content-Type
             contentType: false,
             processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
-            beforeSend: function (xhr, settings) {//set csrf cookie
-                var csrftoken = getCookie('csrftoken');
-                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                }
-            },
             success: function (data) {
                 if (data.id) {
                     let put_url = url + data.id + '/';
@@ -652,12 +685,6 @@
             data: formData,
             contentType: false,//必须false才会自动加上正确的Content-Type
             processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
-            beforeSend: function (xhr, settings) {//set csrf cookie
-                var csrftoken = getCookie('csrftoken');
-                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                }
-            },
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
                 offset = end;
@@ -805,32 +832,6 @@
         })
     });
 
-    //
-    // 删除一个文件对象(ajax)
-    //
-    function delete_file_object(url, success) {
-        return $.ajax({
-            url: url,
-            type: "DELETE",
-            beforeSend: function (xhr, settings) {//set csrf cookie
-                var csrftoken = getCookie('csrftoken');
-                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                }
-            },
-            success: function (data) {
-                if (data.code === 200) {
-                   success();
-                } else {
-                    show_warning_dialog('删除文件失败！');
-                }
-            },
-            error: function (err) {
-                show_warning_dialog('删除文件失败！', 'error');
-            },
-        });
-    }
-
 
     //
     // 创建文件夹点击事件处理（对话框方式）
@@ -861,12 +862,6 @@
                     timeout: 200000,
                     contentType: false,//必须false才会自动加上正确的Content-Type
                     processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
-                    beforeSend: function (xhr, settings) {//set csrf cookie
-                        var csrftoken = getCookie('csrftoken');
-                        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
-                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
-                        }
-                    },
                     success: (result) => {
                         if (result.code === 200){
                             return result;

@@ -1,4 +1,5 @@
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
+from django.utils.http import urlquote
 from django.db.models import Q as dQ
 from mongoengine.context_managers import switch_collection
 from mongoengine.queryset.visitor import Q as mQ
@@ -138,10 +139,10 @@ class BucketViewSet(#mixins.CreateModelMixin,
     )
 
     def list(self, request, *args, **kwargs):
-        if IsSuperUser().has_permission(request, view=None):
-            pass # superuser return all
-        else:
-            self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
+        # if IsSuperUser().has_permission(request, view=None):
+        #     pass # superuser return all
+        # else:
+        self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
@@ -646,6 +647,7 @@ class BucketFileViewSet(viewsets.GenericViewSet):
         if not file_generator:
             return None
 
+        filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
         response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
