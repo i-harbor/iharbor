@@ -1,17 +1,19 @@
+import uuid
 from datetime import datetime
 
 from django.db import models
 from django.contrib.auth import get_user_model
-from mongoengine import DynamicDocument, EmbeddedDocument
+from mongoengine import DynamicDocument
 from mongoengine import fields
-from mongoengine.base.datastructures import EmbeddedDocumentList
-from rest_framework.reverse import reverse
 
 
 #获取用户模型
 User = get_user_model()
 
 # Create your models here.
+
+def get_uuid1_hex_string():
+    return uuid.uuid1().hex
 
 class Bucket(models.Model):
     '''
@@ -28,10 +30,10 @@ class Bucket(models.Model):
         (False, '正常'),
     )
 
-    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
+    name = models.CharField(max_length=63, db_index=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    collection_name = models.CharField(max_length=50, verbose_name='存储桶对应的集合表名')
+    collection_name = models.CharField(max_length=50, default=get_uuid1_hex_string, editable=False, verbose_name='存储桶对应的集合表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
 
@@ -39,26 +41,46 @@ class Bucket(models.Model):
         verbose_name = '存储桶'
         verbose_name_plural = verbose_name
 
+    @classmethod
+    def get_bucket_by_name(self, bucket_name):
+        '''
+        获取存储通对象
+        :param bucket_name: 存储通名称
+        :return: Bucket对象; None(不存在)
+        '''
+        query_set = Bucket.objects.filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
+        if query_set.exists():
+            return query_set.first()
+
+        return None
+
     def do_soft_delete(self):
         self.soft_delete = True
         self.save()
 
-    @classmethod
-    def check_user_own_bucket(self, request, bucket_name):
+    def check_user_own_bucket(self, request):
         # bucket是否属于当前用户
-        return Bucket.objects.filter(models.Q(user=request.user) & models.Q(name=bucket_name)).exists()
+        return request.user.id == self.user.id
+
+    def get_bucket_mongo_collection_name(self):
+        '''
+        获得bucket对应的mongodb集合名
+        :return: 集合名
+        '''
+        return f'bucket_{self.collection_name}'
 
 
-
-# class FileChunkInfo(EmbeddedDocument):
-# 	'''
-# 	文件块信息模型
-# 	'''
-# 	bm = fields.IntField(required=True) # 文件块编号
-# 	uuid = fields.StringField(required=True) # 文件快唯一标识
-# 	md5 = fields.StringField(required=True, max_length=32, min_length=32) # 文件块MD5码
-# 	up = fields.BooleanField(default=False) # 文件快是否已上传完成，True->已上传完成
-
+# def get_bucket_by_name(self, bucket_name):
+#     '''
+#     获取存储通对象
+#     :param bucket_name: 存储通名称
+#     :return: Bucket对象; None(不存在)
+#     '''
+#     query_set = Bucket.objects.filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
+#     if query_set.exists():
+#         return query_set.first()
+#
+#     return None
 
 
 class BucketFileInfo(DynamicDocument):

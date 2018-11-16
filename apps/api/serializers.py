@@ -8,11 +8,33 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 from mongoengine.context_managers import switch_collection
 
-from buckets.utils import BucketFileManagement, get_collection_name
+from buckets.utils import BucketFileManagement
+# from buckets.models import get_bucket_by_name
 from .models import User, Bucket, BucketFileInfo
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
 from .validators import DNSStringValidator
+
+
+
+def get_bucket_collection_name_or_ValidationError(bucket_name, request):
+    '''
+    获取存储通对应集合名称，或者ValidationError对象
+    :param bucket_name: 存储通名称
+    :return: (collection_name, ValidationError)
+            collection_name=None时，存储通不存在，ValidationError有效；
+            collection_name!=''时，存储通存在，ValidationError=None；
+    '''
+    bucket = Bucket.get_bucket_by_name(bucket_name)
+    if not bucket:
+        vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
+        return (None, vali_error)
+    if not bucket.check_user_own_bucket(request):
+        vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
+        return (None, vali_error)
+
+    collection_name = bucket.get_bucket_mongo_collection_name()
+    return (collection_name, None)
 
 
 class UserDeitalSerializer(serializers.ModelSerializer):
@@ -93,7 +115,7 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_name = bucket_name.lower()
         data['name'] = bucket_name
 
-        if Bucket.objects.filter(name=bucket_name).exists():
+        if Bucket.get_bucket_by_name(bucket_name):
             raise serializers.ValidationError("存储桶名称已存在")
         return data
 
@@ -169,12 +191,11 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         file_name = data.get('file_name')
         overwrite = data.get('overwrite', False)
 
-
         # bucket是否属于当前用户,检测存储桶名称是否存在
-        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
+        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
+        if not _collection_name and vali_error:
+            raise vali_error
 
-        _collection_name = get_collection_name(bucket_name=bucket_name)
         with switch_collection(BucketFileInfo, _collection_name):
             bfm = BucketFileManagement(path=dir_path)
             # 当前目录下是否已存在同文件名文件
@@ -234,10 +255,10 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
-        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
+        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
+        if not _collection_name and vali_error:
+            raise vali_error
 
-        _collection_name = get_collection_name(bucket_name=bucket_name)
         with switch_collection(BucketFileInfo, _collection_name):
             bfi = BucketFileInfo.objects(id=file_id).first()
             if not bfi:
@@ -277,12 +298,13 @@ class FileDeleteSerializer(serializers.Serializer):
         # bucket是否属于当前用户,检测存储桶名称是否存在
         request = self.context.get('request')
         bucket_name = data.get('bucket_name')
-        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(bucket_name=bucket_name)
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
+        if not _collection_name and vali_error:
+            raise vali_error
+
         data['_collection_name'] = _collection_name
-
         return data
 
     def create(self, validated_data):
@@ -319,15 +341,15 @@ class FileDownloadSerializer(serializers.Serializer):
                                           help_text='要读取的文件块的字节大小, 类型int')
 
     def validate(self, data):
-        # bucket是否属于当前用户,检测存储桶名称是否存在
         request = self.context.get('request')
         bucket_name = data.get('bucket_name')
-        if not Bucket.objects.filter(dQ(user=request.user) & dQ(name=bucket_name)).exists():
-            raise serializers.ValidationError(detail={'bucket_name': '存储桶不存在'})
 
-        _collection_name = get_collection_name(bucket_name=bucket_name)
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
+        if not _collection_name and vali_error:
+            raise vali_error
+
         data['_collection_name'] = _collection_name
-
         return data
 
     @property
@@ -346,6 +368,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
 
     def validate(self, data):
         '''校验参数'''
+        request = self.context.get('request')
         bucket_name = data.get('bucket_name', '')
         dir_path = data.get('dir_path', '')
         dir_name = data.get('dir_name', '')
@@ -353,7 +376,14 @@ class DirectoryCreateSerializer(serializers.Serializer):
         if not bucket_name or not dir_name:
             raise serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
 
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
+        if not _collection_name and vali_error:
+            raise vali_error
+
+        data['collection_name'] = _collection_name
+
+        with switch_collection(BucketFileInfo, _collection_name):
             bfm = BucketFileManagement(path=dir_path)
             ok, dir = bfm.get_dir_exists(dir_name=dir_name)
             if not ok:
@@ -363,7 +393,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
             data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
-            return data
+        return data
 
     @property
     def data(self):

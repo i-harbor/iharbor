@@ -10,7 +10,8 @@ from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.reverse import reverse
 
-from buckets.utils import get_collection_name, BucketFileManagement
+from buckets.utils import BucketFileManagement
+# from buckets.models import get_bucket_by_name
 from utils.storagers import FileStorage, PathParser
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
@@ -55,6 +56,25 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         context.update(kwargs.get('context', {}))
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
+
+def get_bucket_collection_name_or_response(bucket_name, request):
+    '''
+    获取存储通对应集合名称，或者Response对象
+    :param bucket_name: 存储通名称
+    :return: (collection_name, response)
+            collection_name=None时，存储通不存在，response有效；
+            collection_name!=''时，存储通存在，response=None；
+    '''
+    bucket = Bucket.get_bucket_by_name(bucket_name)
+    if not bucket:
+        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'}, status=status.HTTP_404_NOT_FOUND)
+        return (None, response)
+    if not bucket.check_user_own_bucket(request):
+        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'}, status=status.HTTP_404_NOT_FOUND)
+        return (None, response)
+
+    collection_name = bucket.get_bucket_mongo_collection_name()
+    return (collection_name, None)
 
 
 class UserViewSet( mixins.RetrieveModelMixin,
@@ -179,8 +199,6 @@ class BucketViewSet(#mixins.CreateModelMixin,
             if not buckets.exists():
                 return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
             for bucket in buckets:
-                # with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket.name)):
-                #     BucketFileInfo.drop_collection()
                 # 只删除用户自己的buckets
                 if bucket.user.id == request.user.id:
                     bucket.do_soft_delete()  # 软删除
@@ -272,33 +290,6 @@ class UploadFileViewSet(viewsets.GenericViewSet):
         context = super(UploadFileViewSet, self).get_serializer_context()
         context['kwargs'] = self.kwargs
         return context
-
-
-class DeleteFileViewSet(viewsets.GenericViewSet):
-    '''
-    删除或者取消上传文件视图集
-
-    create:
-    通过文件id,删除一个文件
-    	Http Code: 状态码201：无异常时，返回数据：
-    	{
-            data: 客户端请求时，携带的数据,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-    '''
-    queryset = []
-    permission_classes = [IsAuthenticated]
-    serializer_class = serializers.FileDeleteSerializer
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.response_data, status=status.HTTP_201_CREATED)
-
-    def destroy(self, request, *args, **kwargs):
-        pass
 
 
 class DownloadFileViewSet(viewsets.GenericViewSet):
@@ -419,12 +410,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         bucket_name = request.query_params.get('bucket_name')
         dir_path = request.query_params.get('dir_path', '')
 
-        if not Bucket.check_user_own_bucket(request, bucket_name):
-            return Response({'code': 404, 'code_text': f'您不存在一个名称为“{bucket_name}”的存储桶'})
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
 
         bfm = BucketFileManagement(path=dir_path)
-        with switch_collection(BucketFileInfo,
-                               get_collection_name(bucket_name=bucket_name)):
+        with switch_collection(BucketFileInfo, collection_name):
             ok, files = bfm.get_cur_dir_files()
             if not ok:
                 return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'})
@@ -452,12 +443,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_200_OK)
 
         validated_data = serializer.validated_data
-        bucket_name = validated_data.get('bucket_name', '')
         dir_path = validated_data.get('dir_path', '')
         dir_name = validated_data.get('dir_name', '')
         did = validated_data.get('did', None)
+        collection_name = validated_data.get('collection_name')
 
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+        with switch_collection(BucketFileInfo, collection_name):
             bfinfo = BucketFileInfo(na=dir_path + '/' + dir_name if dir_path else dir_name,  # 目录名
                                     fod=False,  # 目录
                                     )
@@ -478,16 +469,20 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         dir_path = kwargs.get(self.lookup_field, '')
         bucket_name = request.query_params.get('bucket_name', '')
 
-        pp = PathParser(path=dir_path)
+        pp = PathParser(filepath=dir_path)
         path, dir_name = pp.get_path_and_filename()
         if not bucket_name or not dir_name:
             return Response(data={'code': 400, 'code_text': 'bucket_name or dir_name不能为空'}, status=status.HTTP_400_BAD_REQUEST)
 
-        obj = self.get_dir_object(bucket_name, path, dir_path)
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        obj = self.get_dir_object(path, dir_name, collection_name)
         if not obj:
-            data = {'code': 404, 'code_text': '文件不存在'}
+            return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
         else:
-            with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+            with switch_collection(BucketFileInfo, collection_name):
                 obj.do_soft_delete()
             data = {'code': 200, 'code_text': '已成功删除'}
         return Response(data=data, status=status.HTTP_200_OK)
@@ -513,12 +508,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             return serializers.DirectoryCreateSerializer
         return serializers.DirectoryListSerializer
 
-    def get_dir_object(self, bucket_name, path, dir_name):
+    def get_dir_object(self, path, dir_name, collection_name):
         """
         Returns the object the view is displaying.
         """
         bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+        with switch_collection(BucketFileInfo, collection_name):
             ok, obj = bfm.get_dir_exists(dir_name=dir_name)
             if not ok:
                 return None
@@ -584,7 +579,12 @@ class BucketFileViewSet(viewsets.GenericViewSet):
         bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-        fileobj = self.get_file_obj_or_404(bucket_name, path, filename)
+
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 返回文件对象详细信息
         if info == 'true':
@@ -601,7 +601,7 @@ class BucketFileViewSet(viewsets.GenericViewSet):
                             })
 
         # 增加一次下载次数
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+        with switch_collection(BucketFileInfo, collection_name):
             fileobj.dlc = (fileobj.dlc or 0) + 1  # 下载次数+1
             fileobj.save()
 
@@ -615,17 +615,22 @@ class BucketFileViewSet(viewsets.GenericViewSet):
         bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-        fileobj = self.get_file_obj_or_404(bucket_name, path, filename)
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name=bucket_name)):
+
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        with switch_collection(BucketFileInfo, collection_name):
             fileobj.do_soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def get_file_obj_or_404(self, bucket_name, path, filename):
+    def get_file_obj_or_404(self, collection_name, path, filename):
         """
         获取文件对象信息
         """
         bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, get_collection_name(bucket_name)):
+        with switch_collection(BucketFileInfo, collection_name):
             ok, obj = bfm.get_file_exists(file_name=filename)
             if not ok:
                 return None

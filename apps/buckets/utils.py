@@ -4,12 +4,12 @@ from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 from .models import BucketFileInfo
 
 
-def get_collection_name(bucket_name):
-    '''
-    获得当前用户存储桶Bucket对应集合名称
-    每个存储桶对应的集合表名==用户名_存储桶名称
-    '''
-    return f'bucket_{bucket_name}'
+# def get_collection_name(collection_name):
+#     '''
+#     获得当前用户存储桶Bucket对应集合名称
+#     每个存储桶对应的集合表名==用户名_存储桶对应集合名称
+#     '''
+#     return f'bucket_{collection_name}'
 
 
 class BucketFileManagement():

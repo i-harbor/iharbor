@@ -1,5 +1,23 @@
 ;(function() {
 
+    //API域名
+    let DOMAIN_NAME = ''; //'http://10.0.86.213:8000/';
+
+    // 获取API域名
+    function get_api_domain_name(){
+        return DOMAIN_NAME;
+    }
+
+    // 构建带域名url
+    function build_url_with_domain_name(url){
+        let domain = get_api_domain_name();
+        domain = domain.rightStrip('/');
+        if(!url.startsWith('/'))
+            url = '/' + url;
+        return domain + url;
+    }
+
+
     //
     //所有ajax的请求的全局设置
     //
@@ -32,8 +50,8 @@
     //form 表单获取所有数据 封装方法
     //
     function getFormJson(form_node) {
-        var o = {};
-        var a = $(form_node).serializeArray();
+        let o = {};
+        let a = $(form_node).serializeArray();
         $.each(a, function () {
             if (o[this.name] !== undefined) {
                 if (!o[this.name].push) {
@@ -63,7 +81,7 @@
             showLoaderOnConfirm: true,
             preConfirm: (input_name) => {
                 return $.ajax({
-                    url: '/api/v1/buckets/',
+                    url: build_url_with_domain_name('/api/v1/buckets/'),
                     type: 'post',
                     data: {'name': input_name},
                     timeout: 200000,
@@ -173,7 +191,7 @@
 
                 if (arr.length > 0) {
                     $.ajax({
-                        url: '/api/v1/buckets/0/',
+                        url: build_url_with_domain_name('/api/v1/buckets/0/'),
                         type: 'delete',
                         data: {
                             'ids': arr,// 存储桶id数组
@@ -202,9 +220,8 @@
     let render_bucket_item = template.compile(`
         <tr class="active" id="bucket-list-item">
             <td><input type="checkbox" class="item-checkbox" value="{{ $id }}"></td>
-            <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="">{{ $data['name'] }}</a></td>
+            <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
-            <td>{{ user.username }}</td>
             <td>{{ $data['access_permission'] }}</td>
         </tr>
     `);
@@ -232,7 +249,6 @@
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                             <th>存储桶名称</th>
                             <th>创建时间</th>
-                            <th>所属用户</th>
                             <th>访问权限</th>
                         </tr>
                         {{if buckets}}
@@ -242,7 +258,6 @@
                                     <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.created_time }}</td>
-                                    <td>{{ $value.user.username }}</td>
                                     <td>{{ $value.access_permission }}</td>
                                 </tr>
                             {{/each}}
@@ -261,7 +276,7 @@
     // 获取存储桶列表并渲染
     //
     function get_buckets_and_render(){
-        get_content_and_render('api/v1/buckets/', render_bucket_view);
+        get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
     }
 
     //
@@ -364,6 +379,7 @@
                                             <!--目录-->
                                             {{ if !$value.fod }}
                                                 <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">打开</a></li>
+                                                <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">删除</a></li>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
@@ -398,12 +414,13 @@
         bucket_name = obj.bucket_name;
         cur_path = obj.dir_path;
 
-        url = "/api/v1/bucket/" + bucket_name + "/" ;
+        url = get_api_domain_name() + "/api/v1/bucket/" + bucket_name + "/" ;
         if (cur_path){
             url += cur_path + "/";
         }
         url += filename + "/";
-        delete_one_file_ajax(url, function () {
+        url = build_url_with_domain_name(url);
+        delete_one_file(url, function () {
             list_item_dom.remove();
         });
     });
@@ -412,7 +429,7 @@
     //
     // 删除一个文件文件
     //
-    function delete_one_file_ajax(url, success_do){
+    function delete_one_file(url, success_do){
         swal.showLoading();
         $.ajax({
             type: 'delete',
@@ -429,6 +446,44 @@
         });
     }
 
+
+    //
+    // 删除文件夹事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-item-delete-dir', function (e) {
+        e.preventDefault();
+        let list_item_dom = $(this).parents("tr.bucket-files-table-item");
+        bucket_name = get_bucket_name_and_cur_path().bucket_name;
+        dir_path = $(this).attr('dir_path');
+
+        let url = get_api_domain_name() + "/api/v1/directory/" + dir_path + "/?" + "bucket_name=" + bucket_name;
+        url = build_url_with_domain_name(url);
+        delete_one_directory(url, function () {
+            list_item_dom.remove();
+        });
+    });
+
+    //
+    // 删除一个文件文件
+    //
+    function delete_one_directory(url, success_do){
+        swal.showLoading();
+        $.ajax({
+            type: 'delete',
+            url: url,
+            success: function(data,status,xhr){
+                swal.close();
+                success_do();
+                show_auto_close_warning_dialog('删除成功', type='success');
+            },
+            error: function (error,status) {
+                swal.close();
+                show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
+            }
+        });
+    }
+
+
     //
     // 存储桶列表项点击进入事件处理
     //
@@ -444,8 +499,8 @@
     //
     $("#content-display-div").on("click", '#bucket-files-item-enter-dir', function (e) {
         e.preventDefault();
-        bucket_name = get_bucket_name_and_cur_path().bucket_name;
-        dir_path = $(this).attr('dir_path');
+        let bucket_name = get_bucket_name_and_cur_path().bucket_name;
+        let dir_path = $(this).attr('dir_path');
         get_bucket_files_and_render(bucket_name, dir_path);
     });
 
@@ -455,8 +510,9 @@
     //
     $("#content-display-div").on("click", '#bucket-files-item-enter-file', function (e) {
         e.preventDefault();
-        download_url = $(this).attr('download_url');
-        url = download_url + '?info=true';
+        let download_url = $(this).attr('download_url');
+        let url = download_url + '?info=true';
+        url = build_url_with_domain_name(url);
         get_file_obj_info_and_render(url);
     });
 
@@ -465,7 +521,8 @@
     // 获取存储桶文件列表并渲染
     //
     function get_bucket_files_and_render(bucket_name, dir_path=''){
-        get_content_and_render('api/v1/directory/', render_bucket_files_view, data= {
+        let url = build_url_with_domain_name('api/v1/directory/');
+        get_content_and_render(url, render_bucket_files_view, data= {
             bucket_name: bucket_name,
             dir_path: dir_path
         });
@@ -608,7 +665,8 @@
         let dir_path = obj.dir_path;
 
         beforeFileUploading();
-        uploadFileCreate('api/v1/upload/', bucket_name, dir_path, file);
+        let url = build_url_with_domain_name('api/v1/upload/');
+        uploadFileCreate(url, bucket_name, dir_path, file);
     }
 
     //
@@ -856,7 +914,7 @@
                 formdata.append('dir_path', dir_path);
                 formdata.append('dir_name', input_name);
                 return $.ajax({
-                    url: '/api/v1/directory/',
+                    url: build_url_with_domain_name('/api/v1/directory/'),
                     type: 'post',
                     data: formdata,
                     timeout: 200000,
@@ -915,7 +973,8 @@
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
                aria-expanded="false">操作<span class="caret"></span></a>
                     <ul class="dropdown-menu">
-                         <li class="btn-info"><a>打开</a></li>
+                         <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">打开</a></li>
+                         <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">删除</a></li>
                     </ul>
                 </li>
             </td>

@@ -9,4 +9,3 @@ class BucketAdmin(admin.ModelAdmin):
     list_display_links = ('id', 'name')
 
     list_filter = ('user', 'created_time')
-

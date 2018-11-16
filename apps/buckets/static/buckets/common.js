@@ -65,4 +65,16 @@ function change_url_no_refresh(new_url, new_title) {
     history.replaceState(state, new_title, new_url);
 }
 
+String.prototype.rightStrip = function(searchValue){
+    if(this.endsWith(searchValue)){
+        return this.substring(0, this.lastIndexOf(searchValue));
+    }
+    return this;
+};
 
+String.prototype.leftStrip = function(searchValue){
+    if(this.startsWith(searchValue)){
+        return this.replace(searchValue);
+    }
+    return this;
+};

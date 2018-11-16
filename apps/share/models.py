@@ -12,7 +12,7 @@ class SharedLink(models.Model):
     '''
     分享链接模型
     '''
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name='分享码')
+    shared_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name='分享码')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     bucket_name = models.CharField(verbose_name='存储桶名称')
     path = models.CharField(verbose_name='分享路径', blank=True, help_text='文件或文件夹分享路径，为空时分享整个存储桶')
