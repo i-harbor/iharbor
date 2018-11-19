@@ -30,11 +30,9 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
                            aria-expanded="false">帮助 <span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                            <li><a href="#">Action</a></li>
+                            <li><a href="https://github.com/evharbor" target="view_window">Github</a></li>
                             <li role="separator" class="divider"></li>
-                            <li><a href="#">Separated link</a></li>
-                            <li role="separator" class="divider"></li>
-                            <li><a href="#">One more separated link</a></li>
+                            <li><a href="#">关于</a></li>
                         </ul>
                     </li>
                     <li>
@@ -62,9 +60,14 @@
             </div><!-- /.navbar-collapse -->
         </div><!-- /.container-fluid -->
     </nav>
-    <div style="margin-top: 60px;">
+    <div style="padding-top: 60px;padding-bottom: 30px;">
         {% block boby %}{% endblock %}
     </div>
+    <footer class="navbar-fixed-bottom" style="background: #dddddd">
+        <div class="text_center">
+            <p>© 2018 all rights reserved 中科院网络信息中心 京ICP备xxxxxxxx号</p>
+        </div>
+    </footer>
     <script type="text/javascript" src="{% static 'jquery2.2.4/dist/jquery-2.2.4.min.js' %}"></script>
     {# 加载 Bootstrap 的所有 JavaScript 插件。你也可以根据需要只加载单个插件 #} 
     <script type="text/javascript" src="{% static 'bootstrap-3.3.7/js/bootstrap.min.js' %}"></script>
