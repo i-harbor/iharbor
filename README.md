@@ -28,6 +28,20 @@ connect(
     # authentication_source='admin'
 )
 ```
+### 1.5 ceph配置
+从[rados_io](https://github.com/evobstore/rados_io)下载rados.so库文件，放于项目‘utils/oss/’路径下；以下配置根据实际情况自行修改。
+```
+CEPH_RADOS = {
+    'CLUSTER_NAME': 'ceph',
+    'USER_NAME': 'client.objstore',
+    'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
+    'POOL_NAME': 'objstore',
+    'RADOS_DLL_PATH': 'rados.so'
+}
+```
+
+### 1.6 security_settings.py
+在settings.py文件最后导入了security_settings.py（项目中缺少），security_settings.py中定义了一些安全敏感信息，请自行添加此文件，并根据自己情况参考settings.py中例子完成配置。
 
 ## 2 运行webserver
 ### 2.1 激活python虚拟环境  

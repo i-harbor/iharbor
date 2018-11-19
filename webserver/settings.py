@@ -14,6 +14,7 @@ import os
 import sys
 import datetime
 
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -40,6 +41,7 @@ INSTALLED_APPS = [
 
     # 第三方apps
     'rest_framework',
+    'rest_framework.authtoken',
 
     #自定义apps
     'buckets.apps.BucketsConfig',
@@ -148,6 +150,7 @@ REST_FRAMEWORK = {
         # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -181,7 +184,7 @@ CEPH_RADOS = {
     'POOL_NAME': 'objstore',
     'RADOS_DLL_PATH': 'rados.so'
 }
-'''
+
 # 日志配置
 LOGGING = {
     'version': 1,
@@ -235,10 +238,12 @@ LOGGING = {
             'propagate': False,
         },
     },
-}'''
+}
 
 # 导入安全相关的settings
 from .security_settings import *
+
+# The following is examples for security_settings.py
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'tbfpk*ax#48#^_qzr-cg07&z9&+8j68=x41w5lzv^wsv7xax=v'
