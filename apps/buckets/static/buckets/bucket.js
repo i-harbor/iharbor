@@ -76,6 +76,7 @@
             inputAttributes: {
                 autocapitalize: 'off'
             },
+            showCloseButton: true,
             showCancelButton: true,
             confirmButtonText: '创建',
             showLoaderOnConfirm: true,
@@ -85,16 +86,15 @@
                     type: 'post',
                     data: {'name': input_name},
                     timeout: 200000,
-                    success: (result) => {
-                        if (result.code === 200){
-                            return result;
-                        }else{
-                            swal.showValidationMessage(
-                            `Request failed: ${result.code_text}`
-                            );
-                        }
-                    },
-                });
+                }).done((result) => {
+                    if (result.code === 200){
+                        return result;
+                    }else{
+                        swal.showValidationMessage(
+                        `Request failed: ${result.code_text}`
+                        );
+                    }
+                })
             },
             allowOutsideClick: () => !swal.isLoading()
         }).then(

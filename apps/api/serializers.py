@@ -191,6 +191,9 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         file_name = data.get('file_name')
         overwrite = data.get('overwrite', False)
 
+        if '/' in file_name:
+            raise serializers.ValidationError(detail={'error_text': 'file_name有误，文件名不能包含/'})
+
         # bucket是否属于当前用户,检测存储桶名称是否存在
         _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
         if not _collection_name and vali_error:
@@ -375,6 +378,9 @@ class DirectoryCreateSerializer(serializers.Serializer):
 
         if not bucket_name or not dir_name:
             raise serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
+
+        if '/' in dir_name:
+            raise serializers.ValidationError(detail={'error_text': 'dir_name不能包含‘/’'})
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)

@@ -2,16 +2,13 @@ from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.db.models import Q as dQ
 from mongoengine.context_managers import switch_collection
-from mongoengine.queryset.visitor import Q as mQ
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
-from rest_framework.reverse import reverse
 
 from buckets.utils import BucketFileManagement
-# from buckets.models import get_bucket_by_name
 from utils.storagers import FileStorage, PathParser
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
@@ -120,10 +117,7 @@ class UserViewSet( mixins.RetrieveModelMixin,
         return [IsSuperUser()]
 
 
-class BucketViewSet(#mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   # mixins.DestroyModelMixin,
-                   # mixins.ListModelMixin,
+class BucketViewSet(mixins.RetrieveModelMixin,
                    viewsets.GenericViewSet):
     '''
     存储桶视图
@@ -203,10 +197,10 @@ class BucketViewSet(#mixins.CreateModelMixin,
                 if bucket.user.id == request.user.id:
                     bucket.do_soft_delete()  # 软删除
 
-            data = {'code': 200, 'code_text': '存储桶删除成功'}
-        else:
-            data = {'code': 404, 'code_text': '存储桶id为空'}
-        return Response(data=data, status=status.HTTP_200_OK)
+            return Response(data={'code': 200, 'code_text': '存储桶删除成功'}, status=status.HTTP_200_OK)
+
+        return Response(data={'code': 404, 'code_text': '存储桶id为空'}, status=status.HTTP_404_NOT_FOUND)
+
 
     def get_serializer_class(self):
         """
@@ -244,15 +238,13 @@ class UploadFileViewSet(viewsets.GenericViewSet):
 
     update:
     文件块上传
-        Http Code: 状态码201：上传成功无异常时，返回数据：
+        Http Code: 状态码200：上传成功无异常时，返回数据：
         {
             data: 客户端请求时，携带的参数,不包含数据块；
         }
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
 
-    destroy:
-    通过文件id,删除一个文件，或者取消上传一个文件
     '''
     queryset = {}
     permission_classes = [IsAuthenticated]
@@ -448,7 +440,9 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         collection_name = validated_data.get('collection_name')
 
         with switch_collection(BucketFileInfo, collection_name):
-            bfinfo = BucketFileInfo(na=dir_path + '/' + dir_name if dir_path else dir_name,  # 目录名
+            bfm = BucketFileManagement(dir_path)
+            dir_path_name = bfm.build_dir_full_name(dir_name)
+            bfinfo = BucketFileInfo(na=dir_path_name,  # 目录名
                                     fod=False,  # 目录
                                     )
             # 有父节点

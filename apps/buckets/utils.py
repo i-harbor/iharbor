@@ -21,9 +21,10 @@ class BucketFileManagement():
         self.cur_dir_id = None
 
     def _hand_path(self, path):
-        '''去除path字符串两边可能的空白和/'''
+        '''去除path字符串两边可能的空白和右边/'''
         if isinstance(path, str):
-            return path.strip(' /')
+            path.strip(' ')
+            return path.rstrip('/')
         return ''
 
     def get_dir_link_paths(self, dir_path=None):
@@ -107,6 +108,7 @@ class BucketFileManagement():
         if not ok:
             return False, None
 
+        file_name.strip('/')
         if did:
             bfis = BucketFileInfo.objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
                                           (mQ(sds__exists=False) | mQ(sds=False)))# 目录下是否存在给定文件名的文件
@@ -131,8 +133,7 @@ class BucketFileManagement():
         if not ok:
             return False, None
 
-        path = self._hand_path(self._path)
-        dir_path_name = path + '/' + dir_name if path else dir_name
+        dir_path_name = self.build_dir_full_name(dir_name)
 
         try:
             dir = BucketFileInfo.objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
@@ -143,4 +144,7 @@ class BucketFileManagement():
 
         return True, dir
 
-
+    def build_dir_full_name(self, dir_name):
+        dir_name.strip('/')
+        path = self._hand_path(self._path)
+        return (path + '/' + dir_name) if path else dir_name
