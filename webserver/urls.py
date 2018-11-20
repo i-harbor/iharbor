@@ -15,8 +15,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.conf.urls import url, include
-from rest_framework.documentation import include_docs_urls
 from django.contrib.staticfiles.views import serve
+from rest_framework.documentation import include_docs_urls
 
 urlpatterns = [
     url(r'api/', include('api.urls', namespace='api')),

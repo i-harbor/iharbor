@@ -10,7 +10,7 @@ idna==2.7
 itypes==1.1.0
 Jinja2==2.10
 MarkupSafe==1.1.0
-mongoengine==0.16.0
+mongoengine==0.16.1
 Pillow==5.3.0
 PyJWT==1.6.4
 pymongo==3.7.2
@@ -19,3 +19,4 @@ requests==2.20.1
 six==1.11.0
 uritemplate==3.0.0
 urllib3==1.23
+uWSGI==2.0.17.1

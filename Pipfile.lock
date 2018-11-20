@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dcf0b9195cbccb7f363768fd3902d56d8848bbd3853bc961409cf82e28dd2633"
+            "sha256": "8bda51ea2178d548f2c7c6f2abcc0cf397f3d8d9c557c73e3dd3edf43e3f4dbb"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -132,11 +132,11 @@
         },
         "mongoengine": {
             "hashes": [
-                "sha256:1c375c8bbae89fc3df672c619a5835a2bd15148f9e8939f214a0b398cf12525f",
-                "sha256:e8ed6d9d7f648205f4adcd773bb25ce626fdc6cd74b2959451e425441fb0e6d3"
+                "sha256:6b3bf21d0bf6eb65d525a10427d162d564c70ee4fafc08b7d220ed22eeab743c",
+                "sha256:954aeac6a08fb2b4a9bf1e8592d14ae4369c05d50a34dfa05c83ff5a44394678"
             ],
             "index": "pypi",
-            "version": "==0.16.0"
+            "version": "==0.16.1"
         },
         "pillow": {
             "hashes": [
@@ -259,5 +259,13 @@
             "version": "==1.23"
         }
     },
-    "develop": {}
+    "develop": {
+        "uwsgi": {
+            "hashes": [
+                "sha256:d2318235c74665a60021a4fc7770e9c2756f9fc07de7b8c22805efe85b5ab277"
+            ],
+            "index": "pypi",
+            "version": "==2.0.17.1"
+        }
+    }
 }
