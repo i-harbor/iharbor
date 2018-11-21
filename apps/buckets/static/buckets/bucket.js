@@ -100,7 +100,7 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`).then(() => {
+                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`, 'success').then(() => {
                         item_html = render_bucket_item(result.value.bucket);
                         $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
                     } )
@@ -414,7 +414,7 @@
         bucket_name = obj.bucket_name;
         cur_path = obj.dir_path;
 
-        url = get_api_domain_name() + "/api/v1/bucket/" + bucket_name + "/" ;
+        url = get_api_domain_name() + "/api/v1/obj/" + bucket_name + "/" ;
         if (cur_path){
             url += cur_path + "/";
         }
@@ -427,7 +427,7 @@
 
 
     //
-    // 删除一个文件文件
+    // 删除一个文件
     //
     function delete_one_file(url, success_do){
         swal.showLoading();
@@ -456,7 +456,7 @@
         bucket_name = get_bucket_name_and_cur_path().bucket_name;
         dir_path = $(this).attr('dir_path');
 
-        let url = get_api_domain_name() + "/api/v1/directory/" + dir_path + "/?" + "bucket_name=" + bucket_name;
+        let url = get_api_domain_name() + "/api/v1/dir/" + dir_path + "/?" + "bucket_name=" + bucket_name;
         url = build_url_with_domain_name(url);
         delete_one_directory(url, function () {
             list_item_dom.remove();
@@ -464,7 +464,7 @@
     });
 
     //
-    // 删除一个文件文件
+    // 删除一个文件夹
     //
     function delete_one_directory(url, success_do){
         swal.showLoading();
@@ -521,7 +521,7 @@
     // 获取存储桶文件列表并渲染
     //
     function get_bucket_files_and_render(bucket_name, dir_path=''){
-        let url = build_url_with_domain_name('api/v1/directory/');
+        let url = build_url_with_domain_name('api/v1/dir/');
         get_content_and_render(url, render_bucket_files_view, data= {
             bucket_name: bucket_name,
             dir_path: dir_path
@@ -665,7 +665,7 @@
         let dir_path = obj.dir_path;
 
         beforeFileUploading();
-        let url = build_url_with_domain_name('api/v1/upload/');
+        let url = build_url_with_domain_name('api/v1/obj/');
         uploadFileCreate(url, bucket_name, dir_path, file);
     }
 
@@ -914,7 +914,7 @@
                 formdata.append('dir_path', dir_path);
                 formdata.append('dir_name', input_name);
                 return $.ajax({
-                    url: build_url_with_domain_name('/api/v1/directory/'),
+                    url: build_url_with_domain_name('/api/v1/dir/'),
                     type: 'post',
                     data: formdata,
                     timeout: 200000,
@@ -943,7 +943,7 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`).then(() => {
+                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success').then(() => {
                         // location.reload(true);// 刷新当前页面
                         let html = render_bucket_dir_item(result.value);
                         $("#bucket-files-table tr:eq(0)").after(html);

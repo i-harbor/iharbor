@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # 第三方apps
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_swagger',
 
     #自定义apps
     'buckets.apps.BucketsConfig',
@@ -145,7 +146,7 @@ REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
     'DEFAULT_PERMISSION_CLASSES': [
-        # 'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
         # 'rest_framework.permissions.IsAuthenticated',
         # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],

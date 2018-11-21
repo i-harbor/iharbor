@@ -11,6 +11,7 @@ django-rest-framework = "*"
 coreapi = "*"
 requests = "*"
 djangorestframework-jwt = "*"
+django-rest-swagger = "*"
 
 [dev-packages]
 uwsgi = "*"

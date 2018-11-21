@@ -65,7 +65,7 @@ class UserCreateSerializer(serializers.Serializer):
         username = validated_data['username']
         if User.objects.filter(username=username).exists():
             raise serializers.ValidationError(detail={'error_text': '用户名已存在'})
-        return User.objects.create(**validated_data)
+        return User.objects.create_user(**validated_data)
 
 
 class BucketSerializer(serializers.ModelSerializer):
@@ -133,14 +133,14 @@ class BucketCreateSerializer(serializers.Serializer):
         return bucket
 
 
-class ChunkedUploadCreateSerializer(serializers.Serializer):
+class ObjPostSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
     bucket_name = serializers.CharField(label='存储桶名称', required=True,
                                         help_text='文件上传到的存储桶名称，类型string')
     dir_path = serializers.CharField(label='文件上传路径', required=False,
-                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，类型string')
+                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，为空或者‘/’表示在存储桶下，类型string')
     file_name = serializers.CharField(label='文件名', required=True, help_text='上传文件的文件名，类型string')
     # file_size = serializers.IntegerField(label='文件大小', required=True, min_value=1, help_text='上传文件的字节大小')
     # file_md5 = serializers.CharField(label='文件MD5码', required=False, min_length=32, max_length=32,
@@ -225,7 +225,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         return data
 
 
-class ChunkedUploadUpdateSerializer(serializers.Serializer):
+class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
@@ -244,11 +244,16 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
         """
         request = self.context.get('request')
         kwargs = self.context.get('kwargs')
-        file_id = kwargs.get('pk')
+        file_id = kwargs.get('objpath')
         bucket_name = data.get('bucket_name')
         chunk_offset = data.get('chunk_offset')
         chunk = data.get('chunk')
         chunk_size = data.get('chunk_size')
+
+        try:
+            file_id = ObjectId(file_id)
+        except Exception:
+            raise serializers.ValidationError(detail={'objpath': 'id不是一个有效的ObjectID'})
 
         if not chunk:
             if 0 != chunk_size:
@@ -465,7 +470,7 @@ class DirectoryListSerializer(serializers.Serializer):
         bucket_name = self._context.get('bucket_name', '')
         dir_path = self._context.get('dir_path', '')
         filepath = os.path.join(bucket_name, dir_path, obj.na)
-        download_url = reverse('api:bucket-detail', kwargs={'version': 'v1', 'filepath': filepath})
+        download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url

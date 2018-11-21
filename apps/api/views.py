@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
+from rest_framework.serializers import Serializer
 
 from buckets.utils import BucketFileManagement
 from utils.storagers import FileStorage, PathParser
@@ -74,20 +75,22 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     return (collection_name, None)
 
 
-class UserViewSet( mixins.RetrieveModelMixin,
-                   mixins.DestroyModelMixin,
+class UserViewSet(mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
                    viewsets.GenericViewSet):
     '''
     用户类视图
     list:
-    return user list.
+    获取用户列表,需要管理员权限
 
-    retrieve：
-    return user infomation.
+    retrieve:
+    获取一个用户详细信息，需要管理员权限，或当前用户信息
 
     create:
-    create a user
+    注册一个用户
+
+    destroy:
+    删除一个用户，需要管理员权限
     '''
     queryset = User.objects.all()
 
@@ -95,7 +98,14 @@ class UserViewSet( mixins.RetrieveModelMixin,
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED, )
+        return Response(serializer.validated_data, status=status.HTTP_201_CREATED, )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not (request.user.id == instance.id):
+            return Response(data={"detail": "您没有执行该操作的权限。"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def get_serializer_class(self):
         '''
@@ -111,9 +121,11 @@ class UserViewSet( mixins.RetrieveModelMixin,
         Instantiates and returns the list of permissions that this view requires.
         """
         if self.action in ['list', 'delete']:
-            return [IsSuperUser()]
+            return [IsAuthenticated(), IsSuperUser()]
         elif self.action == 'create':
             return []
+        elif self.action == 'retrieve':
+            return [IsAuthenticated()]
         return [IsSuperUser()]
 
 
@@ -123,16 +135,16 @@ class BucketViewSet(mixins.RetrieveModelMixin,
     存储桶视图
 
     list:
-    return bucket list.
+    获取存储桶列表
 
     retrieve:
-    return bucket infomation.
+    获取一个存储桶详细信息
 
     create:
-    create a bucket
+    创建一个新的存储桶
 
     delete:
-    delete a bucket
+    删除一个存储桶
     '''
     queryset = Bucket.objects.filter(soft_delete=False).all()
     permission_classes = [IsAuthenticated]
@@ -153,9 +165,6 @@ class BucketViewSet(mixins.RetrieveModelMixin,
     )
 
     def list(self, request, *args, **kwargs):
-        # if IsSuperUser().has_permission(request, view=None):
-        #     pass # superuser return all
-        # else:
         self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -222,12 +231,12 @@ class BucketViewSet(mixins.RetrieveModelMixin,
         return [permission() for permission in self.permission_classes]
 
 
-class UploadFileViewSet(viewsets.GenericViewSet):
+class ObjViewSet(viewsets.GenericViewSet):
     '''
-    上传文件视图集
+    文件对象视图集
 
     create:
-    文件上传请求，服务器会生成一条文件对象记录，并返回文件对象的id：
+    创建一个文件对象，并返回文件对象的id：
     	Http Code: 状态码201：无异常时，返回数据：
     	{
             data: 客户端请求时，携带的数据,
@@ -237,7 +246,7 @@ class UploadFileViewSet(viewsets.GenericViewSet):
             对应参数错误信息;
 
     update:
-    文件块上传
+    通过对象ID分片上传文件对象
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
             data: 客户端请求时，携带的参数,不包含数据块；
@@ -245,10 +254,72 @@ class UploadFileViewSet(viewsets.GenericViewSet):
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
 
+    retrieve:
+        通过文件绝对路径（以存储桶名开始）,下载文件对象或文件对象详细信息；
+    	Http Code: 状态码200：无异常时,
+    	    query参数info=true时返回文件对象详细信息，否则返回bytes数据流；
+        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+        Http Code: 状态码404：找不到资源;
+        Http Code: 状态码500：服务器内部错误;
+
+    destroy:
+        通过文件绝对路径（以存储桶名开始）,删除文件对象；
+    	Http Code: 状态码204：删除成功；
+        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+        Http Code: 状态码404：找不到资源;
+        Http Code: 状态码500：服务器内部错误;
+
     '''
     queryset = {}
     permission_classes = [IsAuthenticated]
-    # serializer_class = serializers.BucketCreateSerializer
+    lookup_field = 'objpath'
+    lookup_value_regex = '.+'
+
+    # api docs
+    BASE_METHOD_FEILD = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FEILD + [
+                coreapi.Field(
+                    name='objpath',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+                ),
+                coreapi.Field(
+                    name='info',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
+                )
+            ],
+            'DELETE': BASE_METHOD_FEILD + [
+                coreapi.Field(
+                    name='objpath',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+                )
+            ],
+            'PUT': BASE_METHOD_FEILD + [
+                coreapi.Field(
+                    name='objpath',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='ObjectID，post请求创建文件对象返回的对象ID,类型String')
+                )
+            ],
+            'POST': BASE_METHOD_FEILD
+        }
+    )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -256,11 +327,62 @@ class UploadFileViewSet(viewsets.GenericViewSet):
         serializer.save()
         return Response(serializer.response_data, status=status.HTTP_201_CREATED)
 
-
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, *args, **kwargs):
+        info = request.query_params.get('info', None)
+        filepath = kwargs.get(self.lookup_field, '')
+        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+
+        # 返回文件对象详细信息
+        if info == 'true':
+            bfm = BucketFileManagement(path=path)
+            serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
+                                                                               'bucket_name': bucket_name,
+                                                                               'dir_path': path})
+            return Response(data={
+                                'code': 200,
+                                'bucket_name': bucket_name,
+                                'dir_path': path,
+                                'obj': serializer.data,
+                                'breadcrumb': bfm.get_dir_link_paths()
+                            })
+
+        # 增加一次下载次数
+        with switch_collection(BucketFileInfo, collection_name):
+            fileobj.dlc = (fileobj.dlc or 0) + 1  # 下载次数+1
+            fileobj.save()
+
+        response = self.get_file_download_response(str(fileobj.id), filename)
+        if not response:
+            return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        filepath = kwargs.get(self.lookup_field, '')
+        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        with switch_collection(BucketFileInfo, collection_name):
+            fileobj.do_soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
     def get_serializer_class(self):
@@ -269,19 +391,52 @@ class UploadFileViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action == 'update':
-            return serializers.ChunkedUploadUpdateSerializer
-        elif self.action == 'create':
-            return serializers.ChunkedUploadCreateSerializer
-        return serializers.ChunkedUploadUpdateSerializer
+        if self.action == 'create':
+            return serializers.ObjPostSerializer
+        elif self.action == 'update':
+            return serializers.ObjPutSerializer
+        return Serializer
 
     def get_serializer_context(self):
         """
         Extra context provided to the serializer class.
         """
-        context = super(UploadFileViewSet, self).get_serializer_context()
+        context = super(ObjViewSet, self).get_serializer_context()
         context['kwargs'] = self.kwargs
         return context
+
+    def get_file_obj_or_404(self, collection_name, path, filename):
+        """
+        获取文件对象信息
+        """
+        bfm = BucketFileManagement(path=path)
+        with switch_collection(BucketFileInfo, collection_name):
+            ok, obj = bfm.get_file_exists(file_name=filename)
+            if not ok:
+                return None
+            if not obj:
+                raise Http404
+            return obj
+
+    def get_file_download_response(self, file_id, filename):
+        '''
+        获取文件下载返回对象
+        :param file_id: 文件Id, type: str
+        :filename: 文件名， type: str
+        :return:
+            success：http返回对象，type: dict；
+            error: None
+        '''
+        cro = CephRadosObject(file_id)
+        file_generator = cro.read_obj_generator
+        if not file_generator:
+            return None
+
+        filename = urlquote(filename)# 中文文件名需要
+        response = FileResponse(file_generator())
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
+        return response
 
 
 class DownloadFileViewSet(viewsets.GenericViewSet):
@@ -346,10 +501,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     目录视图集
 
     list:
-    获取一个目录下的文件信息；
+    获取一个目录下的文件和文件夹信息
 
     create:
-    创建一个目录：
+    创建一个目录
     	Http Code: 状态码200：无异常时，返回数据：
     	{
             data: 客户端请求时，携带的数据,
@@ -360,7 +515,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         }
 
     destroy:
-    删除一个目录；
+    删除一个目录
     Http Code: 状态码200;
         无异常时，返回数据：{'code': 200, 'code_text': '已成功删除'};
         异常时，返回数据：{'code': 404, 'code_text': '文件不存在'};
@@ -511,144 +666,4 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             if not ok:
                 return None
             return obj
-
-
-class BucketFileViewSet(viewsets.GenericViewSet):
-    '''
-    存储桶文件视图集
-
-    retrieve:
-    通过文件绝对路径（以存储桶名开始）,下载文件对象或文件对象详细信息；
-    	Http Code: 状态码200：无异常时,
-    	    query参数info=true时返回文件对象详细信息，否则返回bytes数据流；
-        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        Http Code: 状态码404：找不到资源;
-        Http Code: 状态码500：服务器内部错误;
-
-    destroy:
-        通过文件绝对路径（以存储桶名开始）,删除文件对象；
-    	Http Code: 状态码204：删除成功；
-        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        Http Code: 状态码404：找不到资源;
-        Http Code: 状态码500：服务器内部错误;
-    '''
-    queryset = []
-    permission_classes = [IsAuthenticated]
-    # serializer_class = serializers.FileDownloadSerializer
-    lookup_field = 'filepath'
-    lookup_value_regex = '.+'
-
-    # api docs
-    METHOD_FEILD = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-        coreapi.Field(
-            name='filepath',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
-        ),
-        coreapi.Field(
-            name='info',
-            required=False,
-            location='query',
-            schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields = {
-            'GET': METHOD_FEILD,
-            'DELETE': METHOD_FEILD,
-        }
-    )
-
-    def retrieve(self, request, *args, **kwargs):
-        info = request.query_params.get('info', None)
-        filepath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
-
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-
-        # 返回文件对象详细信息
-        if info == 'true':
-            bfm = BucketFileManagement(path=path)
-            serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
-                                                                               'bucket_name': bucket_name,
-                                                                               'dir_path': path})
-            return Response(data={
-                                'code': 200,
-                                'bucket_name': bucket_name,
-                                'dir_path': path,
-                                'obj': serializer.data,
-                                'breadcrumb': bfm.get_dir_link_paths()
-                            })
-
-        # 增加一次下载次数
-        with switch_collection(BucketFileInfo, collection_name):
-            fileobj.dlc = (fileobj.dlc or 0) + 1  # 下载次数+1
-            fileobj.save()
-
-        response = self.get_file_download_response(str(fileobj.id), filename)
-        if not response:
-            return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return response
-
-    def destroy(self, request, *args, **kwargs):
-        filepath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
-
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        with switch_collection(BucketFileInfo, collection_name):
-            fileobj.do_soft_delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def get_file_obj_or_404(self, collection_name, path, filename):
-        """
-        获取文件对象信息
-        """
-        bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, obj = bfm.get_file_exists(file_name=filename)
-            if not ok:
-                return None
-            if not obj:
-                raise Http404
-            return obj
-
-    def get_file_download_response(self, file_id, filename):
-        '''
-        获取文件下载返回对象
-        :param file_id: 文件Id, type: str
-        :filename: 文件名， type: str
-        :return:
-            success：http返回对象，type: dict；
-            error: None
-        '''
-        cro = CephRadosObject(file_id)
-        file_generator = cro.read_obj_generator
-        if not file_generator:
-            return None
-
-        filename = urlquote(filename)# 中文文件名需要
-        response = FileResponse(file_generator())
-        response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
-        return response
-
 
