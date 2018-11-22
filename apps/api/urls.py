@@ -14,11 +14,9 @@ router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name=
 router.register(r'(?P<version>(v1|v2))/obj', views.ObjViewSet, base_name='obj')
 router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
 router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
-# router.register(r'(?P<version>(v1|v2))/bucket', views.BucketFileViewSet, base_name='bucket')
 
 
 urlpatterns = [
-    # url(r'^bucket/(?P<bucket_name>[\w-]{1,50})/(?P<path>.*)', views.file_list, name='file_list'),
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
     url(r'^jwt-token/', obtain_jwt_token),
     url(r'^jwt-token-refresh/', refresh_jwt_token),

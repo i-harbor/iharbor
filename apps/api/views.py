@@ -140,14 +140,47 @@ class BucketViewSet(mixins.RetrieveModelMixin,
     list:
     获取存储桶列表
 
+    >>Http Code: 状态码200：无异常时，返回所有的存储桶信息；
+        {
+            'buckets': [], // bucket对象列表
+        }
+
     retrieve:
     获取一个存储桶详细信息
+
+    >>Http Code: 状态码200：无异常时，返回存储桶的详细信息；
+        {
+            'buckets': {}, // bucket对象
+        }
 
     create:
     创建一个新的存储桶
 
+    >>Http Code: 状态码201；
+        创建成功时：
+        {
+            'code': 200,
+            'code_text': '创建成功',
+            'data': serializer.data, //请求时提交数据
+            'bucket': {}             //bucket对象信息
+        }
+        参数有误时：
+        {
+            'code': 400,
+            'code_text': 'xxx',      //错误码表述信息
+            'data': serializer.data, //请求时提交数据
+        }
+
     delete:
     删除一个存储桶
+
+    >>Http Code: 状态码204,存储桶删除成功
+    >>Http Code: 状态码404：
+        {
+            'code': 404,
+            'code_text': 'xxxxx'
+        }
+
     '''
     queryset = Bucket.objects.filter(soft_delete=False).all()
     permission_classes = [IsAuthenticated]
@@ -212,7 +245,7 @@ class BucketViewSet(mixins.RetrieveModelMixin,
                 if bucket.user.id == request.user.id:
                     bucket.do_soft_delete()  # 软删除
 
-            return Response(data={'code': 200, 'code_text': '存储桶删除成功'}, status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         return Response(data={'code': 404, 'code_text': '存储桶id为空'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -243,6 +276,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     create:
     创建一个文件对象，并返回文件对象的id：
+
     	Http Code: 状态码201：无异常时，返回数据：
     	{
             data: 客户端请求时，携带的数据,
@@ -253,6 +287,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     update:
     通过对象ID分片上传文件对象
+
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
             data: 客户端请求时，携带的参数,不包含数据块；
@@ -262,18 +297,36 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     retrieve:
         通过文件绝对路径（以存储桶名开始）,下载文件对象或文件对象详细信息；
-    	Http Code: 状态码200：无异常时,
-    	    query参数info=true时返回文件对象详细信息，否则返回bytes数据流；
-        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        Http Code: 状态码404：找不到资源;
-        Http Code: 状态码500：服务器内部错误;
+
+    	>>Http Code: 状态码200：
+            info=true,返回文件对象详细信息：
+            {
+                'code': 200,
+                'bucket_name': 'xxx',   //所在存储桶名称
+                'dir_path': 'xxxx',      //所在目录
+                'obj': {},              //文件对象详细信息
+                'breadcrumb': [[xxx, xxx],]    //路径面包屑
+            }
+            其他,返回FileResponse对象,bytes数据流
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'filepath参数有误'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
 
     destroy:
         通过文件绝对路径（以存储桶名开始）,删除文件对象；
-    	Http Code: 状态码204：删除成功；
-        Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        Http Code: 状态码404：找不到资源;
-        Http Code: 状态码500：服务器内部错误;
+
+        >>Http Code: 状态码204：删除成功，NO_CONTENT；
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'filepath参数有误'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
 
     '''
     queryset = {}
@@ -340,10 +393,10 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         info = request.query_params.get('info', None)
-        filepath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
+        objpath = kwargs.get(self.lookup_field, '')
+        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
         if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
@@ -376,10 +429,10 @@ class ObjViewSet(viewsets.GenericViewSet):
         return response
 
     def destroy(self, request, *args, **kwargs):
-        filepath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=filepath).get_bucket_path_and_filename()
+        objpath = kwargs.get(self.lookup_field, '')
+        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
         if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'filepath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
@@ -506,63 +559,94 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     目录视图集
 
-    list:
+    retrieve:
     获取一个目录下的文件和文件夹信息
 
+        >>Http Code: 状态码200:
+            {
+                'code': 200,
+                'files': [fileobj, fileobj, ...],//文件信息对象列表
+                'bucket_name': xxx,             //存储桶名称
+                'dir_path': xxx,                //当前目录路径
+                'breadcrumb': [[xxx, xxx],],    //路径面包屑
+            }
+        >>Http Code: 状态码400:
+            {
+                'code': 400,
+                'code_text': 'ab_path参数有误'
+            }
+        >>Http Code: 状态码404:
+            {
+                'code': xxx,      //404
+                'code_text': xxx  //错误码描述
+            }
+
     create:
-    创建一个目录
-    	Http Code: 状态码200：无异常时，返回数据：
-    	{
-            data: 客户端请求时，携带的数据,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-        {
-            error_text: 对应参数错误信息;
-        }
+        创建一个目录
+
+        >>Http Code: 状态码200, 请求参数有误:
+            {
+                "code": 400,
+                "code_text": {
+                    "error_text": ["xxxx", ] // 错误列表
+                }
+            }
+        >>Http Code: 状态码201,创建文件夹成功：
+            {
+                'code': 201,
+                'code_text': '创建文件夹成功',
+                'data': {},      //请求时提交的数据
+                'dir': {}，      //新目录对象信息
+            }
 
     destroy:
-    删除一个目录
-    Http Code: 状态码200;
-        无异常时，返回数据：{'code': 200, 'code_text': '已成功删除'};
-        异常时，返回数据：{'code': 404, 'code_text': '文件不存在'};
+        删除一个目录
+
+        >>Http Code: 状态码204,成功删除;
+        >>Http Code: 状态码400,参数无效;
+            {
+                'code': 400,
+                'code_text': 'ab_path参数无效'
+            }
+        >>Http Code: 状态码404;
+            {
+                'code': 404,
+                'code_text': '文件不存在
+            }
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
-    lookup_field = 'dir_path'
+    lookup_field = 'ab_path'
     lookup_value_regex = '.+'
     pagination_class = paginations.BucketFileCursorPagination
 
     # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+        coreapi.Field(
+            name='ab_path',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='以存储桶名称开头的目录绝对路径')
+        ),
+    ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET':[
-                coreapi.Field(
-                    name='bucket_name',
-                    required=True,
-                    location='query',
-                    schema = coreschema.String(description='存储桶名称'),
-                    ),
-                coreapi.Field(
-                    name='dir_path',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='存储桶下目录路径')
-                ),
-            ],
-            'DELETE': [
-                coreapi.Field(
-                    name='bucket_name',
-                    required=True,
-                    location='query',
-                    schema=coreschema.String(description='存储桶名称'),
-                ),
-            ]
+            'GET': BASE_METHOD_FIELDS,
+            'DELETE': BASE_METHOD_FIELDS,
         }
     )
 
-    def list(self, request, *args, **kwargs):
-        bucket_name = request.query_params.get('bucket_name')
-        dir_path = request.query_params.get('dir_path', '')
+    def retrieve(self, request, *args, **kwargs):
+        ab_path = kwargs.get(self.lookup_field, '')
+        bucket_name, dir_path= PathParser(filepath=ab_path).get_bucket_and_dirpath()
+        if not bucket_name:
+            return Response(data={'code': 400, 'code_text': 'ab_path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
@@ -572,7 +656,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         with switch_collection(BucketFileInfo, collection_name):
             ok, files = bfm.get_cur_dir_files()
             if not ok:
-                return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'})
+                return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
 
             data_dict = OrderedDict([
                 ('code', 200),
@@ -616,21 +700,19 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             bfinfo.save()
 
         data = {
-            'code': 200,
+            'code': 201,
             'code_text': '创建文件夹成功',
             'data': serializer.data,
             'dir': serializers.DirectoryListSerializer(bfinfo).data
         }
-        return Response(data, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
-        dir_path = kwargs.get(self.lookup_field, '')
-        bucket_name = request.query_params.get('bucket_name', '')
+        ab_path = kwargs.get(self.lookup_field, '')
+        bucket_name, path, dir_name = PathParser(filepath=ab_path).get_bucket_path_and_dirname()
 
-        pp = PathParser(filepath=dir_path)
-        path, dir_name = pp.get_path_and_filename()
         if not bucket_name or not dir_name:
-            return Response(data={'code': 400, 'code_text': 'bucket_name or dir_name不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': 'ab_path参数无效'}, status=status.HTTP_400_BAD_REQUEST)
 
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
@@ -642,8 +724,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         else:
             with switch_collection(BucketFileInfo, collection_name):
                 obj.do_soft_delete()
-            data = {'code': 200, 'code_text': '已成功删除'}
-        return Response(data=data, status=status.HTTP_200_OK)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer(self, *args, **kwargs):
         """

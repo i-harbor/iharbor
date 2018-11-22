@@ -89,12 +89,11 @@ class PathParser():
     路径字符串解析
     '''
     def __init__(self, filepath, *args, **kwargs):
-        self._path = filepath
+        self._path = filepath # 绝对路径， type: str
 
     def get_path_and_filename(self):
         '''
-        分割一个绝对路径，获取文件名和父路径
-        :param fullpath: 绝对路径， type: str
+        分割一个绝对路径，获取文件名和父路径,优先获取文件名
         :return: Tuple(path, filename)
         '''
         fullpath = self._path.strip('/')
@@ -107,8 +106,7 @@ class PathParser():
 
     def get_bucket_path_and_filename(self):
         '''
-       分割一个绝对路径，获取文件名和父路径
-       :param fullpath: 绝对路径， type: str
+       分割一个绝对路径，获取文件名、存储通名和父路径，优先获取文件名、存储通名
        :return: Tuple(bucket_name, path, filename)
        '''
         bucket_path, filename = self.get_path_and_filename()
@@ -118,3 +116,34 @@ class PathParser():
         bucket_name = l[0]
         path = l[-1] if len(l) == 2 else ''
         return (bucket_name, path, filename)
+
+    def get_bucket_and_dirpath(self):
+        '''
+       分割一个绝对路径，获取存储通名、文件夹路径，优先获取存储桶路径
+       :return: Tuple(bucket_name, dirpath)
+       '''
+        fullpath = self._path.strip('/')
+        if not fullpath:
+            return ('', '')
+
+        l = fullpath.split('/', maxsplit=1)
+        bucket_name = l[0]
+        dirpath = l[-1] if len(l) == 2 else ''
+        return (bucket_name, dirpath)
+
+    def get_bucket_path_and_dirname(self):
+        '''
+       分割一个绝对路径，获取存储通名、文件夹名、和父路径，优先获取存储通名、文件夹名
+       :return: Tuple(bucket_name, path, dirname)
+       '''
+        bucket_name, dirpath = self.get_bucket_and_dirpath()
+
+        if not dirpath:
+            return (bucket_name, '', '')
+
+        l = dirpath.rsplit('/', maxsplit=1)
+        dirname = l[-1]
+        path = l[0] if len(l) == 2 else ''
+
+        return (bucket_name, path, dirname)
+

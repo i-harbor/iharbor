@@ -8,7 +8,8 @@ from .views import CustomAutoSchema
 class CustomAuthToken(ObtainAuthToken):
     '''
     post:
-    身份验证并返回一个token，用于其他API验证身份，
+    身份验证并返回一个token，用于其他API验证身份
+
     令牌应包含在AuthorizationHTTP标头中。密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
     例如Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b；
     此外，可选Path参数,“new”，?new=true用于刷新生成一个新token；

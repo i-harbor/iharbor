@@ -141,6 +141,17 @@ APPEND_SLASH=False
 
 #登陆url
 LOGIN_URL = '/users/login/'
+LOGOUT_URL = '/users/logout/'
+
+# api docs
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'basic': {
+            'type': 'basic'
+        }
+    },
+}
+
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,

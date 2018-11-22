@@ -198,12 +198,7 @@
                         },
                         traditional: true,//传递数组时需要设为true
                         success: function (data) {
-                            if (data.code === 200) {
-                                bucket_list_checked.parents('tr').remove();
-                                show_auto_close_warning_dialog('已删除:' + data.code_text, 'success', 'top-end');
-                            }
-                            else
-                                show_auto_close_warning_dialog('删除失败,' + data.error_text, 'error');
+                            show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
                         },
                         error: function (err) {
                             show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
@@ -456,7 +451,7 @@
         bucket_name = get_bucket_name_and_cur_path().bucket_name;
         dir_path = $(this).attr('dir_path');
 
-        let url = get_api_domain_name() + "/api/v1/dir/" + dir_path + "/?" + "bucket_name=" + bucket_name;
+        let url = get_api_domain_name() + "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
         url = build_url_with_domain_name(url);
         delete_one_directory(url, function () {
             list_item_dom.remove();
@@ -521,11 +516,12 @@
     // 获取存储桶文件列表并渲染
     //
     function get_bucket_files_and_render(bucket_name, dir_path=''){
-        let url = build_url_with_domain_name('api/v1/dir/');
-        get_content_and_render(url, render_bucket_files_view, data= {
-            bucket_name: bucket_name,
-            dir_path: dir_path
-        });
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        if(dir_path !== '')
+            api = api + dir_path + '/';
+
+        let url = build_url_with_domain_name(api);
+        get_content_and_render(url, render_bucket_files_view);
     }
 
 
@@ -921,7 +917,7 @@
                     contentType: false,//必须false才会自动加上正确的Content-Type
                     processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
                     success: (result) => {
-                        if (result.code === 200){
+                        if (result.code === 201){
                             return result;
                         }else{
                             swal.showValidationMessage(
