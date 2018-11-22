@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.db.models import Q as dQ
@@ -14,6 +16,7 @@ from utils.storagers import FileStorage, PathParser
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
 from utils.oss.rados_interfaces import CephRadosObject
+from . import paginations
 
 # Create your views here.
 
@@ -148,7 +151,7 @@ class BucketViewSet(mixins.RetrieveModelMixin,
     '''
     queryset = Bucket.objects.filter(soft_delete=False).all()
     permission_classes = [IsAuthenticated]
-    # serializer_class = serializers.BucketCreateSerializer
+    pagination_class = paginations.BucketsLimitOffsetPagination
 
     # api docs
     schema = CustomAutoSchema(
@@ -168,10 +171,13 @@ class BucketViewSet(mixins.RetrieveModelMixin,
         self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        data = {
-            'buckets': serializer.data,
-        }
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        else:
+            serializer = self.get_serializer(queryset, many=True)
+            data = {'buckets': serializer.data,}
         return Response(data)
 
     def create(self, request, *args, **kwargs):
@@ -524,6 +530,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     lookup_field = 'dir_path'
     lookup_value_regex = '.+'
+    pagination_class = paginations.BucketFileCursorPagination
 
     # api docs
     schema = CustomAutoSchema(
@@ -567,21 +574,24 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             if not ok:
                 return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'})
 
+            data_dict = OrderedDict([
+                ('code', 200),
+                ('bucket_name', bucket_name),
+                ('dir_path', dir_path),
+                ('breadcrumb', bfm.get_dir_link_paths())
+            ])
+
             queryset = files
             page = self.paginate_queryset(queryset)
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
+                serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+                data_dict['files'] = serializer.data
+                return self.get_paginated_response(data_dict)
 
             serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
-            data = {
-                'code': 200,
-                'files': serializer.data,
-                'bucket_name': bucket_name,
-                'dir_path': dir_path,
-                'breadcrumb': bfm.get_dir_link_paths()
-            }
-            return Response(data)
+
+            data_dict['files'] = serializer.data
+            return Response(data_dict)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})

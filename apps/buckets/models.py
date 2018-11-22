@@ -127,7 +127,7 @@ class BucketFileInfo(DynamicDocument):
     meta = {
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
         'db_alias': 'default',
-        'indexes': ['did'],#索引
+        'indexes': ['did', 'ult'],#索引
         'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
         # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
         # 'max_documents': 10000, #集合存储文档最大数量
