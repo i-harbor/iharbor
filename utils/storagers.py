@@ -147,3 +147,18 @@ class PathParser():
 
         return (bucket_name, path, dirname)
 
+    def get_path_breadcrumb(self, path=None):
+        '''
+        路径面包屑
+        :return: list([dir_name，dir_full_path])
+        '''
+        breadcrumb = []
+        _path = path if path is not None else self._path
+        if _path == '':
+            return breadcrumb
+
+        _path = _path.strip('/')
+        dirs = _path.split('/')
+        for i, key in enumerate(dirs):
+            breadcrumb.append([key, '/'.join(dirs[0:i+1])])
+        return breadcrumb

@@ -263,15 +263,64 @@
                      {{/if}}
                 </div>
             </div>
+            
+            {{if (previous || next)}}
+            <div class="row">
+                <div class="col-xs-12 col-sm-12">
+                   <nav aria-label="...">
+                      <ul class="pager">
+                        {{if previous}}
+                            <li><a id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        {{if !previous}}
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        
+                        {{if page}}
+                            <li>第{{page.current}}页 共{{page.final}}页</li>
+                        {{/if}}
+                        
+                        {{if next}}
+                            <li><a id="page_next_buckets" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if !next}}
+                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                      </ul>
+                    </nav>
+                </div>
+            </div>
+            {{/if}}
         </div>
     `);
+
+    //
+    // 存储桶列表上一页Previous点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_previous_buckets', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_buckets_and_render(url);
+    });
+
+    //
+    // 存储桶列表下一页Next点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_next_buckets', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_buckets_and_render(url);
+    });
 
 
     //
     // 获取存储桶列表并渲染
     //
-    function get_buckets_and_render(){
-        get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
+    function get_buckets_and_render(url=""){
+        if(url !== "")
+            get_content_and_render(url, render_bucket_view);
+        else
+            get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
     }
 
     //
@@ -394,9 +443,50 @@
                      {{/if}}
                 </div>
             </div>
+            
+            {{if (previous || next)}}
+            <div class="row">
+                <div class="col-xs-12 col-sm-12">
+                   <nav aria-label="...">
+                      <ul class="pager">
+                        {{if previous}}
+                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        {{if !previous}}
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        
+                        {{if next}}
+                            <li><a id="page_next_bucket_files" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if !next}}
+                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                      </ul>
+                    </nav>
+                </div>
+            </div>
+            {{/if}}
         </div>
      `);
 
+    //
+    // 文件夹、文件对象列表上一页Previous点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
+
+    //
+    // 文件夹、文件对象列表下一页Next点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
 
     //
     // 存储桶文件删除事件处理
@@ -485,7 +575,10 @@
     $("#content-display-div").on("click", '#bucket-list-item-enter', function (e) {
         e.preventDefault();
         bucket_name = $(this).attr('bucket_name');
-        get_bucket_files_and_render(bucket_name);
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
     });
 
 
@@ -496,7 +589,13 @@
         e.preventDefault();
         let bucket_name = get_bucket_name_and_cur_path().bucket_name;
         let dir_path = $(this).attr('dir_path');
-        get_bucket_files_and_render(bucket_name, dir_path);
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        if(dir_path !== '')
+            api = api + dir_path + '/';
+
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
     });
 
 
@@ -515,12 +614,7 @@
     //
     // 获取存储桶文件列表并渲染
     //
-    function get_bucket_files_and_render(bucket_name, dir_path=''){
-        let api = 'api/v1/dir/' + bucket_name + '/';
-        if(dir_path !== '')
-            api = api + dir_path + '/';
-
-        let url = build_url_with_domain_name(api);
+    function get_bucket_files_and_render(url=''){
         get_content_and_render(url, render_bucket_files_view);
     }
 
@@ -541,20 +635,12 @@
         $.ajax({
             url: url,
             data: data,
+            timeout: 20000,
             success: function(data,status,xhr){
                 swal.close();
                 if (status === 'success'){
-                    if(data.code) {
-                        if (data.code === 200) {
-                            let html = render(data);
-                            $content_display_div.append(html);
-                        } else {
-                            $content_display_div.append('<p class="text_center text-info">' + data.code_text + "</p>");
-                        }
-                    }else{
-                        let html = render(data);
-                        $content_display_div.append(html);
-                    }
+                    let html = render(data);
+                    $content_display_div.append(html);
                 }else{
                     $content_display_div.append('<p class="text_center text-info">好像哪里出问题了，跑丢了，( T__T ) 怎麼会这样…</p>');
                 }

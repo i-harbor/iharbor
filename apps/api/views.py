@@ -132,8 +132,7 @@ class UserViewSet(mixins.DestroyModelMixin,
         return [IsSuperUser()]
 
 
-class BucketViewSet(mixins.RetrieveModelMixin,
-                   viewsets.GenericViewSet):
+class BucketViewSet(viewsets.GenericViewSet):
     '''
     存储桶视图
 
@@ -142,6 +141,7 @@ class BucketViewSet(mixins.RetrieveModelMixin,
 
     >>Http Code: 状态码200：无异常时，返回所有的存储桶信息；
         {
+            'code': 200,
             'buckets': [], // bucket对象列表
         }
 
@@ -150,7 +150,8 @@ class BucketViewSet(mixins.RetrieveModelMixin,
 
     >>Http Code: 状态码200：无异常时，返回存储桶的详细信息；
         {
-            'buckets': {}, // bucket对象
+            'code': 200,
+            'bucket': {}, // bucket对象
         }
 
     create:
@@ -210,7 +211,7 @@ class BucketViewSet(mixins.RetrieveModelMixin,
             return self.get_paginated_response(serializer.data)
         else:
             serializer = self.get_serializer(queryset, many=True)
-            data = {'buckets': serializer.data,}
+            data = {'code': 200, 'buckets': serializer.data,}
         return Response(data)
 
     def create(self, request, *args, **kwargs):
@@ -230,6 +231,11 @@ class BucketViewSet(mixins.RetrieveModelMixin,
             'bucket': serializers.BucketSerializer(serializer.instance).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({'code': 200, 'bucket': serializer.data})
 
     def destroy(self, request, *args, **kwargs):
         id = kwargs.get(self.lookup_field, None)
@@ -394,7 +400,9 @@ class ObjViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         info = request.query_params.get('info', None)
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
+
+        pp = PathParser(filepath=objpath)
+        bucket_name, path, filename = pp.get_bucket_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -406,7 +414,6 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 返回文件对象详细信息
         if info == 'true':
-            bfm = BucketFileManagement(path=path)
             serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
                                                                                'bucket_name': bucket_name,
                                                                                'dir_path': path})
@@ -415,7 +422,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                                 'bucket_name': bucket_name,
                                 'dir_path': path,
                                 'obj': serializer.data,
-                                'breadcrumb': bfm.get_dir_link_paths()
+                                'breadcrumb': pp.get_path_breadcrumb(path)
                             })
 
         # 增加一次下载次数
@@ -442,7 +449,6 @@ class ObjViewSet(viewsets.GenericViewSet):
         with switch_collection(BucketFileInfo, collection_name):
             fileobj.do_soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
     def get_serializer_class(self):
         """
@@ -644,7 +650,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         ab_path = kwargs.get(self.lookup_field, '')
-        bucket_name, dir_path= PathParser(filepath=ab_path).get_bucket_and_dirpath()
+        pp = PathParser(filepath=ab_path)
+        bucket_name, dir_path = pp.get_bucket_and_dirpath()
         if not bucket_name:
             return Response(data={'code': 400, 'code_text': 'ab_path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -662,7 +669,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 ('code', 200),
                 ('bucket_name', bucket_name),
                 ('dir_path', dir_path),
-                ('breadcrumb', bfm.get_dir_link_paths())
+                ('breadcrumb', pp.get_path_breadcrumb(dir_path))
             ])
 
             queryset = files

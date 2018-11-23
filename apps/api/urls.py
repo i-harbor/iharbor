@@ -1,7 +1,7 @@
 from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
-from rest_framework_swagger.views import get_swagger_view
+# from rest_framework_swagger.views import get_swagger_view
 
 from .auth import obtain_auth_token
 from . import views
@@ -21,6 +21,6 @@ urlpatterns = [
     url(r'^jwt-token/', obtain_jwt_token),
     url(r'^jwt-token-refresh/', refresh_jwt_token),
     url(r'^auth-token/', obtain_auth_token),
-    url(r'docs/', get_swagger_view(title='EVHarbor API')),
+    # url(r'docs/', get_swagger_view(title='EVHarbor API')),
 ]
 

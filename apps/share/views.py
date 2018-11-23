@@ -84,7 +84,6 @@ class ShareViewSet(viewsets.GenericViewSet):
                 'bucket_name': bucket_name,
                 'dir_path': dir_path,
                 'ajax_upload_url': reverse('api:upload-list', kwargs={'version': 'v1'}),
-                'breadcrumb': bfm.get_dir_link_paths()
             }
             return Response(data)
 

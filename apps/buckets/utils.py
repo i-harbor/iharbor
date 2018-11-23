@@ -27,22 +27,6 @@ class BucketFileManagement():
             return path.rstrip('/')
         return ''
 
-    def get_dir_link_paths(self, dir_path=None):
-        '''
-        目录路径导航连接路径path
-        :return: list([dir_name: dir_full_path])
-        '''
-        dir_link_paths = []
-        path = dir_path if dir_path  else self._path
-        if path == '':
-            return dir_link_paths
-        path = self._hand_path(path)
-        dirs = path.split('/')
-        for i, key in enumerate(dirs):
-            dir_link_paths.append([key, '/'.join(dirs[0:i+1])])
-        return dir_link_paths
-
-
     def get_cur_dir_id(self, dir_path=None):
         '''
         获得当前目录节点id
