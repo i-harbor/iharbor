@@ -9,7 +9,6 @@ from rest_framework.reverse import reverse
 from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-# from buckets.models import get_bucket_by_name
 from .models import User, Bucket, BucketFileInfo
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -51,12 +50,9 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     用户创建序列化器
     '''
-    # id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(label='用户名', required=True, max_length=150, help_text='至少5位字母或数字')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
     email = serializers.EmailField(label='邮箱', required=False, help_text='邮箱')
-    # date_joined = serializers.DateTimeField()
-    # last_login = serializers.DateTimeField()
 
     def create(self, validated_data):
         """
@@ -291,79 +287,6 @@ class ObjPutSerializer(serializers.Serializer):
         res = {}
         self.instance = None # 如果self.instance != None, 调用self.data时会使用self.instance（这里真的的instance），会报错
         return res
-
-
-class FileDeleteSerializer(serializers.Serializer):
-    '''
-    文件取消上传或删除序列化器
-    '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
-                               help_text='文件唯一标识id,类型string')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True,
-                                        help_text='文件所属的存储桶名称,类型string')
-
-    def validate(self, data):
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name')
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        data['_collection_name'] = _collection_name
-        return data
-
-    def create(self, validated_data):
-        '''删除文件或取消文件上传'''
-        id = validated_data.get('id')
-        collection_name = validated_data.get('_collection_name')
-        with switch_collection(BucketFileInfo, collection_name):
-            bfi = BucketFileInfo.objects(id=id).first()
-            if bfi:
-                bfi.do_soft_delete()
-                return bfi
-        # create必须要返回一个instance
-        return True
-
-    @property
-    def response_data(self):
-        # 如果self.instance != None, 调用self.data时会使用self.instance取提取字段数据，会报错；
-        # self.instance为False时, self.data会通过上传的数据字段从校验后的validated_data中提取数据
-        self.instance = None
-
-        return self.data
-
-
-class FileDownloadSerializer(serializers.Serializer):
-    '''
-    文件下载序列化器
-    '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
-                               help_text='文件唯一标识id, 类型string')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所属的存储桶名称, 类型string')
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='要读取的文件块的字节大小, 类型int')
-
-    def validate(self, data):
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name')
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        data['_collection_name'] = _collection_name
-        return data
-
-    @property
-    def data(self):
-        self.instance = None
-        return super(FileDownloadSerializer, self).data
 
 
 class DirectoryCreateSerializer(serializers.Serializer):

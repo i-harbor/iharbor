@@ -12,7 +12,6 @@ router = DefaultRouter()
 router.register(r'(?P<version>(v1|v2))/users', views.UserViewSet, base_name='user')
 router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name='buckets')
 router.register(r'(?P<version>(v1|v2))/obj', views.ObjViewSet, base_name='obj')
-router.register(r'(?P<version>(v1|v2))/download', views.DownloadFileViewSet, base_name='download')
 router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
 
 

@@ -342,17 +342,6 @@
 
 
     //
-    // 面包屑路径导航点击进入事件处理
-    //
-    $("#content-display-div").on("click", '#btn-path-item', function (e) {
-        e.preventDefault();
-        bucket_name = $(this).attr('bucket_name');
-        dir_path = $(this).attr('dir_path');
-        get_bucket_files_and_render(bucket_name, dir_path);
-    });
-
-
-    //
     //存储桶文件列表视图渲染模板
     //
     let render_bucket_files_view = template.compile(`
@@ -469,6 +458,23 @@
             {{/if}}
         </div>
      `);
+
+    //
+    // 面包屑路径导航点击进入事件处理
+    //
+    $("#content-display-div").on("click", '#btn-path-item', function (e) {
+        e.preventDefault();
+        bucket_name = $(this).attr('bucket_name');
+        dir_path = $(this).attr('dir_path');
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        if(dir_path !== '')
+            api = api + dir_path + '/';
+
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
+    });
+
 
     //
     // 文件夹、文件对象列表上一页Previous点击事件
@@ -614,7 +620,7 @@
     //
     // 获取存储桶文件列表并渲染
     //
-    function get_bucket_files_and_render(url=''){
+    function get_bucket_files_and_render(url){
         get_content_and_render(url, render_bucket_files_view);
     }
 
@@ -630,7 +636,6 @@
     // GET请求数据并渲染接口封装
     //
     function get_content_and_render(url, render, data={}){
-        $content_display_div.empty();
         swal.showLoading();
         $.ajax({
             url: url,
@@ -640,14 +645,15 @@
                 swal.close();
                 if (status === 'success'){
                     let html = render(data);
+                    $content_display_div.empty();
                     $content_display_div.append(html);
                 }else{
-                    $content_display_div.append('<p class="text_center text-info">好像哪里出问题了，跑丢了，( T__T ) 怎麼会这样…</p>');
+                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
                 }
             },
             error: function (error) {
                 swal.close();
-                $content_display_div.append('<p class="text_center  text-info">好像哪里出问题了，跑丢了，( T__T ) 怎麼会这样…</p>');
+                show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
             }
         });
     }

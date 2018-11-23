@@ -302,10 +302,15 @@ class ObjViewSet(viewsets.GenericViewSet):
             对应参数错误信息;
 
     retrieve:
-        通过文件绝对路径（以存储桶名开始）,下载文件对象或文件对象详细信息；
+        通过文件对象绝对路径（以存储桶名开始）,下载文件对象,可通过query参数获取文件对象详细信息，或者自定义读取对象数据块
+
+        *注：参数优先级判定顺序：info > chunk_offset && chunk_size
+        1. info=true时,返回文件对象详细信息，其他忽略此参数；
+        2. chunk_offset && chunk_size 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
+        3. 不带参数或者info无效时，返回整个文件对象；
 
     	>>Http Code: 状态码200：
-            info=true,返回文件对象详细信息：
+            * info=true,返回文件对象详细信息：
             {
                 'code': 200,
                 'bucket_name': 'xxx',   //所在存储桶名称
@@ -313,35 +318,41 @@ class ObjViewSet(viewsets.GenericViewSet):
                 'obj': {},              //文件对象详细信息
                 'breadcrumb': [[xxx, xxx],]    //路径面包屑
             }
-            其他,返回FileResponse对象,bytes数据流
+            * 自定义读取时：返回bytes数据流，其他信息通过标头headers传递：
+            {
+                evhb_chunk_size: 返回文件块大小
+                evhb_obj_size: 文件对象总大小
+            }
+            * 其他,返回FileResponse对象,bytes数据流；
+
         >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
             {
                 'code': 400,
-                'code_text': 'filepath参数有误'
+                'code_text': 'xxxx参数有误'
             }
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
     destroy:
-        通过文件绝对路径（以存储桶名开始）,删除文件对象；
+        通过文件对象绝对路径（以存储桶名开始）,删除文件对象；
 
         >>Http Code: 状态码204：删除成功，NO_CONTENT；
         >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
             {
                 'code': 400,
-                'code_text': 'filepath参数有误'
+                'code_text': 'objpath参数有误'
             }
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
     '''
     queryset = {}
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
     # api docs
-    BASE_METHOD_FEILD = [
+    VERSION_METHOD_FEILD = [
         coreapi.Field(
             name='version',
             required=True,
@@ -350,31 +361,39 @@ class ObjViewSet(viewsets.GenericViewSet):
         ),
     ]
 
+    OBJ_PATH_METHOD_FEILD = [
+        coreapi.Field(
+            name='objpath',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+        ),
+    ]
+
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FEILD + [
-                coreapi.Field(
-                    name='objpath',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
-                ),
+            'GET': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
                 coreapi.Field(
                     name='info',
                     required=False,
                     location='query',
                     schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
-                )
-            ],
-            'DELETE': BASE_METHOD_FEILD + [
+                ),
                 coreapi.Field(
-                    name='objpath',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
-                )
+                    name='chunk_offset',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int'),
+                ),
+                coreapi.Field(
+                    name='chunk_size',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='要读取的文件块的字节大小, 类型int'),
+                ),
             ],
-            'PUT': BASE_METHOD_FEILD + [
+            'DELETE': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+            'PUT': VERSION_METHOD_FEILD + [
                 coreapi.Field(
                     name='objpath',
                     required=True,
@@ -382,7 +401,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                     schema=coreschema.String(description='ObjectID，post请求创建文件对象返回的对象ID,类型String')
                 )
             ],
-            'POST': BASE_METHOD_FEILD
+            'POST': VERSION_METHOD_FEILD,
         }
     )
 
@@ -406,6 +425,10 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
+        validated_param, valid_response = self.custom_read_param_validate_or_response(request)
+        if not validated_param and valid_response:
+            return valid_response
+
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
             return response
@@ -414,25 +437,21 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 返回文件对象详细信息
         if info == 'true':
-            serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
-                                                                               'bucket_name': bucket_name,
-                                                                               'dir_path': path})
-            return Response(data={
-                                'code': 200,
-                                'bucket_name': bucket_name,
-                                'dir_path': path,
-                                'obj': serializer.data,
-                                'breadcrumb': pp.get_path_breadcrumb(path)
-                            })
+            return self.get_obj_info_response(request=request, fileobj=fileobj, bucket_name=bucket_name, path=path)
 
-        # 增加一次下载次数
-        with switch_collection(BucketFileInfo, collection_name):
-            fileobj.dlc = (fileobj.dlc or 0) + 1  # 下载次数+1
-            fileobj.save()
+        # 自定义读取文件对象
+        if validated_param:
+            offset = validated_param.get('offset')
+            size = validated_param.get('size')
+            return self.get_custom_read_obj_response(obj=fileobj, offset=offset, size=size, collection_name=collection_name)
 
+        # 下载整个文件对象
         response = self.get_file_download_response(str(fileobj.id), filename)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 增加一次下载次数
+        self.download_cound_increase(fileobj, collection_name)
         return response
 
     def destroy(self, request, *args, **kwargs):
@@ -503,62 +522,93 @@ class ObjViewSet(viewsets.GenericViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
         return response
 
+    def get_obj_info_response(self, request, fileobj, bucket_name, path):
+        '''
+        文件对象信息Response
+        :param request:
+        :param fileobj: 文件对象
+        :param bucket_name: 存储桶
+        :param path: 文件对象所在目录路径
+        :return: Response
+        '''
+        serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
+                                                                           'bucket_name': bucket_name,
+                                                                           'dir_path': path})
+        return Response(data={
+            'code': 200,
+            'bucket_name': bucket_name,
+            'dir_path': path,
+            'obj': serializer.data,
+            'breadcrumb': PathParser(path).get_path_breadcrumb()
+        })
 
-class DownloadFileViewSet(viewsets.GenericViewSet):
-    '''
-    分片下载文件数据块视图集
+    def custom_read_param_validate_or_response(self, request):
+        '''
+        自定义读取文件对象参数验证
+        :param request:
+        :return:
+                (None, None) -> 未携带参数
+                (None, response) -> 参数有误
+                ({data}, None) -> 参数验证通过
 
-    create:
-    通过文件id,自定义读取文件对象数据块；
-    	Http Code: 状态码200：无异常时，返回bytes数据流，其他信息通过标头headers传递：
-    	{
-            evob_request_data: 客户端请求时，携带的数据,
-            evob_chunk_size: 返回文件块大小
-            evob_obj_size: 文件对象总大小
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404：找不到资源;
-    '''
-    queryset = []
-    permission_classes = [IsAuthenticated]
-    serializer_class = serializers.FileDownloadSerializer
+        '''
+        chunk_offset = request.query_params.get('chunk_offset', None)
+        chunk_size = request.query_params.get('chunk_size', None)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+        validated_data = {}
+        if chunk_offset is not None and chunk_size is not None:
+            try:
+                offset = int(chunk_offset)
+                size = int(chunk_size)
+                if offset < 0 or size < 0:
+                    raise Exception()
+                validated_data['offset'] = offset
+                validated_data['size'] = size
+            except:
+                response = Response(data={'code': 400, 'code_text': 'chunk_offset或chunk_size参数有误'},
+                                status=status.HTTP_400_BAD_REQUEST)
+                return None, response
+        else:
+            return None, None
+        return validated_data, None
 
-        validated_data = serializer.validated_data
-        id = validated_data.get('id')
-        chunk_offset = validated_data.get('chunk_offset')
-        chunk_size = validated_data.get('chunk_size')
-        collection_name = validated_data.get('_collection_name')
-
-        with switch_collection(BucketFileInfo, collection_name):
-            bfi = BucketFileInfo.objects(id=id).first()
-            if not bfi:
-                return Response({'id': '未找到id对应文件'}, status=status.HTTP_404_NOT_FOUND)
-
-            # 读文件块
-            # fstorage = FileStorage(str(bfi.id))
-            # chunk = fstorage.read(chunk_size, offset=chunk_offset)
-            rados = CephRadosObject(str(bfi.id))
-            ok, chunk = rados.read(offset=chunk_offset, size=chunk_size)
+    def get_custom_read_obj_response(self, obj, offset, size, collection_name):
+        '''
+        文件对象自定义读取response
+        :param obj: 文件对象
+        :param offset: 读起始偏移量
+        :param size: 读取大小
+        :param collection_name: 对象所在mongodb集合名
+        :return: HttpResponse
+        '''
+        if size == 0:
+            chunk = bytes()
+        else:
+            rados = CephRadosObject(str(obj.id))
+            ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
-                response_data = {'data': serializer.data}
-                response_data['error_text'] = 'server error,文件块读取失败'
-                return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                data = {'code':500, 'code_text': 'server error,文件块读取失败'}
+                return Response(data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # 如果从0读文件就增加一次下载次数
-            if chunk_offset == 0:
-                bfi.dlc = (bfi.dlc or 0) + 1# 下载次数+1
-                bfi.save()
+        # 如果从0读文件就增加一次下载次数
+        if offset == 0:
+            self.download_cound_increase(obj, collection_name)
 
         reponse = StreamingHttpResponse(chunk, content_type='application/octet-stream', status=status.HTTP_200_OK)
-        reponse['evob_request_data'] = serializer.data
         reponse['evob_chunk_size'] = len(chunk)
-        reponse['evob_obj_size'] = bfi.si
+        reponse['evob_obj_size'] = obj.si
         return reponse
+
+    def download_cound_increase(self, obj, collection_name):
+        '''
+        文件对象下载次数+1
+        :param obj: 文件对象
+        :param collection_name: 对象所在mongodb集合名
+        :return: 无
+        '''
+        obj.switch_collection(collection_name)
+        obj.dlc = (obj.dlc or 0) + 1  # 下载次数+1
+        obj.save()
 
 
 class DirectoryViewSet(viewsets.GenericViewSet):
