@@ -11,8 +11,10 @@ django-rest-framework = "*"
 coreapi = "*"
 requests = "*"
 djangorestframework-jwt = "*"
+django-rest-swagger = "*"
 
 [dev-packages]
+uwsgi = "*"
 
 [requires]
 python_version = "3.6"

@@ -1,15 +1,9 @@
+from bson import ObjectId
+
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
 from .models import BucketFileInfo
-
-
-# def get_collection_name(collection_name):
-#     '''
-#     获得当前用户存储桶Bucket对应集合名称
-#     每个存储桶对应的集合表名==用户名_存储桶对应集合名称
-#     '''
-#     return f'bucket_{collection_name}'
 
 
 class BucketFileManagement():
@@ -26,22 +20,6 @@ class BucketFileManagement():
             path.strip(' ')
             return path.rstrip('/')
         return ''
-
-    def get_dir_link_paths(self, dir_path=None):
-        '''
-        目录路径导航连接路径path
-        :return: list([dir_name: dir_full_path])
-        '''
-        dir_link_paths = []
-        path = dir_path if dir_path  else self._path
-        if path == '':
-            return dir_link_paths
-        path = self._hand_path(path)
-        dirs = path.split('/')
-        for i, key in enumerate(dirs):
-            dir_link_paths.append([key, '/'.join(dirs[0:i+1])])
-        return dir_link_paths
-
 
     def get_cur_dir_id(self, dir_path=None):
         '''
@@ -148,3 +126,21 @@ class BucketFileManagement():
         dir_name.strip('/')
         path = self._hand_path(self._path)
         return (path + '/' + dir_name) if path else dir_name
+
+    def get_file_obj_by_id(self, id):
+        '''
+        通过id获取文件对象
+        :return:
+        '''
+        try:
+            bfis = BucketFileInfo.objects((mQ(id=id)) & (mQ(sds__exists=False) | mQ(sds=False)))  # 目录下是否存在给定文件名的文件
+        except:
+            return None
+
+        return bfis.first()
+
+
+
+
+
+

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # 第三方apps
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_swagger',
 
     #自定义apps
     'buckets.apps.BucketsConfig',
@@ -140,12 +141,26 @@ APPEND_SLASH=False
 
 #登陆url
 LOGIN_URL = '/users/login/'
+LOGOUT_URL = '/users/logout/'
+
+# api docs
+SWAGGER_SETTINGS = {
+    # 'SECURITY_DEFINITIONS': {
+    #     'basic': {
+    #         'type': 'basic'
+    #     }
+    # },
+    # 'SHOW_REQUEST_HEADERS': True,
+    # 'JSON_EDITOR': True,
+    'DOC_EXPANSION': 'list',
+}
+
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
     'DEFAULT_PERMISSION_CLASSES': [
-        # 'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
         # 'rest_framework.permissions.IsAuthenticated',
         # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
@@ -168,6 +183,10 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSION': 'v1',
     'ALLOWED_VERSIONS': ('v1', ),
     'VERSION_PARAM': 'version',
+
+    # 分页
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 100
 }
 
 JWT_AUTH = {

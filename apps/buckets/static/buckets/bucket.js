@@ -100,7 +100,7 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`).then(() => {
+                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`, 'success').then(() => {
                         item_html = render_bucket_item(result.value.bucket);
                         $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
                     } )
@@ -198,12 +198,7 @@
                         },
                         traditional: true,//传递数组时需要设为true
                         success: function (data) {
-                            if (data.code === 200) {
-                                bucket_list_checked.parents('tr').remove();
-                                show_auto_close_warning_dialog('已删除:' + data.code_text, 'success', 'top-end');
-                            }
-                            else
-                                show_auto_close_warning_dialog('删除失败,' + data.error_text, 'error');
+                            show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
                         },
                         error: function (err) {
                             show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
@@ -268,15 +263,64 @@
                      {{/if}}
                 </div>
             </div>
+            
+            {{if (previous || next)}}
+            <div class="row">
+                <div class="col-xs-12 col-sm-12">
+                   <nav aria-label="...">
+                      <ul class="pager">
+                        {{if previous}}
+                            <li><a id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        {{if !previous}}
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        
+                        {{if page}}
+                            <li>第{{page.current}}页 共{{page.final}}页</li>
+                        {{/if}}
+                        
+                        {{if next}}
+                            <li><a id="page_next_buckets" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if !next}}
+                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                      </ul>
+                    </nav>
+                </div>
+            </div>
+            {{/if}}
         </div>
     `);
+
+    //
+    // 存储桶列表上一页Previous点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_previous_buckets', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_buckets_and_render(url);
+    });
+
+    //
+    // 存储桶列表下一页Next点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_next_buckets', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_buckets_and_render(url);
+    });
 
 
     //
     // 获取存储桶列表并渲染
     //
-    function get_buckets_and_render(){
-        get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
+    function get_buckets_and_render(url=""){
+        if(url !== "")
+            get_content_and_render(url, render_bucket_view);
+        else
+            get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
     }
 
     //
@@ -294,17 +338,6 @@
     $("#content-display-div").on("click", '#btn-path-bucket', function (e) {
         e.preventDefault();
         get_buckets_and_render();
-    });
-
-
-    //
-    // 面包屑路径导航点击进入事件处理
-    //
-    $("#content-display-div").on("click", '#btn-path-item', function (e) {
-        e.preventDefault();
-        bucket_name = $(this).attr('bucket_name');
-        dir_path = $(this).attr('dir_path');
-        get_bucket_files_and_render(bucket_name, dir_path);
     });
 
 
@@ -399,9 +432,67 @@
                      {{/if}}
                 </div>
             </div>
+            
+            {{if (previous || next)}}
+            <div class="row">
+                <div class="col-xs-12 col-sm-12">
+                   <nav aria-label="...">
+                      <ul class="pager">
+                        {{if previous}}
+                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        {{if !previous}}
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
+                        {{/if}}
+                        
+                        {{if next}}
+                            <li><a id="page_next_bucket_files" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if !next}}
+                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                      </ul>
+                    </nav>
+                </div>
+            </div>
+            {{/if}}
         </div>
      `);
 
+    //
+    // 面包屑路径导航点击进入事件处理
+    //
+    $("#content-display-div").on("click", '#btn-path-item', function (e) {
+        e.preventDefault();
+        bucket_name = $(this).attr('bucket_name');
+        dir_path = $(this).attr('dir_path');
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        if(dir_path !== '')
+            api = api + dir_path + '/';
+
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
+    });
+
+
+    //
+    // 文件夹、文件对象列表上一页Previous点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
+
+    //
+    // 文件夹、文件对象列表下一页Next点击事件
+    //
+    $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
+        e.preventDefault();
+        url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
 
     //
     // 存储桶文件删除事件处理
@@ -414,7 +505,7 @@
         bucket_name = obj.bucket_name;
         cur_path = obj.dir_path;
 
-        url = get_api_domain_name() + "/api/v1/bucket/" + bucket_name + "/" ;
+        url = get_api_domain_name() + "/api/v1/obj/" + bucket_name + "/" ;
         if (cur_path){
             url += cur_path + "/";
         }
@@ -427,7 +518,7 @@
 
 
     //
-    // 删除一个文件文件
+    // 删除一个文件
     //
     function delete_one_file(url, success_do){
         swal.showLoading();
@@ -456,7 +547,7 @@
         bucket_name = get_bucket_name_and_cur_path().bucket_name;
         dir_path = $(this).attr('dir_path');
 
-        let url = get_api_domain_name() + "/api/v1/directory/" + dir_path + "/?" + "bucket_name=" + bucket_name;
+        let url = get_api_domain_name() + "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
         url = build_url_with_domain_name(url);
         delete_one_directory(url, function () {
             list_item_dom.remove();
@@ -464,7 +555,7 @@
     });
 
     //
-    // 删除一个文件文件
+    // 删除一个文件夹
     //
     function delete_one_directory(url, success_do){
         swal.showLoading();
@@ -490,7 +581,10 @@
     $("#content-display-div").on("click", '#bucket-list-item-enter', function (e) {
         e.preventDefault();
         bucket_name = $(this).attr('bucket_name');
-        get_bucket_files_and_render(bucket_name);
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
     });
 
 
@@ -501,7 +595,13 @@
         e.preventDefault();
         let bucket_name = get_bucket_name_and_cur_path().bucket_name;
         let dir_path = $(this).attr('dir_path');
-        get_bucket_files_and_render(bucket_name, dir_path);
+
+        let api = 'api/v1/dir/' + bucket_name + '/';
+        if(dir_path !== '')
+            api = api + dir_path + '/';
+
+        let url = build_url_with_domain_name(api);
+        get_bucket_files_and_render(url);
     });
 
 
@@ -520,12 +620,8 @@
     //
     // 获取存储桶文件列表并渲染
     //
-    function get_bucket_files_and_render(bucket_name, dir_path=''){
-        let url = build_url_with_domain_name('api/v1/directory/');
-        get_content_and_render(url, render_bucket_files_view, data= {
-            bucket_name: bucket_name,
-            dir_path: dir_path
-        });
+    function get_bucket_files_and_render(url){
+        get_content_and_render(url, render_bucket_files_view);
     }
 
 
@@ -540,32 +636,24 @@
     // GET请求数据并渲染接口封装
     //
     function get_content_and_render(url, render, data={}){
-        $content_display_div.empty();
         swal.showLoading();
         $.ajax({
             url: url,
             data: data,
+            timeout: 20000,
             success: function(data,status,xhr){
                 swal.close();
                 if (status === 'success'){
-                    if(data.code) {
-                        if (data.code === 200) {
-                            let html = render(data);
-                            $content_display_div.append(html);
-                        } else {
-                            $content_display_div.append('<p class="text_center text-info">' + data.code_text + "</p>");
-                        }
-                    }else{
-                        let html = render(data);
-                        $content_display_div.append(html);
-                    }
+                    let html = render(data);
+                    $content_display_div.empty();
+                    $content_display_div.append(html);
                 }else{
-                    $content_display_div.append('<p class="text_center text-info">好像哪里出问题了，跑丢了，( T__T ) 怎麼会这样…</p>');
+                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
                 }
             },
             error: function (error) {
                 swal.close();
-                $content_display_div.append('<p class="text_center  text-info">好像哪里出问题了，跑丢了，( T__T ) 怎麼会这样…</p>');
+                show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
             }
         });
     }
@@ -665,7 +753,7 @@
         let dir_path = obj.dir_path;
 
         beforeFileUploading();
-        let url = build_url_with_domain_name('api/v1/upload/');
+        let url = build_url_with_domain_name('api/v1/obj/');
         uploadFileCreate(url, bucket_name, dir_path, file);
     }
 
@@ -914,14 +1002,14 @@
                 formdata.append('dir_path', dir_path);
                 formdata.append('dir_name', input_name);
                 return $.ajax({
-                    url: build_url_with_domain_name('/api/v1/directory/'),
+                    url: build_url_with_domain_name('/api/v1/dir/'),
                     type: 'post',
                     data: formdata,
                     timeout: 200000,
                     contentType: false,//必须false才会自动加上正确的Content-Type
                     processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
                     success: (result) => {
-                        if (result.code === 200){
+                        if (result.code === 201){
                             return result;
                         }else{
                             swal.showValidationMessage(
@@ -943,7 +1031,7 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`).then(() => {
+                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success').then(() => {
                         // location.reload(true);// 刷新当前页面
                         let html = render_bucket_dir_item(result.value);
                         $("#bucket-files-table tr:eq(0)").after(html);

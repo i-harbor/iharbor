@@ -9,7 +9,6 @@ from rest_framework.reverse import reverse
 from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-# from buckets.models import get_bucket_by_name
 from .models import User, Bucket, BucketFileInfo
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -51,12 +50,9 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     用户创建序列化器
     '''
-    # id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(label='用户名', required=True, max_length=150, help_text='至少5位字母或数字')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
     email = serializers.EmailField(label='邮箱', required=False, help_text='邮箱')
-    # date_joined = serializers.DateTimeField()
-    # last_login = serializers.DateTimeField()
 
     def create(self, validated_data):
         """
@@ -65,7 +61,7 @@ class UserCreateSerializer(serializers.Serializer):
         username = validated_data['username']
         if User.objects.filter(username=username).exists():
             raise serializers.ValidationError(detail={'error_text': '用户名已存在'})
-        return User.objects.create(**validated_data)
+        return User.objects.create_user(**validated_data)
 
 
 class BucketSerializer(serializers.ModelSerializer):
@@ -133,14 +129,14 @@ class BucketCreateSerializer(serializers.Serializer):
         return bucket
 
 
-class ChunkedUploadCreateSerializer(serializers.Serializer):
+class ObjPostSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
     bucket_name = serializers.CharField(label='存储桶名称', required=True,
                                         help_text='文件上传到的存储桶名称，类型string')
     dir_path = serializers.CharField(label='文件上传路径', required=False,
-                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，类型string')
+                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，为空或者‘/’表示在存储桶下，类型string')
     file_name = serializers.CharField(label='文件名', required=True, help_text='上传文件的文件名，类型string')
     # file_size = serializers.IntegerField(label='文件大小', required=True, min_value=1, help_text='上传文件的字节大小')
     # file_md5 = serializers.CharField(label='文件MD5码', required=False, min_length=32, max_length=32,
@@ -154,19 +150,21 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         # file_md5 = validated_data.get('file_md5')
 
         did = validated_data.get('_did')
-        bfinfo = validated_data.get('finfo')
+        old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
 
         with switch_collection(BucketFileInfo, _collection_name):
-            if bfinfo:
-                bfinfo.si = 0 # 文件大小
-            else:
-                bfinfo = BucketFileInfo(na=file_name,# 文件名
-                                        fod = True, # 文件
-                                        si = 0 )# 文件大小
-                # 有父节点
-                if did:
-                    bfinfo.did = ObjectId(did)
+            # 存在同名文件对象，覆盖上传删除原文件
+            if old_bfinfo:
+                old_bfinfo.do_soft_delete()
+
+            # 创建文件对象
+            bfinfo = BucketFileInfo(na=file_name,# 文件名
+                                    fod = True, # 文件
+                                    si = 0 )# 文件大小
+            # 有父节点
+            if did:
+                bfinfo.did = ObjectId(did)
             bfinfo.save()
 
         # 构造返回数据
@@ -210,12 +208,8 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
             if finfo:
                 # 同名文件覆盖上传
                 if overwrite:
-                    # 删除文件记录
-                    # finfo.delete()
+                    # 文件记录删除动作在create中
                     data['finfo'] = finfo
-                    # 删除文件对象
-                    fs = FileStorage(str(finfo.id))
-                    fs.delete()
                 else:
                     raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
 
@@ -225,7 +219,7 @@ class ChunkedUploadCreateSerializer(serializers.Serializer):
         return data
 
 
-class ChunkedUploadUpdateSerializer(serializers.Serializer):
+class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
@@ -244,15 +238,22 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
         """
         request = self.context.get('request')
         kwargs = self.context.get('kwargs')
-        file_id = kwargs.get('pk')
+        file_id = kwargs.get('objpath')
         bucket_name = data.get('bucket_name')
         chunk_offset = data.get('chunk_offset')
         chunk = data.get('chunk')
         chunk_size = data.get('chunk_size')
 
+        try:
+            file_id = ObjectId(file_id)
+        except Exception:
+            raise serializers.ValidationError(detail={'objpath': 'id不是一个有效的ObjectID'})
+
         if not chunk:
+            # chunk_size != 0时，此时却获得一个空文件块
             if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
+                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小(0)不一致'})
+            # 如果上传确实是一个空文件块不做处理
             return data
         elif chunk.size != chunk_size:
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
@@ -263,7 +264,8 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
             raise vali_error
 
         with switch_collection(BucketFileInfo, _collection_name):
-            bfi = BucketFileInfo.objects(id=file_id).first()
+            # bfi = BucketFileInfo.objects(id=file_id).first()
+            bfi = BucketFileManagement().get_file_obj_by_id(file_id)
             if not bfi:
                 raise serializers.ValidationError(detail={'id': '文件id有误，未找到文件'})
 
@@ -286,79 +288,6 @@ class ChunkedUploadUpdateSerializer(serializers.Serializer):
         res = {}
         self.instance = None # 如果self.instance != None, 调用self.data时会使用self.instance（这里真的的instance），会报错
         return res
-
-
-class FileDeleteSerializer(serializers.Serializer):
-    '''
-    文件取消上传或删除序列化器
-    '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
-                               help_text='文件唯一标识id,类型string')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True,
-                                        help_text='文件所属的存储桶名称,类型string')
-
-    def validate(self, data):
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name')
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        data['_collection_name'] = _collection_name
-        return data
-
-    def create(self, validated_data):
-        '''删除文件或取消文件上传'''
-        id = validated_data.get('id')
-        collection_name = validated_data.get('_collection_name')
-        with switch_collection(BucketFileInfo, collection_name):
-            bfi = BucketFileInfo.objects(id=id).first()
-            if bfi:
-                bfi.do_soft_delete()
-                return bfi
-        # create必须要返回一个instance
-        return True
-
-    @property
-    def response_data(self):
-        # 如果self.instance != None, 调用self.data时会使用self.instance取提取字段数据，会报错；
-        # self.instance为False时, self.data会通过上传的数据字段从校验后的validated_data中提取数据
-        self.instance = None
-
-        return self.data
-
-
-class FileDownloadSerializer(serializers.Serializer):
-    '''
-    文件下载序列化器
-    '''
-    id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
-                               help_text='文件唯一标识id, 类型string')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所属的存储桶名称, 类型string')
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='要读取的文件块的字节大小, 类型int')
-
-    def validate(self, data):
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name')
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        data['_collection_name'] = _collection_name
-        return data
-
-    @property
-    def data(self):
-        self.instance = None
-        return super(FileDownloadSerializer, self).data
 
 
 class DirectoryCreateSerializer(serializers.Serializer):
@@ -408,7 +337,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
         data = super(DirectoryCreateSerializer, self).data
         return data
 
-class DirectoryListSerializer(serializers.Serializer):
+class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
@@ -465,7 +394,7 @@ class DirectoryListSerializer(serializers.Serializer):
         bucket_name = self._context.get('bucket_name', '')
         dir_path = self._context.get('dir_path', '')
         filepath = os.path.join(bucket_name, dir_path, obj.na)
-        download_url = reverse('api:bucket-detail', kwargs={'version': 'v1', 'filepath': filepath})
+        download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url

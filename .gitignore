@@ -6,4 +6,5 @@
 /media/
 /webserver/security_settings.py
 *.so
+*.log
 
