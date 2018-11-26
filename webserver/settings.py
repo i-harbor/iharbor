@@ -145,11 +145,14 @@ LOGOUT_URL = '/users/logout/'
 
 # api docs
 SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'basic': {
-            'type': 'basic'
-        }
-    },
+    # 'SECURITY_DEFINITIONS': {
+    #     'basic': {
+    #         'type': 'basic'
+    #     }
+    # },
+    # 'SHOW_REQUEST_HEADERS': True,
+    # 'JSON_EDITOR': True,
+    'DOC_EXPANSION': 'list',
 }
 
 

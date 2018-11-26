@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -70,19 +70,6 @@ class Bucket(models.Model):
         return f'bucket_{self.collection_name}'
 
 
-# def get_bucket_by_name(self, bucket_name):
-#     '''
-#     获取存储通对象
-#     :param bucket_name: 存储通名称
-#     :return: Bucket对象; None(不存在)
-#     '''
-#     query_set = Bucket.objects.filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
-#     if query_set.exists():
-#         return query_set.first()
-#
-#     return None
-
-
 class BucketFileInfo(DynamicDocument):
     '''
     存储桶bucket文件信息模型
@@ -117,9 +104,9 @@ class BucketFileInfo(DynamicDocument):
     dlc = fields.IntField() # 该文件的下载次数，目录时dlc为空
     bac = fields.ListField(fields.StringField()) # backup，该文件的备份地址，目录时为空
     arc = fields.ListField(fields.StringField()) # archive，该文件的归档地址，目录时arc为空
-    sh = fields.BooleanField() # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
+    sh = fields.BooleanField(default=False) # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
     shp = fields.StringField() # 该文件的共享密码，目录时为空
-    stl = fields.BooleanField() # True: 文件有共享时间限制; False: 则文件无共享时间限制
+    stl = fields.BooleanField(default=True) # True: 文件有共享时间限制; False: 则文件无共享时间限制
     sst = fields.DateTimeField() # share_start_time, 该文件的共享起始时间
     set = fields.DateTimeField() # share_end_time,该文件的共享终止时间
     sds = fields.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
@@ -138,4 +125,63 @@ class BucketFileInfo(DynamicDocument):
         '''软删除'''
         self.sds = True
         self.save()
+
+    def set_shared(self, sh=False, days=0):
+        '''
+        设置对象共享或私有权限
+        :param sh: 共享(True)或私有(False)
+        :param days: 共享天数，0表示永久共享
+        :return: 无
+        '''
+        if sh == True:
+            self.sh = True          # 共享
+            now = datetime.utcnow()
+            self.sst = now          # 共享时间
+            if days == 0:
+                self.dtl = False    # 永久共享
+            else:
+                self.dtl = True     # 有共享时间限制
+                self.set = now + timedelta(days=days) # 共享终止时间
+        else:
+            self.sh = False         # 私有
+
+        self.save()
+
+    def is_shared_and_in_shared_time(self):
+        '''
+        对象是否是分享的, 并且在有效分享时间内，即是否可公共访问
+        :return: True(是), False(否)
+        '''
+        # 对象是否是分享的
+        if not self.sh:
+            return False
+
+        # 是否有分享时间限制
+        if not self.has_shared_limit():
+            return True
+
+        # 检查是否已过共享终止时间
+        if self.is_shared_end_time_out():
+            return True
+
+        return False
+
+    def has_shared_limit(self):
+        '''
+        是否有分享时间限制
+        :return: True(有), False(无)
+        '''
+        return self.stl
+
+    def is_shared_end_time_out(self):
+        '''
+        是否超过分享终止时间
+        :return: True(超时)，False(未超时)
+        '''
+        td = datetime.utcnow() - self.set
+        return td.total_seconds() > 0
+
+
+
+
 

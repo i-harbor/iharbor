@@ -150,19 +150,21 @@ class ObjPostSerializer(serializers.Serializer):
         # file_md5 = validated_data.get('file_md5')
 
         did = validated_data.get('_did')
-        bfinfo = validated_data.get('finfo')
+        old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
 
         with switch_collection(BucketFileInfo, _collection_name):
-            if bfinfo:
-                bfinfo.si = 0 # 文件大小
-            else:
-                bfinfo = BucketFileInfo(na=file_name,# 文件名
-                                        fod = True, # 文件
-                                        si = 0 )# 文件大小
-                # 有父节点
-                if did:
-                    bfinfo.did = ObjectId(did)
+            # 存在同名文件对象，覆盖上传删除原文件
+            if old_bfinfo:
+                old_bfinfo.do_soft_delete()
+
+            # 创建文件对象
+            bfinfo = BucketFileInfo(na=file_name,# 文件名
+                                    fod = True, # 文件
+                                    si = 0 )# 文件大小
+            # 有父节点
+            if did:
+                bfinfo.did = ObjectId(did)
             bfinfo.save()
 
         # 构造返回数据
@@ -206,12 +208,8 @@ class ObjPostSerializer(serializers.Serializer):
             if finfo:
                 # 同名文件覆盖上传
                 if overwrite:
-                    # 删除文件记录
-                    # finfo.delete()
+                    # 文件记录删除动作在create中
                     data['finfo'] = finfo
-                    # 删除文件对象
-                    fs = FileStorage(str(finfo.id))
-                    fs.delete()
                 else:
                     raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
 
@@ -252,8 +250,10 @@ class ObjPutSerializer(serializers.Serializer):
             raise serializers.ValidationError(detail={'objpath': 'id不是一个有效的ObjectID'})
 
         if not chunk:
+            # chunk_size != 0时，此时却获得一个空文件块
             if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
+                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小(0)不一致'})
+            # 如果上传确实是一个空文件块不做处理
             return data
         elif chunk.size != chunk_size:
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
@@ -264,7 +264,8 @@ class ObjPutSerializer(serializers.Serializer):
             raise vali_error
 
         with switch_collection(BucketFileInfo, _collection_name):
-            bfi = BucketFileInfo.objects(id=file_id).first()
+            # bfi = BucketFileInfo.objects(id=file_id).first()
+            bfi = BucketFileManagement().get_file_obj_by_id(file_id)
             if not bfi:
                 raise serializers.ValidationError(detail={'id': '文件id有误，未找到文件'})
 
@@ -336,7 +337,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
         data = super(DirectoryCreateSerializer, self).data
         return data
 
-class DirectoryListSerializer(serializers.Serializer):
+class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''

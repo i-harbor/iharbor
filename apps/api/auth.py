@@ -18,6 +18,12 @@ class CustomAuthToken(ObtainAuthToken):
         manual_fields={
             'POST': [
                 coreapi.Field(
+                    name='version',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='API版本（v1, v2）')
+                ),
+                coreapi.Field(
                     name="username",
                     required=True,
                     location='form',

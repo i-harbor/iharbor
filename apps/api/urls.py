@@ -17,9 +17,9 @@ router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='
 
 urlpatterns = [
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
-    url(r'^jwt-token/', obtain_jwt_token),
-    url(r'^jwt-token-refresh/', refresh_jwt_token),
-    url(r'^auth-token/', obtain_auth_token),
+    url(r'^(?P<version>(v1|v2))/jwt-token/', obtain_jwt_token),
+    url(r'^(?P<version>(v1|v2))/jwt-token-refresh/', refresh_jwt_token),
+    url(r'^(?P<version>(v1|v2))/auth-token/', obtain_auth_token),
     # url(r'docs/', get_swagger_view(title='EVHarbor API')),
 ]
 

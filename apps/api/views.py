@@ -345,6 +345,20 @@ class ObjViewSet(viewsets.GenericViewSet):
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
+    partial_update:
+    对象共享或私有权限设置
+
+        Http Code: 状态码200：上传成功无异常时，返回数据：
+        {
+            'code': 200,
+            'code_text': '对象共享设置成功'，
+            'share': xxx,
+            'days': xxx
+        }
+        Http Code: 状态码400：参数有误时，返回数据：
+            对应参数错误信息;
+        Http Code: 状态码404;
+
     '''
     queryset = {}
     # permission_classes = [IsAuthenticated]
@@ -402,6 +416,20 @@ class ObjViewSet(viewsets.GenericViewSet):
                 )
             ],
             'POST': VERSION_METHOD_FEILD,
+            'PATCH': VERSION_METHOD_FEILD + [
+                coreapi.Field(
+                    name='share',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有),不区分大小写'),
+                ),
+                coreapi.Field(
+                    name='days',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='对象公开分享天数(share=true时有效)，0表示永久公开，默认为0'),
+                ),
+            ],
         }
     )
 
@@ -469,6 +497,37 @@ class ObjViewSet(viewsets.GenericViewSet):
             fileobj.do_soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def partial_update(self, request, *args, **kwargs):
+        objpath = kwargs.get(self.lookup_field, '')
+
+        validated_param, valid_response = self.shared_param_validate_or_response(request)
+        if not validated_param and valid_response:
+            return valid_response
+        share = validated_param.get('share')
+        days = validated_param.get('days')
+
+        pp = PathParser(filepath=objpath)
+        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        with switch_collection(BucketFileInfo, collection_name):
+            fileobj.set_shared(sh=share, days=days)
+
+        data = {
+            'code': 200,
+            'code_text': '对象共享权限设置成功',
+            'share': share,
+            'days': days
+        }
+        return Response(data=data, status=status.HTTP_200_OK)
+
+
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -531,7 +590,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         :param path: 文件对象所在目录路径
         :return: Response
         '''
-        serializer = serializers.DirectoryListSerializer(fileobj, context={'request': request,
+        serializer = serializers.ObjInfoSerializer(fileobj, context={'request': request,
                                                                            'bucket_name': bucket_name,
                                                                            'dir_path': path})
         return Response(data={
@@ -571,6 +630,39 @@ class ObjViewSet(viewsets.GenericViewSet):
         else:
             return None, None
         return validated_data, None
+
+    def shared_param_validate_or_response(self, request):
+        '''
+        文件对象共享或私有权限参数验证
+        :param request:
+        :return:
+            (None, response) -> 参数有误
+            ({data}, None) -> 参数验证通过
+
+        '''
+        days = request.query_params.get('days', 0)
+        share = request.query_params.get('share', '').lower()
+
+        validated_data = {}
+        if share == 'true':
+            share = True
+        elif share == 'false':
+            share = False
+        else:
+            response = Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return (None, response)
+
+        try:
+            days = int(days)
+            if days < 0:
+                raise Exception()
+        except:
+            response = Response(data={'code': 400, 'code_text': 'days参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return (None, response)
+
+        validated_data['share'] = share
+        validated_data['days'] = days
+        return (validated_data, None)
 
     def get_custom_read_obj_response(self, obj, offset, size, collection_name):
         '''
@@ -760,7 +852,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             'code': 201,
             'code_text': '创建文件夹成功',
             'data': serializer.data,
-            'dir': serializers.DirectoryListSerializer(bfinfo).data
+            'dir': serializers.ObjInfoSerializer(bfinfo).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -803,7 +895,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         """
         if self.action in ['create', 'delete']:
             return serializers.DirectoryCreateSerializer
-        return serializers.DirectoryListSerializer
+        return serializers.ObjInfoSerializer
 
     def get_dir_object(self, path, dir_name, collection_name):
         """
