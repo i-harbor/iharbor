@@ -7,4 +7,5 @@
 /webserver/security_settings.py
 *.so
 *.log
+/collect_static/
 

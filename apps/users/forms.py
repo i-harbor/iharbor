@@ -13,7 +13,7 @@ class UserRegisterForm(forms.Form):
                                 max_length=20,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入6-20个数字和字母组合的用户名'
+                                                'placeholder': '请输入5-20个数字和字母组合的用户名'
                                 }))
     password = forms.CharField( label='密码',
                                 min_length=8,
@@ -68,7 +68,7 @@ class LoginForm(forms.Form):
                                 max_length=20,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入6-20个数字和字母组合的用户名'
+                                                'placeholder': '请输入5-20个数字和字母组合的用户名'
                                 }))
     password = forms.CharField( label='密码',
                                 min_length=8,

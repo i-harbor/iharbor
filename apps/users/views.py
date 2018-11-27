@@ -53,8 +53,8 @@ def login_user(request):
         form = LoginForm()
 
     content = {}
-    content['form_title'] = '用户登陆'
-    content['submit_text'] = '登陆'
+    content['form_title'] = '用户登录'
+    content['submit_text'] = '登录'
     content['action_url'] = reverse('users:login')
     content['form'] = form
     return render(request, 'form.html', content)

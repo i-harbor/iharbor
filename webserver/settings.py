@@ -198,9 +198,9 @@ JWT_AUTH = {
 # Ceph rados settings
 CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
-    'USER_NAME': 'client.objstore',
+    'USER_NAME': 'client.admin',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    'POOL_NAME': 'objstore',
+    'POOL_NAME': 'p0',
     'RADOS_DLL_PATH': 'rados.so'
 }
 
@@ -229,7 +229,7 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': '/home/log/webserver.log',
+            'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
         },
         # output to console settings
         'console': {
