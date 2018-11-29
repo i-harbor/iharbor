@@ -22,6 +22,7 @@ from rest_framework_swagger.views import get_swagger_view
 
 urlpatterns = [
     url(r'api/', include('api.urls', namespace='api')),
+    url(r'evcloud/', include('evcloud.urls', namespace='evcloud')),
     url(r'share/', include('share.urls', namespace='share')),
     url(r'', include('buckets.urls', namespace='buckets')),
     url(r'^users/', include('users.urls', namespace='users')),

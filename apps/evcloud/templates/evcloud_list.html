@@ -1,0 +1,92 @@
+{% extends "base_with_sidebar.html" %}
+{% load static %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+    云主机
+{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" type="text/css" href="{% static 'evcloud/evcloud.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-xs-12 col-sm-12">
+                <div>
+                    <button class="btn btn-primary disabled" id="btn-evcloud-list"><span class="glyphicon glyphicon-th-list"></span> 我的云主机</button>
+                    <button class="btn btn-danger" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span> 创建云主机</button>
+                </div>
+            </div>
+        </div>
+        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
+        <div class="row">
+            <div class="col-xs-12 col-sm-12">
+                <table class="table table-hover">
+                    {% csrf_token %}
+                    <tr class="success">
+                        <!--<th><input type="checkbox" data-check-target=".item-checkbox" /></th> -->
+                        <th>UUID</th>
+                        <th>镜像</th>
+                        <th>CPU</th>
+                        <th>内存</th>
+                        <th>IP</th>
+                        <th>创建时间</th>
+                        <th>到期时间</th>
+                        <th>状态</th>
+                        <th>任务</th>
+                        <th>操作</th>
+                    </tr>
+                    {% for vm in vm_list_dict.values %}
+                        <tr class="active" id="{{ vm.vm_id }}">
+                            <!--<td><input type="checkbox" class="item-checkbox"></td> -->
+                            <td>{{ vm.vm_id_display }}</td>
+                            <td>{{ vm.vm_image_display }}</td>
+                            <td>{{ vm.vm_cpu }}</td>
+                            <td>{{ vm.vm_mem }}</td>
+                            <td>{{ vm.vm_ip }}</td>
+                            <td>{{ vm.created_time_display }}</td>
+                            <td>{{ vm.end_time_display }}</td>
+                            <td name="status">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped active" role="progressbar"
+                                         aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
+                                        <span class="sr-only">45% Complete</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td name="mission"></td>
+                            <td>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-danger vnc-btn" value="5">VNC</button>
+                                    <button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown"
+                                            aria-haspopup="true" aria-expanded="false">
+                                        <span class="caret"></span>
+                                        <span class="sr-only">Toggle Dropdown</span>
+                                    </button>
+                                    <ul class="dropdown-menu vm-operate">
+                                        <li><a href="" value="0">启动</a></li>
+                                        <li><a href="" value="1">关闭</a></li>
+                                        <li><a href="" value="2">关闭电源</a></li>
+                                        <li><a href="" value="3">重启</a></li>
+                                        <li><a href="" value="4">删除</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
+{#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
+    <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
+    <script type="text/javascript" src="{% static 'evcloud/evcloud-list.js' %}"></script>
+{% endblock %}
+
