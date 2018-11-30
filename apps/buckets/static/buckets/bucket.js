@@ -87,7 +87,7 @@
                     data: {'name': input_name},
                     timeout: 200000,
                 }).done((result) => {
-                    if (result.code === 200){
+                    if (result.code === 201){
                         return result;
                     }else{
                         swal.showValidationMessage(
@@ -107,7 +107,10 @@
                 }
              },
             (error) => {
-                show_warning_dialog(`Request failed:发生错误，创建失败！`);
+                if(error.status<500)
+                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text);
+                else
+                    show_warning_dialog(`创建失败:` + error.statusText);
             }
         )
     }
@@ -259,7 +262,7 @@
                         {{/if}}
                     </table>
                      {{if buckets.length === 0}}
-                          <p class="text-info text_center">肚子空空如也哦 =^_^=</p>
+                          <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
                      {{/if}}
                 </div>
             </div>
@@ -427,7 +430,7 @@
                     </table>
                     {{if files}}
                         {{if files.length === 0}}
-                              <p class="text-info text_center">肚子空空如也哦 =^_^=</p>
+                              <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
                          {{/if}}
                      {{/if}}
                 </div>
@@ -1039,7 +1042,10 @@
                 }
              },
             (error) => {
-                show_warning_dialog(`发生错误，创建失败！`);
+                if(error.status<500)
+                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text.error_text);
+                else
+                    show_warning_dialog(`创建失败:` + error.statusText);
             }
         )
     }

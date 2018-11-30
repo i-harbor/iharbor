@@ -69,10 +69,10 @@ class BucketFileManagement():
                 return False, None
 
             if dir_id:
-                return True, BucketFileInfo.objects(mQ(did=dir_id) & (mQ(sds__exists=False) | mQ(sds=False))).all()
+                return True, BucketFileInfo.objects(mQ(did=dir_id) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()
 
         #存储桶下文件目录
-        return True, BucketFileInfo.objects(mQ(did__exists=False) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
+        return True, BucketFileInfo.objects(mQ(did__exists=False) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
 
     def get_file_exists(self, file_name):
         '''

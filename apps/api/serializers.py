@@ -223,12 +223,10 @@ class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    #id = serializers.CharField(label='文件ID', required=True, min_length=24, max_length=24,
-    #                           help_text='请求上传文件服务器返回的文件id')
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称，类型string')
+    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所在的存储桶名称，类型string')
     chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
                                             help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
-    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的块数据,如Blob对象')
+    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
                                           help_text='上传文件块的字节大小，类型int')
 

@@ -89,7 +89,7 @@ class PathParser():
     路径字符串解析
     '''
     def __init__(self, filepath, *args, **kwargs):
-        self._path = filepath # 绝对路径， type: str
+        self._path = filepath if isinstance(filepath, str) else '' # 绝对路径， type: str
 
     def get_path_and_filename(self):
         '''
