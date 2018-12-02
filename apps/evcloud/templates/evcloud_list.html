@@ -28,11 +28,10 @@
                     {% csrf_token %}
                     <tr class="success">
                         <!--<th><input type="checkbox" data-check-target=".item-checkbox" /></th> -->
-                        <th>UUID</th>
+                        <th>IP</th>
                         <th>镜像</th>
                         <th>CPU</th>
                         <th>内存</th>
-                        <th>IP</th>
                         <th>创建时间</th>
                         <th>到期时间</th>
                         <th>状态</th>
@@ -40,13 +39,12 @@
                         <th>操作</th>
                     </tr>
                     {% for vm in vm_list_dict.values %}
-                        <tr class="active" id="{{ vm.vm_id }}">
+                        <tr class="active vm-line" id="{{ vm.vm_id }}">
                             <!--<td><input type="checkbox" class="item-checkbox"></td> -->
-                            <td>{{ vm.vm_id_display }}</td>
+                            <td>{{ vm.vm_ip }}</td>
                             <td>{{ vm.vm_image_display }}</td>
                             <td>{{ vm.vm_cpu }}</td>
                             <td>{{ vm.vm_mem }}</td>
-                            <td>{{ vm.vm_ip }}</td>
                             <td>{{ vm.created_time_display }}</td>
                             <td>{{ vm.end_time_display }}</td>
                             <td name="status">
@@ -85,8 +83,6 @@
 
 {% block script %}
     <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
-{#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
-    <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
     <script type="text/javascript" src="{% static 'evcloud/evcloud-list.js' %}"></script>
 {% endblock %}
 
