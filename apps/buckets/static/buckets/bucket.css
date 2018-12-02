@@ -10,30 +10,15 @@
 	background-color: #97dffd;
 }
 
-
-.text_center {
-	text-align: center;
-}
-
-.file-list-item {
-	padding: 10px;
-	margin-bottom: 20px;
-	background: pink;
-}
-
-.file-list-item:hover {
-	background-color: #97dffd;
-}
-
 .sidebar {
-	overflow: auto;
+	/*overflow: auto;*/
 	/*font-size: 12px;*/
 	/*font-weight: 200;*/
-	background-color: rgba(165, 189, 194, 0.36);
-	position: fixed;
-	top: 60px;
+	/*background-color: rgba(165, 189, 194, 0.36);*/
+	/*position: fixed;*/
+	/*top: 60px;*/
 	/*width: 225px;*/
-	height: 100%;
-	color: rgba(33, 38, 39, 0.92);
+	/*height: 100%;*/
+	/*color: rgba(33, 38, 39, 0.92);*/
 }
 

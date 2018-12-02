@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+    {% block head_extends %}{% endblock %}
 {% endblock %}
 
 {% block boby %}
@@ -38,7 +38,7 @@
             </li>
         </ul>
     </div>
-    <div class="col-xs-offset-2" id="content-display-div">
+    <div class="col-xs-10" id="content-display-div">
         {% block content %}{% endblock %}
     </div>
 {% endblock %}
@@ -47,8 +47,6 @@
     <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
 {#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
     <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
-    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
-    <script type="text/javascript" src="{% static 'buckets/bucket.js' %}"></script>
-{#    jquery模板定义#}
+    {% block script_extends %}{% endblock %}
 {% endblock %}
 

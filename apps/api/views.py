@@ -160,12 +160,12 @@ class BucketViewSet(viewsets.GenericViewSet):
     >>Http Code: 状态码201；
         创建成功时：
         {
-            'code': 200,
+            'code': 201,
             'code_text': '创建成功',
             'data': serializer.data, //请求时提交数据
             'bucket': {}             //bucket对象信息
         }
-        参数有误时：
+    >>Http Code: 状态码400,参数有误：
         {
             'code': 400,
             'code_text': 'xxx',      //错误码表述信息
@@ -176,6 +176,11 @@ class BucketViewSet(viewsets.GenericViewSet):
     删除一个存储桶
 
     >>Http Code: 状态码204,存储桶删除成功
+    >>Http Code: 状态码400
+        {
+            'code': 400,
+            'code_text': '存储桶id有误'
+        }
     >>Http Code: 状态码404：
         {
             'code': 404,
@@ -222,10 +227,10 @@ class BucketViewSet(viewsets.GenericViewSet):
                 'code_text': serializer.errors['non_field_errors'],
                 'data': serializer.data,
             }
-            return Response(data, status=status.HTTP_201_CREATED)
+            return Response(data, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         data = {
-            'code': 200,
+            'code': 201,
             'code_text': '创建成功',
             'data': serializer.data,
             'bucket': serializers.BucketSerializer(serializer.instance).data
@@ -240,8 +245,14 @@ class BucketViewSet(viewsets.GenericViewSet):
     def destroy(self, request, *args, **kwargs):
         id = kwargs.get(self.lookup_field, None)
         ids = request.POST.getlist('ids')
+
         if id and id not in ids:
             ids.append(id)
+        try:
+            ids = [int(i) for i in ids]
+        except ValueError:
+            return Response(data={'code': 400, 'code_text': '存储桶id有误'}, status=status.HTTP_400_BAD_REQUEST)
+
         if ids:
             buckets = Bucket.objects.filter(id__in=ids)
             if not buckets.exists():
@@ -829,7 +840,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if not serializer.is_valid(raise_exception=False):
-            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_200_OK)
+            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
         dir_path = validated_data.get('dir_path', '')

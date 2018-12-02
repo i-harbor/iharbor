@@ -1,7 +1,9 @@
 from django import forms
 from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 
-from .models import UserProfile
+#获取用户模型
+User = get_user_model()
 
 
 class UserRegisterForm(forms.Form):
@@ -15,6 +17,12 @@ class UserRegisterForm(forms.Form):
                                                 'class': 'form-control',
                                                 'placeholder': '请输入5-20个数字和字母组合的用户名'
                                 }))
+    email = forms.EmailField(label='邮箱',
+                               max_length=200,
+                               widget=forms.TextInput(attrs={
+                                   'class': 'form-control',
+                                   'placeholder': '请输入邮箱'
+                               }))
     password = forms.CharField( label='密码',
                                 min_length=8,
                                 max_length=20,
@@ -34,26 +42,26 @@ class UserRegisterForm(forms.Form):
         '''
         验证表单提交的数据
         '''
-        # username = getattr(self.cleaned_data, 'username', None)
-        username = self.cleaned_data['username']
-        password = self.cleaned_data['password']
-        confirm_password = self.cleaned_data['confirm_password']
+        username = self.cleaned_data.get('username', '')
+        email = self.cleaned_data.get('email', '')
+        password = self.cleaned_data.get('password', '')
+        confirm_password = self.cleaned_data.get('confirm_password', '')
 
         #用户名输入是否为空
         if not username:
             raise forms.ValidationError('用户名不能为空')
 
         #检查用户名是否已存在
-        if UserProfile.objects.filter(username=username).exists():
+        if User.objects.filter(username=username).first():
             raise forms.ValidationError('用户名已存在，请重新输入')
+
+        # 检查邮箱是否已存在
+        if email and User.objects.filter(email=email).first():
+            raise forms.ValidationError('邮箱已被绑定，请换一个邮箱')
 
         #密码是否一致
         if not password or password != confirm_password:
             raise forms.ValidationError('密码输入不一致')
-
-        #创建新用户
-        user = UserProfile.objects.create_user(username=username, password=password)
-        self.cleaned_data['user'] = user
 
         return self.cleaned_data
 
@@ -83,8 +91,8 @@ class LoginForm(forms.Form):
         '''
         验证表单提交的数据
         '''
-        username = self.cleaned_data['username']
-        password = self.cleaned_data['password']
+        username = self.cleaned_data.get('username')
+        password = self.cleaned_data.get('password')
 
         #验证用户
         user = authenticate(username=username, password=password)
@@ -131,8 +139,8 @@ class PasswordChangeForm(forms.Form):
         '''
         验证表单提交的数据
         '''
-        new_password = self.cleaned_data['new_password']
-        confirm_new_password = self.cleaned_data['confirm_new_password']
+        new_password = self.cleaned_data.get('new_password')
+        confirm_new_password = self.cleaned_data.get('confirm_new_password')
         if new_password != confirm_new_password or not new_password:
             raise forms.ValidationError('新密码输入不一致，请重新输入')
         return self.cleaned_data
@@ -142,7 +150,7 @@ class PasswordChangeForm(forms.Form):
         '''
         验证原密码
         '''
-        old_password = self.cleaned_data['old_password']
+        old_password = self.cleaned_data.get('old_password')
         if not self.user.check_password(old_password):
             raise forms.ValidationError('原密码有误')
         return old_password
