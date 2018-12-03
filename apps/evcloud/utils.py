@@ -5,7 +5,7 @@ class evcloud_operations():
     def __init__(self):
         auth = coreapi.auth.BasicAuthentication(username='evcloud', password='evcloud')
         self.client = coreapi.Client(auth=auth)
-        self.schema = self.client.get("http://10.0.200.201/api/v2/docs/")
+        # self.schema = self.client.get("http://10.0.200.201/api/v2/docs/")
 
     def create(self, image, cpu, mem):
         action = ["vms", "create"]

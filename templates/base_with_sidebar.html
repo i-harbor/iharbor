@@ -7,14 +7,14 @@
 {% endblock %}
 
 {% block boby %}
-    <div class="sidebar container col-xs-2">
+    <div class="container col-xs-2">
         <ul class="nav nav-tabs nav-stacked">
             <li role="presentation" class="active menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
                     <h5><span class="glyphicon glyphicon-list"></span>  对象存储<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
                 <ul class="nav nav-pills nav-stacked collapse in" id="oos-nav-list-group">
-                    <li><a href="/" >存储桶</a></li>
+                    <li><a href="{% url 'buckets:bucket_view' %}" >存储桶</a></li>
                     <li><a>预留</a></li>
                 </ul>
             </li>

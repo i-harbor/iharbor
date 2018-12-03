@@ -2,8 +2,15 @@
 
 
 {% block boby %}
-    <div class="row">
-        <div class="alert alert-success" role="alert">{{ message }}</div>
+    <div class="row text-center col-xs-offset-2 col-xs-8">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <div class="alert alert-success" role="alert">{{ message }}</div>
+                {% for url in urls %}
+                    <a class="btn btn-primary" href="{{ url.url }}">{{ url.name }}</a>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 {% endblock %}
 
