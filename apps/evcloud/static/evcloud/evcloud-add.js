@@ -1,7 +1,7 @@
 ;(function() {
 
     $('#btn-evcloud-list').click(function () {
-        self.location.href = "/evcloud/list";
+        self.location.href = "/evcloud/list/";
     })
 
     $form_create = $('#form-create');

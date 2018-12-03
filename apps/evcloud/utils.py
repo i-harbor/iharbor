@@ -1,11 +1,24 @@
 import coreapi
+from .models import APIAuth
 
 class evcloud_operations():
 
     def __init__(self):
-        auth = coreapi.auth.BasicAuthentication(username='evcloud', password='evcloud')
+        api_config = APIAuth.objects.get(flag=True)
+        auth = coreapi.auth.BasicAuthentication(username=api_config.name, password=api_config.pwd)
         self.client = coreapi.Client(auth=auth)
-        # self.schema = self.client.get("http://10.0.200.201/api/v2/docs/")
+        self.schema = self.client.get(api_config.url)
+
+    def get_image_list(self):
+        action = ["images", "list"]
+        params = {
+            "pool_id": 1,
+        }
+        search_result = self.client.action(self.schema, action, params=params)
+        finally_result = {}
+        for i, image in enumerate(search_result):
+            finally_result[i] = image
+        return finally_result
 
     def create(self, image, cpu, mem):
         action = ["vms", "create"]
@@ -14,7 +27,7 @@ class evcloud_operations():
             "vcpu": cpu,
             "mem": mem,
             "group_id": 1,
-            "host_id": 3,
+            
             "net_type_id": 1,
             "vlan_id": 2,
             "diskname": '',

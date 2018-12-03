@@ -15,14 +15,4 @@
     margin-bottom: 0;
 }
 
-.sidebar {
-	overflow: auto;
-	/*font-size: 12px;*/
-	/*font-weight: 200;*/
-	background-color: rgba(165, 189, 194, 0.36);
-	position: fixed;
-	top: 60px;
-	/*width: 225px;*/
-	height: 100%;
-	color: rgba(33, 38, 39, 0.92);
-}
+

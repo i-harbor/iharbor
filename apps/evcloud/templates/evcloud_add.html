@@ -29,12 +29,16 @@
                     <label for="image" class="col-sm-2 control-label">镜像</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="image" name="image">
+                            {% for image in image_list.values %}
+                                <option value="{{ image.id }}">{{ image.name }} {{ image.version }}</option>
+                            {% endfor %}
+                            <!--
                             <option value="4">winxp 32bit</option>
                             <option value="2">win10 64bit</option>
                             <option value="3">centos6 64bit</option>
                             <option value="1">centos7 64bit</option>
                             <option value="5">fedora28 64bit</option>
-                            <!--
+
                             <option>ubuntu 1404</option>
                             <option>ubuntu 1604</option>
                             <option>winserver2016 64bit</option>
@@ -64,9 +68,9 @@
                     <label for="configure" class="col-sm-2 control-label">配置</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="configure" name="configure">
-                            <option value="1">2 vcpu | 2048MB mem | 12 month(s)</option>
-                            <option value="2">4 vcpu | 4096MB mem | 12 month(s)</option>
-                            <option value="3">8 vcpu | 8192MB mem | 12 month(s)</option>
+                            {% for config in config_list_dict.values %}
+                                <option value="{{ config.id }}">{{ config.cpu }} vcpu | {{ config.mem }}MB mem | {{ config.time }} month(s)</option>
+                            {% endfor %}
                         </select>
                         <!--
                         <div class="dropdown">
@@ -96,8 +100,6 @@
 
 {% block script %}
     <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
-{#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
-    <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
     <script type="text/javascript" src="{% static 'evcloud/evcloud-add.js' %}"></script>
 {% endblock %}
 
