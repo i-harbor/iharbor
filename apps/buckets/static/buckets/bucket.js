@@ -87,7 +87,7 @@
                     data: {'name': input_name},
                     timeout: 200000,
                 }).done((result) => {
-                    if (result.code === 200){
+                    if (result.code === 201){
                         return result;
                     }else{
                         swal.showValidationMessage(
@@ -107,7 +107,10 @@
                 }
              },
             (error) => {
-                show_warning_dialog(`Request failed:发生错误，创建失败！`);
+                if(error.status<500)
+                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text);
+                else
+                    show_warning_dialog(`创建失败:` + error.statusText);
             }
         )
     }
@@ -259,7 +262,7 @@
                         {{/if}}
                     </table>
                      {{if buckets.length === 0}}
-                          <p class="text-info text_center">肚子空空如也哦 =^_^=</p>
+                          <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
                      {{/if}}
                 </div>
             </div>
@@ -427,7 +430,7 @@
                     </table>
                     {{if files}}
                         {{if files.length === 0}}
-                              <p class="text-info text_center">肚子空空如也哦 =^_^=</p>
+                              <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
                          {{/if}}
                      {{/if}}
                 </div>
@@ -753,59 +756,29 @@
         let dir_path = obj.dir_path;
 
         beforeFileUploading();
-        let url = build_url_with_domain_name('api/v1/obj/');
-        uploadFileCreate(url, bucket_name, dir_path, file);
+        let url = 'api/v1/obj/' + bucket_name + '/';
+        if (dir_path)
+            url = url + dir_path + '/';
+        url = url + file.name + '/';
+        url = build_url_with_domain_name(url);
+        uploadFile(url, file, 0);
     }
-
-    //
-    // 创建文件对象
-    //
-    function uploadFileCreate(url, bucket_name, dir_path, file, overwrite = false, file_md5 = '') {
-        var formData = new FormData();
-        formData.append("bucket_name", bucket_name);
-        formData.append("dir_path", dir_path);
-        formData.append("file_name", file.name);
-        formData.append("file_size", file.size);
-        formData.append("file_md5", file_md5);
-        formData.append("overwrite", false);
-
-        $.ajax({
-            url: url,
-            type: "POST",
-            data: formData, //必须false才会自动加上正确的Content-Type
-            contentType: false,
-            processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
-            success: function (data) {
-                if (data.id) {
-                    let put_url = url + data.id + '/';
-                    uploadFile(put_url, bucket_name, dir_path, file);
-                } else {
-                    show_warning_dialog('创建文件对象失败');
-                }
-            },
-            error: function (err) {
-                show_warning_dialog('创建文件对象失败,'+ err.responseJSON.error_text);
-                endFileUploading();
-            }
-        });
-    }
-
 
     //
     //文件上传
     //
-    function uploadFile(put_url, bucket_name, dir_path, file, csrf_code, offset = 0) {
+    function uploadFile(put_url, file, offset = 0) {
         // 断点续传记录检查
 
         // 分片上传文件
-        uploadFileChunk(put_url, bucket_name, file, offset);
+        uploadFileChunk(put_url, file, offset);
     }
 
     //
     //分片上传文件
     //
-    function uploadFileChunk(url, bucket_name, file, offset) {
-        let chunk_size = 2 * 1024 * 1024;//2MB
+    function uploadFileChunk(url, file, offset) {
+        let chunk_size = 2 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
         fileUploadProgressBar(offset, file.size);
@@ -820,10 +793,10 @@
         }
         var chunk = file.slice(offset, end);
         var formData = new FormData();
-        formData.append("bucket_name", bucket_name);
         formData.append("chunk_offset", offset);
         formData.append("chunk", chunk);
         formData.append("chunk_size", chunk.size);
+        formData.append("overwrite", false);
 
         $.ajax({
             url: url,
@@ -834,10 +807,14 @@
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
                 offset = end;
-                uploadFileChunk(url, bucket_name, file, offset);
+                uploadFileChunk(url, file, offset);
             },
             error: function (err) {
-                show_warning_dialog('上传文件发生错误，上传文件可能不完整，请重新上传');
+                if (err.responseJSON.error_text)
+                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.error_text);
+                else
+                    show_warning_dialog('上传文件发生错误,'+ err.responseText);
+
                 endFileUploading();
             },
         })
@@ -1039,7 +1016,10 @@
                 }
              },
             (error) => {
-                show_warning_dialog(`发生错误，创建失败！`);
+                if(error.status<500)
+                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text.error_text);
+                else
+                    show_warning_dialog(`创建失败:` + error.statusText);
             }
         )
     }

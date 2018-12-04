@@ -1,0 +1,105 @@
+{% extends "base_with_sidebar.html" %}
+{% load static %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+    云主机
+{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" type="text/css" href="{% static 'evcloud/evcloud.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-xs-12 col-sm-12">
+                <div>
+                    <button class="btn btn-primary" id="btn-evcloud-list"><span class="glyphicon glyphicon-th-list"></span> 我的云主机</button>
+                    <button class="btn btn-danger disabled" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span> 创建云主机</button>
+                </div>
+            </div>
+        </div>
+        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
+        <div class="row">
+            <form id="form-create" class="form-horizontal">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="image" class="col-sm-2 control-label">镜像</label>
+                    <div class="col-sm-6">
+                        <select class="form-control" id="image" name="image">
+                            {% for image in image_list.values %}
+                                <option value="{{ image.id }}">{{ image.name }} {{ image.version }}</option>
+                            {% endfor %}
+                            <!--
+                            <option value="4">winxp 32bit</option>
+                            <option value="2">win10 64bit</option>
+                            <option value="3">centos6 64bit</option>
+                            <option value="1">centos7 64bit</option>
+                            <option value="5">fedora28 64bit</option>
+
+                            <option>ubuntu 1404</option>
+                            <option>ubuntu 1604</option>
+                            <option>winserver2016 64bit</option>
+                            -->
+                        </select>
+                        <!--
+                        <div class="dropdown">
+                            <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                请选择镜像
+                                <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                <li><a href="#">winxp 32bit</a></li>
+                                <li><a href="#">win10 64bit</a></li>
+                                <li><a href="#">centos6 64bit</a></li>
+                                <li><a href="#">centos7 64bit</a></li>
+                                <li><a href="#">fedora28 64bit</a></li>
+                                <li><a href="#">ubuntu 1404</a></li>
+                                <li><a href="#">ubuntu 1604</a></li>
+                                <li><a href="#">winserver2016 64bit</a></li>
+                            </ul>
+                        </div>
+                        -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="configure" class="col-sm-2 control-label">配置</label>
+                    <div class="col-sm-6">
+                        <select class="form-control" id="configure" name="configure">
+                            {% for config in config_list_dict.values %}
+                                <option value="{{ config.id }}">{{ config.cpu }} vcpu | {{ config.mem }}MB mem | {{ config.time }} month(s)</option>
+                            {% endfor %}
+                        </select>
+                        <!--
+                        <div class="dropdown">
+                            <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                请选择配置
+                                <span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                <li><a href="#">2 vcpu | 2048MB mem | 12 month(s)</a></li>
+                                <li><a href="#">4 vcpu | 4096MB mem | 12 month(s)</a></li>
+                                <li><a href="#">8 vcpu | 8192MB mem | 12 month(s)</a></li>
+                            </ul>
+                        </div>
+                        -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="col-sm-offset-2 col-sm-10">
+                        <button id="btn-evcloud-create" type="submit" class="btn btn-default">创建</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'evcloud/evcloud-add.js' %}"></script>
+{% endblock %}
+

@@ -20,7 +20,7 @@
                     <span class="icon-bar"></span>
                 </button>
                 <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">
-                    EVOBStore
+                    EVHarbor
                 </a>
             </div>
             <!-- Collect the nav links, forms, and other content for toggling -->
@@ -32,7 +32,7 @@
                         <ul class="dropdown-menu">
                             <li><a href="https://github.com/evharbor" target="view_window">Github</a></li>
                             <li role="separator" class="divider"></li>
-                            <li><a href="#">关于</a></li>
+                            <li><a href="/docs/" target="view_window" >API文档</a></li>
                         </ul>
                     </li>
                     <li>
@@ -51,7 +51,7 @@
                                     </ul>
                                 </li>
                             {% else %}
-                                <li><a href="{% url 'users:login' %}">登陆</a></li>
+                                <li><a href="{% url 'users:login' %}">登录</a></li>
                                 <li><a href="{% url 'users:register' %}">注册</a></li>
                             {% endif %}
                         </ul>
@@ -64,7 +64,7 @@
         {% block boby %}{% endblock %}
     </div>
     <footer class="navbar-fixed-bottom" style="background: #dddddd">
-        <div class="text_center">
+        <div class="text-center">
             <p>© 2018 all rights reserved 中科院网络信息中心 京ICP备xxxxxxxx号</p>
         </div>
     </footer>

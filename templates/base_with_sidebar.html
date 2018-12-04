@@ -3,42 +3,42 @@
 {% load static %}
 
 {% block head %}
-    <link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+    {% block head_extends %}{% endblock %}
 {% endblock %}
 
 {% block boby %}
-    <div class="sidebar container col-xs-2">
+    <div class="container col-xs-2">
         <ul class="nav nav-tabs nav-stacked">
             <li role="presentation" class="active menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
                     <h5><span class="glyphicon glyphicon-list"></span>  对象存储<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
-                <ul class="nav nav-pills nav-stacked collapse in" id="oos-nav-list-group">
-                    <li><a href="#" id="nav-bucket-view">存储桶</a></li>
-                    <li><a>预留</a></li>
+                <ul class="bg-info nav nav-pills nav-stacked collapse in" id="oos-nav-list-group">
+                    <li class="bg-info"><a href="{% url 'buckets:bucket_view' %}" >存储桶</a></li>
+                    <li class="bg-info"><a>预留</a></li>
                 </ul>
             </li>
             <li role="presentation" class="menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#cloud-nav-list-group">
                     <h5><span class="glyphicon glyphicon-list"></span>  云主机<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
-                <ul class="nav nav-pills nav-stacked collapse" id="cloud-nav-list-group">
-                    <li><a>预留</a></li>
-                    <li><a>预留</a></li>
+                <ul class="bg-info nav nav-pills nav-stacked collapse in" id="cloud-nav-list-group">
+                    <li><a href="{% url 'evcloud:list' %}">云主机列表</a></li>
+                    <li><a href="{% url 'evcloud:add' %}">创建云主机</a></li>
                 </ul>
             </li>
             <li role="presentation" class="menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#vpn-nav-list-group">
                     <h5><span class="glyphicon glyphicon-list"></span>  VPN<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
-                <ul class="nav nav-pills nav-stacked collapse" id="vpn-nav-list-group">
+                <ul class="bg-info nav nav-pills nav-stacked collapse in" id="vpn-nav-list-group">
                     <li><a>预留</a></li>
                     <li><a>预留</a></li>
                 </ul>
             </li>
         </ul>
     </div>
-    <div class="col-xs-offset-2" id="content-display-div">
+    <div class="col-xs-10" id="content-display-div">
         {% block content %}{% endblock %}
     </div>
 {% endblock %}
@@ -47,8 +47,6 @@
     <script type="text/javascript" src="{% static 'sweetalert2/dist/sweetalert2.all.min.js' %}"></script>
 {#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
     <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.js' %}"></script>
-    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
-    <script type="text/javascript" src="{% static 'buckets/bucket.js' %}"></script>
-{#    jquery模板定义#}
+    {% block script_extends %}{% endblock %}
 {% endblock %}
 

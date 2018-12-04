@@ -14,6 +14,7 @@ import os
 import sys
 import datetime
 
+# import raven
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'buckets.apps.BucketsConfig',
     'users.apps.UsersConfig',
     'api',
+    'evcloud',
 ]
 
 MIDDLEWARE = [
@@ -198,9 +200,9 @@ JWT_AUTH = {
 # Ceph rados settings
 CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
-    'USER_NAME': 'client.objstore',
+    'USER_NAME': 'client.admin',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    'POOL_NAME': 'objstore',
+    'POOL_NAME': 'p0',
     'RADOS_DLL_PATH': 'rados.so'
 }
 
@@ -229,7 +231,7 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': '/home/log/webserver.log',
+            'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
         },
         # output to console settings
         'console': {
@@ -291,5 +293,14 @@ from .security_settings import *
 # )
 # connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
 
+# 邮箱配置
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_USE_TLS = True   #是否使用TLS安全传输协议
+# # EMAIL_PORT = 25
+# EMAIL_HOST = 'xxx'
+# EMAIL_HOST_USER = 'xxx'
+# EMAIL_HOST_PASSWORD = 'xxx'
 
-
+# RAVEN_CONFIG = {
+#     'dsn': 'sentry上面创建项目的时候得到的dsn'
+# }
