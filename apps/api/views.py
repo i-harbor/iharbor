@@ -1,4 +1,6 @@
+from bson import ObjectId
 from collections import OrderedDict
+from datetime import datetime
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
@@ -303,7 +305,14 @@ class ObjViewSet(viewsets.GenericViewSet):
             对应参数错误信息;
 
     update:
-    通过对象ID分片上传文件对象
+    通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
+
+    注意：
+        文件对象已存在，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
+        当chunk_offset=0时会被认为一次新文件对象上传，如果文件对象已存在，此时overwrite参数有效，
+            overwrite=False时为不覆盖上传，会返回400错误码和已存在同名文件的错误提示。
+            overwrite=True时会重置原文件对象大小为0，相当于删除已存在的同名文件对象，创建一个新同名文件对象，
+
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
@@ -311,6 +320,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         }
         Http Code: 状态码400：参数有误时，返回数据：
             对应参数错误信息;
+        Http Code: 状态码500
+            {
+                'code': 500,
+                'error_text': '文件块rados写入失败'
+            }
 
     retrieve:
         通过文件对象绝对路径（以存储桶名开始）,下载文件对象,可通过query参数获取文件对象详细信息，或者自定义读取对象数据块
@@ -418,14 +432,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                 ),
             ],
             'DELETE': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-            'PUT': VERSION_METHOD_FEILD + [
-                coreapi.Field(
-                    name='objpath',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='ObjectID，post请求创建文件对象返回的对象ID,类型String')
-                )
-            ],
+            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
             'POST': VERSION_METHOD_FEILD,
             'PATCH': VERSION_METHOD_FEILD + [
                 coreapi.Field(
@@ -444,16 +451,58 @@ class ObjViewSet(viewsets.GenericViewSet):
         }
     )
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.response_data, status=status.HTTP_201_CREATED)
+    # def create(self, request, *args, **kwargs):
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     serializer.save()
+    #     return Response(serializer.response_data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
+        objpath = kwargs.get(self.lookup_field, '')
+
+        # 对象路径分析
+        pp = PathParser(filepath=objpath)
+        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 数据验证
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+
+        # 存储桶验证和获取桶对象mongodb集合名
+        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not collection_name and response:
+            return response
+
+        chunk_offset = data.get('chunk_offset')
+        chunk = request.data.get('chunk')
+        overwrite = data.get('overwrite')
+
+        obj, created = self.get_file_obj_or_create_or_404(collection_name, path, filename)
+        if not created: # 对象存在 ，
+            if chunk_offset == 0:
+                if not overwrite: # 不覆盖
+                    return Response({'code': 400, 'error_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    cro = CephRadosObject(str(obj.id))
+                    if cro.delete():
+                        obj.si = 0
+
+        # 存储文件块
+        rados = CephRadosObject(str(obj.id))
+        ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
+        if ok:
+            with switch_collection(BucketFileInfo, collection_name):
+                # 更新文件修改时间
+                obj.upt = datetime.utcnow()
+                obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
+                obj.save()
+        else:
+            return Response({'code': 500, 'code_text': '文件块rados写入失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
         info = request.query_params.get('info', None)
@@ -561,16 +610,47 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     def get_file_obj_or_404(self, collection_name, path, filename):
         """
-        获取文件对象信息
+        获取文件对象
         """
         bfm = BucketFileManagement(path=path)
         with switch_collection(BucketFileInfo, collection_name):
             ok, obj = bfm.get_file_exists(file_name=filename)
-            if not ok:
-                return None
-            if not obj:
+            if not ok or not obj:
                 raise Http404
             return obj
+
+    def get_file_obj_or_create_or_404(self, collection_name, path, filename):
+        '''
+        获取文件对象, 不存在则创建，其他错误(如对象父路径不存在)会抛404错误
+
+        :param collection_name:
+        :param path:
+        :param filename:
+        :return: (obj, created)
+                obj: 对象
+                created: 指示对象是否是新创建的，True(是)
+        '''
+        bfm = BucketFileManagement(path=path)
+        with switch_collection(BucketFileInfo, collection_name):
+            ok, did = bfm.get_cur_dir_id()
+            if not ok:
+                raise Http404 # 目录路径不存在
+
+            ok, obj = bfm.get_file_exists(file_name=filename)
+            if not ok:
+                raise Http404
+
+            if not obj:
+                # 创建文件对象
+                bfinfo = BucketFileInfo(na=filename,  # 文件名
+                                        fod=True,  # 文件
+                                        si=0)  # 文件大小
+                # 有父节点
+                if did:
+                    bfinfo.did = ObjectId(did)
+                obj = bfinfo.save()
+                return obj, True
+            return obj, False
 
     def get_file_download_response(self, file_id, filename):
         '''

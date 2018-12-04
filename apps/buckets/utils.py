@@ -44,7 +44,7 @@ class BucketFileManagement():
         except DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
-            raise e
+            return (False, None)  # path参数有误,未找到对应目录信息
         if dir:
             self.cur_dir_id = dir.id
         return (True, self.cur_dir_id)  # None->未找到对应目录
