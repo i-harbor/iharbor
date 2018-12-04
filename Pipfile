@@ -13,6 +13,7 @@ requests = "*"
 djangorestframework-jwt = "*"
 django-rest-swagger = "*"
 mysqlclient = "*"
+raven = "*"
 
 [dev-packages]
 uwsgi = "*"

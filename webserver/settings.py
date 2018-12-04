@@ -14,6 +14,7 @@ import os
 import sys
 import datetime
 
+# import raven
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -300,3 +301,6 @@ from .security_settings import *
 # EMAIL_HOST_USER = 'xxx'
 # EMAIL_HOST_PASSWORD = 'xxx'
 
+# RAVEN_CONFIG = {
+#     'dsn': 'sentry上面创建项目的时候得到的dsn'
+# }
