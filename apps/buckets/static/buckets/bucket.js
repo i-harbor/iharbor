@@ -191,7 +191,6 @@
                 bucket_list_checked.each(function (i) {
                     arr[i] = $(this).val();
                 });
-
                 if (arr.length > 0) {
                     $.ajax({
                         url: build_url_with_domain_name('/api/v1/buckets/0/'),
@@ -201,6 +200,7 @@
                         },
                         traditional: true,//传递数组时需要设为true
                         success: function (data) {
+                            bucket_list_checked.parents('tr').remove();
                             show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
                         },
                         error: function (err) {

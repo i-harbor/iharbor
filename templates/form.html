@@ -19,7 +19,7 @@
                             {% endfor %}
                             <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
                             <div class="clearfix"></div>
-                            <button type="submit" class="btn btn-primary pull-right">{{ submit_text }}</button>
+                            <button type="submit" class="btn btn-primary pull-left">{{ submit_text }}</button>
                         </form>
                         {% block form_extend %}{% endblock %}
                     </div>
