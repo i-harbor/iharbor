@@ -96,7 +96,7 @@ def evcloud_add(request):
             if vm_number >= limit:
                 raise Exception('the number of VM exceed limit')
             vms = evcloud_operations()
-            create_result = vms.create(image, cpu, mem)
+            create_result = vms.create(image, cpu, mem, user.email)
             EvcloudVM.objects.create(vm_id=create_result['uuid'],
                                      user=user,
                                      end_time=datetime.datetime.now()+datetime.timedelta(days=time),

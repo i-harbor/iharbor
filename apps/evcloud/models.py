@@ -25,7 +25,7 @@ class EvcloudVM(models.Model):
 class VMLimit(models.Model):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
-    limit = models.IntegerField(default=3, verbose_name='限制数量')
+    limit = models.IntegerField(default=1, verbose_name='限制数量')
 
     class Meta:
         verbose_name = '虚拟机限制'
