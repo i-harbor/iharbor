@@ -46,6 +46,10 @@ class APIAuth(models.Model):
     url = models.CharField(max_length=150, verbose_name='api_url')
     name = models.CharField(max_length=50, verbose_name='用户名')
     pwd = models.CharField(max_length=50, verbose_name='密码')
+    group_id = models.IntegerField()
+    vlan_id = models.IntegerField()
+    net_type_id = models.IntegerField()
+    pool_id = models.IntegerField()
     flag = models.BooleanField(verbose_name='是否当前使用')
 
     class Meta:

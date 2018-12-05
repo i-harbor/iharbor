@@ -5,6 +5,10 @@ class evcloud_operations():
 
     def __init__(self):
         api_config = APIAuth.objects.get(flag=True)
+        self.group_id = api_config.group_id
+        self.vlan_id = api_config.vlan_id
+        self.net_type_id = api_config.net_type_id
+        self.pool_id = api_config.pool_id
         auth = coreapi.auth.BasicAuthentication(username=api_config.name, password=api_config.pwd)
         self.client = coreapi.Client(auth=auth)
         self.schema = self.client.get(api_config.url)
@@ -12,7 +16,7 @@ class evcloud_operations():
     def get_image_list(self):
         action = ["images", "list"]
         params = {
-            "pool_id": 1,
+            "pool_id": self.pool_id,
         }
         search_result = self.client.action(self.schema, action, params=params)
         finally_result = {}
@@ -26,12 +30,10 @@ class evcloud_operations():
             "image_id": image,
             "vcpu": cpu,
             "mem": mem,
-            "group_id": 1,
+            "group_id": self.group_id,
             
-            "net_type_id": 1,
-            "vlan_id": 2,
-            "diskname": '',
-            "remarks": '',
+            "net_type_id": self.net_type_id,
+            "vlan_id": self.vlan_id,
         }
         vm_id = self.client.action(self.schema, action, params=params)
         return self.read_vm(vm_id)

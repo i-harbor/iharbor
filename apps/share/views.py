@@ -1,5 +1,6 @@
-from django.shortcuts import render
-from rest_framework import viewsets, status, generics, mixins
+from django.http import FileResponse, Http404
+from django.utils.http import urlquote
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.reverse import reverse
@@ -9,138 +10,83 @@ from buckets.utils import BucketFileManagement
 from buckets.models import Bucket, BucketFileInfo
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
+from utils.oss.rados_interfaces import CephRadosObject
 from . import serializers
 
 # Create your views here.
 
-class ShareViewSet(viewsets.GenericViewSet):
+class ObsViewSet(viewsets.GenericViewSet):
     '''
     分享视图集
 
     retrieve:
-    获取分享文件信息或文件夹文件列表信息；
+    浏览器端下载文件对象，公共文件对象或当前用户(如果用户登录了)文件对象下载，没有权限下载非公共文件对象或不属于当前用户文件对象
 
-    create:
-    创建一个分享连接
+    >>Http Code: 状态码200：
+            返回FileResponse对象,bytes数据流；
 
-    destroy:
-    删除分享连接；
-    Http Code: 状态码200;
-        无异常时，返回数据：{'code': 200, 'code_text': '已成功删除'};
-        异常时，返回数据：{'code': 404, 'code_text': '文件不存在'};
+    >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+        {
+            'code': 400,
+            'code_text': 'xxxx参数有误'
+        }
+    >>Http Code: 状态码403
+        {
+            'code': 403,
+            'code_text': '您没有访问权限'
+        }
+    >>Http Code: 状态码404：找不到资源;
+    >>Http Code: 状态码500：服务器内部错误;
+
     '''
     queryset = []
     permission_classes = []
-    lookup_field = 'shared_code'
+    lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
     # api docs
     schema = CustomAutoSchema(
         manual_fields={
-            'POST':[
+            'GET':[
                 coreapi.Field(
-                    name='path',
+                    name='objpath',
                     required=False,
                     location='query',
-                    schema=coreschema.String(description='存储桶下目录路径')
+                    schema=coreschema.String(description='以存储桶名称开头文件对象绝对路径')
                 ),
             ],
-            'DELETE': [
-                coreapi.Field(
-                    name='bucket_name',
-                    required=True,
-                    location='query',
-                    schema=coreschema.String(description='存储桶名称'),
-                ),
-            ]
         }
     )
 
     def retrieve(self, request, *args, **kwargs):
-        bucket_name = request.query_params.get('bucket_name')
-        dir_path = request.query_params.get('dir_path', '')
+        objpath = kwargs.get(self.lookup_field, '')
+
+        pp = PathParser(filepath=objpath)
+        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         bucket = Bucket.get_bucket_by_name(bucket_name)
         if not bucket:
-            return Response({'code': 404, 'code_text': f'不存在一个名称为“{bucket_name}”的存储桶'})
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'},
+                                status=status.HTTP_404_NOT_FOUND)
+
         collection_name = bucket.get_bucket_mongo_collection_name()
+        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
-        bfm = BucketFileManagement(path=dir_path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, files = bfm.get_cur_dir_files()
-            if not ok:
-                return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'})
+        # 文件对象是否属于当前用户 或 文件是否是共享的
+        if not bucket.check_user_own_bucket(request) and not fileobj.is_shared_and_in_shared_time():
+            return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
-            queryset = files
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
+        # 下载整个文件对象
+        response = self.get_file_download_response(str(fileobj.id), filename)
+        if not response:
+            return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
-            data = {
-                'code': 200,
-                'files': serializer.data,
-                'bucket_name': bucket_name,
-                'dir_path': dir_path,
-                'ajax_upload_url': reverse('api:upload-list', kwargs={'version': 'v1'}),
-            }
-            return Response(data)
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        if not serializer.is_valid(raise_exception=False):
-            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_200_OK)
-
-        validated_data = serializer.validated_data
-        bucket_name = validated_data.get('bucket_name', '')
-        dir_path = validated_data.get('dir_path', '')
-        dir_name = validated_data.get('dir_name', '')
-        did = validated_data.get('did', None)
-
-        bucket = Bucket.get_bucket_by_name(bucket_name)
-        if not bucket:
-            return Response({'code': 404, 'code_text': f'不存在一个名称为“{bucket_name}”的存储桶'})
-        collection_name = bucket.get_bucket_mongo_collection_name()
-
-        with switch_collection(BucketFileInfo, collection_name):
-            bfinfo = BucketFileInfo(na=dir_path + '/' + dir_name if dir_path else dir_name,  # 目录名
-                                    fod=False,  # 目录
-                                    )
-            # 有父节点
-            if did:
-                bfinfo.did = did
-            bfinfo.save()
-
-        data = {
-            'code': 200,
-            'code_text': '创建分享连接成功',
-            'data': serializer.data,
-        }
-        return Response(data, status=status.HTTP_200_OK)
-
-    def destroy(self, request, *args, **kwargs):
-        dir_path = kwargs.get(self.lookup_field, '')
-        bucket_name = request.query_params.get('bucket_name', '')
-
-        pp = PathParser(path=dir_path)
-        path, dir_name = pp.get_path_and_filename()
-        if not bucket_name or not dir_name:
-            return Response(data={'code': 400, 'code_text': 'bucket_name or dir_name不能为空'}, status=status.HTTP_400_BAD_REQUEST)
-
-        bucket = Bucket.get_bucket_by_name(bucket_name)
-        if not bucket:
-            return Response({'code': 404, 'code_text': f'不存在一个名称为“{bucket_name}”的存储桶'})
-        collection_name = bucket.get_bucket_mongo_collection_name()
-
-        obj = self.get_dir_object(collection_name, path, dir_path)
-        if not obj:
-            data = {'code': 404, 'code_text': '文件不存在'}
-        else:
-            with switch_collection(BucketFileInfo, collection_name):
-                obj.do_soft_delete()
-            data = {'code': 200, 'code_text': '已成功删除'}
-        return Response(data=data, status=status.HTTP_200_OK)
+        # 增加一次下载次数
+        fileobj.download_cound_increase(collection_name)
+        return response
 
     def get_serializer(self, *args, **kwargs):
         """
@@ -163,16 +109,34 @@ class ShareViewSet(viewsets.GenericViewSet):
             return serializers.SharedPostSerializer
         return serializers.SharedPostSerializer
 
-    def get_dir_object(self, collection_name, path, dir_name):
+    def get_file_download_response(self, file_id, filename):
+        '''
+        获取文件下载返回对象
+        :param file_id: 文件Id, type: str
+        :filename: 文件名， type: str
+        :return:
+            success：http返回对象，type: dict；
+            error: None
+        '''
+        cro = CephRadosObject(file_id)
+        file_generator = cro.read_obj_generator
+        if not file_generator:
+            return None
+
+        filename = urlquote(filename)# 中文文件名需要
+        response = FileResponse(file_generator())
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
+        return response
+
+    def get_file_obj_or_404(self, collection_name, path, filename):
         """
-        Returns the object the view is displaying.
+        获取文件对象
         """
         bfm = BucketFileManagement(path=path)
         with switch_collection(BucketFileInfo, collection_name):
-            ok, obj = bfm.get_dir_exists(dir_name=dir_name)
-            if not ok:
-                return None
+            ok, obj = bfm.get_file_exists(file_name=filename)
+            if not ok or not obj:
+                raise Http404
             return obj
-
-
 

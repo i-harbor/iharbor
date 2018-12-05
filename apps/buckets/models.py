@@ -181,7 +181,11 @@ class BucketFileInfo(DynamicDocument):
         td = datetime.utcnow() - self.set
         return td.total_seconds() > 0
 
-
+    def download_cound_increase(self, collection_name):
+        '''下载次数加1'''
+        self.switch_collection(collection_name)
+        self.dlc = (self.dlc or 0) + 1  # 下载次数+1
+        self.save()
 
 
 
