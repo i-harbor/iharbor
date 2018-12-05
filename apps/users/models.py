@@ -27,7 +27,7 @@ class Email(models.Model):
         verbose_name = '邮件'
         verbose_name_plural = verbose_name
 
-    def send_active_email(self, receiver=None, message=None):
+    def send_email(self, subject='EVHarbor',receiver=None, message=None):
         '''
         发送用户激活邮件
 
@@ -43,7 +43,7 @@ class Email(models.Model):
         self.email_host = settings.EMAIL_HOST
 
         ok = send_mail(
-            subject='EVHarbor账户激活',         # 标题
+            subject=subject,         # 标题
             message=message,                    # 内容
             from_email=self.sender,             # 发送者
             recipient_list=[self.receiver],     # 接收者
