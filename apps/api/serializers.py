@@ -427,7 +427,8 @@ class ObjInfoSerializer(serializers.Serializer):
         bucket_name = self._context.get('bucket_name', '')
         dir_path = self._context.get('dir_path', '')
         filepath = os.path.join(bucket_name, dir_path, obj.na)
-        download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
+        # download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
+        download_url = reverse('share:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url

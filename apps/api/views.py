@@ -99,11 +99,11 @@ class UserViewSet(mixins.DestroyModelMixin,
     '''
     queryset = User.objects.all()
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.validated_data, status=status.HTTP_201_CREATED, )
+    # def create(self, request, *args, **kwargs):
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     serializer.save()
+    #     return Response(serializer.validated_data, status=status.HTTP_201_CREATED, )
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -481,17 +481,16 @@ class ObjViewSet(viewsets.GenericViewSet):
         overwrite = data.get('overwrite')
 
         obj, created = self.get_file_obj_or_create_or_404(collection_name, path, filename)
+        rados = CephRadosObject(str(obj.id))
         if not created: # 对象存在 ，
             if chunk_offset == 0:
                 if not overwrite: # 不覆盖
                     return Response({'code': 400, 'error_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    cro = CephRadosObject(str(obj.id))
-                    if cro.delete():
-                        obj.si = 0
+                    rados.delete()
+                    obj.si = 0
 
         # 存储文件块
-        rados = CephRadosObject(str(obj.id))
         ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
         if ok:
             with switch_collection(BucketFileInfo, collection_name):

@@ -394,7 +394,7 @@
                                 {{ if $value.fod }}
                                     <td class="bucket-files-table-item">
                                         <span class="glyphicon glyphicon-file"></span>
-                                        <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.na }}</a>
+                                        <a href="#" id="bucket-files-item-enter-file" dir_path="$data['dir_path']" download_url="{{$value.download_url}}">{{ $value.na }}</a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
                                     <td>{{ $value.si }}</td>
@@ -508,7 +508,7 @@
         bucket_name = obj.bucket_name;
         cur_path = obj.dir_path;
 
-        url = get_api_domain_name() + "/api/v1/obj/" + bucket_name + "/" ;
+        url = "/api/v1/obj/" + bucket_name + "/" ;
         if (cur_path){
             url += cur_path + "/";
         }
@@ -550,7 +550,7 @@
         bucket_name = get_bucket_name_and_cur_path().bucket_name;
         dir_path = $(this).attr('dir_path');
 
-        let url = get_api_domain_name() + "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
+        let url = "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
         url = build_url_with_domain_name(url);
         delete_one_directory(url, function () {
             list_item_dom.remove();
@@ -613,8 +613,15 @@
     //
     $("#content-display-div").on("click", '#bucket-files-item-enter-file', function (e) {
         e.preventDefault();
-        let download_url = $(this).attr('download_url');
-        let url = download_url + '?info=true';
+        let obj = get_bucket_name_and_cur_path();
+        let bucket_name = obj.bucket_name;
+        let dir_path = obj.dir_path;
+        let filename = $(this).text();
+
+        let url = 'api/v1/obj/' + bucket_name + '/';
+        if (dir_path)
+            url += dir_path + '/';
+        url += filename + '/?info=true';
         url = build_url_with_domain_name(url);
         get_file_obj_info_and_render(url);
     });
