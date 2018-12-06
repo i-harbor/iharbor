@@ -1,17 +1,16 @@
 import os
-
 from datetime import datetime
 from bson import ObjectId
 
-from django.db.models import Q as dQ
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
 from .models import User, Bucket, BucketFileInfo
-from utils.storagers import FileStorage, PathParser
+from utils.storagers import PathParser
 from utils.oss.rados_interfaces import CephRadosObject
+from utils.time import to_localtime_string_naive_by_utc
 from .validators import DNSStringValidator
 
 
@@ -81,7 +80,9 @@ class BucketSerializer(serializers.ModelSerializer):
         return {'id': obj.user.id, 'username': obj.user.username}
 
     def get_created_time(self, obj):
-        return obj.created_time.strftime("%Y-%m-%d %H:%M:%S")
+        if not obj.created_time:
+            return ''
+        return to_localtime_string_naive_by_utc(obj.created_time)
 
     def get_access_permission(self, obj):
         return obj.get_access_permission_display()
@@ -219,75 +220,6 @@ class ObjPostSerializer(serializers.Serializer):
         return data
 
 
-class ObjOldPutSerializer(serializers.Serializer):
-    '''
-    文件分块上传序列化器
-    '''
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所在的存储桶名称，类型string')
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
-    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='上传文件块的字节大小，类型int')
-
-    def validate(self, data):
-        """
-        复杂验证
-        """
-        request = self.context.get('request')
-        kwargs = self.context.get('kwargs')
-        file_id = kwargs.get('objpath')
-        bucket_name = data.get('bucket_name')
-        chunk_offset = data.get('chunk_offset')
-        chunk = data.get('chunk')
-        chunk_size = data.get('chunk_size')
-
-        try:
-            file_id = ObjectId(file_id)
-        except Exception:
-            raise serializers.ValidationError(detail={'objpath': 'id不是一个有效的ObjectID'})
-
-        if not chunk:
-            # chunk_size != 0时，此时却获得一个空文件块
-            if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小(0)不一致'})
-            # 如果上传确实是一个空文件块不做处理
-            return data
-        elif chunk.size != chunk_size:
-            raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        with switch_collection(BucketFileInfo, _collection_name):
-            # bfi = BucketFileInfo.objects(id=file_id).first()
-            bfi = BucketFileManagement().get_file_obj_by_id(file_id)
-            if not bfi:
-                raise serializers.ValidationError(detail={'id': '文件id有误，未找到文件'})
-
-             # 存储文件块
-            # fstorage = FileStorage(str(bfi.id))
-            # if fstorage.write(chunk, chunk_size, offset=chunk_offset):
-            rados = CephRadosObject(str(bfi.id))
-            ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
-            if ok:
-                # 更新文件修改时间
-                bfi.upt = datetime.utcnow()
-                bfi.si = max(chunk_offset+chunk.size, bfi.si if bfi.si else 0) # 更新文件大小（只增不减）
-                bfi.save()
-            else:
-                raise serializers.ValidationError(detail={'error': 'server error,文件块写入失败'})
-        return data
-
-    @property
-    def response_data(self):
-        res = {}
-        self.instance = None # 如果self.instance != None, 调用self.data时会使用self.instance（这里真的的instance），会报错
-        return res
-
-
 class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
@@ -412,12 +344,12 @@ class ObjInfoSerializer(serializers.Serializer):
     def get_ult(self, obj):
         if not obj.ult:
             return ''
-        return obj.ult.strftime("%Y-%m-%d %H:%M:%S")
+        return to_localtime_string_naive_by_utc(obj.ult)
 
     def get_upt(self, obj):
         if not obj.upt:
             return ''
-        return obj.upt.strftime("%Y-%m-%d %H:%M:%S")
+        return to_localtime_string_naive_by_utc(obj.upt)
 
     def get_download_url(self, obj):
         # 目录

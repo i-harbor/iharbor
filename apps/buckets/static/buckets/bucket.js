@@ -71,7 +71,7 @@
     //
     function on_create_bucket(){
         swal({
-            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小字写)、数字和-',
+            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-',
             input: 'text',
             inputAttributes: {
                 autocapitalize: 'off'

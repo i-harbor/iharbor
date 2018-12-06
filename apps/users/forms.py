@@ -102,7 +102,7 @@ class PasswordChangeForm(forms.Form):
     old_password = forms.CharField( label='原密码',
                                 min_length=8,
                                 max_length=20,
-                                widget=forms.TextInput(attrs={
+                                widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
                                                 'placeholder': '请输入原密码'
                                 }))
