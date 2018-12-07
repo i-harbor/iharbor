@@ -264,6 +264,12 @@ def send_one_email(receiver, message, subject='EVHarbor', log_message=''):
 
 
 def get_or_create_token(user):
+    '''
+    获取用户或为用户创建一个token，会在数据库表中产生一条token记录
+
+    :param user: 用户对象
+    :return: Token对象
+    '''
     token, created = Token.objects.get_or_create(user=user)
     if not token:
         return None
@@ -271,6 +277,12 @@ def get_or_create_token(user):
     return token
 
 def reflesh_new_token(token):
+    '''
+    更新用户的token
+
+    :param token: token对象
+    :return: 无
+    '''
     token.delete()
     token.key = token.generate_key()
     token.save()
@@ -315,5 +327,13 @@ def get_find_password_link(request, user):
     url = request.build_absolute_uri(url)
     return url + '?jwt=' + token
 
+@login_required
+def security(request, *args, **kwargs):
+    '''
+     安全凭证函数视图
+    '''
+    user = request.user
+    token = get_or_create_token(user=user)
+    return render(request, 'security.html', context={'token': token})
 
 

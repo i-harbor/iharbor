@@ -365,3 +365,16 @@ class ObjInfoSerializer(serializers.Serializer):
             download_url = request.build_absolute_uri(download_url)
         return download_url
 
+
+class AuthTokenDumpSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    user = serializers.SerializerMethodField()
+    created = serializers.SerializerMethodField()
+
+    def get_user(self, obj):
+        return obj.user.username
+
+    def get_created(self, obj):
+        return to_localtime_string_naive_by_utc(obj.created)
+
+

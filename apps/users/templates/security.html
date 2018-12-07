@@ -1,0 +1,48 @@
+{% extends "base_with_sidebar.html" %}
+{% load static %}
+
+{% block title %}
+    安全凭证
+{% endblock %}
+
+{% block content %}
+    <div class="row col-xs-11">
+        <h3>您的安全凭证</h3>
+        <p>使用此页面管理 EVHarbor 账户凭证。</p>
+        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
+        <div class="nav-list" id="security-nav-list">
+            <div class="nav-list-item" id="nav-list-token">
+                <div class="btn btn-info" data-toggle="collapse" data-target="#nav-list-token-body">
+                    <span class="glyphicon glyphicon-record"></span><span>身份认证token</span></div>
+                <div class="collapse in"  id="nav-list-token-body">
+                    <div class="">
+                        <p>token密钥用于身份验证，token应包含在Authorization HTTP标头中，密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
+                            <p class="text-info">例如：Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b</p></p>
+                        <p>刷新创建新token，旧token会失效，如果token泄露，请及时创建新的token，以防数据泄露丢失。</p>
+                            {% if token %}
+                            <table class="table table-hover" id="token-table">
+                                <tr class="bg-info">
+                                    <th>创建时间</th>
+                                    <th>Token</th>
+                                    <th></th>
+{#                                    <th></th>#}
+                                </tr>
+                                <tr>
+                                    <th>{{ token.created | date:'Y-m-d H:i:s' }}</th>
+                                    <th>{{ token.key }}</th>
+{#                                    <th><span class="btn btn-info" id="btn-copy"><span class="glyphicon glyphicon-copy"></span>复制</span></th>#}
+                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>创建新密钥</span></th>
+                                </tr>
+                            </table>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block script_extends %}
+    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
+    <script type="text/javascript" src="{% static 'users/users.js' %}"></script>
+{% endblock %}
