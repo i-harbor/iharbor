@@ -10,4 +10,5 @@ urlpatterns = [
     url(r'^active/$', views.active_user, name='active'),
     url(r'^forget/$', views.forget_password, name='forget'),
     url(r'^fconfirm/$', views.forget_password_confirm, name='forget_confirm'),
+    url(r'^security/$', views.security, name='security')
 ]

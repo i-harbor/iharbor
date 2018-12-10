@@ -24,16 +24,16 @@ class evcloud_operations():
             finally_result[i] = image
         return finally_result
 
-    def create(self, image, cpu, mem):
+    def create(self, image, cpu, mem, remarks):
         action = ["vms", "create"]
         params = {
             "image_id": image,
             "vcpu": cpu,
             "mem": mem,
             "group_id": self.group_id,
-            
             "net_type_id": self.net_type_id,
             "vlan_id": self.vlan_id,
+            "remarks": remarks,
         }
         vm_id = self.client.action(self.schema, action, params=params)
         return self.read_vm(vm_id)

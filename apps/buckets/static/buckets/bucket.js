@@ -71,7 +71,7 @@
     //
     function on_create_bucket(){
         swal({
-            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小字写)、数字和-',
+            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-',
             input: 'text',
             inputAttributes: {
                 autocapitalize: 'off'
@@ -174,50 +174,49 @@
             show_warning_dialog('请先选择要删除的存储桶');
             return;
         }
-        swal({
+
+        show_confirm_dialog({
             title: '确认删除选中的存储桶？',
-            text: "此操作是不可逆的",
-            type: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: '删除',
-            cancelButtonText: '取消'
-        }).then((result) => {
-            if (result.value) {
-                //获取选中的存储桶的id
-                var arr = new Array();
-                let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
-                bucket_list_checked.each(function (i) {
-                    arr[i] = $(this).val();
-                });
-                if (arr.length > 0) {
-                    $.ajax({
-                        url: build_url_with_domain_name('/api/v1/buckets/0/'),
-                        type: 'delete',
-                        data: {
-                            'ids': arr,// 存储桶id数组
-                        },
-                        traditional: true,//传递数组时需要设为true
-                        success: function (data) {
-                            bucket_list_checked.parents('tr').remove();
-                            show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
-                        },
-                        error: function (err) {
-                            show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
-                        },
-                    })
-                }
-            }
-        });
+            ok_todo: delete_selected_buckets,
+        })
     });
+
+
+    //
+    // 删除选中的存储桶
+    //
+    function delete_selected_buckets(){
+        //获取选中的存储桶的id
+        var arr = new Array();
+        let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
+        bucket_list_checked.each(function (i) {
+            arr[i] = $(this).val();
+        });
+        if (arr.length > 0) {
+            $.ajax({
+                url: build_url_with_domain_name('/api/v1/buckets/0/'),
+                type: 'delete',
+                data: {
+                    'ids': arr,// 存储桶id数组
+                },
+                traditional: true,//传递数组时需要设为true
+                success: function (data) {
+                    bucket_list_checked.parents('tr').remove();
+                    show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
+                },
+                error: function (err) {
+                    show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
+                },
+            })
+        }
+    }
 
     //
     // 单个存储桶列表项渲染模板
     //
     let render_bucket_item = template.compile(`
         <tr class="active" id="bucket-list-item">
-            <td><input type="checkbox" class="item-checkbox" value="{{ $id }}"></td>
+            <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
             <td>{{ $data['access_permission'] }}</td>
@@ -502,20 +501,27 @@
     //
     $("#content-display-div").on("click", '#bucket-files-item-delete', function (e) {
         e.preventDefault();
+
         let list_item_dom = $(this).parents("tr.bucket-files-table-item");
         filename = $(this).attr("filename");
         obj = get_bucket_name_and_cur_path();
         bucket_name = obj.bucket_name;
         cur_path = obj.dir_path;
 
-        url = "/api/v1/obj/" + bucket_name + "/" ;
-        if (cur_path){
+        url = "/api/v1/obj/" + bucket_name + "/";
+        if (cur_path) {
             url += cur_path + "/";
         }
         url += filename + "/";
         url = build_url_with_domain_name(url);
-        delete_one_file(url, function () {
-            list_item_dom.remove();
+
+        show_confirm_dialog({
+            title: '确定要删除吗？',
+            ok_todo: function() {
+                delete_one_file(url, function () {
+                    list_item_dom.remove();
+                })
+            },
         });
     });
 
@@ -552,8 +558,14 @@
 
         let url = "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
         url = build_url_with_domain_name(url);
-        delete_one_directory(url, function () {
-            list_item_dom.remove();
+
+        show_confirm_dialog({
+            title: '确定要删除吗？',
+            ok_todo: function() {
+                delete_one_directory(url, function () {
+                    list_item_dom.remove();
+                });
+            },
         });
     });
 
@@ -572,7 +584,10 @@
             },
             error: function (error,status) {
                 swal.close();
-                show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
+                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
+                else
+                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
             }
         });
     }
@@ -817,10 +832,10 @@
                 uploadFileChunk(url, file, offset);
             },
             error: function (err) {
-                if (err.responseJSON.error_text)
-                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.error_text);
+                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text);
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.responseText);
+                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
 
                 endFileUploading();
             },
@@ -919,48 +934,6 @@
     function get_btn_file_upload() {
         return $("#btn-upload-file");
     }
-
-
-    //
-    // 删除文件对象点击事件处理
-    //
-    $("[id=file-item-delete]").on("click", function (e) {
-        e.preventDefault();
-
-        const swalWithBootstrapButtons = swal.mixin({
-            confirmButtonClass: 'btn btn-success',
-            cancelButtonClass: 'btn btn-danger',
-            buttonsStyling: false,
-        });
-
-        swalWithBootstrapButtons({
-            title: '确认删除?',
-            text: "文件将会被删除!",
-            type: 'warning',
-            showCancelButton: true,
-            confirmButtonText: '删除',
-            cancelButtonText: '取消',
-            reverseButtons: true
-        }).then((result) => {
-            if (result.value) {
-                let url = $(this).attr('file-delete-url');
-                delete_file_object(url, () => {
-                    swalWithBootstrapButtons(
-                    '已删除!',
-                    '您选择的文件已经被删除',
-                    'success'
-                    );
-                    $(this).parents(".bucket-files-table-item")[0].remove();
-                });
-            } else if (result.dismiss === swal.DismissReason.cancel) {// Read more about handling dismissals
-                swalWithBootstrapButtons(
-                    '取消',
-                    '您已取消删除文件 :)',
-                    'error'
-                )
-            }
-        })
-    });
 
 
     //

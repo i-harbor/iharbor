@@ -5,7 +5,6 @@ from datetime import datetime
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.db.models import Q as dQ
-from mongoengine.context_managers import switch_collection
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
@@ -14,10 +13,11 @@ from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
 
 from buckets.utils import BucketFileManagement
+from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
+from utils.oss.rados_interfaces import CephRadosObject
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
-from utils.oss.rados_interfaces import CephRadosObject
 from . import paginations
 
 # Create your views here.
@@ -99,11 +99,18 @@ class UserViewSet(mixins.DestroyModelMixin,
     '''
     queryset = User.objects.all()
 
-    # def create(self, request, *args, **kwargs):
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     serializer.save()
-    #     return Response(serializer.validated_data, status=status.HTTP_201_CREATED, )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        if not send_active_url_email(request._request, user.email, user):
+            return Response('激活链接邮件发送失败', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        data = {
+            'code': 201,
+            'code_text': '用户注册成功，请登录邮箱访问收到的连接以激活用户',
+            'data': serializer.validated_data,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -226,7 +233,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         if not serializer.is_valid(raise_exception=False):
             data = {
                 'code': 400,
-                'code_text': serializer.errors['non_field_errors'],
+                'code_text': serializer.errors.get('non_field_errors', '参数验证未通过'),
                 'data': serializer.data,
             }
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
@@ -323,7 +330,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         Http Code: 状态码500
             {
                 'code': 500,
-                'error_text': '文件块rados写入失败'
+                'code_text': '文件块rados写入失败'
             }
 
     retrieve:
@@ -439,7 +446,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                     name='share',
                     required=False,
                     location='query',
-                    schema=coreschema.String(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有),不区分大小写'),
+                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
                 ),
                 coreapi.Field(
                     name='days',
@@ -468,14 +475,18 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 数据验证
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.data
+        if not serializer.is_valid(raise_exception=False):
+            return Response({
+                'code': 400,
+                'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # 存储桶验证和获取桶对象mongodb集合名
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
             return response
 
+        data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
         overwrite = data.get('overwrite')
@@ -485,7 +496,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not created: # 对象存在 ，
             if chunk_offset == 0:
                 if not overwrite: # 不覆盖
-                    return Response({'code': 400, 'error_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'code': 400, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
                     rados.delete()
                     obj.si = 0
@@ -493,11 +504,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         # 存储文件块
         ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
         if ok:
-            with switch_collection(BucketFileInfo, collection_name):
-                # 更新文件修改时间
-                obj.upt = datetime.utcnow()
-                obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
-                obj.save()
+            # 更新文件修改时间
+            obj.upt = datetime.utcnow()
+            obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
+            obj.switch_collection(collection_name)
+            obj.save()
         else:
             return Response({'code': 500, 'code_text': '文件块rados写入失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -552,8 +563,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        with switch_collection(BucketFileInfo, collection_name):
-            fileobj.do_soft_delete()
+        fileobj.do_soft_delete(collection_name)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
@@ -575,8 +585,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        with switch_collection(BucketFileInfo, collection_name):
-            fileobj.set_shared(sh=share, days=days)
+        fileobj.switch_collection(collection_name)
+        fileobj.set_shared(sh=share, days=days)
 
         data = {
             'code': 200,
@@ -611,12 +621,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         """
         获取文件对象
         """
-        bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, obj = bfm.get_file_exists(file_name=filename)
-            if not ok or not obj:
-                raise Http404
-            return obj
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+        ok, obj = bfm.get_file_exists(file_name=filename)
+        if not ok or not obj:
+            raise Http404
+        return obj
 
     def get_file_obj_or_create_or_404(self, collection_name, path, filename):
         '''
@@ -629,27 +638,28 @@ class ObjViewSet(viewsets.GenericViewSet):
                 obj: 对象
                 created: 指示对象是否是新创建的，True(是)
         '''
-        bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, did = bfm.get_cur_dir_id()
-            if not ok:
-                raise Http404 # 目录路径不存在
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+        ok, did = bfm.get_cur_dir_id()
+        if not ok:
+            raise Http404 # 目录路径不存在
 
-            ok, obj = bfm.get_file_exists(file_name=filename)
-            if not ok:
-                raise Http404
+        ok, obj = bfm.get_file_exists(file_name=filename)
+        if not ok:
+            raise Http404
 
-            if not obj:
-                # 创建文件对象
-                bfinfo = BucketFileInfo(na=filename,  # 文件名
-                                        fod=True,  # 文件
-                                        si=0)  # 文件大小
-                # 有父节点
-                if did:
-                    bfinfo.did = ObjectId(did)
-                obj = bfinfo.save()
-                return obj, True
-            return obj, False
+        if not obj:
+            # 创建文件对象
+            bfinfo = BucketFileInfo(na=filename,  # 文件名
+                                    fod=True,  # 文件
+                                    si=0)  # 文件大小
+            # 有父节点
+            if did:
+                bfinfo.did = ObjectId(did)
+
+            bfinfo.switch_collection(collection_name)
+            obj = bfinfo.save()
+            return obj, True
+        return obj, False
 
     def get_file_download_response(self, file_id, filename):
         '''
@@ -822,7 +832,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     create:
         创建一个目录
 
-        >>Http Code: 状态码200, 请求参数有误:
+        >>Http Code: 状态码400, 请求参数有误:
             {
                 "code": 400,
                 "code_text": {
@@ -891,30 +901,29 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not collection_name and response:
             return response
 
-        bfm = BucketFileManagement(path=dir_path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, files = bfm.get_cur_dir_files()
-            if not ok:
-                return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
+        bfm = BucketFileManagement(path=dir_path, collection_name=collection_name)
+        ok, files = bfm.get_cur_dir_files()
+        if not ok:
+            return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
 
-            data_dict = OrderedDict([
-                ('code', 200),
-                ('bucket_name', bucket_name),
-                ('dir_path', dir_path),
-                ('breadcrumb', pp.get_path_breadcrumb(dir_path))
-            ])
+        data_dict = OrderedDict([
+            ('code', 200),
+            ('bucket_name', bucket_name),
+            ('dir_path', dir_path),
+            ('breadcrumb', pp.get_path_breadcrumb(dir_path))
+        ])
 
-            queryset = files
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
-                data_dict['files'] = serializer.data
-                return self.get_paginated_response(data_dict)
-
-            serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
-
+        queryset = files
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
             data_dict['files'] = serializer.data
-            return Response(data_dict)
+            return self.get_paginated_response(data_dict)
+
+        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+
+        data_dict['files'] = serializer.data
+        return Response(data_dict)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
@@ -927,16 +936,16 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         did = validated_data.get('did', None)
         collection_name = validated_data.get('collection_name')
 
-        with switch_collection(BucketFileInfo, collection_name):
-            bfm = BucketFileManagement(dir_path)
-            dir_path_name = bfm.build_dir_full_name(dir_name)
-            bfinfo = BucketFileInfo(na=dir_path_name,  # 目录名
-                                    fod=False,  # 目录
-                                    )
-            # 有父节点
-            if did:
-                bfinfo.did = did
-            bfinfo.save()
+        bfm = BucketFileManagement(dir_path, collection_name=collection_name)
+        dir_path_name = bfm.build_dir_full_name(dir_name)
+        bfinfo = BucketFileInfo(na=dir_path_name,  # 目录名
+                                fod=False,  # 目录
+                                )
+        # 有父节点
+        if did:
+            bfinfo.did = did
+        bfinfo.switch_collection(collection_name)
+        bfinfo.save()
 
         data = {
             'code': 201,
@@ -961,8 +970,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not obj:
             return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
         else:
-            with switch_collection(BucketFileInfo, collection_name):
-                obj.do_soft_delete()
+            obj.do_soft_delete(collection_name)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -991,10 +999,9 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         """
         Returns the object the view is displaying.
         """
-        bfm = BucketFileManagement(path=path)
-        with switch_collection(BucketFileInfo, collection_name):
-            ok, obj = bfm.get_dir_exists(dir_name=dir_name)
-            if not ok:
-                return None
-            return obj
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+        ok, obj = bfm.get_dir_exists(dir_name=dir_name)
+        if not ok:
+            return None
+        return obj
 

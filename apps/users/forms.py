@@ -47,8 +47,12 @@ class UserRegisterForm(forms.Form):
                 raise forms.ValidationError('用户名不能为空')
 
         #检查用户名是否已存在
-        if User.objects.filter(username=username).first():
-            raise forms.ValidationError('用户名已存在，请重新输入')
+        user = User.objects.filter(username=username).first()
+        if user:
+            if user.is_active:
+                raise forms.ValidationError('用户名已存在，请重新输入')
+            else:
+                self.cleaned_data['user'] = user # 未激活用户
 
         #密码是否一致
         if not password or password != confirm_password:
@@ -102,7 +106,7 @@ class PasswordChangeForm(forms.Form):
     old_password = forms.CharField( label='原密码',
                                 min_length=8,
                                 max_length=20,
-                                widget=forms.TextInput(attrs={
+                                widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
                                                 'placeholder': '请输入原密码'
                                 }))
