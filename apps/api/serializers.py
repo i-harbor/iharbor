@@ -100,7 +100,7 @@ class BucketCreateSerializer(serializers.Serializer):
         """
         复杂验证
         """
-        bucket_name = data['name']
+        bucket_name = data.get('name')
 
         if not bucket_name:
             raise serializers.ValidationError('存储桶bucket名称不能为空')
@@ -125,6 +125,8 @@ class BucketCreateSerializer(serializers.Serializer):
         Create and return a new `Bucket` instance, given the validated data.
         """
         request = self.context.get('request')
+        if not request:
+            return None
         user = request.user
         bucket = Bucket.objects.create(user=user, **validated_data) # 创建并保存
         return bucket
@@ -154,19 +156,20 @@ class ObjPostSerializer(serializers.Serializer):
         old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            # 存在同名文件对象，覆盖上传删除原文件
-            if old_bfinfo:
-                old_bfinfo.do_soft_delete()
+        # 存在同名文件对象，覆盖上传删除原文件
+        if old_bfinfo:
+            old_bfinfo.switch_collection(_collection_name)
+            old_bfinfo.do_soft_delete()
 
-            # 创建文件对象
-            bfinfo = BucketFileInfo(na=file_name,# 文件名
-                                    fod = True, # 文件
-                                    si = 0 )# 文件大小
-            # 有父节点
-            if did:
-                bfinfo.did = ObjectId(did)
-            bfinfo.save()
+        # 创建文件对象
+        bfinfo = BucketFileInfo(na=file_name,# 文件名
+                                fod = True, # 文件
+                                si = 0 )# 文件大小
+        # 有父节点
+        if did:
+            bfinfo.did = ObjectId(did)
+        bfinfo.switch_collection(_collection_name)
+        bfinfo.save()
 
         # 构造返回数据
         res = {}
@@ -198,25 +201,24 @@ class ObjPostSerializer(serializers.Serializer):
         if not _collection_name and vali_error:
             raise vali_error
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            bfm = BucketFileManagement(path=dir_path)
-            # 当前目录下是否已存在同文件名文件
-            ok, finfo = bfm.get_file_exists(file_name)
-            #
-            if not ok:
-                raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        # 当前目录下是否已存在同文件名文件
+        ok, finfo = bfm.get_file_exists(file_name)
+        #
+        if not ok:
+            raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
 
-            if finfo:
-                # 同名文件覆盖上传
-                if overwrite:
-                    # 文件记录删除动作在create中
-                    data['finfo'] = finfo
-                else:
-                    raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
+        if finfo:
+            # 同名文件覆盖上传
+            if overwrite:
+                # 文件记录删除动作在create中
+                data['finfo'] = finfo
+            else:
+                raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
 
-            _, did = bfm.get_cur_dir_id()
-            data['_did'] = did
-            data['_collection_name'] = _collection_name
+        _, did = bfm.get_cur_dir_id()
+        data['_did'] = did
+        data['_collection_name'] = _collection_name
         return data
 
 
@@ -283,15 +285,14 @@ class DirectoryCreateSerializer(serializers.Serializer):
 
         data['collection_name'] = _collection_name
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            bfm = BucketFileManagement(path=dir_path)
-            ok, dir = bfm.get_dir_exists(dir_name=dir_name)
-            if not ok:
-                raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
-            # 目录已存在
-            if dir:
-                raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
-            data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        if not ok:
+            raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
+        # 目录已存在
+        if dir:
+            raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
         return data
 

@@ -121,12 +121,13 @@ class BucketFileInfo(DynamicDocument):
         # 'max_size': 2000000, #集合的最大字节数
     }
 
-    def do_soft_delete(self):
+    def do_soft_delete(self, collection_name):
         '''软删除'''
         self.sds = True
+        self.switch_collection(collection_name)
         self.save()
 
-    def set_shared(self, sh=False, days=0):
+    def set_shared(self, collection_name, sh=False, days=0):
         '''
         设置对象共享或私有权限
         :param sh: 共享(True)或私有(False)
@@ -144,7 +145,7 @@ class BucketFileInfo(DynamicDocument):
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
-
+        self.switch_collection(collection_name)
         self.save()
 
     def is_shared_and_in_shared_time(self):

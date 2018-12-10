@@ -584,7 +584,10 @@
             },
             error: function (error,status) {
                 swal.close();
-                show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
+                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
+                else
+                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
             }
         });
     }
@@ -829,10 +832,10 @@
                 uploadFileChunk(url, file, offset);
             },
             error: function (err) {
-                if (err.responseJSON.error_text)
-                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.error_text);
+                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text);
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.responseText);
+                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
 
                 endFileUploading();
             },
