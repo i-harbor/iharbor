@@ -9,7 +9,7 @@ admin.site.site_title = 'EVHarbor站点管理'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('id', 'username', 'email')
+    list_display = ('id', 'username', 'email', 'is_active')
     list_display_links = ('id', 'username')
     list_filter = ('date_joined',)
 

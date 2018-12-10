@@ -13,10 +13,11 @@ from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
 
 from buckets.utils import BucketFileManagement
+from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
+from utils.oss.rados_interfaces import CephRadosObject
 from .models import User, Bucket, BucketFileInfo
 from . import serializers
-from utils.oss.rados_interfaces import CephRadosObject
 from . import paginations
 
 # Create your views here.
@@ -98,11 +99,18 @@ class UserViewSet(mixins.DestroyModelMixin,
     '''
     queryset = User.objects.all()
 
-    # def create(self, request, *args, **kwargs):
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     serializer.save()
-    #     return Response(serializer.validated_data, status=status.HTTP_201_CREATED, )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        if not send_active_url_email(request._request, user.email, user):
+            return Response('激活链接邮件发送失败', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        data = {
+            'code': 201,
+            'code_text': '用户注册成功，请登录邮箱访问收到的连接以激活用户',
+            'data': serializer.validated_data,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -322,7 +330,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         Http Code: 状态码500
             {
                 'code': 500,
-                'error_text': '文件块rados写入失败'
+                'code_text': '文件块rados写入失败'
             }
 
     retrieve:
@@ -438,7 +446,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                     name='share',
                     required=False,
                     location='query',
-                    schema=coreschema.String(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有),不区分大小写'),
+                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
                 ),
                 coreapi.Field(
                     name='days',
@@ -470,7 +478,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not serializer.is_valid(raise_exception=False):
             return Response({
                 'code': 400,
-                'error_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
+                'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # 存储桶验证和获取桶对象mongodb集合名
@@ -488,7 +496,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not created: # 对象存在 ，
             if chunk_offset == 0:
                 if not overwrite: # 不覆盖
-                    return Response({'code': 400, 'error_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'code': 400, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
                     rados.delete()
                     obj.si = 0
@@ -824,7 +832,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     create:
         创建一个目录
 
-        >>Http Code: 状态码200, 请求参数有误:
+        >>Http Code: 状态码400, 请求参数有误:
             {
                 "code": 400,
                 "code_text": {

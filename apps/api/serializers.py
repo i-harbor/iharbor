@@ -49,18 +49,36 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     用户创建序列化器
     '''
-    username = serializers.CharField(label='用户名', required=True, max_length=150, help_text='至少5位字母或数字')
+    username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
-    email = serializers.EmailField(label='邮箱', required=False, help_text='邮箱')
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            raise serializers.ValidationError(detail={'code_text': '用户名或密码不能为空'})
+        return data
 
     def create(self, validated_data):
         """
         Create and return a new `Snippet` instance, given the validated data.
         """
-        username = validated_data['username']
-        if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError(detail={'error_text': '用户名已存在'})
-        return User.objects.create_user(**validated_data)
+        email = username = validated_data.get('username')
+        password = validated_data.get('password')
+
+        user = User.objects.filter(username=username).first()
+        if user:
+            if user.is_active:
+                raise serializers.ValidationError(detail={'code_text': '用户名已存在'})
+            else:
+                user.email = email
+                user.set_password(password)
+                user.save()
+                return user # 未激活用户
+
+        # 创建非激活状态新用户并保存
+        return User.objects.create_user(username=username, password=password, email=email, is_active=False)
 
 
 class BucketSerializer(serializers.ModelSerializer):

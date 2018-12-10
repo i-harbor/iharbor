@@ -14,6 +14,15 @@ class CustomAuthToken(ObtainAuthToken):
     get:
     获取当前用户的token，需要通过身份认证权限(如session认证)
 
+    返回内容：
+    {
+        "token": {
+            "key": "655e0bcc7216d0ccf7d2be7466f94fa241dc32cb",
+            "user": "username",
+            "created": "2018-12-10 14:04:01"
+        }
+    }
+
     put:
     刷新当前用户的token，旧token失效，需要通过身份认证权限
 
@@ -96,7 +105,9 @@ class CustomAuthToken(ObtainAuthToken):
             token.delete()
             token.key = token.generate_key()
             token.save()
-        return Response({'token': token.key})
+
+        slr = AuthTokenDumpSerializer(token)
+        return Response({'token': slr.data})
 
     def get_permissions(self):
         """

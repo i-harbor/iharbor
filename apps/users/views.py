@@ -24,17 +24,22 @@ def register_user(request):
         #表单数据验证通过
         if form.is_valid():
             cleaned_data = form.cleaned_data
-            username = cleaned_data.get('username', '')
-            email = username
+            user = cleaned_data.get('user', None)
+            email = username = cleaned_data.get('username', '')
             password = cleaned_data.get('password', '')
 
-            # 创建非激活状态新用户并保存
-            user = User.objects.create_user(username=username, password=password, email=email, is_active=False)
+            if not user:
+                user.email = email
+                user.set_password(password)
+                user.save()
+
+                # 创建非激活状态新用户并保存
+                user = User.objects.create_user(username=username, password=password, email=email, is_active=False)
 
             logout(request)#登出用户（确保当前没有用户登陆）
 
             # 向邮箱发送激活连接
-            if send_active_url_email(request, email, user):
+            if send_active_url_email(request, user.email, user):
                 return render(request, 'message.html', context={'message': '用户注册成功，请登录邮箱访问收到的连接以激活用户'})
 
             form.add_error(None, '邮件发送失败，请检查邮箱输入是否有误')
@@ -97,7 +102,7 @@ def change_password(request):
             new_password = form.cleaned_data['new_password']
             user = request.user
             user.set_password(new_password)
-            ret = user.save()
+            user.save()
 
             #注销当前用户，重新登陆
             logout(request)
