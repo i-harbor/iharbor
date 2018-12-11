@@ -234,7 +234,7 @@
                         <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
                         </button>
                         <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
-                        <button class="btn btn-warning disabled">清空存储桶</button>
+                        <!--<button class="btn btn-warning disabled">清空存储桶</button>-->
                     </div>
                 </div>
             </div>
@@ -699,7 +699,6 @@
                             <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path={{$value[1]}}>{{ $value[0] }}</a></li>
                         {{/each}}
                     </ol>
-                    <hr/>
                     <p><h3>{{ obj.na }}</h3></p>
                 </div>
             </div>
@@ -710,29 +709,24 @@
                 </div>
                 <hr/>
                 <div>
-                    <strong>文件标识ID</strong>
-                    <p>{{ obj.id }}</p>
-                    <strong>文件名称</strong>
+                    <strong>对象名称：</strong>
                     <p>{{ obj.na }}</p>
-                    <strong>文件大小</strong>
-                    <p>{{ obj.si }}</p>
-                    <strong>创建日期</strong>
-                    <p>{{ obj.ult }}</p>
-                    <strong>修改日期</strong>
-                    <p>{{ obj.upt }}</p>
-                    <strong>下载次数</strong>
+                    <p><strong>对象大小：</strong>{{ obj.si }}</p>                   
+                    <p><strong>创建日期：</strong>{{ obj.ult }}</p>                   
+                    <p><strong>修改日期：</strong>{{ obj.upt }}</p> 
+                                      
                     {{if obj.dlc}}
-                        <p>{{ obj.dlc }}</p>
+                        <p><strong>下载次数：</strong>{{ obj.dlc }}</p>
                     {{else if !obj.dlc}}
-                        <p>0</p>
+                        <p><strong>下载次数：</strong>0</p>
                     {{/if}}
-                    <strong>权限</strong>
+                    
                     {{if obj.sh}} ... 
-                        <p>公开</p>
+                        <p><strong>权限：</strong>公开</p>
                     {{ else if !obj.sh }}
-                        <p>私有</p>
+                        <p><strong>权限：</strong>私有</p>
                     {{/if}}
-                    <strong>下载连接</strong>
+                    <strong>下载连接：</strong>
                     <p><a href="{{ obj.download_url }}">{{ obj.download_url }}</a></p>
                 </div>
             </div>
