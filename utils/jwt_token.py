@@ -1,9 +1,8 @@
 import jwt
 from django.contrib.auth import get_user_model
+from django.utils.translation import ugettext as _
 from rest_framework_jwt.settings import api_settings
 from rest_framework import exceptions
-
-# User = get_user_model()
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
@@ -39,6 +38,14 @@ class JWTokenTool():
         if jwt_value is None:
             return None
 
+        return self.authenticate_jwt(jwt_value)
+
+    def authenticate_jwt(self, jwt_value):
+        '''
+        jwt身份验证
+        :param jwt_value:
+        :return: (user, jwt_value)
+        '''
         try:
             payload = jwt_decode_handler(jwt_value)
         except jwt.ExpiredSignature:
@@ -50,10 +57,9 @@ class JWTokenTool():
         except jwt.InvalidTokenError:
             raise exceptions.AuthenticationFailed()
 
-        password = payload.get('email') # 要重置的密码在生产jwt时用email存储了
         user = self.authenticate_credentials(payload)
 
-        return (user, password)
+        return (user, jwt_value)
 
     def authenticate_credentials(self, payload):
         """

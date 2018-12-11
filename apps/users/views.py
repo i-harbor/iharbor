@@ -7,7 +7,7 @@ from django.template.loader import get_template
 from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool
-from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm
+from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
 from .models import Email
 
 #获取用户模型
@@ -132,8 +132,8 @@ def forget_password(request):
 
             user = form.cleaned_data['user']
             email = form.cleaned_data['username']
-            new_password = form.cleaned_data.get('new_password')
-            user.email = new_password # 用于email字段暂存要重置的密码
+            # new_password = form.cleaned_data.get('new_password')
+            # user.email = new_password # 用于email字段暂存要重置的密码
             # 是否是未激活的用户
             if not user.is_active:
                 if send_active_url_email(request, email, user):
@@ -166,20 +166,32 @@ def forget_password_confirm(request):
     except:
         pass
 
-    jwt = JWTokenTool()
-    try:
-        ret = jwt.authenticate(request)
-    except:
-        ret = None
+    if request.method == 'POST':
+        form = PasswordResetForm(request.POST)
+        if form.is_valid():
+            password = form.cleaned_data.get('new_password')
+            user = form.cleaned_data.get('user')
+            user.set_password(password)
+            user.save()
+            return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
+    else:
+        jwtt = JWTokenTool()
+        try:
+            ret = jwtt.authenticate(request)
+        except:
+            ret = None
+        if not ret:
+            return render(request, 'message.html', context={'message': '链接无效或已过期，请重新找回密码获取新的链接', 'urls': urls})
 
-    if not ret:
-        return render(request, 'message.html', context={'message': 'jwt无效，用户重置密码失败', 'urls': urls})
+        jwt_value = ret[-1]
+        form = PasswordResetForm(initial={'jwt': jwt_value})
 
-    user = ret[0]
-    password = ret[1]
-    user.set_password(password)
-    user.save()
-    return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
+    content = {}
+    content['form_title'] = '重置密码'
+    content['submit_text'] = '确定'
+    content['form'] = form
+    return render(request, 'form.html', context=content)
+
 
 def active_user(request):
     '''

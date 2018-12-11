@@ -3,6 +3,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 
+from utils.jwt_token import JWTokenTool
+
 #获取用户模型
 User = get_user_model()
 
@@ -153,13 +155,42 @@ class PasswordChangeForm(forms.Form):
 
 class ForgetPasswordForm(forms.Form):
     '''
-    忘记密码表单
+    忘记密码用户名表单
     '''
     username = forms.EmailField(label='用户名（邮箱）',
                                max_length=100,
                                widget=forms.EmailInput(attrs={
                                    'class': 'form-control',
                                    'placeholder': '请输入用户名'}))
+
+    def clean(self):
+        '''
+        在调用is_valid()后会被调用
+        '''
+        username = self.cleaned_data.get('username', '')
+
+        #用户名输入是否为空
+        if not username:
+            if not self.has_error('username'):
+                raise forms.ValidationError('用户名不能为空')
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                self.cleaned_data['user'] = user
+            except ObjectDoesNotExist:
+                raise forms.ValidationError('用户不存在')
+
+        return self.cleaned_data
+
+
+class PasswordResetForm(forms.Form):
+    '''
+    密码用户名表单
+    '''
+    jwt = forms.CharField( label=None, max_length=1000,
+                           widget=forms.HiddenInput(attrs={
+                               'class': 'form-control',
+                               'placeholder': 'jwt-value',}))
 
     new_password = forms.CharField( label='新密码',
                                 min_length=8,
@@ -180,24 +211,24 @@ class ForgetPasswordForm(forms.Form):
         '''
         在调用is_valid()后会被调用
         '''
-        username = self.cleaned_data.get('username', '')
+        jwt = self.cleaned_data.get('jwt', '')
         new_password = self.cleaned_data.get('new_password')
         confirm_new_password = self.cleaned_data.get('confirm_new_password')
-
-        #用户名输入是否为空
-        if not username:
-            if not self.has_error('username'):
-                raise forms.ValidationError('用户名不能为空')
 
         if new_password != confirm_new_password or not new_password:
             raise forms.ValidationError('新密码输入不一致，请重新输入')
 
+        jwtt = JWTokenTool()
         try:
-            user = User.objects.get(username=username)
-            self.cleaned_data['user'] = user
-        except ObjectDoesNotExist:
-            raise forms.ValidationError('用户不存在')
+            ret = jwtt.authenticate_jwt(jwt)
+        except:
+            ret = None
+
+        if not ret:
+            raise forms.ValidationError('重置密码失败，jwt无效或已过期，请重新找回密码获取新的链接')
+
+        user = ret[0]
+        self.cleaned_data['user'] = user
 
         return self.cleaned_data
-
 

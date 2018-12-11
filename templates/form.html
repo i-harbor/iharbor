@@ -14,8 +14,12 @@
                         <form method="POST" action="{{ action_url }}" enctype="multipart/form-data">
                             {% csrf_token %}
                             {% for field in form %}
-                                {{ field.label_tag }} {{ field }}
-                                <p class="text-danger">{{ field.errors.as_text }}</p>
+                                {% if field.is_hidden %}
+                                    {{ field }}
+                                {% else %}
+                                    {{ field.label_tag }}{{ field }}
+                                    <p class="text-danger">{{ field.errors.as_text }}</p>
+                                {% endif %}
                             {% endfor %}
                             <p id="tip_text" class="text-danger pull-left">{{ form.non_field_errors.as_text }}</p>
                             <div class="clearfix"></div>
