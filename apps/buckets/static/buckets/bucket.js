@@ -469,13 +469,20 @@
         bucket_name = $(this).attr('bucket_name');
         dir_path = $(this).attr('dir_path');
 
-        let api = 'api/v1/dir/' + bucket_name + '/';
+        let path_with_bucket = bucket_name + '/';
         if(dir_path !== '')
-            api = api + dir_path + '/';
+            path_with_bucket = path_with_bucket + dir_path + '/';
 
-        let url = build_url_with_domain_name(api);
+        let url = build_dir_url(path_with_bucket);
         get_bucket_files_and_render(url);
     });
+
+
+    //构建目录url
+    function build_dir_url(path_with_bucket){
+        let api = 'api/v1/dir/' + path_with_bucket;
+        return build_url_with_domain_name(api);
+    }
 
 
     //
@@ -767,17 +774,42 @@
     // 上传一个文件
     //
     function uploadOneFile(file) {
+        let path = get_cur_path_startwith_bucket();
+        if(!path){
+            show_warning_dialog('上传文件失败，无法获取当前路径');
+            return;
+        }
+        let url = build_obj_upload_url({path_with_bucket: path, filename: file.name});
+        beforeFileUploading();
+        uploadFile(url, file, 0);
+    }
+
+    //
+    // 获取以存储桶开头的当前路径
+    // 获取失败返回空字符串
+    //
+    function get_cur_path_startwith_bucket() {
         let obj = get_bucket_name_and_cur_path();
         let bucket_name = obj.bucket_name;
         let dir_path = obj.dir_path;
+        if(!bucket_name)
+            return '';
 
-        beforeFileUploading();
-        let url = 'api/v1/obj/' + bucket_name + '/';
+        let path = bucket_name + '/';
         if (dir_path)
-            url = url + dir_path + '/';
-        url = url + file.name + '/';
+            path = path + dir_path + '/';
+        return path;
+    }
+
+    //
+    //构造文件对象上传url
+    function build_obj_upload_url(obj={path_with_bucket:'', filename:''}) {
+        path = obj.path_with_bucket;
+        filename = obj.filename;
+
+        let url = 'api/v1/obj/' + path + filename + '/';
         url = build_url_with_domain_name(url);
-        uploadFile(url, file, 0);
+        return url;
     }
 
     //
@@ -803,8 +835,18 @@
         if (end === -1){
             //进度条
             fileUploadProgressBar(0, 1, true);
-            show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
             endFileUploading();
+            show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
+            // 如果上传的文件在当前页面的列表中，刷新
+            let path = get_cur_path_startwith_bucket();
+            if(path){
+                let cur_url = build_obj_upload_url({path_with_bucket: path, filename: file.name});
+                if (cur_url === url){
+                    let url = build_dir_url(path);
+                    get_bucket_files_and_render(url);
+                }
+            }
+
             return;
         }
         var chunk = file.slice(offset, end);
@@ -860,6 +902,11 @@
     //
     function get_bucket_name_and_cur_path(){
         let $btn = $('#btn-upload-file');
+        if(!$btn)
+            return {
+                'bucket_name': '',
+                'dir_path': ''
+            };
         let bucket_name = $btn.attr('bucket_name');
         let dir_path = $btn.attr('cur_dir_path');
         return {

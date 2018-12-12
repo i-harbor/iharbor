@@ -508,7 +508,10 @@ class ObjViewSet(viewsets.GenericViewSet):
             obj.upt = datetime.utcnow()
             obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
             obj.switch_collection(collection_name)
-            obj.save()
+            try:
+                obj.save()
+            except:
+                pass
         else:
             return Response({'code': 500, 'code_text': '文件块rados写入失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -549,7 +552,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 增加一次下载次数
-        self.download_cound_increase(fileobj, collection_name)
+        fileobj.download_cound_increase(collection_name)
         return response
 
     def destroy(self, request, *args, **kwargs):
@@ -657,7 +660,10 @@ class ObjViewSet(viewsets.GenericViewSet):
                 bfinfo.did = ObjectId(did)
 
             bfinfo.switch_collection(collection_name)
-            obj = bfinfo.save()
+            try:
+                obj = bfinfo.save()
+            except:
+                raise Http404
             return obj, True
         return obj, False
 
@@ -784,23 +790,12 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 如果从0读文件就增加一次下载次数
         if offset == 0:
-            self.download_cound_increase(obj, collection_name)
+            obj.download_cound_increase(collection_name)
 
         reponse = StreamingHttpResponse(chunk, content_type='application/octet-stream', status=status.HTTP_200_OK)
         reponse['evob_chunk_size'] = len(chunk)
         reponse['evob_obj_size'] = obj.si
         return reponse
-
-    def download_cound_increase(self, obj, collection_name):
-        '''
-        文件对象下载次数+1
-        :param obj: 文件对象
-        :param collection_name: 对象所在mongodb集合名
-        :return: 无
-        '''
-        obj.switch_collection(collection_name)
-        obj.dlc = (obj.dlc or 0) + 1  # 下载次数+1
-        obj.save()
 
 
 class DirectoryViewSet(viewsets.GenericViewSet):
@@ -945,7 +940,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if did:
             bfinfo.did = did
         bfinfo.switch_collection(collection_name)
-        bfinfo.save()
+        try:
+            bfinfo.save()
+        except:
+            return Response(data={'code': 500, 'code_text': '数据存入数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,
