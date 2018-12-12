@@ -684,7 +684,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f'attachment; filename="{filename}";'  # 注意filename 这个是下载后的名字
         return response
 
     def get_obj_info_response(self, request, fileobj, bucket_name, path):

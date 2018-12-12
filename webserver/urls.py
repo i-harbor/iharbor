@@ -19,6 +19,8 @@ from django.contrib.staticfiles.views import serve
 # from rest_framework.documentation import include_docs_urls
 from rest_framework_swagger.views import get_swagger_view
 
+from .views import about
+
 
 urlpatterns = [
     url(r'api/', include('api.urls', namespace='api')),
@@ -29,5 +31,6 @@ urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
     # url(r'docs/', include_docs_urls(title='EVHarbor API Docs')),
-    url(r'docs/', get_swagger_view(title='EVHarbor API')),
+    url(r'docs/', get_swagger_view(title='EVHarbor API'), name='docs'),
+    url(r'about/', about, name='about'),
 ]

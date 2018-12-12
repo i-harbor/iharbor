@@ -126,7 +126,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f'attachment; filename="{filename}";'  # 注意filename 这个是下载后的名字
         return response
 
     def get_file_obj_or_404(self, collection_name, path, filename):
