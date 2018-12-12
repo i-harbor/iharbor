@@ -28,11 +28,12 @@ def register_user(request):
             email = username = cleaned_data.get('username', '')
             password = cleaned_data.get('password', '')
 
-            if not user:
+            #已注册未激活
+            if user:
                 user.email = email
                 user.set_password(password)
                 user.save()
-
+            else:
                 # 创建非激活状态新用户并保存
                 user = User.objects.create_user(username=username, password=password, email=email, is_active=False)
 

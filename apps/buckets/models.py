@@ -122,18 +122,28 @@ class BucketFileInfo(DynamicDocument):
     }
 
     def do_soft_delete(self, collection_name=None):
-        '''软删除'''
+        '''
+        软删除
+        :param collection_name: 对象所在集合名
+        :return: True(success); False(error)
+        '''
         self.sds = True
         if collection_name and isinstance(collection_name, str):
             self.switch_collection(collection_name)
-        self.save()
+
+        try:
+            self.save()
+        except:
+            return False
+        return True
 
     def set_shared(self, collection_name=None, sh=False, days=0):
         '''
         设置对象共享或私有权限
+        :param collection_name: 对象所在集合名
         :param sh: 共享(True)或私有(False)
         :param days: 共享天数，0表示永久共享
-        :return: 无
+        :return: True(success); False(error)
         '''
         if sh == True:
             self.sh = True          # 共享
@@ -149,7 +159,12 @@ class BucketFileInfo(DynamicDocument):
 
         if collection_name and isinstance(collection_name, str):
             self.switch_collection(collection_name)
-        self.save()
+
+        try:
+            self.save()
+        except:
+            return False
+        return True
 
     def is_shared_and_in_shared_time(self):
         '''
@@ -186,11 +201,19 @@ class BucketFileInfo(DynamicDocument):
         return td.total_seconds() > 0
 
     def download_cound_increase(self, collection_name=None):
-        '''下载次数加1'''
+        '''
+        下载次数加1
+        :param collection_name: 对象所在集合名
+        :return: True(success); False(error)
+        '''
         if collection_name and isinstance(collection_name, str):
             self.switch_collection(collection_name)
         self.dlc = (self.dlc or 0) + 1  # 下载次数+1
-        self.save()
+        try:
+            self.save()
+        except:
+            return False
+        return True
 
 
 
