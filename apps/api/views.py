@@ -148,52 +148,71 @@ class BucketViewSet(viewsets.GenericViewSet):
     list:
     获取存储桶列表
 
-    >>Http Code: 状态码200：无异常时，返回所有的存储桶信息；
-        {
-            'code': 200,
-            'buckets': [], // bucket对象列表
-        }
+        >>Http Code: 状态码200：无异常时，返回所有的存储桶信息；
+            {
+                'code': 200,
+                'buckets': [], // bucket对象列表
+            }
 
     retrieve:
     获取一个存储桶详细信息
 
-    >>Http Code: 状态码200：无异常时，返回存储桶的详细信息；
-        {
-            'code': 200,
-            'bucket': {}, // bucket对象
-        }
+        >>Http Code: 状态码200：无异常时，返回存储桶的详细信息；
+            {
+                'code': 200,
+                'bucket': {}, // bucket对象
+            }
 
     create:
     创建一个新的存储桶
 
-    >>Http Code: 状态码201；
-        创建成功时：
-        {
-            'code': 201,
-            'code_text': '创建成功',
-            'data': serializer.data, //请求时提交数据
-            'bucket': {}             //bucket对象信息
-        }
-    >>Http Code: 状态码400,参数有误：
-        {
-            'code': 400,
-            'code_text': 'xxx',      //错误码表述信息
-            'data': serializer.data, //请求时提交数据
-        }
+        >>Http Code: 状态码201；
+            创建成功时：
+            {
+                'code': 201,
+                'code_text': '创建成功',
+                'data': serializer.data, //请求时提交数据
+                'bucket': {}             //bucket对象信息
+            }
+        >>Http Code: 状态码400,参数有误：
+            {
+                'code': 400,
+                'code_text': 'xxx',      //错误码表述信息
+                'data': serializer.data, //请求时提交数据
+            }
 
     delete:
     删除一个存储桶
 
-    >>Http Code: 状态码204,存储桶删除成功
-    >>Http Code: 状态码400
+        >>Http Code: 状态码204,存储桶删除成功
+        >>Http Code: 状态码400
+            {
+                'code': 400,
+                'code_text': '存储桶id有误'
+            }
+        >>Http Code: 状态码404：
+            {
+                'code': 404,
+                'code_text': 'xxxxx'
+            }
+
+    partial_update:
+    存储桶公有或私有权限设置
+
+        Http Code: 状态码200：上传成功无异常时，返回数据：
         {
-            'code': 400,
-            'code_text': '存储桶id有误'
+            'code': 200,
+            'code_text': '对象共享设置成功'，
+            'public': xxx,
         }
-    >>Http Code: 状态码404：
+        Http Code: 状态码400：参数有误时，返回数据：
+            对应参数错误信息;
+        Http Code: 状态码404;
+
+        Http code: 状态码500：
         {
-            'code': 404,
-            'code_text': 'xxxxx'
+            "code": 500,
+            "code_text": "保存到数据库时错误"
         }
 
     '''
@@ -210,6 +229,14 @@ class BucketViewSet(viewsets.GenericViewSet):
                     required=False,
                     location='body',
                     schema=coreschema.String(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
+                ),
+            ],
+            'PATCH': [
+                coreapi.Field(
+                    name='public',
+                    required=True,
+                    location='query',
+                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
                 ),
             ]
         }
@@ -252,6 +279,57 @@ class BucketViewSet(viewsets.GenericViewSet):
         return Response({'code': 200, 'bucket': serializer.data})
 
     def destroy(self, request, *args, **kwargs):
+        ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
+        if not ids and response:
+            return response
+
+        buckets = Bucket.objects.filter(id__in=ids)
+        if not buckets.exists():
+            return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+        for bucket in buckets:
+            # 只删除用户自己的buckets
+            if bucket.user.id == request.user.id:
+                bucket.do_soft_delete()  # 软删除
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def partial_update(self, request, *args, **kwargs):
+        public = request.query_params.get('public', '').lower()
+        if public == 'true':
+            public = True
+        elif public == 'false':
+            public = False
+        else:
+            return Response(data={'code': 400, 'code_text': 'public参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
+        if not ids and response:
+            return response
+
+        buckets = Bucket.objects.filter(id__in=ids)
+        if not buckets.exists():
+            return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+        for bucket in buckets:
+            # 只删除用户自己的buckets
+            if bucket.user.id == request.user.id:
+                if not bucket.set_permission(public=public):
+                    return Response(data={'code': 500, 'code_text': '保存到数据库时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = {
+            'code': 200,
+            'code_text': '存储桶权限设置成功',
+            'public': public,
+        }
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    def get_buckets_ids_or_error_response(self, request, **kwargs):
+        '''
+        获取存储桶id列表
+        :param request:
+        :return:
+            error: None, Response
+            success:[ids], None
+        '''
         id = kwargs.get(self.lookup_field, None)
         ids = request.POST.getlist('ids')
 
@@ -260,21 +338,9 @@ class BucketViewSet(viewsets.GenericViewSet):
         try:
             ids = [int(i) for i in ids]
         except ValueError:
-            return Response(data={'code': 400, 'code_text': '存储桶id有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return None, Response(data={'code': 400, 'code_text': '存储桶id有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if ids:
-            buckets = Bucket.objects.filter(id__in=ids)
-            if not buckets.exists():
-                return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
-            for bucket in buckets:
-                # 只删除用户自己的buckets
-                if bucket.user.id == request.user.id:
-                    bucket.do_soft_delete()  # 软删除
-
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        return Response(data={'code': 404, 'code_text': '存储桶id为空'}, status=status.HTTP_404_NOT_FOUND)
-
+        return ids, None
 
     def get_serializer_class(self):
         """
@@ -282,10 +348,11 @@ class BucketViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create', 'delete']:
+        if self.action == 'list':
+            return serializers.BucketSerializer
+        elif self.action =='create':
             return serializers.BucketCreateSerializer
-
-        return serializers.BucketSerializer
+        return Serializer
 
     def get_permissions(self):
         """
@@ -314,7 +381,7 @@ class ObjViewSet(viewsets.GenericViewSet):
     update:
     通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
 
-    注意：
+        注意：
         文件对象已存在，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
         当chunk_offset=0时会被认为一次新文件对象上传，如果文件对象已存在，此时overwrite参数有效，
             overwrite=False时为不覆盖上传，会返回400错误码和已存在同名文件的错误提示。
@@ -589,7 +656,8 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
         fileobj.switch_collection(collection_name)
-        fileobj.set_shared(sh=share, days=days)
+        if not fileobj.set_shared(sh=share, days=days):
+            return Response(data={'code': 500, 'code_text': '更新数据库数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,

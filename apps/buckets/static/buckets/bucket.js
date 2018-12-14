@@ -96,6 +96,29 @@
     }
 
     //
+    // 存储桶base api
+    //
+    function get_buckets_base_api(){
+        return '/api/v1/buckets/';
+    }
+
+    //
+    // 存储桶detail api
+    //@param id:存储桶id, type:int
+    function build_buckets_detail_api(id){
+        return get_buckets_base_api() + id + '/';
+    }
+
+    //
+    // 存储桶权限设置url
+    //@param id:存储桶id, type:int
+    //@param public: true(公开)；false（私有）
+    function build_buckets_permission_url(params={id: 0, public: false}){
+        let api = build_buckets_detail_api(params.id) + '?public=' + params.public;
+        return build_url_with_domain_name(api);
+    }
+
+    //
     // 获取以存储桶开头的当前路径
     //传入参数无效或未传入参数时将尝试获取
     // 获取失败返回空字符串
@@ -288,6 +311,64 @@
         }
     }
 
+
+    //
+    // 存储桶私有或公有访问权限设置按钮事件
+    //
+    $("#content-display-div").on('click', '#btn-public-bucket', function () {
+        if(!is_exists_checked()){
+            show_warning_dialog('请先选择存储桶');
+            return;
+        }
+
+        (async function() {
+            const {value: result} = await Swal({
+                title: '选择权限',
+                input: 'radio',
+                inputOptions: {
+                    'true': '公开',
+                    'false': '私有',
+                },
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    return !value && 'You need to choose something!'
+                }
+            });
+
+            if (result) {
+                selected_buckets_permission_set(result === 'true');
+            }
+        })();
+    });
+
+    //
+    // 存储桶私有或公有访问权限设置
+    //
+    function selected_buckets_permission_set(publiced=false){
+        //获取选中的存储桶的id
+        var arr = new Array();
+        let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
+        bucket_list_checked.each(function (i) {
+            arr[i] = $(this).val();
+        });
+        if (arr.length > 0) {
+            $.ajax({
+                url: build_buckets_permission_url({id: 0, public: publiced}),
+                type: 'patch',
+                data: {
+                    'ids': arr,// 存储桶id数组
+                },
+                traditional: true,//传递数组时需要设为true
+                success: function (data) {
+                    show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
+                },
+                error: function (err) {
+                    show_auto_close_warning_dialog('设置存储桶访问权限失败,' + err.status + ':' + err.statusText, 'error');
+                },
+            })
+        }
+    }
+
     //
     // 单个存储桶列表项渲染模板
     //
@@ -312,6 +393,7 @@
                         </button>
                         <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
                         <!--<button class="btn btn-warning disabled">清空存储桶</button>-->
+                        <button class="btn btn-success" id="btn-public-bucket">公开</button>
                     </div>
                 </div>
             </div>

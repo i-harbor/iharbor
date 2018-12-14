@@ -22,21 +22,21 @@ class ObsViewSet(viewsets.GenericViewSet):
     retrieve:
     浏览器端下载文件对象，公共文件对象或当前用户(如果用户登录了)文件对象下载，没有权限下载非公共文件对象或不属于当前用户文件对象
 
-    >>Http Code: 状态码200：
-            返回FileResponse对象,bytes数据流；
+        >>Http Code: 状态码200：
+                返回FileResponse对象,bytes数据流；
 
-    >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        {
-            'code': 400,
-            'code_text': 'xxxx参数有误'
-        }
-    >>Http Code: 状态码403
-        {
-            'code': 403,
-            'code_text': '您没有访问权限'
-        }
-    >>Http Code: 状态码404：找不到资源;
-    >>Http Code: 状态码500：服务器内部错误;
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'xxxx参数有误'
+            }
+        >>Http Code: 状态码403
+            {
+                'code': 403,
+                'code_text': '您没有访问权限'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
 
     '''
     queryset = []

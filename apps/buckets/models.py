@@ -69,6 +69,27 @@ class Bucket(models.Model):
         '''
         return f'bucket_{self.collection_name}'
 
+    def set_permission(self, public=False):
+        '''
+        设置存储桶公有或私有访问权限
+
+        :param public: 公有(True)或私有(False)
+        :return: True(success); False(error)
+        '''
+        if public == True and self.access_permission != self.PUBLIC:
+            self.access_permission = self.PUBLIC
+        elif  public == False and self.access_permission != self.PRIVATE:
+            self.access_permission = self.PRIVATE
+        else:
+            return True
+
+        try:
+            self.save()
+        except:
+            return  False
+
+        return True
+
 
 class BucketFileInfo(DynamicDocument):
     '''

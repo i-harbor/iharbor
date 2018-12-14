@@ -14,14 +14,14 @@ class CustomAuthToken(ObtainAuthToken):
     get:
     获取当前用户的token，需要通过身份认证权限(如session认证)
 
-    返回内容：
-    {
-        "token": {
-            "key": "655e0bcc7216d0ccf7d2be7466f94fa241dc32cb",
-            "user": "username",
-            "created": "2018-12-10 14:04:01"
+        返回内容：
+        {
+            "token": {
+                "key": "655e0bcc7216d0ccf7d2be7466f94fa241dc32cb",
+                "user": "username",
+                "created": "2018-12-10 14:04:01"
+            }
         }
-    }
 
     put:
     刷新当前用户的token，旧token失效，需要通过身份认证权限
@@ -29,9 +29,9 @@ class CustomAuthToken(ObtainAuthToken):
     post:
     身份验证并返回一个token，用于其他API验证身份
 
-    令牌应包含在AuthorizationHTTP标头中。密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
-    例如Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b；
-    此外，可选Path参数,“new”，?new=true用于刷新生成一个新token；
+        令牌应包含在AuthorizationHTTP标头中。密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
+        例如Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b；
+        此外，可选Path参数,“new”，?new=true用于刷新生成一个新token；
     '''
     common_manual_fields = [
         coreapi.Field(
