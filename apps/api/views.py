@@ -452,7 +452,7 @@ class ObjViewSet(viewsets.GenericViewSet):
                     name='days',
                     required=False,
                     location='query',
-                    schema=coreschema.String(description='对象公开分享天数(share=true时有效)，0表示永久公开，默认为0'),
+                    schema=coreschema.String(description='对象公开分享天数(share=true时有效)，0表示永久公开，负数表示不公开，默认为0'),
                 ),
             ],
         }
@@ -760,8 +760,8 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         try:
             days = int(days)
-            if days < 0:
-                raise Exception()
+            # if days < 0:
+            #     raise Exception()
         except:
             response = Response(data={'code': 400, 'code_text': 'days参数有误'}, status=status.HTTP_400_BAD_REQUEST)
             return (None, response)

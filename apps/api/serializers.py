@@ -337,13 +337,14 @@ class ObjInfoSerializer(serializers.Serializer):
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
     # arc = serializers.ListField(child = serializers.CharField(required=True))  # archive，该文件的归档地址，目录时arc为空
-    # sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
+    sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
     # shp = serializers.CharField()  # 该文件的共享密码，目录时为空
-    # stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
+    stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
     # sst = serializers.DateTimeField()  # share_start_time, 该文件的共享起始时间
-    # set = serializers.DateTimeField()  # share_end_time,该文件的共享终止时间
+    set = serializers.SerializerMethodField()  # share_end_time,该文件的共享终止时间
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
+    access_permission = serializers.SerializerMethodField() # 公共读权限
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
@@ -370,6 +371,11 @@ class ObjInfoSerializer(serializers.Serializer):
             return ''
         return to_localtime_string_naive_by_utc(obj.upt)
 
+    def get_set(self, obj):
+        if not obj.set:
+            return ''
+        return to_localtime_string_naive_by_utc(obj.set)
+
     def get_download_url(self, obj):
         # 目录
         if not obj.fod:
@@ -383,6 +389,18 @@ class ObjInfoSerializer(serializers.Serializer):
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url
+
+    def get_access_permission(self, obj):
+        # 目录
+        if not obj.fod:
+            return ''
+
+        try:
+            if obj.is_shared_and_in_shared_time():
+                return '公有'
+        except:
+            pass
+        return '私有'
 
 
 class AuthTokenDumpSerializer(serializers.Serializer):

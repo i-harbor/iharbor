@@ -17,6 +17,105 @@
         return domain + url;
     }
 
+    //
+    // 文件对象base api
+    //
+    function get_obj_base_api(){
+        return 'api/v1/obj/';
+    }
+
+    //
+    //构建对象api
+    //错误返回空字符串
+    function build_obj_detail_api(params={bucket_name: '', dir_path: '', filename: ''}){
+        if (!params.hasOwnProperty('bucket_name') || !params.hasOwnProperty('dir_path') || !params.hasOwnProperty('filename'))
+            return '';
+
+        let bucket_path = get_cur_path_startwith_bucket({
+            bucket_name: params.bucket_name,
+            dir_path: params.dir_path
+        });
+
+        if (!bucket_path)
+            return '';
+
+        return get_obj_base_api() + bucket_path + params.filename + '/';
+    }
+
+    //
+    //构建对象info api
+    //错误返回空字符串
+    function build_obj_info_api(params={bucket_name: '', dir_path: '', filename: ''}){
+        let detail_api = build_obj_detail_api(params);
+        if (!detail_api)
+            return '';
+        return detail_api + '?info=true';
+    }
+
+    //
+    //构造文件对象上传url
+    function build_obj_detail_url(params={bucket_name:'', dir_path: '', filename:''}) {
+        let api = build_obj_detail_api(params);
+        return build_url_with_domain_name(api);
+    }
+
+
+    //
+    // 构造文件对象共享url
+    //@ param share:是否公开，true or false
+    //@ param days:公开时间天数，<0(不公开); 0(永久公开);
+    // @returns url(string)
+    //
+    function build_obj_share_url(params={detail_url:'', share: '', days:''}) {
+        return params.detail_url + '?share=' + params.share + '&days=' + params.days;
+
+    }
+
+    //
+    // 目录base api
+    //
+    function get_dir_base_api(){
+        return 'api/v1/dir/';
+    }
+
+    //构建目录detail api
+    function build_dir_detail_api(params={bucket_name: '', dir_path: ''}){
+        return get_dir_base_api() + get_cur_path_startwith_bucket(params);
+    }
+
+    //构建目录detail url
+    function build_dir_detail_url(params={bucket_name: '', dir_path: ''}){
+        let api = build_dir_detail_api(params);
+        return build_url_with_domain_name(api);
+    }
+
+    //构建目录url
+    function build_dir_url(path_with_bucket){
+        let api = get_dir_base_api() + path_with_bucket;
+        return build_url_with_domain_name(api);
+    }
+
+    //
+    // 获取以存储桶开头的当前路径
+    //传入参数无效或未传入参数时将尝试获取
+    // 获取失败返回空字符串
+    //
+    function get_cur_path_startwith_bucket(params={bucket_name:'', dir_path: ''}) {
+        let obj = params;
+        //传入参数无效或未传入
+        if(!params.hasOwnProperty('bucket_name') || (params.bucket_name==='')){
+            obj = get_bucket_name_and_cur_path();
+        }
+
+        if(!obj.bucket_name)
+            return '';
+
+        let path = obj.bucket_name + '/';
+        if (obj.dir_path)
+            path = path + obj.dir_path + '/';
+        return path;
+    }
+
 
     //
     //所有ajax的请求的全局设置
@@ -40,31 +139,9 @@
     //
     // 创建存储桶按钮点击事件
     //
-    $("#content-display-div").on('click', "#btn-new-bucket",
-        function () {
-            on_create_bucket();//对话框方式
-        }
-    );
+    $("#content-display-div").on('click', "#btn-new-bucket", on_create_bucket);//对话框方式
 
-    //
-    //form 表单获取所有数据 封装方法
-    //
-    function getFormJson(form_node) {
-        let o = {};
-        let a = $(form_node).serializeArray();
-        $.each(a, function () {
-            if (o[this.name] !== undefined) {
-                if (!o[this.name].push) {
-                    o[this.name] = [o[this.name]];
-                }
-                o[this.name].push(this.value || '');
-            } else {
-                o[this.name] = this.value || '';
-            }
-        });
 
-        return o;
-    }
 
     //
     // 创建新的存储桶点击事件处理（对话框方式）
@@ -353,7 +430,7 @@
                     <!--{#目录导航栏#}-->
                     <div>
                         <ol class="breadcrumb">
-                            <a href="#" id="btn-path-bucket">Buckets</a>
+                            <a href="#" id="btn-path-bucket">存储桶</a>
                             <span>></span>
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{each breadcrumb}}
@@ -384,6 +461,7 @@
                             <th>名称</th>
                             <th>上传时间</th>
                             <th>大小</th>
+                            <th>权限</th>
                             <th></th>
                         </tr>
                         {{each files}}
@@ -393,10 +471,11 @@
                                 {{ if $value.fod }}
                                     <td class="bucket-files-table-item">
                                         <span class="glyphicon glyphicon-file"></span>
-                                        <a href="#" id="bucket-files-item-enter-file" dir_path="$data['dir_path']" download_url="{{$value.download_url}}">{{ $value.na }}</a>
+                                        <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.na }}</a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
                                     <td>{{ $value.si }}</td>
+                                    <td>{{ $value.access_permission}}</td>
                                 {{/if}}
                                 {{ if !$value.fod }}
                                     <td>
@@ -404,6 +483,7 @@
                                         <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.dir_name }}</strong></a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
+                                    <td>--</td>
                                     <td>--</td>
                                 {{/if}}
                                 <td>
@@ -420,6 +500,7 @@
                                             {{ if $value.fod }}
                                                 <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
                                                 <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.na}}">删除</a></li>
+                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.na}}">分享公开</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
@@ -461,6 +542,47 @@
         </div>
      `);
 
+
+    //
+    // 单个存储桶文件列表单个文件对象项渲染模板
+    //
+    let render_bucket_file_item = template.compile(`
+        <tr class="bucket-files-table-item">
+            <td><input type="checkbox" class="item-checkbox" value=""></td>
+            <td class="bucket-files-table-item">
+                <span class="glyphicon glyphicon-file"></span>
+                <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.na }}</a>
+            </td>
+            <td>{{ obj.ult }}</td>
+            <td>{{ obj.si }}</td>
+            <td>{{ obj.access_permission }}</td>
+            <td>
+                <li class="dropdown btn">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+               aria-expanded="false">操作<span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+                        <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >下载</a></li>
+                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.na}}">删除</a></li>
+                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.na}}">分享公开</a></li>
+                    </ul>
+                </li>
+            </td>
+        </tr>
+    `);
+
+    // 获取文件对象信息，并渲染文件对象列表项
+    function get_file_info_and_list_item_render(url, render_bucket_file_item){
+        $.ajax({
+            type: 'get',
+            url: url,
+            // async: false,
+            success: function(data,status,xhr){
+                let html = render_bucket_file_item(data);
+                $('#bucket-files-table tr:first').after(html);
+            }
+        });
+    }
+
     //
     // 面包屑路径导航点击进入事件处理
     //
@@ -469,20 +591,12 @@
         bucket_name = $(this).attr('bucket_name');
         dir_path = $(this).attr('dir_path');
 
-        let path_with_bucket = bucket_name + '/';
-        if(dir_path !== '')
-            path_with_bucket = path_with_bucket + dir_path + '/';
-
-        let url = build_dir_url(path_with_bucket);
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: dir_path
+        });
         get_bucket_files_and_render(url);
     });
-
-
-    //构建目录url
-    function build_dir_url(path_with_bucket){
-        let api = 'api/v1/dir/' + path_with_bucket;
-        return build_url_with_domain_name(api);
-    }
 
 
     //
@@ -512,15 +626,9 @@
         let list_item_dom = $(this).parents("tr.bucket-files-table-item");
         filename = $(this).attr("filename");
         obj = get_bucket_name_and_cur_path();
-        bucket_name = obj.bucket_name;
-        cur_path = obj.dir_path;
+        obj.filename = filename;
 
-        url = "/api/v1/obj/" + bucket_name + "/";
-        if (cur_path) {
-            url += cur_path + "/";
-        }
-        url += filename + "/";
-        url = build_url_with_domain_name(url);
+        let url = build_obj_detail_url(obj);
 
         show_confirm_dialog({
             title: '确定要删除吗？',
@@ -531,6 +639,64 @@
             },
         });
     });
+
+    //
+    // 文件对象分享公开点击事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-obj-share', function (e) {
+        e.preventDefault();
+
+        let obj = {
+            bucket_name: $(this).attr("bucket_name"),
+            dir_path: $(this).attr("dir_path"),
+            filename: $(this).attr("filename")
+        };
+
+        let detail_url = build_obj_detail_url(obj);
+
+        (async function() {
+            const {value: key} = await Swal({
+                title: '请选择公开时间',
+                input: 'select',
+                inputOptions: {
+                    '0': '永久公开',
+                    '1': '1天',
+                    '7': '7天',
+                    '30': '30天',
+                    '-1': '私有'
+                },
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    return !value && '请选择一个选项';
+                }
+            });
+
+            if (key) {
+                let share_url = build_obj_share_url({
+                    detail_url: detail_url,
+                    share: true,
+                    days: key
+                });
+                set_obj_shared(share_url);
+            }
+        })();
+    });
+
+    //
+    // 文件对象分享公开权限设置
+    //
+    function set_obj_shared(url) {
+        $.ajax({
+            type: 'patch',
+            url: url,
+            success: function (data,status,xhr) {
+                show_auto_close_warning_dialog('分享公开设置成功', type='success');
+            },
+            error: function (error) {
+                show_warning_dialog('分享公开设置失败！', type='error');
+            }
+        })
+    }
 
 
     //
@@ -563,8 +729,10 @@
         bucket_name = get_bucket_name_and_cur_path().bucket_name;
         dir_path = $(this).attr('dir_path');
 
-        let url = "/api/v1/dir/" + bucket_name + "/" + dir_path + "/";
-        url = build_url_with_domain_name(url);
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: dir_path
+        });
 
         show_confirm_dialog({
             title: '确定要删除吗？',
@@ -607,8 +775,10 @@
         e.preventDefault();
         bucket_name = $(this).attr('bucket_name');
 
-        let api = 'api/v1/dir/' + bucket_name + '/';
-        let url = build_url_with_domain_name(api);
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: ''
+        });
         get_bucket_files_and_render(url);
     });
 
@@ -621,11 +791,10 @@
         let bucket_name = get_bucket_name_and_cur_path().bucket_name;
         let dir_path = $(this).attr('dir_path');
 
-        let api = 'api/v1/dir/' + bucket_name + '/';
-        if(dir_path !== '')
-            api = api + dir_path + '/';
-
-        let url = build_url_with_domain_name(api);
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: dir_path
+        });
         get_bucket_files_and_render(url);
     });
 
@@ -636,14 +805,8 @@
     $("#content-display-div").on("click", '#bucket-files-item-enter-file', function (e) {
         e.preventDefault();
         let obj = get_bucket_name_and_cur_path();
-        let bucket_name = obj.bucket_name;
-        let dir_path = obj.dir_path;
-        let filename = $(this).text();
-
-        let url = 'api/v1/obj/' + bucket_name + '/';
-        if (dir_path)
-            url += dir_path + '/';
-        url += filename + '/?info=true';
+        obj.filename = $(this).text();
+        let url = build_obj_info_api(obj);
         url = build_url_with_domain_name(url);
         get_file_obj_info_and_render(url);
     });
@@ -699,11 +862,11 @@
             <div class="col-xs-12 col-sm-12">
                 <div>
                     <ol class="breadcrumb">
-                        <a href="#" id="btn-path-bucket">Home</a>
+                        <a href="#" id="btn-path-bucket">存储桶</a>
                         <span>></span>
                         <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                         {{each breadcrumb}}
-                            <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path={{$value[1]}}>{{ $value[0] }}</a></li>
+                            <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                         {{/each}}
                     </ol>
                     <p><h3>{{ obj.na }}</h3></p>
@@ -713,6 +876,7 @@
             <div class="col-xs-12 col-sm-12">
                 <div>
                     <a class="btn btn-info" href="{{ obj.download_url }}">下载</a>
+                    <button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.na}}">分享公开</button>
                 </div>
                 <hr/>
                 <div>
@@ -728,10 +892,13 @@
                         <p><strong>下载次数：</strong>0</p>
                     {{/if}}
                     
-                    {{if obj.sh}} ... 
-                        <p><strong>权限：</strong>公开</p>
-                    {{ else if !obj.sh }}
-                        <p><strong>权限：</strong>私有</p>
+                    <p><strong>访问权限：</strong>{{obj.access_permission}}</p>
+                    {{if obj.sh}}
+                        {{if obj.stl}}
+                            <p><strong>公共访问终止时间：</strong>{{obj.set}}</p>
+                        {{else if !obj.stl}}
+                            <p><strong>公终止时间：</strong>永久公开</p>
+                        {{/if}}
                     {{/if}}
                     <strong>下载连接：</strong>
                     <p><a href="{{ obj.download_url }}">{{ obj.download_url }}</a></p>
@@ -774,43 +941,21 @@
     // 上传一个文件
     //
     function uploadOneFile(file) {
-        let path = get_cur_path_startwith_bucket();
-        if(!path){
-            show_warning_dialog('上传文件失败，无法获取当前路径');
+        obj = get_bucket_name_and_cur_path();
+        if(!obj.bucket_name){
+            show_warning_dialog('上传文件失败，无法获取当前存储桶下路径');
             return;
         }
-        let url = build_obj_upload_url({path_with_bucket: path, filename: file.name});
+
+        let url = build_obj_detail_url({
+            bucket_name: obj.bucket_name,
+            dir_path: obj.dir_path,
+            filename: file.name
+        });
         beforeFileUploading();
         uploadFile(url, file, 0);
     }
 
-    //
-    // 获取以存储桶开头的当前路径
-    // 获取失败返回空字符串
-    //
-    function get_cur_path_startwith_bucket() {
-        let obj = get_bucket_name_and_cur_path();
-        let bucket_name = obj.bucket_name;
-        let dir_path = obj.dir_path;
-        if(!bucket_name)
-            return '';
-
-        let path = bucket_name + '/';
-        if (dir_path)
-            path = path + dir_path + '/';
-        return path;
-    }
-
-    //
-    //构造文件对象上传url
-    function build_obj_upload_url(obj={path_with_bucket:'', filename:''}) {
-        path = obj.path_with_bucket;
-        filename = obj.filename;
-
-        let url = 'api/v1/obj/' + path + filename + '/';
-        url = build_url_with_domain_name(url);
-        return url;
-    }
 
     //
     //文件上传
@@ -837,15 +982,8 @@
             fileUploadProgressBar(0, 1, true);
             endFileUploading();
             show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
-            // 如果上传的文件在当前页面的列表中，刷新
-            let path = get_cur_path_startwith_bucket();
-            if(path){
-                let cur_url = build_obj_upload_url({path_with_bucket: path, filename: file.name});
-                if (cur_url === url){
-                    let url = build_dir_url(path);
-                    get_bucket_files_and_render(url);
-                }
-            }
+            // 如果上传的文件在当前页面的列表中，插入文件列表
+            success_upload_file_append_list_item(url, file.name);
 
             return;
         }
@@ -878,6 +1016,26 @@
         })
     }
 
+    //
+    // 成功上传文件后，插入文件列表项
+    function success_upload_file_append_list_item(obj_url, filename) {
+        let obj = get_bucket_name_and_cur_path();
+        if(!obj.bucket_name){
+            return;
+        }
+
+        params = {
+            bucket_name: obj.bucket_name,
+            dir_path: obj.dir_path,
+            filename: filename
+        };
+        let cur_url = build_obj_detail_url(params);
+
+        if (cur_url === obj_url){
+            let info_url = build_obj_info_api(params);
+            get_file_info_and_list_item_render(info_url, render_bucket_file_item);
+        }
+    }
 
     //
     // 文件块结束字节偏移量
@@ -942,7 +1100,6 @@
         }
         setProgressBar($("#upload-progress-bar"), percent, hide);
     }
-    // fileUploadProgressBar(0, 100, true);
 
 
     //
@@ -1000,7 +1157,7 @@
                 formdata.append('dir_path', dir_path);
                 formdata.append('dir_name', input_name);
                 return $.ajax({
-                    url: build_url_with_domain_name('/api/v1/dir/'),
+                    url: build_url_with_domain_name(get_dir_base_api()),
                     type: 'post',
                     data: formdata,
                     timeout: 200000,
@@ -1057,6 +1214,7 @@
             </td>
             <td>{{ dir.ult }}</td>
             <td>--</td>
+            <td>--</td>
             <td>
                 <li class="dropdown btn">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
@@ -1070,22 +1228,6 @@
         </tr>
     `);
 
-
-    //
-    //把路径分解面包屑路径
-    function get_dir_link_paths(path){
-        dir_link_paths = [];
-        if (path === '')
-            return dir_link_paths;
-        path = path.strip('/');
-        dirs = path.split('/');
-        arr.forEach(function(value,i){
-            item = [key, '/'.join(dirs.slice(0, i+1))];
-            dir_link_paths.append(item);
-        });
-
-        return dir_link_paths
-    }
 
 })();
 

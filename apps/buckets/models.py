@@ -142,7 +142,7 @@ class BucketFileInfo(DynamicDocument):
         设置对象共享或私有权限
         :param collection_name: 对象所在集合名
         :param sh: 共享(True)或私有(False)
-        :param days: 共享天数，0表示永久共享
+        :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
         '''
         if sh == True:
@@ -150,9 +150,11 @@ class BucketFileInfo(DynamicDocument):
             now = datetime.utcnow()
             self.sst = now          # 共享时间
             if days == 0:
-                self.dtl = False    # 永久共享
+                self.stl = False    # 永久共享,没有共享时间限制
+            elif days < 0:
+                self.sh = False     # 私有
             else:
-                self.dtl = True     # 有共享时间限制
+                self.stl = True     # 有共享时间限制
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
@@ -181,9 +183,9 @@ class BucketFileInfo(DynamicDocument):
 
         # 检查是否已过共享终止时间
         if self.is_shared_end_time_out():
-            return True
+            return False
 
-        return False
+        return True
 
     def has_shared_limit(self):
         '''
