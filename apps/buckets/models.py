@@ -91,9 +91,9 @@ class Bucket(models.Model):
         return True
 
 
-class BucketFileInfo(DynamicDocument):
+class BucketFileInfoBase(DynamicDocument):
     '''
-    存储桶bucket文件信息模型
+    存储桶bucket文件信息模型基类
 
     @ na : name，若该doc代表文件，则na为文件名，若该doc代表目录，则na为目录路径;
     @ fos: file_or_dir，用于判断该doc代表的是一个文件还是一个目录，若fod为True，则是文件，若fod为False，则是目录;
@@ -133,24 +133,23 @@ class BucketFileInfo(DynamicDocument):
     sds = fields.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
 
     meta = {
+        'abstract': True,
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
-        'db_alias': 'default',
-        'indexes': ['did', 'ult'],#索引
-        'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+        # 'db_alias': 'default',
+        # 'indexes': ['did', 'ult'],#索引
+        # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
         # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
         # 'max_documents': 10000, #集合存储文档最大数量
         # 'max_size': 2000000, #集合的最大字节数
     }
 
-    def do_soft_delete(self, collection_name=None):
+    def do_soft_delete(self):
         '''
         软删除
-        :param collection_name: 对象所在集合名
+
         :return: True(success); False(error)
         '''
         self.sds = True
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
 
         try:
             self.save()
@@ -158,10 +157,10 @@ class BucketFileInfo(DynamicDocument):
             return False
         return True
 
-    def set_shared(self, collection_name=None, sh=False, days=0):
+    def set_shared(self, sh=False, days=0):
         '''
         设置对象共享或私有权限
-        :param collection_name: 对象所在集合名
+
         :param sh: 共享(True)或私有(False)
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
@@ -179,9 +178,6 @@ class BucketFileInfo(DynamicDocument):
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
-
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
 
         try:
             self.save()
@@ -223,14 +219,12 @@ class BucketFileInfo(DynamicDocument):
         td = datetime.utcnow() - self.set
         return td.total_seconds() > 0
 
-    def download_cound_increase(self, collection_name=None):
+    def download_cound_increase(self):
         '''
         下载次数加1
-        :param collection_name: 对象所在集合名
+
         :return: True(success); False(error)
         '''
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
         self.dlc = (self.dlc or 0) + 1  # 下载次数+1
         try:
             self.save()

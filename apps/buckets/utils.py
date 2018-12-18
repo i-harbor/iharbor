@@ -2,9 +2,8 @@ from bson import ObjectId
 
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
-from mongoengine.context_managers import switch_collection
 
-from .models import BucketFileInfo
+from .models import BucketFileInfoBase
 
 
 class BucketFileManagement():
@@ -15,6 +14,27 @@ class BucketFileManagement():
         self._path = path if path else ''
         self._collection_name = collection_name
         self.cur_dir_id = None
+        self._bucket_file_class = self.creat_bucket_file_class()
+
+    def creat_bucket_file_class(self):
+        '''动态创建类，以避免mongoengine switch_collection的线程安全问题'''
+        return type('BucketFile', (BucketFileInfoBase,), {
+            'meta': {
+                'db_alias': 'default',
+                'indexes': ['did', 'ult'],#索引
+                'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+                'collection': self.get_collection_name(),
+            }
+        })
+
+    def get_bucket_file_class(self):
+        if not self._bucket_file_class:
+            self._bucket_file_class = self.creat_bucket_file_class()
+
+        return self._bucket_file_class
+
+    def get_collection_name(self):
+        return self._collection_name
 
     def _hand_path(self, path):
         '''去除path字符串两边可能的空白和右边/'''
@@ -42,8 +62,7 @@ class BucketFileManagement():
             return (False, None) # path参数有误
 
         try:
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                dir = Bfi.objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
         except DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -62,8 +81,7 @@ class BucketFileManagement():
         '''
         if cur_dir_id:
             dir_id = cur_dir_id
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                files = Bfi.objects(did=dir_id).all()
+            files = self.get_bucket_file_class().objects(did=dir_id).all()
             return True, files
 
         if self._path:
@@ -74,13 +92,11 @@ class BucketFileManagement():
                 return False, None
 
             if dir_id:
-                with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                    files = Bfi.objects(mQ(did=dir_id) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()
+                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()
                 return True, files
 
         #存储桶下文件目录
-        with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-            files = Bfi.objects(mQ(did__exists=False) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
+        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
         return True, files
 
     def get_file_exists(self, file_name):
@@ -97,12 +113,10 @@ class BucketFileManagement():
 
         file_name.strip('/')
         if did:
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                bfis = Bfi.objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
+            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
                                           (mQ(sds__exists=False) | mQ(sds=False)))# 目录下是否存在给定文件名的文件
         else:
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                bfis = Bfi.objects((mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True)) &
+            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True)) &
                                           (mQ(sds__exists=False) | mQ(sds=False)))  # 存储桶下是否存在给定文件名的文件
 
         bfi = bfis.first()
@@ -125,8 +139,7 @@ class BucketFileManagement():
         dir_path_name = self.build_dir_full_name(dir_name)
 
         try:
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                dir = Bfi.objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
         except DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -145,8 +158,7 @@ class BucketFileManagement():
         :return:
         '''
         try:
-            with switch_collection(BucketFileInfo, self._collection_name) as Bfi:
-                bfis = Bfi.objects((mQ(id=id)) & (mQ(sds__exists=False) | mQ(sds=False)))  # 目录下是否存在给定文件名的文件
+            bfis = self.get_bucket_file_class().objects((mQ(id=id)) & (mQ(sds__exists=False) | mQ(sds=False)))  # 目录下是否存在给定文件名的文件
         except:
             return None
 

@@ -1,7 +1,6 @@
 from django.db.models import Q as dQ
 from rest_framework import serializers
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.models import Bucket
 

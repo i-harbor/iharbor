@@ -1,15 +1,12 @@
 import os
-from datetime import datetime
 from bson import ObjectId
 
 from rest_framework import serializers
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-from .models import User, Bucket, BucketFileInfo
+from .models import User, Bucket
 from utils.storagers import PathParser
-from utils.oss.rados_interfaces import CephRadosObject
 from utils.time import to_localtime_string_naive_by_utc
 from .validators import DNSStringValidator
 
@@ -173,20 +170,19 @@ class ObjPostSerializer(serializers.Serializer):
         did = validated_data.get('_did')
         old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
+        BucketFileClass = validated_data.get('BucketFileClass')
 
         # 存在同名文件对象，覆盖上传删除原文件
         if old_bfinfo:
-            old_bfinfo.switch_collection(_collection_name)
             old_bfinfo.do_soft_delete()
 
         # 创建文件对象
-        bfinfo = BucketFileInfo(na=file_name,# 文件名
+        bfinfo = BucketFileClass(na=file_name,# 文件名
                                 fod = True, # 文件
                                 si = 0 )# 文件大小
         # 有父节点
         if did:
             bfinfo.did = ObjectId(did)
-        bfinfo.switch_collection(_collection_name)
         bfinfo.save()
 
         # 构造返回数据
@@ -237,6 +233,7 @@ class ObjPostSerializer(serializers.Serializer):
         _, did = bfm.get_cur_dir_id()
         data['_did'] = did
         data['_collection_name'] = _collection_name
+        data['BucketFileClass'] = bfm.get_bucket_file_class()
         return data
 
 

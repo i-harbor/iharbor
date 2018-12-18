@@ -4,10 +4,9 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-from buckets.models import Bucket, BucketFileInfo
+from buckets.models import Bucket
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -85,7 +84,7 @@ class ObsViewSet(viewsets.GenericViewSet):
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 增加一次下载次数
-        fileobj.download_cound_increase(collection_name)
+        fileobj.download_cound_increase()
         return response
 
     def get_serializer(self, *args, **kwargs):

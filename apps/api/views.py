@@ -16,7 +16,7 @@ from buckets.utils import BucketFileManagement
 from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
-from .models import User, Bucket, BucketFileInfo
+from .models import User, Bucket
 from . import serializers
 from . import paginations
 
@@ -574,7 +574,6 @@ class ObjViewSet(viewsets.GenericViewSet):
             # 更新文件修改时间
             obj.upt = datetime.utcnow()
             obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
-            obj.switch_collection(collection_name)
             try:
                 obj.save()
             except:
@@ -619,7 +618,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 增加一次下载次数
-        fileobj.download_cound_increase(collection_name)
+        fileobj.download_cound_increase()
         return response
 
     def destroy(self, request, *args, **kwargs):
@@ -633,7 +632,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        fileobj.do_soft_delete(collection_name)
+        fileobj.do_soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
@@ -655,7 +654,6 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        fileobj.switch_collection(collection_name)
         if not fileobj.set_shared(sh=share, days=days):
             return Response(data={'code': 500, 'code_text': '更新数据库数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -720,14 +718,14 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         if not obj:
             # 创建文件对象
-            bfinfo = BucketFileInfo(na=filename,  # 文件名
+            BucketFileClass = bfm.get_bucket_file_class()
+            bfinfo = BucketFileClass(na=filename,  # 文件名
                                     fod=True,  # 文件
                                     si=0)  # 文件大小
             # 有父节点
             if did:
                 bfinfo.did = ObjectId(did)
 
-            bfinfo.switch_collection(collection_name)
             try:
                 obj = bfinfo.save()
             except:
@@ -858,7 +856,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 如果从0读文件就增加一次下载次数
         if offset == 0:
-            obj.download_cound_increase(collection_name)
+            obj.download_cound_increase()
 
         reponse = StreamingHttpResponse(chunk, content_type='application/octet-stream', status=status.HTTP_200_OK)
         reponse['evob_chunk_size'] = len(chunk)
@@ -1001,13 +999,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
-        bfinfo = BucketFileInfo(na=dir_path_name,  # 目录名
+        BucketFileClass = bfm.get_bucket_file_class()
+        bfinfo = BucketFileClass(na=dir_path_name,  # 目录名
                                 fod=False,  # 目录
                                 )
         # 有父节点
         if did:
             bfinfo.did = did
-        bfinfo.switch_collection(collection_name)
         try:
             bfinfo.save()
         except:
@@ -1036,7 +1034,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not obj:
             return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
         else:
-            obj.do_soft_delete(collection_name)
+            obj.do_soft_delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
