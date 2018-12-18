@@ -927,7 +927,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     lookup_field = 'ab_path'
     lookup_value_regex = '.+'
-    pagination_class = paginations.BucketFileCursorPagination
+    pagination_class = paginations.BucketFileLimitOffsetPagination
 
     # api docs
     BASE_METHOD_FIELDS = [

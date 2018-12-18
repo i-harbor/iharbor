@@ -90,6 +90,16 @@ class Bucket(models.Model):
 
         return True
 
+    def is_public_permission(self):
+        '''
+        存储桶是否是公共访问权限
+
+        :return: True(是公共); False(私有权限)
+        '''
+        if self.access_permission == self.PUBLIC:
+            return True
+        return False
+
 
 class BucketFileInfoBase(DynamicDocument):
     '''

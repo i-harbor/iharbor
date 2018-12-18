@@ -610,6 +610,10 @@
                             <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
                         {{/if}}
                         
+                        {{if page}}
+                            <li>第{{page.current}}页 共{{page.final}}页</li>
+                        {{/if}}
+                        
                         {{if next}}
                             <li><a id="page_next_bucket_files" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}

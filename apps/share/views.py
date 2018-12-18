@@ -73,8 +73,8 @@ class ObsViewSet(viewsets.GenericViewSet):
         collection_name = bucket.get_bucket_mongo_collection_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
-        # 文件对象是否属于当前用户 或 文件是否是共享的
-        if not bucket.check_user_own_bucket(request) and not fileobj.is_shared_and_in_shared_time():
+        # 是否有文件对象的访问权限
+        if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
         # 下载整个文件对象
@@ -137,4 +137,27 @@ class ObsViewSet(viewsets.GenericViewSet):
         if not ok or not obj:
             raise Http404
         return obj
+
+    def has_access_permission(self, request, bucket, obj):
+        '''
+        当前已认证用户或未认证用户是否有访问对象的权限
+
+        :param request: 请求体对象
+        :param bucket: 存储桶对象
+        :param obj: 文件对象
+        :return: True(可访问)；False（不可访问）
+        '''
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+
+        # 存储桶是否属于当前用户
+        if bucket.check_user_own_bucket(request):
+            return True
+
+        # 对象是否共享的，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False
 
