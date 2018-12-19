@@ -393,7 +393,11 @@ class ObjViewSet(viewsets.GenericViewSet):
             data: 客户端请求时，携带的参数,不包含数据块；
         }
         Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
+            {
+                'code': 400,
+                'exists': true,                 # 此项内容仅因'存在同名文件'导致此错误时包含
+                'code_text': '对应参数错误信息'
+            }
         Http Code: 状态码500
             {
                 'code': 500,
@@ -563,10 +567,15 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not created: # 对象存在 ，
             if chunk_offset == 0:
                 if not overwrite: # 不覆盖
-                    return Response({'code': 400, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    rados.delete()
-                    obj.si = 0
+                    if rados.delete():
+                        # 更新文件上传时间
+                        obj.ult = datetime.utcnow()
+                        obj.si = 0
+                    else:
+                        return Response({'code': 500, 'code_text': 'rados文件对象删除失败'},
+                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 存储文件块
         ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())

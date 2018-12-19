@@ -1056,7 +1056,7 @@
     //
     //分片上传文件
     //
-    function uploadFileChunk(url, file, offset) {
+    function uploadFileChunk(url, file, offset, overwrite=false) {
         let chunk_size = 2 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
@@ -1068,17 +1068,19 @@
             fileUploadProgressBar(0, 1, true);
             endFileUploading();
             show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
-            // 如果上传的文件在当前页面的列表中，插入文件列表
-            success_upload_file_append_list_item(url, file.name);
-
+            // 如果不是覆盖上传
+            if (overwrite === false){
+                // 如果上传的文件在当前页面的列表中，插入文件列表
+                success_upload_file_append_list_item(url, file.name);
+            }
             return;
         }
-        var chunk = file.slice(offset, end);
-        var formData = new FormData();
+        let chunk = file.slice(offset, end);
+        let formData = new FormData();
         formData.append("chunk_offset", offset);
         formData.append("chunk", chunk);
         formData.append("chunk_size", chunk.size);
-        formData.append("overwrite", false);
+        formData.append("overwrite", overwrite);
 
         $.ajax({
             url: url,
@@ -1089,10 +1091,21 @@
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
                 offset = end;
-                uploadFileChunk(url, file, offset);
+                uploadFileChunk(url, file, offset, overwrite);
             },
             error: function (err) {
-                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){
+                    if(err.responseJSON.exists === true)
+                    {
+                        show_confirm_dialog({
+                            title:"已存在同名文件,是否覆盖上传？",
+                            text:"注意，覆盖后数据无法恢复",
+                            ok_todo: function (){
+                                uploadFileChunk(url, file, offset, true);//覆盖上传
+                            }
+                        })
+                    }
+                }else if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
                     show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text);
                 else
                     show_warning_dialog('上传文件发生错误,'+ err.statusText);
