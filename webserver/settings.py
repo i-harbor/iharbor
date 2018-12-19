@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'api',
     'evcloud',
+    'docs',
 ]
 
 MIDDLEWARE = [
