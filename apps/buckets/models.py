@@ -41,8 +41,19 @@ class Bucket(models.Model):
         verbose_name = '存储桶'
         verbose_name_plural = verbose_name
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f'<Bucket>{self.name}'
+
     @classmethod
-    def get_bucket_by_name(self, bucket_name):
+    def get_user_valid_bucket_count(cls, user):
+        '''获取用户有效的存储桶数量'''
+        return cls.objects.filter(models.Q(user=user) & models.Q(soft_delete=False)).count()
+
+    @classmethod
+    def get_bucket_by_name(cls, bucket_name):
         '''
         获取存储通对象
         :param bucket_name: 存储通名称
@@ -99,6 +110,29 @@ class Bucket(models.Model):
         if self.access_permission == self.PUBLIC:
             return True
         return False
+
+
+class BucketLimitConfig(models.Model):
+    '''
+    用户可拥有存储桶数量限制配置模型
+    '''
+    limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=2)
+    user = models.OneToOneField(to=User, related_name='bucketlimit', on_delete=models.CASCADE, verbose_name='用户')
+
+    class Meta:
+        verbose_name = '桶上限配置'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return str(self.limit)
+
+    def __repr__(self):
+        return f'limit<={self.limit}'
+
+    @classmethod
+    def get_user_bucket_limit(cls, user:User):
+        obj, created = cls.objects.get_or_create(user=user)
+        return obj.limit
 
 
 class BucketFileInfoBase(DynamicDocument):

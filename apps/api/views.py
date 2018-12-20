@@ -256,7 +256,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         return Response(data)
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
             data = {
                 'code': 400,

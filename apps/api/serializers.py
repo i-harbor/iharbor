@@ -8,7 +8,7 @@ from buckets.utils import BucketFileManagement
 from .models import User, Bucket
 from utils.storagers import PathParser
 from utils.time import to_localtime_string_naive_by_utc
-from .validators import DNSStringValidator
+from .validators import DNSStringValidator, bucket_limit_validator
 
 
 
@@ -116,6 +116,8 @@ class BucketCreateSerializer(serializers.Serializer):
         复杂验证
         """
         bucket_name = data.get('name')
+        request = self.context.get('request')
+        user = request.user
 
         if not bucket_name:
             raise serializers.ValidationError('存储桶bucket名称不能为空')
@@ -127,13 +129,12 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_name = bucket_name.lower()
         data['name'] = bucket_name
 
+        # 用户存储桶限制数量检测
+        bucket_limit_validator(user=user)
+
         if Bucket.get_bucket_by_name(bucket_name):
             raise serializers.ValidationError("存储桶名称已存在")
         return data
-
-    # def validate_name(self, value):
-    #     '''验证字段'''
-    #     return value
 
     def create(self, validated_data):
         """

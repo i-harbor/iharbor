@@ -12,6 +12,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('id', 'username', 'email', 'is_active')
     list_display_links = ('id', 'username')
     list_filter = ('date_joined',)
+    search_fields = ('username',)  # 搜索字段
 
 
 @admin.register(Email)
@@ -19,3 +20,4 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('id', 'sender', 'receiver', 'send_time')
     list_display_links = ('id',)
     list_filter = ('send_time',)
+    search_fields = ('receiver',)  # 搜索字段
