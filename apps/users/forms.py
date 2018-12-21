@@ -35,6 +35,29 @@ class UserRegisterForm(forms.Form):
                                                 'placeholder': '请输入确认密码'
                                 }))
 
+    last_name = forms.CharField(label='姓氏', max_length=30,
+                                widget=forms.TextInput(attrs={
+                                    'class': 'form-control',
+                                    'placeholder': '请如实填写'
+                                }))
+
+    first_name = forms.CharField(label='名字', max_length=30,
+                                 widget=forms.TextInput(attrs={
+                                                'class': 'form-control',
+                                                'placeholder': '请如实填写'
+                                            }))
+
+    telephone = forms.CharField(label='电话', max_length=11,
+                                widget=forms.TextInput(attrs={
+                                                'class': 'form-control',
+                                                'placeholder': '请如实填写'
+                                            }))
+    company = forms.CharField(label='公司/单位', max_length=255,
+                              widget=forms.TextInput(attrs={
+                                                  'class': 'form-control',
+                                                  'placeholder': '请如实填写'
+                                                }))
+
     def clean(self):
         '''
         验证表单提交的数据
@@ -62,6 +85,34 @@ class UserRegisterForm(forms.Form):
 
         return self.cleaned_data
 
+    def get_or_creat_unactivated_user(self):
+        '''
+        获取或者创建未激活用户
+
+        :return: user
+        '''
+        cleaned_data = self.cleaned_data
+        user = cleaned_data.get('user', None)
+        email = username = cleaned_data.get('username', '')
+        password = cleaned_data.get('password', '')
+        first_name = cleaned_data.get('first_name')
+        last_name = cleaned_data.get('last_name')
+        telephone = cleaned_data.get('telephone')
+        company = cleaned_data.get('company')
+
+        # 如果不是已注册未激活用户
+        if not user:
+            # 创建非激活状态新用户
+            user = User(username=username, is_active=False)
+            User.objects.create_user()
+        user.email = email
+        user.set_password(password)
+        user.first_name = first_name
+        user.last_name = last_name
+        user.telephone = telephone
+        user.company = company
+        user.save()
+        return user
 
 
 class LoginForm(forms.Form):

@@ -23,19 +23,7 @@ def register_user(request):
         form = UserRegisterForm(request.POST)
         #表单数据验证通过
         if form.is_valid():
-            cleaned_data = form.cleaned_data
-            user = cleaned_data.get('user', None)
-            email = username = cleaned_data.get('username', '')
-            password = cleaned_data.get('password', '')
-
-            #已注册未激活
-            if user:
-                user.email = email
-                user.set_password(password)
-                user.save()
-            else:
-                # 创建非激活状态新用户并保存
-                user = User.objects.create_user(username=username, password=password, email=email, is_active=False)
+            user = form.get_or_creat_unactivated_user()
 
             logout(request)#登出用户（确保当前没有用户登陆）
 
