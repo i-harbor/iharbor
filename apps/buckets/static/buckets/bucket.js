@@ -525,10 +525,13 @@
                         <button class="btn btn-info" id="btn-new-directory"><span class="glyphicon glyphicon-plus"></span>创建文件夹</button>
                         <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}">上传文件</button>
                         <button class="btn btn-success" id="btn-path-item" bucket_name="{{ $data['bucket_name'] }}" dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-refresh"></span></button>
-                        <div class="progress text-warning" id="upload-progress-bar" style="display: none;">
-                            <div class="progress-bar"  role="progressbar" aria-valuenow="0" aria-valuemin="0"
-                                 aria-valuemax="100" style="min-width: 2em;width: 0%;">
-                                0%
+                        <div  id="upload-progress-bar" style="display: none;">
+                            <p class="text-warning">请勿离开此页面，以防文件上传过程中断！</p>
+                            <div class="progress text-warning">             
+                                <div class="progress-bar"  role="progressbar" aria-valuenow="0" aria-valuemin="0"
+                                     aria-valuemax="100" style="min-width: 2em;width: 0%;">
+                                    0%
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1180,8 +1183,8 @@
         width = Math.floor(width);
         var $bar = $(obj_bar);
         percent = width + '%';
-        $bar.children().attr({"style": "min-width: 2em;width: " + percent + ";"});
-        $bar.children().text(percent);
+        $bar.find("div.progress-bar").attr({"style": "min-width: 2em;width: " + percent + ";"});
+        $bar.find("div.progress-bar").text(percent);
         if (hide === true)
             $bar.hide();
         else

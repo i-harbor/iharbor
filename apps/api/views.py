@@ -557,14 +557,20 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not collection_name and response:
             return response
 
+        # 集合文档数量上限验证
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
         overwrite = data.get('overwrite')
 
-        obj, created = self.get_file_obj_or_create_or_404(collection_name, path, filename)
+        obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
+        if obj is None:
+            return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
+
         rados = CephRadosObject(str(obj.id))
-        if not created: # 对象存在 ，
+        if created is False: # 对象存在
             if chunk_offset == 0:
                 if not overwrite: # 不覆盖
                     return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
@@ -705,16 +711,28 @@ class ObjViewSet(viewsets.GenericViewSet):
             raise Http404
         return obj
 
-    def get_file_obj_or_create_or_404(self, collection_name, path, filename):
+    def do_bucket_limit_validate(self, bfm:BucketFileManagement):
         '''
-        获取文件对象, 不存在则创建，其他错误(如对象父路径不存在)会抛404错误
+        存储桶的限制验证
+        :return: True(验证通过); False(未通过)
+        '''
+        # 存储桶对象数量上限验证
+        if bfm.get_obj_document_count() >= 10**7:
+            return False
+
+        return True
+
+    def get_obj_and_check_limit_or_create_or_404(self, collection_name, path, filename):
+        '''
+        获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
 
         :param collection_name:
         :param path:
         :param filename:
-        :return: (obj, created)
-                obj: 对象
-                created: 指示对象是否是新创建的，True(是)
+        :return: (obj, created); obj: 对象; created: 指示对象是否是新创建的，True(是)
+                (obj, False) # 对象存在
+                (obj, True)  # 对象不存在，创建一个新对象
+                (None, None) # 集合文档数量已达上限，不允许再创建新的对象
         '''
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
         ok, did = bfm.get_cur_dir_id()
@@ -725,22 +743,28 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not ok:
             raise Http404
 
-        if not obj:
-            # 创建文件对象
-            BucketFileClass = bfm.get_bucket_file_class()
-            bfinfo = BucketFileClass(na=filename,  # 文件名
-                                    fod=True,  # 文件
-                                    si=0)  # 文件大小
-            # 有父节点
-            if did:
-                bfinfo.did = ObjectId(did)
+        if obj:
+            return obj, False
 
-            try:
-                obj = bfinfo.save()
-            except:
-                raise Http404
-            return obj, True
-        return obj, False
+        # 验证集合文档上限
+        if not self.do_bucket_limit_validate(bfm):
+            return None, None
+
+        # 创建文件对象
+        BucketFileClass = bfm.get_bucket_file_class()
+        bfinfo = BucketFileClass(na=filename,  # 文件名
+                                fod=True,  # 文件
+                                si=0)  # 文件大小
+        # 有父节点
+        if did:
+            bfinfo.did = ObjectId(did)
+
+        try:
+            obj = bfinfo.save()
+        except:
+            raise Http404
+        return obj, True
+
 
     def get_file_download_response(self, file_id, filename):
         '''

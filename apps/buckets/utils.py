@@ -1,5 +1,3 @@
-from bson import ObjectId
-
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
@@ -164,8 +162,26 @@ class BucketFileManagement():
 
         return bfis.first()
 
+    def get_document_count(self):
+        '''
+        获取集合的对象文档数量
+        :return:
+        '''
+        return self.get_bucket_file_class().objects().count()
 
+    def get_obj_document_count(self):
+        '''
+        获取集合的对象文档数量
+        :return:
+        '''
+        return self.get_bucket_file_class().objects(fod=True).count()
 
+    def get_valid_obj_document_count(self):
+        '''
+        获取集合的有效（未删除状态）对象文档数量
+        :return:
+        '''
+        return self.get_bucket_file_class().objects(mQ(fod=True) & (mQ(sds__exists=False) | mQ(sds=False))).count()
 
 
 
