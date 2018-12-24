@@ -41,8 +41,19 @@ class Bucket(models.Model):
         verbose_name = '存储桶'
         verbose_name_plural = verbose_name
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f'<Bucket>{self.name}'
+
     @classmethod
-    def get_bucket_by_name(self, bucket_name):
+    def get_user_valid_bucket_count(cls, user):
+        '''获取用户有效的存储桶数量'''
+        return cls.objects.filter(models.Q(user=user) & models.Q(soft_delete=False)).count()
+
+    @classmethod
+    def get_bucket_by_name(cls, bucket_name):
         '''
         获取存储通对象
         :param bucket_name: 存储通名称
@@ -69,10 +80,64 @@ class Bucket(models.Model):
         '''
         return f'bucket_{self.collection_name}'
 
+    def set_permission(self, public=False):
+        '''
+        设置存储桶公有或私有访问权限
 
-class BucketFileInfo(DynamicDocument):
+        :param public: 公有(True)或私有(False)
+        :return: True(success); False(error)
+        '''
+        if public == True and self.access_permission != self.PUBLIC:
+            self.access_permission = self.PUBLIC
+        elif  public == False and self.access_permission != self.PRIVATE:
+            self.access_permission = self.PRIVATE
+        else:
+            return True
+
+        try:
+            self.save()
+        except:
+            return  False
+
+        return True
+
+    def is_public_permission(self):
+        '''
+        存储桶是否是公共访问权限
+
+        :return: True(是公共); False(私有权限)
+        '''
+        if self.access_permission == self.PUBLIC:
+            return True
+        return False
+
+
+class BucketLimitConfig(models.Model):
     '''
-    存储桶bucket文件信息模型
+    用户可拥有存储桶数量限制配置模型
+    '''
+    limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=2)
+    user = models.OneToOneField(to=User, related_name='bucketlimit', on_delete=models.CASCADE, verbose_name='用户')
+
+    class Meta:
+        verbose_name = '桶上限配置'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return str(self.limit)
+
+    def __repr__(self):
+        return f'limit<={self.limit}'
+
+    @classmethod
+    def get_user_bucket_limit(cls, user:User):
+        obj, created = cls.objects.get_or_create(user=user)
+        return obj.limit
+
+
+class BucketFileInfoBase(DynamicDocument):
+    '''
+    存储桶bucket文件信息模型基类
 
     @ na : name，若该doc代表文件，则na为文件名，若该doc代表目录，则na为目录路径;
     @ fos: file_or_dir，用于判断该doc代表的是一个文件还是一个目录，若fod为True，则是文件，若fod为False，则是目录;
@@ -112,24 +177,23 @@ class BucketFileInfo(DynamicDocument):
     sds = fields.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
 
     meta = {
+        'abstract': True,
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
-        'db_alias': 'default',
-        'indexes': ['did', 'ult'],#索引
-        'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+        # 'db_alias': 'default',
+        # 'indexes': ['did', 'ult'],#索引
+        # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
         # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
         # 'max_documents': 10000, #集合存储文档最大数量
         # 'max_size': 2000000, #集合的最大字节数
     }
 
-    def do_soft_delete(self, collection_name=None):
+    def do_soft_delete(self):
         '''
         软删除
-        :param collection_name: 对象所在集合名
+
         :return: True(success); False(error)
         '''
         self.sds = True
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
 
         try:
             self.save()
@@ -137,12 +201,12 @@ class BucketFileInfo(DynamicDocument):
             return False
         return True
 
-    def set_shared(self, collection_name=None, sh=False, days=0):
+    def set_shared(self, sh=False, days=0):
         '''
         设置对象共享或私有权限
-        :param collection_name: 对象所在集合名
+
         :param sh: 共享(True)或私有(False)
-        :param days: 共享天数，0表示永久共享
+        :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
         '''
         if sh == True:
@@ -150,15 +214,14 @@ class BucketFileInfo(DynamicDocument):
             now = datetime.utcnow()
             self.sst = now          # 共享时间
             if days == 0:
-                self.dtl = False    # 永久共享
+                self.stl = False    # 永久共享,没有共享时间限制
+            elif days < 0:
+                self.sh = False     # 私有
             else:
-                self.dtl = True     # 有共享时间限制
+                self.stl = True     # 有共享时间限制
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
-
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
 
         try:
             self.save()
@@ -181,9 +244,9 @@ class BucketFileInfo(DynamicDocument):
 
         # 检查是否已过共享终止时间
         if self.is_shared_end_time_out():
-            return True
+            return False
 
-        return False
+        return True
 
     def has_shared_limit(self):
         '''
@@ -200,14 +263,12 @@ class BucketFileInfo(DynamicDocument):
         td = datetime.utcnow() - self.set
         return td.total_seconds() > 0
 
-    def download_cound_increase(self, collection_name=None):
+    def download_cound_increase(self):
         '''
         下载次数加1
-        :param collection_name: 对象所在集合名
+
         :return: True(success); False(error)
         '''
-        if collection_name and isinstance(collection_name, str):
-            self.switch_collection(collection_name)
         self.dlc = (self.dlc or 0) + 1  # 下载次数+1
         try:
             self.save()

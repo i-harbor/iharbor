@@ -1,17 +1,14 @@
 import os
-from datetime import datetime
 from bson import ObjectId
 
 from rest_framework import serializers
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-from .models import User, Bucket, BucketFileInfo
+from .models import User, Bucket
 from utils.storagers import PathParser
-from utils.oss.rados_interfaces import CephRadosObject
 from utils.time import to_localtime_string_naive_by_utc
-from .validators import DNSStringValidator
+from .validators import DNSStringValidator, bucket_limit_validator
 
 
 
@@ -119,6 +116,8 @@ class BucketCreateSerializer(serializers.Serializer):
         复杂验证
         """
         bucket_name = data.get('name')
+        request = self.context.get('request')
+        user = request.user
 
         if not bucket_name:
             raise serializers.ValidationError('存储桶bucket名称不能为空')
@@ -130,13 +129,12 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_name = bucket_name.lower()
         data['name'] = bucket_name
 
+        # 用户存储桶限制数量检测
+        bucket_limit_validator(user=user)
+
         if Bucket.get_bucket_by_name(bucket_name):
             raise serializers.ValidationError("存储桶名称已存在")
         return data
-
-    # def validate_name(self, value):
-    #     '''验证字段'''
-    #     return value
 
     def create(self, validated_data):
         """
@@ -173,20 +171,19 @@ class ObjPostSerializer(serializers.Serializer):
         did = validated_data.get('_did')
         old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
+        BucketFileClass = validated_data.get('BucketFileClass')
 
         # 存在同名文件对象，覆盖上传删除原文件
         if old_bfinfo:
-            old_bfinfo.switch_collection(_collection_name)
             old_bfinfo.do_soft_delete()
 
         # 创建文件对象
-        bfinfo = BucketFileInfo(na=file_name,# 文件名
+        bfinfo = BucketFileClass(na=file_name,# 文件名
                                 fod = True, # 文件
                                 si = 0 )# 文件大小
         # 有父节点
         if did:
             bfinfo.did = ObjectId(did)
-        bfinfo.switch_collection(_collection_name)
         bfinfo.save()
 
         # 构造返回数据
@@ -237,6 +234,7 @@ class ObjPostSerializer(serializers.Serializer):
         _, did = bfm.get_cur_dir_id()
         data['_did'] = did
         data['_collection_name'] = _collection_name
+        data['BucketFileClass'] = bfm.get_bucket_file_class()
         return data
 
 
@@ -337,13 +335,14 @@ class ObjInfoSerializer(serializers.Serializer):
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
     # arc = serializers.ListField(child = serializers.CharField(required=True))  # archive，该文件的归档地址，目录时arc为空
-    # sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
+    sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
     # shp = serializers.CharField()  # 该文件的共享密码，目录时为空
-    # stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
+    stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
     # sst = serializers.DateTimeField()  # share_start_time, 该文件的共享起始时间
-    # set = serializers.DateTimeField()  # share_end_time,该文件的共享终止时间
+    set = serializers.SerializerMethodField()  # share_end_time,该文件的共享终止时间
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
+    access_permission = serializers.SerializerMethodField() # 公共读权限
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
@@ -370,6 +369,11 @@ class ObjInfoSerializer(serializers.Serializer):
             return ''
         return to_localtime_string_naive_by_utc(obj.upt)
 
+    def get_set(self, obj):
+        if not obj.set:
+            return ''
+        return to_localtime_string_naive_by_utc(obj.set)
+
     def get_download_url(self, obj):
         # 目录
         if not obj.fod:
@@ -379,10 +383,22 @@ class ObjInfoSerializer(serializers.Serializer):
         dir_path = self._context.get('dir_path', '')
         filepath = os.path.join(bucket_name, dir_path, obj.na)
         # download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
-        download_url = reverse('share:obs-detail', kwargs={'objpath': filepath})
+        download_url = reverse('obs:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url
+
+    def get_access_permission(self, obj):
+        # 目录
+        if not obj.fod:
+            return ''
+
+        try:
+            if obj.is_shared_and_in_shared_time():
+                return '公有'
+        except:
+            pass
+        return '私有'
 
 
 class AuthTokenDumpSerializer(serializers.Serializer):

@@ -110,3 +110,23 @@ function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:n
         }
     })
 }
+
+//
+//form 表单获取所有数据 封装方法
+//
+function getFormJson(form_node) {
+    let o = {};
+    let a = $(form_node).serializeArray();
+    $.each(a, function () {
+        if (o[this.name] !== undefined) {
+            if (!o[this.name].push) {
+                o[this.name] = [o[this.name]];
+            }
+            o[this.name].push(this.value || '');
+        } else {
+            o[this.name] = this.value || '';
+        }
+    });
+
+    return o;
+}

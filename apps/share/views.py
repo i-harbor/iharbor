@@ -4,10 +4,9 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-from buckets.models import Bucket, BucketFileInfo
+from buckets.models import Bucket
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -22,21 +21,21 @@ class ObsViewSet(viewsets.GenericViewSet):
     retrieve:
     浏览器端下载文件对象，公共文件对象或当前用户(如果用户登录了)文件对象下载，没有权限下载非公共文件对象或不属于当前用户文件对象
 
-    >>Http Code: 状态码200：
-            返回FileResponse对象,bytes数据流；
+        >>Http Code: 状态码200：
+                返回FileResponse对象,bytes数据流；
 
-    >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-        {
-            'code': 400,
-            'code_text': 'xxxx参数有误'
-        }
-    >>Http Code: 状态码403
-        {
-            'code': 403,
-            'code_text': '您没有访问权限'
-        }
-    >>Http Code: 状态码404：找不到资源;
-    >>Http Code: 状态码500：服务器内部错误;
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'xxxx参数有误'
+            }
+        >>Http Code: 状态码403
+            {
+                'code': 403,
+                'code_text': '您没有访问权限'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
 
     '''
     queryset = []
@@ -74,8 +73,8 @@ class ObsViewSet(viewsets.GenericViewSet):
         collection_name = bucket.get_bucket_mongo_collection_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
-        # 文件对象是否属于当前用户 或 文件是否是共享的
-        if not bucket.check_user_own_bucket(request) and not fileobj.is_shared_and_in_shared_time():
+        # 是否有文件对象的访问权限
+        if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
         # 下载整个文件对象
@@ -85,7 +84,7 @@ class ObsViewSet(viewsets.GenericViewSet):
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 增加一次下载次数
-        fileobj.download_cound_increase(collection_name)
+        fileobj.download_cound_increase()
         return response
 
     def get_serializer(self, *args, **kwargs):
@@ -126,7 +125,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=utf-8 ${filename}'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f'attachment; filename="{filename}";'  # 注意filename 这个是下载后的名字
         return response
 
     def get_file_obj_or_404(self, collection_name, path, filename):
@@ -138,4 +137,27 @@ class ObsViewSet(viewsets.GenericViewSet):
         if not ok or not obj:
             raise Http404
         return obj
+
+    def has_access_permission(self, request, bucket, obj):
+        '''
+        当前已认证用户或未认证用户是否有访问对象的权限
+
+        :param request: 请求体对象
+        :param bucket: 存储桶对象
+        :param obj: 文件对象
+        :return: True(可访问)；False（不可访问）
+        '''
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+
+        # 存储桶是否属于当前用户
+        if bucket.check_user_own_bucket(request):
+            return True
+
+        # 对象是否共享的，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False
 
