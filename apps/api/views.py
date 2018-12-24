@@ -70,10 +70,10 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     '''
     bucket = Bucket.get_bucket_by_name(bucket_name)
     if not bucket:
-        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'}, status=status.HTTP_404_NOT_FOUND)
+        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
         return (None, response)
     if not bucket.check_user_own_bucket(request):
-        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'}, status=status.HTTP_404_NOT_FOUND)
+        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
         return (None, response)
 
     collection_name = bucket.get_bucket_mongo_collection_name()
@@ -407,10 +407,10 @@ class ObjViewSet(viewsets.GenericViewSet):
     retrieve:
         通过文件对象绝对路径（以存储桶名开始）,下载文件对象,可通过query参数获取文件对象详细信息，或者自定义读取对象数据块
 
-        *注：参数优先级判定顺序：info > chunk_offset && chunk_size
-        1. info=true时,返回文件对象详细信息，其他忽略此参数；
-        2. chunk_offset && chunk_size 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
-        3. 不带参数或者info无效时，返回整个文件对象；
+        *注：可选参数优先级判定顺序：info > offset && size
+        1. 如果携带了info参数，info=true时,返回文件对象详细信息，其他返回400错误；
+        2. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
+        3. 不带参数时，返回整个文件对象；
 
     	>>Http Code: 状态码200：
             * info=true,返回文件对象详细信息：
@@ -497,13 +497,13 @@ class ObjViewSet(viewsets.GenericViewSet):
                     schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
                 ),
                 coreapi.Field(
-                    name='chunk_offset',
+                    name='offset',
                     required=False,
                     location='query',
                     schema=coreschema.String(description='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int'),
                 ),
                 coreapi.Field(
-                    name='chunk_size',
+                    name='size',
                     required=False,
                     location='query',
                     schema=coreschema.String(description='要读取的文件块的字节大小, 类型int'),
@@ -602,6 +602,9 @@ class ObjViewSet(viewsets.GenericViewSet):
         info = request.query_params.get('info', None)
         objpath = kwargs.get(self.lookup_field, '')
 
+        if (info is not None) and (info.lower() != 'true'):
+            return Response(data={'code': 400, 'code_text': 'info参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
         pp = PathParser(filepath=objpath)
         bucket_name, path, filename = pp.get_bucket_path_and_filename()
         if not bucket_name or not filename:
@@ -618,7 +621,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 返回文件对象详细信息
-        if info == 'true':
+        if info:
             return self.get_obj_info_response(request=request, fileobj=fileobj, bucket_name=bucket_name, path=path)
 
         # 自定义读取文件对象
@@ -783,7 +786,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}";'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
         return response
 
     def get_obj_info_response(self, request, fileobj, bucket_name, path):
@@ -816,20 +819,20 @@ class ObjViewSet(viewsets.GenericViewSet):
                 ({data}, None) -> 参数验证通过
 
         '''
-        chunk_offset = request.query_params.get('chunk_offset', None)
-        chunk_size = request.query_params.get('chunk_size', None)
+        chunk_offset = request.query_params.get('offset', None)
+        chunk_size = request.query_params.get('size', None)
 
         validated_data = {}
         if chunk_offset is not None and chunk_size is not None:
             try:
                 offset = int(chunk_offset)
                 size = int(chunk_size)
-                if offset < 0 or size < 0:
+                if offset < 0 or size < 0 or size > 20*1024**2: #20Mb
                     raise Exception()
                 validated_data['offset'] = offset
                 validated_data['size'] = size
             except:
-                response = Response(data={'code': 400, 'code_text': 'chunk_offset或chunk_size参数有误'},
+                response = Response(data={'code': 400, 'code_text': 'offset或size参数有误'},
                                 status=status.HTTP_400_BAD_REQUEST)
                 return None, response
         else:
