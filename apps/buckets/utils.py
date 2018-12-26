@@ -1,3 +1,4 @@
+from django.http import Http404
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
 
@@ -60,7 +61,8 @@ class BucketFileManagement():
             return (False, None) # path参数有误
 
         try:
-            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False)
+                                                           & (mQ(sds__exists=False) | mQ(sds=False)))  # 查找目录记录
         except DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -90,11 +92,13 @@ class BucketFileManagement():
                 return False, None
 
             if dir_id:
-                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()
+                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)
+                                                             & (mQ(sds__exists=False) | mQ(sds=False))).all()
                 return True, files
 
-        #存储桶下文件目录
-        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
+        #存储桶下文件目录,did不存在表示是存储桶下的文件目录
+        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)
+                                                     & (mQ(sds__exists=False) | mQ(sds=False))).all()
         return True, files
 
     def get_file_exists(self, file_name):
@@ -130,9 +134,9 @@ class BucketFileManagement():
             第二个返回值：如果存在返回文件记录对象，否则None
         '''
         # 先检测当前目录存在
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
+        # ok, did = self.get_cur_dir_id()
+        # if not ok:
+        #     return False, None
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
@@ -182,6 +186,37 @@ class BucketFileManagement():
         :return:
         '''
         return self.get_bucket_file_class().objects(mQ(fod=True) & (mQ(sds__exists=False) | mQ(sds=False))).count()
+
+    def cur_dir_is_empty(self):
+        '''
+        当前目录是否为空目录
+        :return:True(空); False(非空); None(有错误或目录不存在)
+        '''
+        ok, did = self.get_cur_dir_id()
+        # 有错误发生
+        if not ok:
+            return None
+
+        # 未找到目录
+        if did is None:
+            return None
+
+        if self.get_bucket_file_class().objects(did=did).count() > 0:
+            return False
+
+        return True
+
+    def dir_is_empty(self, dir_obj):
+        '''
+        给定目录是否为空目录
+        :return:True(空); False(非空)
+        '''
+        did = dir_obj.id
+
+        if self.get_bucket_file_class().objects(did=did).count() > 0:
+            return False
+
+        return True
 
 
 

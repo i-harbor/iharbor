@@ -848,10 +848,10 @@
             },
             error: function (error,status) {
                 swal.close();
-                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                if ((error.status < 500) && error.responseJSON.hasOwnProperty('code_text'))
                     show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
+                    show_warning_dialog('上传文件发生错误,'+ error.statusText);
             }
         });
     }

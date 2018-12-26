@@ -651,7 +651,13 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        fileobj.do_soft_delete()
+        cro = CephRadosObject(str(fileobj.id))
+        if not cro.delete():
+            return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not fileobj.do_delete():
+            return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
@@ -946,13 +952,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             }
 
     destroy:
-        删除一个目录
+        删除一个目录, 目录必须为空，否则400错误
 
         >>Http Code: 状态码204,成功删除;
-        >>Http Code: 状态码400,参数无效;
+        >>Http Code: 状态码400,参数无效或目录不为空;
             {
                 'code': 400,
-                'code_text': 'ab_path参数无效'
+                'code_text': 'xxx'
             }
         >>Http Code: 状态码404;
             {
@@ -1070,8 +1076,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         obj = self.get_dir_object(path, dir_name, collection_name)
         if not obj:
             return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            obj.do_soft_delete()
+
+        bfm = BucketFileManagement(collection_name=collection_name)
+        if not bfm.dir_is_empty(obj):
+            return Response(data={'code': 400, 'code_text': '无法删除非空目录'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not obj.do_delete():
+            return Response(data={'code': 500, 'code_text': '删除数据库元数据错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

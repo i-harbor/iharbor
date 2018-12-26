@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 
 from django.db import models
 from django.contrib.auth import get_user_model
-from mongoengine import DynamicDocument
-from mongoengine import fields
+from mongoengine import DynamicDocument, OperationError
+from mongoengine import fields,QuerySet
 
 
 #获取用户模型
@@ -284,3 +284,14 @@ class BucketFileInfoBase(DynamicDocument):
     def is_file(self):
         return self.fod
 
+    def do_delete(self):
+        '''
+        删除
+        :return: True(删除成功); False(删除失败)
+        '''
+        try:
+            self.delete()
+        except OperationError:
+            return False
+
+        return True
