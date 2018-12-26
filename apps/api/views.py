@@ -716,8 +716,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         获取文件对象
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_file_exists(file_name=filename)
-        if not ok or not obj:
+        obj = bfm.get_file_exists(file_name=filename)
+        if not obj:
             raise Http404
         return obj
 
@@ -749,10 +749,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not ok:
             raise Http404 # 目录路径不存在
 
-        ok, obj = bfm.get_file_exists(file_name=filename)
-        if not ok:
-            raise Http404
-
+        obj = bfm.get_file_exists(file_name=filename)
         if obj:
             return obj, False
 
@@ -762,7 +759,8 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 创建文件对象
         BucketFileClass = bfm.get_bucket_file_class()
-        bfinfo = BucketFileClass(na=filename,  # 文件名
+        full_filename = bfm.build_dir_full_name(filename)
+        bfinfo = BucketFileClass(na=full_filename,  # 文件名
                                 fod=True,  # 文件
                                 si=0)  # 文件大小
         # 有父节点

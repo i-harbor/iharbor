@@ -61,8 +61,7 @@ class BucketFileManagement():
             return (False, None) # path参数有误
 
         try:
-            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False)
-                                                           & (mQ(sds__exists=False) | mQ(sds=False)))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
         except DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -92,38 +91,25 @@ class BucketFileManagement():
                 return False, None
 
             if dir_id:
-                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)
-                                                             & (mQ(sds__exists=False) | mQ(sds=False))).all()
+                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
                 return True, files
 
         #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)
-                                                     & (mQ(sds__exists=False) | mQ(sds=False))).all()
+        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
         return True, files
 
     def get_file_exists(self, file_name):
         '''
         通过文件名获取当前目录下的文件信息
-        :param file_name:
-        :return:
-            第一个返回值表示是否有错去发生
-            第二个返回值，如果存在返回文件记录对象，否则None
+        :param file_name: 文件名
+        :return: 如果存在返回文件记录对象，否则None
         '''
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
-
-        file_name.strip('/')
-        if did:
-            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
-                                          (mQ(sds__exists=False) | mQ(sds=False)))# 目录下是否存在给定文件名的文件
-        else:
-            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True)) &
-                                          (mQ(sds__exists=False) | mQ(sds=False)))  # 存储桶下是否存在给定文件名的文件
-
+        file_name = file_name.strip('/')
+        full_file_name = self.build_dir_full_name(file_name)
+        bfis = self.get_bucket_file_class().objects((mQ(na=full_file_name) & mQ(fod=True)))
         bfi = bfis.first()
 
-        return True, bfi if bfi else None
+        return bfi
 
     def get_dir_exists(self, dir_name):
         '''
@@ -141,7 +127,7 @@ class BucketFileManagement():
         dir_path_name = self.build_dir_full_name(dir_name)
 
         try:
-            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)))  # 查找目录记录
         except DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -160,7 +146,7 @@ class BucketFileManagement():
         :return:
         '''
         try:
-            bfis = self.get_bucket_file_class().objects((mQ(id=id)) & (mQ(sds__exists=False) | mQ(sds=False)))  # 目录下是否存在给定文件名的文件
+            bfis = self.get_bucket_file_class().objects((mQ(id=id)))  # 目录下是否存在给定文件名的文件
         except:
             return None
 

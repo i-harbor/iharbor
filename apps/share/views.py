@@ -133,8 +133,8 @@ class ObsViewSet(viewsets.GenericViewSet):
         获取文件对象
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_file_exists(file_name=filename)
-        if not ok or not obj:
+        obj = bfm.get_file_exists(file_name=filename)
+        if not obj:
             raise Http404
         return obj
 

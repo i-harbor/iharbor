@@ -82,7 +82,7 @@ class Bucket(models.Model):
         获得bucket对应的mongodb集合名
         :return: 集合名
         '''
-        return f'bucket_{self.collection_name}'
+        return f'bucket_{self.id}'
 
     def set_permission(self, public=False):
         '''
@@ -295,3 +295,15 @@ class BucketFileInfoBase(DynamicDocument):
             return False
 
         return True
+
+    def get_obj_key(self, bucket_id):
+        '''
+        获取此文档在ceph中对应的对象id
+
+        :param bucket_id:
+        :return: type:str; 无效的参数返回None
+        '''
+        if isinstance(bucket_id, str) or isinstance(bucket_id, int):
+            return str(bucket_id) + str(self.id)
+        return None
+

@@ -11,7 +11,7 @@ admin.site.site_title = 'EVHarbor站点管理'
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('id', 'username', 'fullname', 'company', 'telephone', 'is_active')
     list_display_links = ('id', 'username')
-    list_filter = ('date_joined',)
+    list_filter = ('date_joined', 'is_superuser', 'is_staff')
     search_fields = ('username', 'company')  # 搜索字段
 
     def fullname(self, obj):

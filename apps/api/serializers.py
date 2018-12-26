@@ -218,10 +218,10 @@ class ObjPostSerializer(serializers.Serializer):
 
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
         # 当前目录下是否已存在同文件名文件
-        ok, finfo = bfm.get_file_exists(file_name)
+        finfo = bfm.get_file_exists(file_name)
         #
-        if not ok:
-            raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
+        # if not ok:
+        #     raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
 
         if finfo:
             # 同名文件覆盖上传
@@ -323,7 +323,7 @@ class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
-    na = serializers.CharField(required=True, help_text='文件名或目录名')
+    na = serializers.SerializerMethodField() # 文件名或目录名
     dir_name = serializers.SerializerMethodField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.CharField()  # 父节点objectID
@@ -343,6 +343,15 @@ class ObjInfoSerializer(serializers.Serializer):
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
     access_permission = serializers.SerializerMethodField() # 公共读权限
+
+    def get_na(self, obj):
+        # 文件
+        if obj.fod:
+            pp = PathParser(obj.na)
+            _, name = pp.get_path_and_filename()
+            return name
+
+        return obj.na
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
@@ -380,9 +389,7 @@ class ObjInfoSerializer(serializers.Serializer):
             return  ''
         request = self.context.get('request', None)
         bucket_name = self._context.get('bucket_name', '')
-        dir_path = self._context.get('dir_path', '')
-        filepath = os.path.join(bucket_name, dir_path, obj.na)
-        # download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
+        filepath = '/'.join((bucket_name, obj.na))
         download_url = reverse('obs:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
