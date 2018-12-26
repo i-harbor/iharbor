@@ -28,6 +28,9 @@ class CephRadosObject():
         self._obj_id = obj_id
         self._rados_dll = rados_dll
 
+    def reset_obj_id(self, obj_id):
+        self._obj_id = obj_id
+
     def read(self, offset, size):
         '''
         从指定字节偏移位置读取指定长度的数据块

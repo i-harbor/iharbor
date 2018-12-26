@@ -36,6 +36,7 @@ class Bucket(models.Model):
     collection_name = models.CharField(max_length=50, default=get_uuid1_hex_string, editable=False, verbose_name='存储桶对应的集合表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
 
     class Meta:
         verbose_name = '存储桶'
@@ -68,6 +69,9 @@ class Bucket(models.Model):
     def do_soft_delete(self):
         self.soft_delete = True
         self.save()
+
+    def is_soft_deleted(self):
+        return self.soft_delete
 
     def check_user_own_bucket(self, request):
         # bucket是否属于当前用户
@@ -194,6 +198,7 @@ class BucketFileInfoBase(DynamicDocument):
         :return: True(success); False(error)
         '''
         self.sds = True
+        self.upt = datetime.utcnow() # 修改时间标记删除时间
 
         try:
             self.save()
@@ -276,5 +281,6 @@ class BucketFileInfoBase(DynamicDocument):
             return False
         return True
 
-
+    def is_file(self):
+        return self.fod
 

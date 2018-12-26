@@ -5,7 +5,7 @@ from .models import Bucket, BucketLimitConfig, BucketFileInfoBase
 
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'collection_name', 'created_time', 'user', 'soft_delete')
+    list_display = ('id', 'name', 'collection_name', 'created_time', 'user', 'soft_delete', 'modified_time')
     list_display_links = ('id', 'name')
 
     list_filter = ('user', 'created_time')
