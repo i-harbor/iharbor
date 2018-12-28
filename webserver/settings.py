@@ -232,9 +232,10 @@ LOGGING = {
     'handlers': {
         # logging file settings
         'file': {
-            'level': 'ERROR',
+            'level': 'WARNING',
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
+            'formatter': 'verbose'
         },
         # output to console settings
         'console': {
@@ -261,6 +262,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        # 'django.server': {
+        #     'handlers': ['file', 'console'],
+        #     'level': 'ERROR',
+        #     'propagate': False,
+        # },
     },
 }
 

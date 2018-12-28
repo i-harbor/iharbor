@@ -1,6 +1,7 @@
 from bson import ObjectId
 from collections import OrderedDict
 from datetime import datetime
+import logging
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
@@ -21,6 +22,7 @@ from . import serializers
 from . import paginations
 
 # Create your views here.
+logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 class IsSuperUser(BasePermission):
     '''
@@ -558,9 +560,6 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not collection_name and response:
             return response
 
-        # 集合文档数量上限验证
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
@@ -576,26 +575,13 @@ class ObjViewSet(viewsets.GenericViewSet):
                 if not overwrite: # 不覆盖
                     return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    if rados.delete():
-                        # 更新文件上传时间
-                        obj.ult = datetime.utcnow()
-                        obj.si = 0
-                    else:
-                        return Response({'code': 500, 'code_text': 'rados文件对象删除失败'},
-                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    response = self.pre_overwrite_upload(obj=obj, rados=rados)
+                    if response is not True:
+                        return response
 
-        # 存储文件块
-        ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
-        if ok:
-            # 更新文件修改时间
-            obj.upt = datetime.utcnow()
-            obj.si = max(chunk_offset + chunk.size, obj.si if obj.si else 0)  # 更新文件大小（只增不减）
-            try:
-                obj.save()
-            except:
-                pass
-        else:
-            return Response({'code': 500, 'code_text': '文件块rados写入失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
+        if response is not True:
+            return response
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -651,12 +637,17 @@ class ObjViewSet(viewsets.GenericViewSet):
             return response
 
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        # 先删除元数据，后删除rados对象（删除失败恢复元数据）
+        if not fileobj.do_delete():
+            logger.error('删除对象数据库原数据时错误')
+            return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         cro = CephRadosObject(str(fileobj.id))
         if not cro.delete():
+            # 恢复元数据
+            fileobj.do_save()
+            logger.error('删除rados对象数据时错误')
             return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if not fileobj.do_delete():
-            return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -903,6 +894,74 @@ class ObjViewSet(viewsets.GenericViewSet):
         reponse['evob_chunk_size'] = len(chunk)
         reponse['evob_obj_size'] = obj.si
         return reponse
+
+    def pre_overwrite_upload(self, obj, rados):
+        '''
+        覆盖上传前的一些操作
+
+        :param obj: 文件对象元数据
+        :param rados: rados接口类对象
+        :return:
+                正常：True
+                错误：Response
+        '''
+        # 先更新元数据，后删除rados数据（如果删除失败，恢复元数据）
+        # 更新文件上传时间
+        old_ult = obj.ult
+        old_size = obj.si
+
+        obj.ult = datetime.utcnow()
+        obj.si = 0
+        if not obj.do_save():
+            logger.error('修改对象元数据失败')
+            return Response({'code': 500, 'code_text': '修改对象元数据失败'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not rados.delete():
+            # 恢复元数据
+            obj.ult = old_ult
+            obj.si = old_size
+            obj.do_save()
+            logger.error('rados文件对象删除失败')
+            return Response({'code': 500, 'code_text': 'rados文件对象删除失败'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return True
+
+    def save_one_chunk(self, obj, rados, chunk_offset, chunk):
+        '''
+        保存一个上传的分片
+
+        :param obj: 对象元数据
+        :param rados: rados接口
+        :param chunk_offset: 分片偏移量
+        :param chunk: 分片数据
+        :return:
+            成功：True
+            失败：Response
+        '''
+        # 先更新元数据，后写rados数据（如果写入失败，恢复元数据）
+        # 更新文件修改时间和对象大小
+        old_size = obj.si if obj.si else 0
+        old_upt = obj.upt
+        obj.upt = datetime.utcnow()
+        obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+        if not obj.do_save():
+            logger.error('修改对象元数据失败')
+            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 存储文件块
+        ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
+        if not ok:
+            obj.si = old_size
+            obj.upt = old_upt
+            obj.do_save()
+
+            error = '文件块rados写入失败:' + msg
+            logger.error(error)
+            return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return True
 
 
 class DirectoryViewSet(viewsets.GenericViewSet):

@@ -20,9 +20,10 @@ class BucketFileManagement():
         return type('BucketFile', (BucketFileInfoBase,), {
             'meta': {
                 'db_alias': 'default',
-                'indexes': ['did', 'ult', 'na'],#索引
+                'indexes': ['did', 'ult', 'na', 'fod'],#索引
                 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
                 'collection': self.get_collection_name(),
+                # 'shard_key': ('na', )  # 分片键
             }
         })
 

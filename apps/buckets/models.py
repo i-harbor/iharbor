@@ -307,3 +307,15 @@ class BucketFileInfoBase(DynamicDocument):
             return str(bucket_id) + str(self.id)
         return None
 
+    def do_save(self, **kwargs):
+        '''
+        创建一个文档或更新一个已存在的文档
+
+        :return: True(成功); False(失败)
+        '''
+        try:
+            self.save(**kwargs)
+        except:
+            return False
+
+        return True

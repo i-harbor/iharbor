@@ -1108,7 +1108,7 @@
                             }
                         })
                     }
-                }else if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                }else if (err.responseJSON && err.responseJSON.hasOwnProperty('code_text'))
                     show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text);
                 else
                     show_warning_dialog('上传文件发生错误,'+ err.statusText);
