@@ -1288,11 +1288,9 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success').then(() => {
-                        // location.reload(true);// 刷新当前页面
-                        let html = render_bucket_dir_item(result.value);
-                        $("#bucket-files-table tr:eq(0)").after(html);
-                    } )
+                    let html = render_bucket_dir_item(result.value);
+                    $("#bucket-files-table tr:eq(0)").after(html);
+                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success');
                 }
              },
             (error) => {

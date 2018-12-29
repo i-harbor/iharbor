@@ -19,11 +19,11 @@ class BucketFileManagement():
         '''动态创建类，以避免mongoengine switch_collection的线程安全问题'''
         return type('BucketFile', (BucketFileInfoBase,), {
             'meta': {
-                'db_alias': 'default',
-                'indexes': ['did', 'ult', 'na', 'fod'],#索引
-                'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+                # 'db_alias': 'default',
+                # 'indexes': ['did', 'ult', 'fod', ('na', 'fod')],#索引
+                # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
                 'collection': self.get_collection_name(),
-                # 'shard_key': ('na', )  # 分片键
+                # 'shard_key': ('id', )  # 分片键
             }
         })
 
@@ -79,24 +79,23 @@ class BucketFileManagement():
         :param cur_dir_id: 目录id;
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
         '''
+        dir_id = None
         if cur_dir_id:
             dir_id = cur_dir_id
-            files = self.get_bucket_file_class().objects(did=dir_id).all()
-            return True, files
 
-        if self._path:
+        if not dir_id and self._path:
             ok, dir_id = self.get_cur_dir_id()
 
             # path路径有误
             if not ok:
                 return False, None
 
-            if dir_id:
-                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
-                return True, files
-
-        #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
+        if dir_id:
+            files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
+            return True, files
+        else:
+            #存储桶下文件目录,did不存在表示是存储桶下的文件目录
+            files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
         return True, files
 
     def get_file_exists(self, file_name):

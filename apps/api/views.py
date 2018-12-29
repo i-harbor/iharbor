@@ -62,6 +62,23 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
+def get_user_own_bucket(bucket_name, request):
+    '''
+    获取当前用户的存储桶
+
+    :param bucket_name: 存储通名称
+    :param request: 请求对象
+    :return:
+        success: bucket
+        failure: None
+    '''
+    bucket = Bucket.get_bucket_by_name(bucket_name)
+    if not bucket:
+        return None
+    if not bucket.check_user_own_bucket(request):
+        return None
+    return bucket
+
 def get_bucket_collection_name_or_response(bucket_name, request):
     '''
     获取存储通对应集合名称，或者Response对象
@@ -70,13 +87,9 @@ def get_bucket_collection_name_or_response(bucket_name, request):
             collection_name=None时，存储通不存在，response有效；
             collection_name!=''时，存储通存在，response=None；
     '''
-    bucket = Bucket.get_bucket_by_name(bucket_name)
-    if not bucket:
-        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
-        return (None, response)
-    if not bucket.check_user_own_bucket(request):
-        response = Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
-        return (None, response)
+    bucket = get_user_own_bucket(bucket_name, request)
+    if not isinstance(bucket, Bucket):
+        return None, Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
 
     collection_name = bucket.get_bucket_mongo_collection_name()
     return (collection_name, None)
@@ -267,6 +280,7 @@ class BucketViewSet(viewsets.GenericViewSet):
             }
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
+
         data = {
             'code': 201,
             'code_text': '创建成功',
@@ -555,16 +569,17 @@ class ObjViewSet(viewsets.GenericViewSet):
                 'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 存储桶验证和获取桶对象mongodb集合名
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name, request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
         overwrite = data.get('overwrite')
 
+        collection_name = bucket.get_bucket_mongo_collection_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
@@ -581,6 +596,9 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
         if response is not True:
+            # 如果对象是新创建的，上传失败删除对象元数据
+            if created is True:
+                obj.do_delete()
             return response
 
         return Response(data, status=status.HTTP_200_OK)
@@ -645,7 +663,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         cro = CephRadosObject(str(fileobj.id))
         if not cro.delete():
             # 恢复元数据
-            fileobj.do_save()
+            fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
             logger.error('删除rados对象数据时错误')
             return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -717,8 +735,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         存储桶的限制验证
         :return: True(验证通过); False(未通过)
         '''
-        # 存储桶对象数量上限验证
-        if bfm.get_obj_document_count() >= 10**7:
+        # 存储桶对象和文件夹数量上限验证
+        if bfm.get_document_count() >= 10**7:
             return False
 
         return True
@@ -745,8 +763,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             return obj, False
 
         # 验证集合文档上限
-        if not self.do_bucket_limit_validate(bfm):
-            return None, None
+        # if not self.do_bucket_limit_validate(bfm):
+        #     return None, None
 
         # 创建文件对象
         BucketFileClass = bfm.get_bucket_file_class()

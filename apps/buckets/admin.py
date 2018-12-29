@@ -5,11 +5,17 @@ from .models import Bucket, BucketLimitConfig, BucketFileInfoBase
 
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'collection_name', 'created_time', 'user', 'soft_delete', 'modified_time')
+    list_display = ('id', 'name', 'get_collection_name', 'created_time', 'user', 'objs_count',
+                    'size', 'soft_delete', 'modified_time')
     list_display_links = ('id', 'name')
 
     list_filter = ('user', 'created_time')
     search_fields = ('name', 'user__username')  # 搜索字段
+
+    def get_collection_name(self, obj):
+        return obj.get_bucket_mongo_collection_name()
+
+    get_collection_name.short_description = '桶的集合名'
 
 
 @admin.register(BucketLimitConfig)

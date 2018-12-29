@@ -37,6 +37,8 @@ class Bucket(models.Model):
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
+    objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
+    size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
 
     class Meta:
         verbose_name = '存储桶'
@@ -115,6 +117,38 @@ class Bucket(models.Model):
             return True
         return False
 
+    def obj_count_increase(self, save=True):
+        '''
+        存储桶对象数量加1
+
+        :param save: 是否更新到数据库
+        :return: True(success); False(failure)
+        '''
+        self.obj_count += 1
+        if save:
+            try:
+                self.save()
+            except:
+                return False
+
+        return True
+
+    def obj_count_decrease(self, save=True):
+        '''
+        存储桶对象数量减1
+
+        :param save: 是否更新到数据库
+        :return: True(success); False(failure)
+        '''
+        self.obj_count = max(self.obj_count - 1, 0)
+        if not save:
+            try:
+                self.save()
+            except:
+                return False
+
+        return True
+
 
 class BucketLimitConfig(models.Model):
     '''
@@ -183,9 +217,9 @@ class BucketFileInfoBase(DynamicDocument):
     meta = {
         'abstract': True,
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
-        # 'db_alias': 'default',
-        # 'indexes': ['did', 'ult'],#索引
-        # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+        'db_alias': 'default',
+        'indexes': ['did', 'ult', ('fod', 'na')],  # 索引
+        'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
         # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
         # 'max_documents': 10000, #集合存储文档最大数量
         # 'max_size': 2000000, #集合的最大字节数
