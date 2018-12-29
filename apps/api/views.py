@@ -13,7 +13,7 @@ from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
 
-from buckets.utils import BucketFileManagement
+from buckets.utils import BucketFileManagement, create_shard_collection
 from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -279,7 +279,12 @@ class BucketViewSet(viewsets.GenericViewSet):
                 'data': serializer.data,
             }
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
+
+        # 创建bucket,创建bucket的shard集合
+        bucket = serializer.save()
+        col_name = bucket.get_bucket_mongo_collection_name()
+        if not create_shard_collection(db_name='metadata', collection_name=col_name):
+            logger.error(f'创建桶“{bucket.name}”的shard集合失败')
 
         data = {
             'code': 201,

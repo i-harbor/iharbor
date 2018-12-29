@@ -1,8 +1,34 @@
 from django.http import Http404
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
+from mongoengine.connection import DEFAULT_CONNECTION_NAME, get_connection
 
 from .models import BucketFileInfoBase
+
+
+def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=True):
+    '''
+    为一个集合进行分片、集合所在的数据库需要有分片权限、分片的 key 需要有对应的索引
+
+    :param db_name: 分片集合所在的数据库
+    :param collection_name: 分片集合的名字
+    :param sharding_colunm: 分片的 key
+    :param ishashed: 是否为 hash 分片
+    :return:
+        success: True
+        failure: False
+    '''
+    conn = get_connection(alias=DEFAULT_CONNECTION_NAME)
+    admin_db = conn['admin']
+
+    db_collection = '{}.{}'.format(db_name, collection_name)
+    sharding_type = 'hashed' if ishashed else 1
+    try:
+        admin_db.command('shardCollection', db_collection, key = {sharding_colunm: sharding_type})
+    except Exception as e:
+        return False
+
+    return True
 
 
 class BucketFileManagement():
