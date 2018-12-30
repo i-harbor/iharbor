@@ -65,6 +65,7 @@ function change_url_no_refresh(new_url, new_title) {
     history.replaceState(state, new_title, new_url);
 }
 
+//返回一个去除右边的给定字符的字符串，不改变原字符串
 String.prototype.rightStrip = function(searchValue){
     if(this.endsWith(searchValue)){
         return this.substring(0, this.lastIndexOf(searchValue));
@@ -72,9 +73,60 @@ String.prototype.rightStrip = function(searchValue){
     return this;
 };
 
+//返回一个去除左边的给定字符的字符串，不改变原字符串
 String.prototype.leftStrip = function(searchValue){
     if(this.startsWith(searchValue)){
         return this.replace(searchValue);
     }
     return this;
 };
+
+//
+// 弹出一个确认对话框
+// 输入参数：一个对象
+// @title: 标题
+// @text：显示文本
+// @ok_todo：确定 回调函数
+// @cancel_todo：取消 回调函数
+function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:null}) {
+    Swal({
+        title: obj.title || "你确定要这样做吗？",
+        text: obj.text || "此操作是不可逆的！",
+        type: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
+    }).then((result) => {
+        console.log(result);
+        if (result.value) {
+            if(typeof obj.ok_todo === "function")//是函数
+                obj.ok_todo();
+        }
+        else{
+            if(typeof obj.cancel_todo === "function")//是函数
+                obj.cancel_todo();
+        }
+    })
+}
+
+//
+//form 表单获取所有数据 封装方法
+//
+function getFormJson(form_node) {
+    let o = {};
+    let a = $(form_node).serializeArray();
+    $.each(a, function () {
+        if (o[this.name] !== undefined) {
+            if (!o[this.name].push) {
+                o[this.name] = [o[this.name]];
+            }
+            o[this.name].push(this.value || '');
+        } else {
+            o[this.name] = this.value || '';
+        }
+    });
+
+    return o;
+}

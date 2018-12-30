@@ -1,18 +1,14 @@
 import os
-
-from datetime import datetime
 from bson import ObjectId
 
-from django.db.models import Q as dQ
 from rest_framework import serializers
 from rest_framework.reverse import reverse
-from mongoengine.context_managers import switch_collection
 
 from buckets.utils import BucketFileManagement
-from .models import User, Bucket, BucketFileInfo
-from utils.storagers import FileStorage, PathParser
-from utils.oss.rados_interfaces import CephRadosObject
-from .validators import DNSStringValidator
+from .models import User, Bucket
+from utils.storagers import PathParser
+from utils.time import to_localtime_string_naive_by_utc
+from .validators import DNSStringValidator, bucket_limit_validator
 
 
 
@@ -50,18 +46,36 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     用户创建序列化器
     '''
-    username = serializers.CharField(label='用户名', required=True, max_length=150, help_text='至少5位字母或数字')
+    username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
-    email = serializers.EmailField(label='邮箱', required=False, help_text='邮箱')
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            raise serializers.ValidationError(detail={'code_text': '用户名或密码不能为空'})
+        return data
 
     def create(self, validated_data):
         """
         Create and return a new `Snippet` instance, given the validated data.
         """
-        username = validated_data['username']
-        if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError(detail={'error_text': '用户名已存在'})
-        return User.objects.create_user(**validated_data)
+        email = username = validated_data.get('username')
+        password = validated_data.get('password')
+
+        user = User.objects.filter(username=username).first()
+        if user:
+            if user.is_active:
+                raise serializers.ValidationError(detail={'code_text': '用户名已存在'})
+            else:
+                user.email = email
+                user.set_password(password)
+                user.save()
+                return user # 未激活用户
+
+        # 创建非激活状态新用户并保存
+        return User.objects.create_user(username=username, password=password, email=email, is_active=False)
 
 
 class BucketSerializer(serializers.ModelSerializer):
@@ -81,7 +95,9 @@ class BucketSerializer(serializers.ModelSerializer):
         return {'id': obj.user.id, 'username': obj.user.username}
 
     def get_created_time(self, obj):
-        return obj.created_time.strftime("%Y-%m-%d %H:%M:%S")
+        if not obj.created_time:
+            return ''
+        return to_localtime_string_naive_by_utc(obj.created_time)
 
     def get_access_permission(self, obj):
         return obj.get_access_permission_display()
@@ -99,7 +115,9 @@ class BucketCreateSerializer(serializers.Serializer):
         """
         复杂验证
         """
-        bucket_name = data['name']
+        bucket_name = data.get('name')
+        request = self.context.get('request')
+        user = request.user
 
         if not bucket_name:
             raise serializers.ValidationError('存储桶bucket名称不能为空')
@@ -111,19 +129,20 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_name = bucket_name.lower()
         data['name'] = bucket_name
 
+        # 用户存储桶限制数量检测
+        bucket_limit_validator(user=user)
+
         if Bucket.get_bucket_by_name(bucket_name):
             raise serializers.ValidationError("存储桶名称已存在")
         return data
-
-    # def validate_name(self, value):
-    #     '''验证字段'''
-    #     return value
 
     def create(self, validated_data):
         """
         Create and return a new `Bucket` instance, given the validated data.
         """
         request = self.context.get('request')
+        if not request:
+            return None
         user = request.user
         bucket = Bucket.objects.create(user=user, **validated_data) # 创建并保存
         return bucket
@@ -152,20 +171,20 @@ class ObjPostSerializer(serializers.Serializer):
         did = validated_data.get('_did')
         old_bfinfo = validated_data.get('finfo')
         _collection_name = validated_data.get('_collection_name')
+        BucketFileClass = validated_data.get('BucketFileClass')
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            # 存在同名文件对象，覆盖上传删除原文件
-            if old_bfinfo:
-                old_bfinfo.do_soft_delete()
+        # 存在同名文件对象，覆盖上传删除原文件
+        if old_bfinfo:
+            old_bfinfo.do_soft_delete()
 
-            # 创建文件对象
-            bfinfo = BucketFileInfo(na=file_name,# 文件名
-                                    fod = True, # 文件
-                                    si = 0 )# 文件大小
-            # 有父节点
-            if did:
-                bfinfo.did = ObjectId(did)
-            bfinfo.save()
+        # 创建文件对象
+        bfinfo = BucketFileClass(na=file_name,# 文件名
+                                fod = True, # 文件
+                                si = 0 )# 文件大小
+        # 有父节点
+        if did:
+            bfinfo.did = ObjectId(did)
+        bfinfo.save()
 
         # 构造返回数据
         res = {}
@@ -197,95 +216,26 @@ class ObjPostSerializer(serializers.Serializer):
         if not _collection_name and vali_error:
             raise vali_error
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            bfm = BucketFileManagement(path=dir_path)
-            # 当前目录下是否已存在同文件名文件
-            ok, finfo = bfm.get_file_exists(file_name)
-            #
-            if not ok:
-                raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        # 当前目录下是否已存在同文件名文件
+        finfo = bfm.get_file_exists(file_name)
+        #
+        # if not ok:
+        #     raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
 
-            if finfo:
-                # 同名文件覆盖上传
-                if overwrite:
-                    # 文件记录删除动作在create中
-                    data['finfo'] = finfo
-                else:
-                    raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
-
-            _, did = bfm.get_cur_dir_id()
-            data['_did'] = did
-            data['_collection_name'] = _collection_name
-        return data
-
-
-class ObjOldPutSerializer(serializers.Serializer):
-    '''
-    文件分块上传序列化器
-    '''
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件所在的存储桶名称，类型string')
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
-                                            help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
-    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='上传文件块的字节大小，类型int')
-
-    def validate(self, data):
-        """
-        复杂验证
-        """
-        request = self.context.get('request')
-        kwargs = self.context.get('kwargs')
-        file_id = kwargs.get('objpath')
-        bucket_name = data.get('bucket_name')
-        chunk_offset = data.get('chunk_offset')
-        chunk = data.get('chunk')
-        chunk_size = data.get('chunk_size')
-
-        try:
-            file_id = ObjectId(file_id)
-        except Exception:
-            raise serializers.ValidationError(detail={'objpath': 'id不是一个有效的ObjectID'})
-
-        if not chunk:
-            # chunk_size != 0时，此时却获得一个空文件块
-            if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小(0)不一致'})
-            # 如果上传确实是一个空文件块不做处理
-            return data
-        elif chunk.size != chunk_size:
-            raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        with switch_collection(BucketFileInfo, _collection_name):
-            # bfi = BucketFileInfo.objects(id=file_id).first()
-            bfi = BucketFileManagement().get_file_obj_by_id(file_id)
-            if not bfi:
-                raise serializers.ValidationError(detail={'id': '文件id有误，未找到文件'})
-
-             # 存储文件块
-            # fstorage = FileStorage(str(bfi.id))
-            # if fstorage.write(chunk, chunk_size, offset=chunk_offset):
-            rados = CephRadosObject(str(bfi.id))
-            ok, bytes = rados.write(offset=chunk_offset, data_block=chunk.read())
-            if ok:
-                # 更新文件修改时间
-                bfi.upt = datetime.utcnow()
-                bfi.si = max(chunk_offset+chunk.size, bfi.si if bfi.si else 0) # 更新文件大小（只增不减）
-                bfi.save()
+        if finfo:
+            # 同名文件覆盖上传
+            if overwrite:
+                # 文件记录删除动作在create中
+                data['finfo'] = finfo
             else:
-                raise serializers.ValidationError(detail={'error': 'server error,文件块写入失败'})
-        return data
+                raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
 
-    @property
-    def response_data(self):
-        res = {}
-        self.instance = None # 如果self.instance != None, 调用self.data时会使用self.instance（这里真的的instance），会报错
-        return res
+        _, did = bfm.get_cur_dir_id()
+        data['_did'] = did
+        data['_collection_name'] = _collection_name
+        data['BucketFileClass'] = bfm.get_bucket_file_class()
+        return data
 
 
 class ObjPutSerializer(serializers.Serializer):
@@ -351,15 +301,14 @@ class DirectoryCreateSerializer(serializers.Serializer):
 
         data['collection_name'] = _collection_name
 
-        with switch_collection(BucketFileInfo, _collection_name):
-            bfm = BucketFileManagement(path=dir_path)
-            ok, dir = bfm.get_dir_exists(dir_name=dir_name)
-            if not ok:
-                raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
-            # 目录已存在
-            if dir:
-                raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
-            data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        if not ok:
+            raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
+        # 目录已存在
+        if dir:
+            raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
         return data
 
@@ -374,7 +323,7 @@ class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
-    na = serializers.CharField(required=True, help_text='文件名或目录名')
+    na = serializers.SerializerMethodField() # 文件名或目录名
     dir_name = serializers.SerializerMethodField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.CharField()  # 父节点objectID
@@ -386,13 +335,23 @@ class ObjInfoSerializer(serializers.Serializer):
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
     # arc = serializers.ListField(child = serializers.CharField(required=True))  # archive，该文件的归档地址，目录时arc为空
-    # sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
+    sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
     # shp = serializers.CharField()  # 该文件的共享密码，目录时为空
-    # stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
+    stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
     # sst = serializers.DateTimeField()  # share_start_time, 该文件的共享起始时间
-    # set = serializers.DateTimeField()  # share_end_time,该文件的共享终止时间
+    set = serializers.SerializerMethodField()  # share_end_time,该文件的共享终止时间
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
+    access_permission = serializers.SerializerMethodField() # 公共读权限
+
+    def get_na(self, obj):
+        # 文件
+        if obj.fod:
+            pp = PathParser(obj.na)
+            _, name = pp.get_path_and_filename()
+            return name
+
+        return obj.na
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
@@ -412,12 +371,17 @@ class ObjInfoSerializer(serializers.Serializer):
     def get_ult(self, obj):
         if not obj.ult:
             return ''
-        return obj.ult.strftime("%Y-%m-%d %H:%M:%S")
+        return to_localtime_string_naive_by_utc(obj.ult)
 
     def get_upt(self, obj):
         if not obj.upt:
             return ''
-        return obj.upt.strftime("%Y-%m-%d %H:%M:%S")
+        return to_localtime_string_naive_by_utc(obj.upt)
+
+    def get_set(self, obj):
+        if not obj.set:
+            return ''
+        return to_localtime_string_naive_by_utc(obj.set)
 
     def get_download_url(self, obj):
         # 目录
@@ -425,11 +389,34 @@ class ObjInfoSerializer(serializers.Serializer):
             return  ''
         request = self.context.get('request', None)
         bucket_name = self._context.get('bucket_name', '')
-        dir_path = self._context.get('dir_path', '')
-        filepath = os.path.join(bucket_name, dir_path, obj.na)
-        # download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
-        download_url = reverse('share:obs-detail', kwargs={'objpath': filepath})
+        filepath = '/'.join((bucket_name, obj.na))
+        download_url = reverse('obs:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url
+
+    def get_access_permission(self, obj):
+        # 目录
+        if not obj.fod:
+            return ''
+
+        try:
+            if obj.is_shared_and_in_shared_time():
+                return '公有'
+        except:
+            pass
+        return '私有'
+
+
+class AuthTokenDumpSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    user = serializers.SerializerMethodField()
+    created = serializers.SerializerMethodField()
+
+    def get_user(self, obj):
+        return obj.user.username
+
+    def get_created(self, obj):
+        return to_localtime_string_naive_by_utc(obj.created)
+
 

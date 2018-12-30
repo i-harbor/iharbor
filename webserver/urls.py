@@ -16,18 +16,25 @@ Including another URLconf
 from django.contrib import admin
 from django.conf.urls import url, include
 from django.contrib.staticfiles.views import serve
-# from rest_framework.documentation import include_docs_urls
+from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
+
+from apps.share.views import ObsViewSet
+
+# Create a router and register our viewsets with it.
+router = DefaultRouter(trailing_slash=False)
+router.register(r'obs', ObsViewSet, base_name='obs')
 
 
 urlpatterns = [
     url(r'api/', include('api.urls', namespace='api')),
     url(r'evcloud/', include('evcloud.urls', namespace='evcloud')),
     url(r'share/', include('share.urls', namespace='share')),
-    url(r'', include('buckets.urls', namespace='buckets')),
+    url(r'', include('buckets.urls', namespace='buckets')), # 注意顺序
+    url(r'', include(router.urls, namespace='obs')),        # 注意顺序
     url(r'^users/', include('users.urls', namespace='users')),
     url(r'^admin/', admin.site.urls),
     url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
-    # url(r'docs/', include_docs_urls(title='EVHarbor API Docs')),
-    url(r'docs/', get_swagger_view(title='EVHarbor API')),
+    url(r'apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),
+    url(r'^docs/', include('docs.urls', namespace='docs')),
 ]

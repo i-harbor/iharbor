@@ -7,7 +7,7 @@ from django.template.loader import get_template
 from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool
-from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm
+from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
 from .models import Email
 
 #获取用户模型
@@ -23,18 +23,12 @@ def register_user(request):
         form = UserRegisterForm(request.POST)
         #表单数据验证通过
         if form.is_valid():
-            cleaned_data = form.cleaned_data
-            username = cleaned_data.get('username', '')
-            email = username
-            password = cleaned_data.get('password', '')
-
-            # 创建非激活状态新用户并保存
-            user = User.objects.create_user(username=username, password=password, email=email, is_active=False)
+            user = form.get_or_creat_unactivated_user()
 
             logout(request)#登出用户（确保当前没有用户登陆）
 
             # 向邮箱发送激活连接
-            if send_active_url_email(request, email, user):
+            if send_active_url_email(request, user.email, user):
                 return render(request, 'message.html', context={'message': '用户注册成功，请登录邮箱访问收到的连接以激活用户'})
 
             form.add_error(None, '邮件发送失败，请检查邮箱输入是否有误')
@@ -97,7 +91,7 @@ def change_password(request):
             new_password = form.cleaned_data['new_password']
             user = request.user
             user.set_password(new_password)
-            ret = user.save()
+            user.save()
 
             #注销当前用户，重新登陆
             logout(request)
@@ -127,8 +121,8 @@ def forget_password(request):
 
             user = form.cleaned_data['user']
             email = form.cleaned_data['username']
-            new_password = form.cleaned_data.get('new_password')
-            user.email = new_password # 用于email字段暂存要重置的密码
+            # new_password = form.cleaned_data.get('new_password')
+            # user.email = new_password # 用于email字段暂存要重置的密码
             # 是否是未激活的用户
             if not user.is_active:
                 if send_active_url_email(request, email, user):
@@ -161,20 +155,32 @@ def forget_password_confirm(request):
     except:
         pass
 
-    jwt = JWTokenTool()
-    try:
-        ret = jwt.authenticate(request)
-    except:
-        ret = None
+    if request.method == 'POST':
+        form = PasswordResetForm(request.POST)
+        if form.is_valid():
+            password = form.cleaned_data.get('new_password')
+            user = form.cleaned_data.get('user')
+            user.set_password(password)
+            user.save()
+            return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
+    else:
+        jwtt = JWTokenTool()
+        try:
+            ret = jwtt.authenticate(request)
+        except:
+            ret = None
+        if not ret:
+            return render(request, 'message.html', context={'message': '链接无效或已过期，请重新找回密码获取新的链接', 'urls': urls})
 
-    if not ret:
-        return render(request, 'message.html', context={'message': 'jwt无效，用户重置密码失败', 'urls': urls})
+        jwt_value = ret[-1]
+        form = PasswordResetForm(initial={'jwt': jwt_value})
 
-    user = ret[0]
-    password = ret[1]
-    user.set_password(password)
-    user.save()
-    return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
+    content = {}
+    content['form_title'] = '重置密码'
+    content['submit_text'] = '确定'
+    content['form'] = form
+    return render(request, 'form.html', context=content)
+
 
 def active_user(request):
     '''
@@ -264,6 +270,12 @@ def send_one_email(receiver, message, subject='EVHarbor', log_message=''):
 
 
 def get_or_create_token(user):
+    '''
+    获取用户或为用户创建一个token，会在数据库表中产生一条token记录
+
+    :param user: 用户对象
+    :return: Token对象
+    '''
     token, created = Token.objects.get_or_create(user=user)
     if not token:
         return None
@@ -271,6 +283,12 @@ def get_or_create_token(user):
     return token
 
 def reflesh_new_token(token):
+    '''
+    更新用户的token
+
+    :param token: token对象
+    :return: 无
+    '''
     token.delete()
     token.key = token.generate_key()
     token.save()
@@ -315,5 +333,13 @@ def get_find_password_link(request, user):
     url = request.build_absolute_uri(url)
     return url + '?jwt=' + token
 
+@login_required
+def security(request, *args, **kwargs):
+    '''
+     安全凭证函数视图
+    '''
+    user = request.user
+    token = get_or_create_token(user=user)
+    return render(request, 'security.html', context={'token': token})
 
 

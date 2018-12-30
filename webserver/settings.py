@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*',]
 
@@ -44,12 +44,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_swagger',
+    # 'raven.contrib.django.raven_compat',
 
     #自定义apps
     'buckets.apps.BucketsConfig',
     'users.apps.UsersConfig',
     'api',
     'evcloud',
+    'docs',
 ]
 
 MIDDLEWARE = [
@@ -132,6 +134,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, "media") 
 
 #session 有效期设置
+SESSION_SAVE_EVERY_REQUEST = True #
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True #True：关闭浏览器，则Cookie失效。
 # SESSION_COOKIE_AGE=60*30   #30分钟
 
@@ -162,8 +165,8 @@ REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-        # 'rest_framework.permissions.IsAuthenticated',
+        # 'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.IsAuthenticated',
         # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -229,9 +232,10 @@ LOGGING = {
     'handlers': {
         # logging file settings
         'file': {
-            'level': 'ERROR',
+            'level': 'WARNING',
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
+            'formatter': 'verbose'
         },
         # output to console settings
         'console': {
@@ -258,6 +262,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        # 'django.server': {
+        #     'handlers': ['file', 'console'],
+        #     'level': 'ERROR',
+        #     'propagate': False,
+        # },
     },
 }
 
