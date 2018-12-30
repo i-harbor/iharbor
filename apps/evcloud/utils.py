@@ -3,11 +3,9 @@ from .models import APIAuth
 
 class evcloud_operations():
 
-    def __init__(self):
-        api_config = APIAuth.objects.get(flag=True)
+    def __init__(self, api_config = APIAuth.objects.first()):
         self.group_id = api_config.group_id
         self.vlan_id = api_config.vlan_id
-        self.net_type_id = api_config.net_type_id
         self.pool_id = api_config.pool_id
         auth = coreapi.auth.BasicAuthentication(username=api_config.name, password=api_config.pwd)
         self.client = coreapi.Client(auth=auth)
@@ -31,7 +29,6 @@ class evcloud_operations():
             "vcpu": cpu,
             "mem": mem,
             "group_id": self.group_id,
-            "net_type_id": self.net_type_id,
             "vlan_id": self.vlan_id,
             "remarks": remarks,
         }

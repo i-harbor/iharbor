@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 import json
 import datetime
-from .models import EvcloudVM, VMLimit, VMConfig
+from .models import EvcloudVM, VMLimit, VMConfig, APIAuth
 from .utils import evcloud_operations
 
 # Create your views here.
@@ -28,6 +28,7 @@ def evcloud_list(request):
                 vm['vm_image_display'] = '服务出错'
             vm['created_time_display'] = vm['created_time'].strftime("%Y-%m-%d")
             vm['end_time_display'] = vm['end_time'].strftime("%Y-%m-%d")
+            vm['api_display'] = APIAuth.objects.get(id = vm['api_id']).description
             vm_list_dict[i] = vm
         return render(request, 'evcloud_list.html', {'vm_list_dict':vm_list_dict})
     elif request.method == "POST":
@@ -60,6 +61,8 @@ def evcloud_list(request):
         }
         #print(e)
         return JsonResponse(data=result)
+
+
 def evcloud_add(request):
     #print(request.method)
     user = request.user
@@ -74,16 +77,23 @@ def evcloud_add(request):
         config_list_dict = {}
         for i, config in enumerate(config_list):
             config_list_dict[i] = config
+        api_list = APIAuth.objects.filter(flag=True).values()
+        api_list_dict = {}
+        for i, api in enumerate(api_list):
+            api_list_dict[i] = api
         return render(request, 'evcloud_add.html', {'config_list_dict': config_list_dict,
                                                     'image_list': image_list,
+                                                    'api_list_dict': api_list_dict,
                                                     })
 
     elif request.method == "POST":
+        api_id = int(request.POST.get('api'))
         try:
-            limit = VMLimit.objects.get(user=user).limit
+            api = APIAuth.objects.get(id=api_id)
+            limit = VMLimit.objects.filter(user=user).filter(api=api)[0].limit
         except :
-            VMLimit.objects.create(user=user)
-            limit = VMLimit.objects.get(user=user).limit
+            VMLimit.objects.create(user=user, limit=api.limit, api=api)
+            limit = api.limit
         result = {}
         image = int(request.POST.get('image'))
         config_id = int(request.POST.get('configure'))
@@ -92,10 +102,10 @@ def evcloud_add(request):
         mem = config.mem
         time = config.time * 30
         try:
-            vm_number = EvcloudVM.objects.filter(user=user).filter(deleted=False).count()
+            vm_number = EvcloudVM.objects.filter(user=user).filter(deleted=False).filter(api=api).count()
             if vm_number >= limit:
                 raise Exception('the number of VM exceed limit')
-            vms = evcloud_operations()
+            vms = evcloud_operations(api)
             create_result = vms.create(image, cpu, mem, user.email)
             EvcloudVM.objects.create(vm_id=create_result['uuid'],
                                      user=user,
@@ -104,7 +114,8 @@ def evcloud_add(request):
                                      vm_cpu=cpu,
                                      vm_mem=mem,
                                      vm_ip=create_result['ipv4'],
-                                     group_id=create_result['group_id'])
+                                     group_id=create_result['group_id'],
+                                     api=api )
             #print(create_result)
             result['code'] = 200
         except Exception as e:

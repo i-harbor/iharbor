@@ -34,6 +34,7 @@
                         <th>内存</th>
                         <th>创建时间</th>
                         <th>到期时间</th>
+                        <th>类型</th>
                         <th>状态</th>
                         <th>任务</th>
                         <th>操作</th>
@@ -47,6 +48,7 @@
                             <td>{{ vm.vm_mem }}</td>
                             <td>{{ vm.created_time_display }}</td>
                             <td>{{ vm.end_time_display }}</td>
+                            <td>{{ vm.api_display }}</td>
                             <td name="status">
                                 <div class="progress">
                                     <div class="progress-bar progress-bar-striped active" role="progressbar"
@@ -56,9 +58,9 @@
                                 </div>
                             </td>
                             <td name="mission"></td>
-                            <td>
+                            <td name="operate">
                                 <div class="btn-group">
-                                    <button type="button" class="btn btn-danger vnc-btn" value="5">VNC</button>
+                                    <button name="vnc" type="button" class="btn btn-danger vnc-btn" value="5">VNC</button>
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown"
                                             aria-haspopup="true" aria-expanded="false">
                                         <span class="caret"></span>
