@@ -247,8 +247,8 @@ class ObjPutSerializer(serializers.Serializer):
     chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
                                           help_text='上传文件块的字节大小，类型int')
-    overwrite = serializers.BooleanField(label='是否覆盖', required=False,
-                                         help_text='存在同名文件时是否覆盖(chunk_offset=0时有效)，True(覆盖)，其他默认False(不覆盖)')
+    # overwrite = serializers.BooleanField(label='是否覆盖', required=False,
+    #                                      help_text='存在同名文件时是否覆盖(chunk_offset=0时有效)，True(覆盖)，其他默认False(不覆盖)')
 
     def validate(self, data):
         """
@@ -256,7 +256,7 @@ class ObjPutSerializer(serializers.Serializer):
         """
         chunk = data.get('chunk')
         chunk_size = data.get('chunk_size')
-        overwrite = data.get('overwrite', None)
+        # overwrite = data.get('overwrite', None)
 
         if not chunk:
             # chunk_size != 0时，此时却获得一个空文件块
@@ -267,8 +267,8 @@ class ObjPutSerializer(serializers.Serializer):
         elif chunk.size != chunk_size:
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
 
-        if overwrite is not True :
-            overwrite = False
+        # if overwrite is not True :
+        #     overwrite = False
 
         return data
 

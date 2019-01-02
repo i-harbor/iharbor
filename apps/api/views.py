@@ -388,17 +388,6 @@ class ObjViewSet(viewsets.GenericViewSet):
     '''
     文件对象视图集
 
-    create:
-    创建一个文件对象，并返回文件对象的id：
-
-    	Http Code: 状态码201：无异常时，返回数据：
-    	{
-            data: 客户端请求时，携带的数据,
-            id: 文件id，上传文件块时url中需要,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-
     update:
     通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
 
@@ -406,18 +395,15 @@ class ObjViewSet(viewsets.GenericViewSet):
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
-        当chunk_offset=0时会被认为一次新文件对象上传，如果文件对象已存在，此时overwrite参数有效，
-            overwrite=False时为不覆盖上传，会返回400错误码和已存在同名文件的错误提示。
-            overwrite=True时会重置原文件对象大小为0，相当于删除已存在的同名文件对象，创建一个新同名文件对象，
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
-            data: 客户端请求时，携带的参数,不包含数据块；
+            'created': True, # 上传第一个分片时，可用于判断对象是否是新建的，True(新建的)
+            'data': 客户端请求时，携带的参数,不包含数据块；
         }
         Http Code: 状态码400：参数有误时，返回数据：
             {
                 'code': 400,
-                'exists': true,                 # 此项内容仅因'存在同名文件'导致此错误时包含
                 'code_text': '对应参数错误信息'
             }
         Http Code: 状态码500
@@ -582,7 +568,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
-        overwrite = data.get('overwrite')
+        # overwrite = data.get('overwrite')
 
         collection_name = bucket.get_bucket_mongo_collection_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
@@ -591,14 +577,14 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         rados = CephRadosObject(obj_key)
-        if created is False: # 对象存在
-            if chunk_offset == 0:
-                if not overwrite: # 不覆盖
-                    return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    response = self.pre_overwrite_upload(obj=obj, rados=rados)
-                    if response is not True:
-                        return response
+        # if created is False: # 对象存在
+        #     if chunk_offset == 0:
+        #         if not overwrite: # 不覆盖
+        #             return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+        #         else:
+        #             response = self.pre_overwrite_upload(obj=obj, rados=rados)
+        #             if response is not True:
+        #                 return response
 
         response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
         if response is not True:
@@ -606,7 +592,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             if created is True:
                 obj.do_delete()
             return response
-
+        data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
