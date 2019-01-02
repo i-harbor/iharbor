@@ -1094,7 +1094,6 @@
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
                 // 是否是新建对象
-                console.log(data);
                 if (data.responseJSON && data.responseJSON.hasOwnProperty('created'))
                     if(data.responseJSON.created === true)
                         overwrite = false;

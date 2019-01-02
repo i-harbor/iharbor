@@ -754,13 +754,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 (None, None) # 集合文档数量已达上限，不允许再创建新的对象
         '''
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, did = bfm.get_cur_dir_id()
-        if not ok:
-            raise Http404 # 目录路径不存在
 
         obj = bfm.get_file_exists(file_name=filename)
         if obj:
             return obj, False
+
+        ok, did = bfm.get_cur_dir_id()
+        if not ok:
+            raise Http404 # 目录路径不存在
 
         # 验证集合文档上限
         # if not self.do_bucket_limit_validate(bfm):
@@ -779,6 +780,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         try:
             obj = bfinfo.save()
         except:
+            logger.error(f'新建对象元数据保存数据库错误：{bfinfo.na}')
             raise Http404
         return obj, True
 
