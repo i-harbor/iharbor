@@ -24,14 +24,16 @@ def register_user(request):
         #表单数据验证通过
         if form.is_valid():
             user = form.get_or_creat_unactivated_user()
+            if user:
+                logout(request)#登出用户（确保当前没有用户登陆）
 
-            logout(request)#登出用户（确保当前没有用户登陆）
+                # 向邮箱发送激活连接
+                if send_active_url_email(request, user.email, user):
+                    return render(request, 'message.html', context={'message': '用户注册成功，请登录邮箱访问收到的连接以激活用户'})
 
-            # 向邮箱发送激活连接
-            if send_active_url_email(request, user.email, user):
-                return render(request, 'message.html', context={'message': '用户注册成功，请登录邮箱访问收到的连接以激活用户'})
-
-            form.add_error(None, '邮件发送失败，请检查邮箱输入是否有误')
+                form.add_error(None, '邮件发送失败，请检查邮箱输入是否有误')
+            else:
+                form.add_error(None, '用户注册失败，保存用户数据是错误')
     else:
         form = UserRegisterForm()
 
