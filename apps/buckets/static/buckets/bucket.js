@@ -848,10 +848,10 @@
             },
             error: function (error,status) {
                 swal.close();
-                if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
+                if ((error.status < 500) && error.responseJSON.hasOwnProperty('code_text'))
                     show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
+                    show_warning_dialog('上传文件发生错误,'+ error.statusText);
             }
         });
     }
@@ -1030,6 +1030,10 @@
     // 上传一个文件
     //
     function uploadOneFile(file) {
+        if(file.size === 0) {
+            show_warning_dialog("无法上传一个空文件");
+            return;
+        }
         obj = get_bucket_name_and_cur_path();
         if(!obj.bucket_name){
             show_warning_dialog('上传文件失败，无法获取当前存储桶下路径');
@@ -1059,8 +1063,8 @@
     //
     //分片上传文件
     //
-    function uploadFileChunk(url, file, offset, overwrite=false) {
-        let chunk_size = 2 * 1024 * 1024;//5MB
+    function uploadFileChunk(url, file, offset, overwrite=true) {
+        let chunk_size = 5 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
         fileUploadProgressBar(offset, file.size);
@@ -1083,7 +1087,7 @@
         formData.append("chunk_offset", offset);
         formData.append("chunk", chunk);
         formData.append("chunk_size", chunk.size);
-        formData.append("overwrite", overwrite);
+        // formData.append("overwrite", overwrite);
 
         $.ajax({
             url: url,
@@ -1093,25 +1097,30 @@
             processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
+                // 是否是新建对象
+                if (data.hasOwnProperty('created') && (data.created === true)){
+                    overwrite = false;
+                }
                 offset = end;
                 uploadFileChunk(url, file, offset, overwrite);
             },
             error: function (err) {
-                if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){
-                    if(err.responseJSON.exists === true)
-                    {
-                        show_confirm_dialog({
-                            title:"已存在同名文件,是否覆盖上传？",
-                            text:"注意，覆盖后数据无法恢复",
-                            ok_todo: function (){
-                                uploadFileChunk(url, file, offset, true);//覆盖上传
-                            }
-                        })
-                    }
-                }else if ((err.status < 500) && err.responseJSON.hasOwnProperty('code_text'))
-                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text);
+                // if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){
+                //     if(err.responseJSON.exists === true)
+                //     {
+                //         show_confirm_dialog({
+                //             title:"已存在同名文件,是否覆盖上传？",
+                //             text:"注意，覆盖后数据无法恢复",
+                //             ok_todo: function (){
+                //                 uploadFileChunk(url, file, offset, true);//覆盖上传
+                //             }
+                //         })
+                //     }
+                // }else
+                if (err.responseJSON && err.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text + '请重新上传');
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.statusText);
+                    show_warning_dialog('上传文件发生错误,'+ err.statusText + '请重新上传');
 
                 endFileUploading();
             },
@@ -1288,11 +1297,9 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success').then(() => {
-                        // location.reload(true);// 刷新当前页面
-                        let html = render_bucket_dir_item(result.value);
-                        $("#bucket-files-table tr:eq(0)").after(html);
-                    } )
+                    let html = render_bucket_dir_item(result.value);
+                    $("#bucket-files-table tr:eq(0)").after(html);
+                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success');
                 }
              },
             (error) => {

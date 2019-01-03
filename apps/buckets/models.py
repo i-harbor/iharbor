@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 
 from django.db import models
 from django.contrib.auth import get_user_model
-from mongoengine import DynamicDocument
-from mongoengine import fields
+from mongoengine import DynamicDocument, OperationError
+from mongoengine import fields,QuerySet
 
 
 #获取用户模型
@@ -36,6 +36,9 @@ class Bucket(models.Model):
     collection_name = models.CharField(max_length=50, default=get_uuid1_hex_string, editable=False, verbose_name='存储桶对应的集合表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
+    objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
+    size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
 
     class Meta:
         verbose_name = '存储桶'
@@ -69,6 +72,9 @@ class Bucket(models.Model):
         self.soft_delete = True
         self.save()
 
+    def is_soft_deleted(self):
+        return self.soft_delete
+
     def check_user_own_bucket(self, request):
         # bucket是否属于当前用户
         return request.user.id == self.user.id
@@ -78,7 +84,7 @@ class Bucket(models.Model):
         获得bucket对应的mongodb集合名
         :return: 集合名
         '''
-        return f'bucket_{self.collection_name}'
+        return f'bucket_{self.id}'
 
     def set_permission(self, public=False):
         '''
@@ -110,6 +116,38 @@ class Bucket(models.Model):
         if self.access_permission == self.PUBLIC:
             return True
         return False
+
+    def obj_count_increase(self, save=True):
+        '''
+        存储桶对象数量加1
+
+        :param save: 是否更新到数据库
+        :return: True(success); False(failure)
+        '''
+        self.obj_count += 1
+        if save:
+            try:
+                self.save()
+            except:
+                return False
+
+        return True
+
+    def obj_count_decrease(self, save=True):
+        '''
+        存储桶对象数量减1
+
+        :param save: 是否更新到数据库
+        :return: True(success); False(failure)
+        '''
+        self.obj_count = max(self.obj_count - 1, 0)
+        if not save:
+            try:
+                self.save()
+            except:
+                return False
+
+        return True
 
 
 class BucketLimitConfig(models.Model):
@@ -160,7 +198,7 @@ class BucketFileInfoBase(DynamicDocument):
         (False, '正常'),
     )
 
-    na = fields.StringField(required=True) # name,文件名或目录名
+    na = fields.StringField(required=True, unique=True) # name,文件名或目录名
     fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
     did = fields.ObjectIdField() #父节点objectID
     si = fields.LongField() # 文件大小,字节数
@@ -179,9 +217,9 @@ class BucketFileInfoBase(DynamicDocument):
     meta = {
         'abstract': True,
         #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
-        # 'db_alias': 'default',
-        # 'indexes': ['did', 'ult'],#索引
-        # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+        'db_alias': 'default',
+        'indexes': ['did', 'ult', ('fod', 'na')],  # 索引
+        'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
         # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
         # 'max_documents': 10000, #集合存储文档最大数量
         # 'max_size': 2000000, #集合的最大字节数
@@ -194,6 +232,7 @@ class BucketFileInfoBase(DynamicDocument):
         :return: True(success); False(error)
         '''
         self.sds = True
+        self.upt = datetime.utcnow() # 修改时间标记删除时间
 
         try:
             self.save()
@@ -276,5 +315,41 @@ class BucketFileInfoBase(DynamicDocument):
             return False
         return True
 
+    def is_file(self):
+        return self.fod
 
+    def do_delete(self):
+        '''
+        删除
+        :return: True(删除成功); False(删除失败)
+        '''
+        try:
+            self.delete()
+        except OperationError:
+            return False
 
+        return True
+
+    def get_obj_key(self, bucket_id):
+        '''
+        获取此文档在ceph中对应的对象id
+
+        :param bucket_id:
+        :return: type:str; 无效的参数返回None
+        '''
+        if isinstance(bucket_id, str) or isinstance(bucket_id, int):
+            return str(bucket_id) + str(self.id)
+        return None
+
+    def do_save(self, **kwargs):
+        '''
+        创建一个文档或更新一个已存在的文档
+
+        :return: True(成功); False(失败)
+        '''
+        try:
+            self.save(**kwargs)
+        except:
+            return False
+
+        return True

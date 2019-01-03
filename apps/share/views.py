@@ -78,7 +78,8 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
         # 下载整个文件对象
-        response = self.get_file_download_response(str(fileobj.id), filename)
+        obj_key = fileobj.get_obj_key(bucket.id)
+        response = self.get_file_download_response(obj_key, filename)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -125,7 +126,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f'attachment; filename="{filename}";'  # 注意filename 这个是下载后的名字
+        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
         return response
 
     def get_file_obj_or_404(self, collection_name, path, filename):
@@ -133,8 +134,8 @@ class ObsViewSet(viewsets.GenericViewSet):
         获取文件对象
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_file_exists(file_name=filename)
-        if not ok or not obj:
+        obj = bfm.get_file_exists(file_name=filename)
+        if not obj:
             raise Http404
         return obj
 

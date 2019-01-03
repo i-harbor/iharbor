@@ -218,10 +218,10 @@ class ObjPostSerializer(serializers.Serializer):
 
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
         # 当前目录下是否已存在同文件名文件
-        ok, finfo = bfm.get_file_exists(file_name)
+        finfo = bfm.get_file_exists(file_name)
         #
-        if not ok:
-            raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
+        # if not ok:
+        #     raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
 
         if finfo:
             # 同名文件覆盖上传
@@ -247,8 +247,8 @@ class ObjPutSerializer(serializers.Serializer):
     chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
                                           help_text='上传文件块的字节大小，类型int')
-    overwrite = serializers.BooleanField(label='是否覆盖', required=False,
-                                         help_text='存在同名文件时是否覆盖(chunk_offset=0时有效)，True(覆盖)，其他默认False(不覆盖)')
+    # overwrite = serializers.BooleanField(label='是否覆盖', required=False,
+    #                                      help_text='存在同名文件时是否覆盖(chunk_offset=0时有效)，True(覆盖)，其他默认False(不覆盖)')
 
     def validate(self, data):
         """
@@ -256,7 +256,7 @@ class ObjPutSerializer(serializers.Serializer):
         """
         chunk = data.get('chunk')
         chunk_size = data.get('chunk_size')
-        overwrite = data.get('overwrite', None)
+        # overwrite = data.get('overwrite', None)
 
         if not chunk:
             # chunk_size != 0时，此时却获得一个空文件块
@@ -267,8 +267,8 @@ class ObjPutSerializer(serializers.Serializer):
         elif chunk.size != chunk_size:
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
 
-        if overwrite is not True :
-            overwrite = False
+        # if overwrite is not True :
+        #     overwrite = False
 
         return data
 
@@ -323,7 +323,7 @@ class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
-    na = serializers.CharField(required=True, help_text='文件名或目录名')
+    na = serializers.SerializerMethodField() # 文件名或目录名
     dir_name = serializers.SerializerMethodField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.CharField()  # 父节点objectID
@@ -343,6 +343,15 @@ class ObjInfoSerializer(serializers.Serializer):
     sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
     access_permission = serializers.SerializerMethodField() # 公共读权限
+
+    def get_na(self, obj):
+        # 文件
+        if obj.fod:
+            pp = PathParser(obj.na)
+            _, name = pp.get_path_and_filename()
+            return name
+
+        return obj.na
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
@@ -380,9 +389,7 @@ class ObjInfoSerializer(serializers.Serializer):
             return  ''
         request = self.context.get('request', None)
         bucket_name = self._context.get('bucket_name', '')
-        dir_path = self._context.get('dir_path', '')
-        filepath = os.path.join(bucket_name, dir_path, obj.na)
-        # download_url = reverse('api:obj-detail', kwargs={'version': 'v1', 'objpath': filepath})
+        filepath = '/'.join((bucket_name, obj.na))
         download_url = reverse('obs:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)

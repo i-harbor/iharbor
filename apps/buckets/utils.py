@@ -1,7 +1,37 @@
+import logging
+
+from django.http import Http404
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
+from mongoengine.connection import DEFAULT_CONNECTION_NAME, get_connection
 
 from .models import BucketFileInfoBase
+
+logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+
+def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=True):
+    '''
+    为一个集合进行分片、集合所在的数据库需要有分片权限、分片的 key 需要有对应的索引
+
+    :param db_name: 分片集合所在的数据库
+    :param collection_name: 分片集合的名字
+    :param sharding_colunm: 分片的 key
+    :param ishashed: 是否为 hash 分片
+    :return:
+        success: True
+        failure: False
+    '''
+    conn = get_connection(alias=DEFAULT_CONNECTION_NAME)
+    admin_db = conn['admin']
+
+    db_collection = '{}.{}'.format(db_name, collection_name)
+    sharding_type = 'hashed' if ishashed else 1
+    try:
+        admin_db.command('shardCollection', db_collection, key = {sharding_colunm: sharding_type})
+    except Exception as e:
+        return False
+
+    return True
 
 
 class BucketFileManagement():
@@ -18,10 +48,11 @@ class BucketFileManagement():
         '''动态创建类，以避免mongoengine switch_collection的线程安全问题'''
         return type('BucketFile', (BucketFileInfoBase,), {
             'meta': {
-                'db_alias': 'default',
-                'indexes': ['did', 'ult', 'na'],#索引
-                'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
+                # 'db_alias': 'default',
+                # 'indexes': ['did', 'ult', 'fod', ('na', 'fod')],#索引
+                # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
                 'collection': self.get_collection_name(),
+                # 'shard_key': ('id', )  # 分片键
             }
         })
 
@@ -77,49 +108,41 @@ class BucketFileManagement():
         :param cur_dir_id: 目录id;
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
         '''
+        dir_id = None
         if cur_dir_id:
             dir_id = cur_dir_id
-            files = self.get_bucket_file_class().objects(did=dir_id).all()
-            return True, files
 
-        if self._path:
+        if not dir_id and self._path:
             ok, dir_id = self.get_cur_dir_id()
 
             # path路径有误
             if not ok:
                 return False, None
 
+        try:
             if dir_id:
-                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()
-                return True, files
+                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
+            else:
+                #存储桶下文件目录,did不存在表示是存储桶下的文件目录
+                files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
+        except Exception as e:
+            logger.error('In get_cur_dir_files:' + str(e))
+            return False, None
 
-        #存储桶下文件目录
-        files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True) & (mQ(sds__exists=False) | mQ(sds=False))).all()  # did不存在表示是存储桶下的文件目录
         return True, files
 
     def get_file_exists(self, file_name):
         '''
         通过文件名获取当前目录下的文件信息
-        :param file_name:
-        :return:
-            第一个返回值表示是否有错去发生
-            第二个返回值，如果存在返回文件记录对象，否则None
+        :param file_name: 文件名
+        :return: 如果存在返回文件记录对象，否则None
         '''
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
-
-        file_name.strip('/')
-        if did:
-            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did=did) & mQ(fod=True)) &
-                                          (mQ(sds__exists=False) | mQ(sds=False)))# 目录下是否存在给定文件名的文件
-        else:
-            bfis = self.get_bucket_file_class().objects((mQ(na=file_name) & mQ(did__exists=False) & mQ(fod=True)) &
-                                          (mQ(sds__exists=False) | mQ(sds=False)))  # 存储桶下是否存在给定文件名的文件
-
+        file_name = file_name.strip('/')
+        full_file_name = self.build_dir_full_name(file_name)
+        bfis = self.get_bucket_file_class().objects((mQ(na=full_file_name) & mQ(fod=True)))
         bfi = bfis.first()
 
-        return True, bfi if bfi else None
+        return bfi
 
     def get_dir_exists(self, dir_name):
         '''
@@ -130,18 +153,19 @@ class BucketFileManagement():
             第二个返回值：如果存在返回文件记录对象，否则None
         '''
         # 先检测当前目录存在
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
+        # ok, did = self.get_cur_dir_id()
+        # if not ok:
+        #     return False, None
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
         try:
-            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)) & ((mQ(sds__exists=False) | mQ(sds=False))))  # 查找目录记录
+            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)))  # 查找目录记录
         except DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
-            raise e
+            logger.error(f'In get_dir_exists({dir_name}):' + str(e))
+            return False, None
 
         return True, dir
 
@@ -156,7 +180,7 @@ class BucketFileManagement():
         :return:
         '''
         try:
-            bfis = self.get_bucket_file_class().objects((mQ(id=id)) & (mQ(sds__exists=False) | mQ(sds=False)))  # 目录下是否存在给定文件名的文件
+            bfis = self.get_bucket_file_class().objects((mQ(id=id)))  # 目录下是否存在给定文件名的文件
         except:
             return None
 
@@ -182,6 +206,37 @@ class BucketFileManagement():
         :return:
         '''
         return self.get_bucket_file_class().objects(mQ(fod=True) & (mQ(sds__exists=False) | mQ(sds=False))).count()
+
+    def cur_dir_is_empty(self):
+        '''
+        当前目录是否为空目录
+        :return:True(空); False(非空); None(有错误或目录不存在)
+        '''
+        ok, did = self.get_cur_dir_id()
+        # 有错误发生
+        if not ok:
+            return None
+
+        # 未找到目录
+        if did is None:
+            return None
+
+        if self.get_bucket_file_class().objects(did=did).count() > 0:
+            return False
+
+        return True
+
+    def dir_is_empty(self, dir_obj):
+        '''
+        给定目录是否为空目录
+        :return:True(空); False(非空)
+        '''
+        did = dir_obj.id
+
+        if self.get_bucket_file_class().objects(did=did).count() > 0:
+            return False
+
+        return True
 
 
 

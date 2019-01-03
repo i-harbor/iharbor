@@ -28,6 +28,9 @@ class CephRadosObject():
         self._obj_id = obj_id
         self._rados_dll = rados_dll
 
+    def reset_obj_id(self, obj_id):
+        self._obj_id = obj_id
+
     def read(self, offset, size):
         '''
         从指定字节偏移位置读取指定长度的数据块
@@ -52,6 +55,42 @@ class CephRadosObject():
         data = ctypes.string_at(result.data_ptr, result.data_len)
         return (result.ok, data)
 
+    def write_file(self, offset, file, per_size=20*1024**2):
+        '''
+        向对象写入一个类文件数据
+
+        :param offset: 文件数据写入对象偏移量
+        :param file: 类文件
+        :param per_size: 每次从文件读取数据的大小,默认20MB
+        :return:
+                （True, msg）无误
+                 (False msg) 错误
+        '''
+        try:
+            size = file.size
+        except AttributeError:
+            return False, 'input is not a file'
+
+        file_offset = 0 # 文件已写入的偏移量
+        while True:
+            # 文件是否已完全写入
+            if file_offset == size:
+                return True, 'writed successfull'
+
+            file.seek(file_offset)
+            chunk = file.read(per_size)
+            if chunk:
+                ok, msg = self.write(offset + file_offset, chunk)
+                if not ok:
+                    # 写入失败再尝试一次
+                    ok, msg = self.write(offset + file_offset, chunk)
+                    if not ok:
+                        return False, msg
+
+                file_offset += len(chunk) # 更新已写入大小
+            else:
+                return False, 'read error'
+
     def write(self, offset, data_block):
         '''
         从指定字节偏移量写入数据块
@@ -59,11 +98,11 @@ class CephRadosObject():
         :param offset: 偏移量
         :param data_block: 数据块
         :return: Tuple
-            正常时：(True, bytes) bytes是正常结果描述
-            错误时：(False, bytes) bytes是错误描述
+            正常时：(True, str) str是正常结果描述
+            错误时：(False, str) str是错误描述
         '''
         if offset < 0 or not isinstance(data_block, bytes):
-            return None
+            return False, 'offset must be >=0 and data input must be bytes'
 
         return self.write_by_chunk(data_block=data_block, offset=offset, mode='w')
 
@@ -73,8 +112,8 @@ class CephRadosObject():
 
         :param data_block: 数据块
         :return: Tuple
-            正常时：(True, bytes) bytes是正常结果描述
-            错误时：(False, bytes) bytes是错误描述
+            正常时：(True, str) str是正常结果描述
+            错误时：(False, str) str是错误描述
         '''
         if not isinstance(data_block, bytes):
             return None
@@ -87,8 +126,8 @@ class CephRadosObject():
 
         :param data_block: 数据块
         :return: Tuple
-            正常时：(True, bytes) bytes是正常结果描述
-            错误时：(False, bytes) bytes是错误描述
+            正常时：(True, str) str是正常结果描述
+            错误时：(False, str) str是错误描述
         '''
         if not isinstance(data_block, bytes):
             return None
@@ -142,21 +181,21 @@ class CephRadosObject():
             else:
                 break
 
-    def write_by_chunk(self, data_block, mode, offset=0, chunk_size=10*1024**2):
+    def write_by_chunk(self, data_block, mode, offset=0, chunk_size=20*1024**2):
         '''
-        分片写入一个数据块，默认分片大小10MB
+        分片写入一个数据块，默认分片大小20MB
         :param data_block: 要写入的数据块; type: bytes
         :param offset: 写入起始偏移量; type: int
         :param mode: 写入模式; type: str; value: 'w', 'wf', 'wa'
         :return:
-            正常时：(True, bytes) bytes是正常结果描述
-            错误时：(False, bytes) bytes是错误描述
+            正常时：(True, str) str是正常结果描述
+            错误时：(False, str) str是错误描述
         '''
         if offset < 0 or chunk_size < 0:
-            return (False, "error:offset or chunk_size don't less than 0".encode('utf-8'))
+            return (False, "error:offset or chunk_size don't less than 0")
 
         if mode not in ('w', 'wf', 'wa'):
-            return (False, "error:write mode not in ('w', 'wf', 'wa')".encode('utf-8'))
+            return (False, "error:write mode not in ('w', 'wf', 'wa')")
 
         block_size = len(data_block)
         start = 0
@@ -175,10 +214,11 @@ class CephRadosObject():
                                                chunk,
                                                ctypes.c_int(len(chunk)),
                                                mode.encode('utf-8'),
-                                               ctypes.c_ulonglong(offset))
+                                               ctypes.c_ulonglong(offset+ start))
                 data = ctypes.string_at(result.data_ptr, result.data_len)
                 if not result.ok:
-                    return (False, data)
+                    _, err = self.parse_error_bytes(data)
+                    return (False, err)
                 start += len(chunk)
                 end = start + chunk_size
 
