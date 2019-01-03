@@ -89,7 +89,7 @@ class UserRegisterForm(forms.Form):
         '''
         获取或者创建未激活用户
 
-        :return: user
+        :return: 正常-> user; 错误-> None
         '''
         cleaned_data = self.cleaned_data
         user = cleaned_data.get('user', None)
@@ -104,14 +104,17 @@ class UserRegisterForm(forms.Form):
         if not user:
             # 创建非激活状态新用户
             user = User(username=username, is_active=False)
-            User.objects.create_user()
+
         user.email = email
         user.set_password(password)
         user.first_name = first_name
         user.last_name = last_name
         user.telephone = telephone
         user.company = company
-        user.save()
+        try:
+            user.save()
+        except:
+            return None
         return user
 
 

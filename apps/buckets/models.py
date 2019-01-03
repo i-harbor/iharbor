@@ -198,7 +198,7 @@ class BucketFileInfoBase(DynamicDocument):
         (False, '正常'),
     )
 
-    na = fields.StringField(required=True) # name,文件名或目录名
+    na = fields.StringField(required=True, unique=True) # name,文件名或目录名
     fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
     did = fields.ObjectIdField() #父节点objectID
     si = fields.LongField() # 文件大小,字节数

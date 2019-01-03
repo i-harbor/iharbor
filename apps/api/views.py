@@ -388,17 +388,6 @@ class ObjViewSet(viewsets.GenericViewSet):
     '''
     文件对象视图集
 
-    create:
-    创建一个文件对象，并返回文件对象的id：
-
-    	Http Code: 状态码201：无异常时，返回数据：
-    	{
-            data: 客户端请求时，携带的数据,
-            id: 文件id，上传文件块时url中需要,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-
     update:
     通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
 
@@ -406,18 +395,18 @@ class ObjViewSet(viewsets.GenericViewSet):
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
-        当chunk_offset=0时会被认为一次新文件对象上传，如果文件对象已存在，此时overwrite参数有效，
-            overwrite=False时为不覆盖上传，会返回400错误码和已存在同名文件的错误提示。
-            overwrite=True时会重置原文件对象大小为0，相当于删除已存在的同名文件对象，创建一个新同名文件对象，
+
+        注意：
+        分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
-            data: 客户端请求时，携带的参数,不包含数据块；
+            'created': True, # 上传第一个分片时，可用于判断对象是否是新建的，True(新建的)
+            'data': 客户端请求时，携带的参数,不包含数据块；
         }
         Http Code: 状态码400：参数有误时，返回数据：
             {
                 'code': 400,
-                'exists': true,                 # 此项内容仅因'存在同名文件'导致此错误时包含
                 'code_text': '对应参数错误信息'
             }
         Http Code: 状态码500
@@ -582,22 +571,23 @@ class ObjViewSet(viewsets.GenericViewSet):
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
-        overwrite = data.get('overwrite')
+        # overwrite = data.get('overwrite')
 
         collection_name = bucket.get_bucket_mongo_collection_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
 
-        rados = CephRadosObject(str(obj.id))
-        if created is False: # 对象存在
-            if chunk_offset == 0:
-                if not overwrite: # 不覆盖
-                    return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    response = self.pre_overwrite_upload(obj=obj, rados=rados)
-                    if response is not True:
-                        return response
+        obj_key = obj.get_obj_key(bucket.id)
+        rados = CephRadosObject(obj_key)
+        # if created is False: # 对象存在
+        #     if chunk_offset == 0:
+        #         if not overwrite: # 不覆盖
+        #             return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
+        #         else:
+        #             response = self.pre_overwrite_upload(obj=obj, rados=rados)
+        #             if response is not True:
+        #                 return response
 
         response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
         if response is not True:
@@ -605,7 +595,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             if created is True:
                 obj.do_delete()
             return response
-
+        data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
@@ -624,10 +614,13 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not validated_param and valid_response:
             return valid_response
 
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
 
+        collection_name = bucket.get_bucket_mongo_collection_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 返回文件对象详细信息
@@ -638,10 +631,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         if validated_param:
             offset = validated_param.get('offset')
             size = validated_param.get('size')
-            return self.get_custom_read_obj_response(obj=fileobj, offset=offset, size=size, collection_name=collection_name)
+            return self.get_custom_read_obj_response(obj=fileobj, offset=offset, size=size, bucket_id=bucket.id)
 
         # 下载整个文件对象
-        response = self.get_file_download_response(str(fileobj.id), filename)
+        obj_key = fileobj.get_obj_key(bucket.id)
+        response = self.get_file_download_response(obj_key, filename)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -655,17 +649,21 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
 
+        collection_name = bucket.get_bucket_mongo_collection_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
             logger.error('删除对象数据库原数据时错误')
             return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        cro = CephRadosObject(str(fileobj.id))
+        obj_key = fileobj.get_obj_key(bucket.id)
+        cro = CephRadosObject(obj_key)
         if not cro.delete():
             # 恢复元数据
             fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
@@ -759,13 +757,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 (None, None) # 集合文档数量已达上限，不允许再创建新的对象
         '''
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, did = bfm.get_cur_dir_id()
-        if not ok:
-            raise Http404 # 目录路径不存在
 
         obj = bfm.get_file_exists(file_name=filename)
         if obj:
             return obj, False
+
+        ok, did = bfm.get_cur_dir_id()
+        if not ok:
+            raise Http404 # 目录路径不存在
 
         # 验证集合文档上限
         # if not self.do_bucket_limit_validate(bfm):
@@ -784,6 +783,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         try:
             obj = bfinfo.save()
         except:
+            logger.error(f'新建对象元数据保存数据库错误：{bfinfo.na}')
             raise Http404
         return obj, True
 
@@ -891,19 +891,20 @@ class ObjViewSet(viewsets.GenericViewSet):
         validated_data['days'] = days
         return (validated_data, None)
 
-    def get_custom_read_obj_response(self, obj, offset, size, collection_name):
+    def get_custom_read_obj_response(self, obj, offset, size, bucket_id):
         '''
         文件对象自定义读取response
         :param obj: 文件对象
         :param offset: 读起始偏移量
         :param size: 读取大小
-        :param collection_name: 对象所在mongodb集合名
+        :param bucket_id: 桶id
         :return: HttpResponse
         '''
         if size == 0:
             chunk = bytes()
         else:
-            rados = CephRadosObject(str(obj.id))
+            obj_key = obj.get_obj_key(bucket_id)
+            rados = CephRadosObject(obj_key)
             ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
                 data = {'code':500, 'code_text': 'server error,文件块读取失败'}
@@ -974,7 +975,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 存储文件块
-        ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
+        # ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
+        ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
         if not ok:
             obj.si = old_size
             obj.upt = old_upt
@@ -1130,7 +1132,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if did:
             bfinfo.did = did
         try:
-            bfinfo.save()
+            bfinfo.save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
         except:
             return Response(data={'code': 500, 'code_text': '数据存入数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

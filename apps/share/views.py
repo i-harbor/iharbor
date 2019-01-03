@@ -78,7 +78,8 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
         # 下载整个文件对象
-        response = self.get_file_download_response(str(fileobj.id), filename)
+        obj_key = fileobj.get_obj_key(bucket.id)
+        response = self.get_file_download_response(obj_key, filename)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)

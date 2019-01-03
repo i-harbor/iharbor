@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q as dQ
 from mongoengine.queryset.visitor import Q as mQ
 
 from buckets.utils import BucketFileManagement
@@ -26,6 +27,10 @@ class Command(BaseCommand):
         parser.add_argument(
             '--daysago', default='30', dest='daysago', type=int,
             help='Clear objects and directories that have been softly deleted more than days ago.',
+        )
+        parser.add_argument(
+            '--all-deleted', default=None, nargs='?', dest='all_deleted', const=True, # 当命令行有此参数时取值const, 否则取值default
+            help='All buckets that have been softly deleted will be clearing.',
         )
 
     def handle(self, *args, **options):
@@ -57,12 +62,25 @@ class Command(BaseCommand):
         '''
         bucketname = options['bucketname']
         all = options['all']
+        all_deleted = options['all_deleted']
 
+        # 指定名字的桶
+        if bucketname:
+            self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
+            return Bucket.objects.filter(name=bucketname).all()
+
+        # 全部已删除的桶
+        if all_deleted:
+            self.stdout.write(self.style.NOTICE('Will clear all buckets that have been softly deleted '))
+            return Bucket.objects.filter(soft_delete=True).all()
+
+        # 全部的桶
         if all is not None:
             self.stdout.write(self.style.NOTICE(
                 'Will clear objs or dirs that have been softly deleted before {0} from all buckets.'.format(self._clear_datetime)))
             return Bucket.objects.all()
 
+        # 未给出参数
         if not bucketname:
             bucketname = input('Please input a bucket name:')
 
@@ -78,10 +96,16 @@ class Command(BaseCommand):
         :param by_filters: 是否按条件过滤，当整个bucket是删除的状态就不需要过滤
         :return:
         '''
-        if not by_filters:
-            return modelclass.objects().limit(num)
-
-        return modelclass.objects(mQ(sds=True) & mQ(upt__lt=self._clear_datetime)).limit(num)
+        try:
+            if not by_filters:
+                objs = modelclass.objects().limit(num)
+            else:
+                objs = modelclass.objects(mQ(sds=True) & mQ(upt__lt=self._clear_datetime)).limit(num)
+        except Exception as e:
+            self.stdout.write(self.style.ERROR('Error when clearing bucket collection named {0},'.format(
+                modelclass._get_collection_name()) + str(e)))
+            return None
+        return objs
 
     def clear_one_bucket(self, bucket):
         '''
@@ -90,7 +114,7 @@ class Command(BaseCommand):
         :param bucket: Bucket obj
         :return:
         '''
-        self.stdout.write(self.style.NOTICE('Now clearing bucket named {0}'.format(bucket.name)))
+        self.stdout.write('Now clearing bucket named {0}'.format(bucket.name))
 
         collection_name = bucket.get_bucket_mongo_collection_name()
         modelclass = BucketFileManagement(collection_name=collection_name).get_bucket_file_class()
@@ -104,12 +128,13 @@ class Command(BaseCommand):
         cro = CephRadosObject(obj_id='')
         while True:
             objs = self.get_objs_and_dirs(modelclass=modelclass, by_filters=by_filters)
-            if objs.count() <= 0:
+            if objs is None or objs.count() <= 0:
                 break
 
             for obj in objs:
                 if obj.is_file():
-                    cro.reset_obj_id(str(obj.id))
+                    obj_key = obj.get_obj_key(bucket.id)
+                    cro.reset_obj_id(obj_key)
                     if cro.delete():
                         obj.delete()
                 else:
@@ -120,6 +145,7 @@ class Command(BaseCommand):
             if modelclass.objects().count() == 0:
                 modelclass.drop_collection()
                 bucket.delete()
+                self.stdout.write(self.style.WARNING(f'deleted bucket and collection:{bucket.name}'))
 
-        self.stdout.write(self.style.NOTICE('Clearing bucket named {0} is completed'.format(bucket.name)))
+        self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
 
