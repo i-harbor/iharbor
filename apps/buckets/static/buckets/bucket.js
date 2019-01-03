@@ -1030,6 +1030,10 @@
     // 上传一个文件
     //
     function uploadOneFile(file) {
+        if(file.size === 0) {
+            show_warning_dialog("无法上传一个空文件");
+            return;
+        }
         obj = get_bucket_name_and_cur_path();
         if(!obj.bucket_name){
             show_warning_dialog('上传文件失败，无法获取当前存储桶下路径');
@@ -1060,7 +1064,7 @@
     //分片上传文件
     //
     function uploadFileChunk(url, file, offset, overwrite=true) {
-        let chunk_size = 2 * 1024 * 1024;//5MB
+        let chunk_size = 5 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
         fileUploadProgressBar(offset, file.size);
@@ -1094,10 +1098,9 @@
             success: function (data, textStatus, request) {
                 // request.getResponseHeader('Server');
                 // 是否是新建对象
-                if (data.responseJSON && data.responseJSON.hasOwnProperty('created'))
-                    if(data.responseJSON.created === true)
-                        overwrite = false;
-
+                if (data.hasOwnProperty('created') && (data.created === true)){
+                    overwrite = false;
+                }
                 offset = end;
                 uploadFileChunk(url, file, offset, overwrite);
             },

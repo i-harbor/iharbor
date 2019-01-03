@@ -396,6 +396,9 @@ class ObjViewSet(viewsets.GenericViewSet):
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
 
+        注意：
+        分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片
+
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
             'created': True, # 上传第一个分片时，可用于判断对象是否是新建的，True(新建的)
@@ -972,7 +975,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 存储文件块
-        ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
+        # ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
+        ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
         if not ok:
             obj.si = old_size
             obj.upt = old_upt
@@ -1128,7 +1132,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if did:
             bfinfo.did = did
         try:
-            bfinfo.save()
+            bfinfo.save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
         except:
             return Response(data={'code': 500, 'code_text': '数据存入数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

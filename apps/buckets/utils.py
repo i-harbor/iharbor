@@ -1,3 +1,5 @@
+import logging
+
 from django.http import Http404
 from mongoengine.queryset.visitor import Q as mQ
 from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
@@ -5,6 +7,7 @@ from mongoengine.connection import DEFAULT_CONNECTION_NAME, get_connection
 
 from .models import BucketFileInfoBase
 
+logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=True):
     '''
@@ -116,12 +119,16 @@ class BucketFileManagement():
             if not ok:
                 return False, None
 
-        if dir_id:
-            files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
-            return True, files
-        else:
-            #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-            files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
+        try:
+            if dir_id:
+                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
+            else:
+                #存储桶下文件目录,did不存在表示是存储桶下的文件目录
+                files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
+        except Exception as e:
+            logger.error('In get_cur_dir_files:' + str(e))
+            return False, None
+
         return True, files
 
     def get_file_exists(self, file_name):
@@ -157,7 +164,8 @@ class BucketFileManagement():
         except DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
-            raise e
+            logger.error(f'In get_dir_exists({dir_name}):' + str(e))
+            return False, None
 
         return True, dir
 
