@@ -26,42 +26,27 @@
             <form id="form-create" class="form-horizontal">
                 {% csrf_token %}
                 <div class="form-group">
+                    <label for="api" class="col-sm-2 control-label">类型</label>
+                    <div class="col-sm-6">
+                        <select class="form-control" id="api" name="api">
+                            {% for api in api_list_dict.values %}
+                                <option value="{{ api.id }}">{{ api.description }}</option>
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="image" class="col-sm-2 control-label">镜像</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="image" name="image">
                             {% for image in image_list.values %}
                                 <option value="{{ image.id }}">{{ image.name }} {{ image.version }}</option>
                             {% endfor %}
-                            <!--
-                            <option value="4">winxp 32bit</option>
-                            <option value="2">win10 64bit</option>
-                            <option value="3">centos6 64bit</option>
-                            <option value="1">centos7 64bit</option>
-                            <option value="5">fedora28 64bit</option>
 
-                            <option>ubuntu 1404</option>
-                            <option>ubuntu 1604</option>
-                            <option>winserver2016 64bit</option>
-                            -->
                         </select>
-                        <!--
-                        <div class="dropdown">
-                            <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                请选择镜像
-                                <span class="caret"></span>
-                            </button>
-                            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-                                <li><a href="#">winxp 32bit</a></li>
-                                <li><a href="#">win10 64bit</a></li>
-                                <li><a href="#">centos6 64bit</a></li>
-                                <li><a href="#">centos7 64bit</a></li>
-                                <li><a href="#">fedora28 64bit</a></li>
-                                <li><a href="#">ubuntu 1404</a></li>
-                                <li><a href="#">ubuntu 1604</a></li>
-                                <li><a href="#">winserver2016 64bit</a></li>
-                            </ul>
-                        </div>
-                        -->
+
                     </div>
                 </div>
                 <div class="form-group">
@@ -72,19 +57,7 @@
                                 <option value="{{ config.id }}">{{ config.cpu }} vcpu | {{ config.mem }}MB mem | {{ config.time }} month(s)</option>
                             {% endfor %}
                         </select>
-                        <!--
-                        <div class="dropdown">
-                            <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                请选择配置
-                                <span class="caret"></span>
-                            </button>
-                            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-                                <li><a href="#">2 vcpu | 2048MB mem | 12 month(s)</a></li>
-                                <li><a href="#">4 vcpu | 4096MB mem | 12 month(s)</a></li>
-                                <li><a href="#">8 vcpu | 8192MB mem | 12 month(s)</a></li>
-                            </ul>
-                        </div>
-                        -->
+
                     </div>
                 </div>
 

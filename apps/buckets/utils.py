@@ -9,7 +9,7 @@ from .models import BucketFileInfoBase
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
-def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=True):
+def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=False, unique=True):
     '''
     为一个集合进行分片、集合所在的数据库需要有分片权限、分片的 key 需要有对应的索引
 
@@ -26,8 +26,9 @@ def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ish
 
     db_collection = '{}.{}'.format(db_name, collection_name)
     sharding_type = 'hashed' if ishashed else 1
+
     try:
-        admin_db.command('shardCollection', db_collection, key = {sharding_colunm: sharding_type})
+        admin_db.command('shardCollection', db_collection, key={sharding_colunm: sharding_type}, unique=unique)
     except Exception as e:
         return False
 
@@ -52,7 +53,7 @@ class BucketFileManagement():
                 # 'indexes': ['did', 'ult', 'fod', ('na', 'fod')],#索引
                 # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
                 'collection': self.get_collection_name(),
-                # 'shard_key': ('id', )  # 分片键
+                'shard_key': ('na', )  # 分片键
             }
         })
 

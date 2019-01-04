@@ -283,7 +283,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         # 创建bucket,创建bucket的shard集合
         bucket = serializer.save()
         col_name = bucket.get_bucket_mongo_collection_name()
-        if not create_shard_collection(db_name='metadata', collection_name=col_name):
+        if not create_shard_collection(db_name='metadata', collection_name=col_name, sharding_colunm='na'):
             logger.error(f'创建桶“{bucket.name}”的shard集合失败')
 
         data = {
@@ -970,6 +970,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         old_upt = obj.upt
         obj.upt = datetime.utcnow()
         obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+
         if not obj.do_save():
             logger.error('修改对象元数据失败')
             return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

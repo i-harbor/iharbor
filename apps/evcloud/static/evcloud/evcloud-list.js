@@ -23,10 +23,17 @@
             success: function (data) {
                 if(data.code === 200){
                     click_element.children('[name="status"]').html(data.e);
+                    if(data.e == '关机'){
+                        click_element.find('[name="vnc"]').addClass('disabled');
+                    }
+                    if(data.e == '运行'){
+                        click_element.find('[name="vnc"]').removeClass('disabled');
+                    }
                     //click_element.children('[name="status"]').addClass('btn-danger');
                     //click_element.parents('td').siblings('[name="mission"]').html('');
                 } else {
                     click_element.children('[name="status"]').html('failed');
+                    click_element.children('[name="operate"]').addClass('disabled');
                     swal({
                         type: 'error',
                         title: '查询状态失败',
@@ -103,6 +110,9 @@
     //vnc
     $('.vnc-btn').click(function (event) {
         event.preventDefault();
+        if($(this).is('.disabled')){
+            return;
+        }
         vm_operate = this.value;
         vm_id = $(this).parents('tr').attr('id');
         $.ajax({
