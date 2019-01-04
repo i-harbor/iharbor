@@ -200,10 +200,9 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`, 'success').then(() => {
-                        item_html = render_bucket_item(result.value.bucket);
-                        $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
-                    } )
+                    item_html = render_bucket_item(result.value.bucket);
+                    $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
+                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`, 'success');
                 }
              },
             (error) => {

@@ -349,7 +349,7 @@ class BucketFileInfoBase(DynamicDocument):
         '''
         try:
             self.save(**kwargs)
-        except:
+        except Exception as e:
             return False
 
         return True
