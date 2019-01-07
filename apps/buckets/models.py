@@ -5,6 +5,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from mongoengine import DynamicDocument, OperationError
 from mongoengine import fields,QuerySet
+from ckeditor.fields import RichTextField
 
 
 #获取用户模型
@@ -353,3 +354,23 @@ class BucketFileInfoBase(DynamicDocument):
             return False
 
         return True
+
+
+class ApiUsageDescription(models.Model):
+    '''
+    EVHarbor API使用说明
+    '''
+    title = models.CharField(verbose_name='标题', default='EVHarbor API使用说明', max_length=255)
+    content = RichTextField(verbose_name='说明内容', default='')
+    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
+
+    class Meta:
+        verbose_name = 'API使用说明'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f'<ApiUsageDescription>{self.title}'
+
+    def __repr__(self):
+        return f'<ApiUsageDescription>{self.title}'

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from ckeditor.fields import RichTextField
 # Create your models here.
 
 User = get_user_model()
@@ -23,7 +24,7 @@ class APIAuth(models.Model):
     group_id = models.IntegerField()
     vlan_id = models.IntegerField()
     pool_id = models.IntegerField()
-    description = models.CharField(max_length=50, null=True, verbose_name='描述')
+    description = models.CharField(max_length=50, default='', verbose_name='描述')
     limit = models.IntegerField(verbose_name='虚拟机限制')
     flag = models.BooleanField(verbose_name='是否当前使用')
 
@@ -62,4 +63,23 @@ class EvcloudVM(models.Model):
     class Meta:
         verbose_name = '虚拟机列表'
         verbose_name_plural = verbose_name
+
+class VMUsageDescription(models.Model):
+    '''
+    虚拟云主机使用说明
+    '''
+    title = models.CharField(verbose_name='标题', default='虚拟云主机使用说明', max_length=255)
+    content = RichTextField(verbose_name='说明内容', default='')
+    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
+
+    class Meta:
+        verbose_name = '虚拟云主机使用说明'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f'<VMUsageDescription>{self.title}'
+
+    def __repr__(self):
+        return f'<VMUsageDescription>{self.title}'
 

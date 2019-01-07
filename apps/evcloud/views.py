@@ -1,8 +1,11 @@
-from django.shortcuts import render
-from django.http import JsonResponse
 import json
 import datetime
-from .models import EvcloudVM, VMLimit, VMConfig, APIAuth
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views import View
+
+from .models import (EvcloudVM, VMLimit, VMConfig, APIAuth, VMUsageDescription)
 from .utils import evcloud_operations
 
 # Create your views here.
@@ -67,11 +70,12 @@ def evcloud_add(request):
     #print(request.method)
     user = request.user
     if request.method == "GET":
+        image_list = []
         try:
             vms = evcloud_operations()
             image_list = vms.get_image_list()
         except:
-            image_list[0] = {'name': '服务出错'}
+            image_list.append({'name': '服务出错'})
             pass
         config_list = VMConfig.objects.all().values()
         config_list_dict = {}
@@ -125,3 +129,13 @@ def evcloud_add(request):
         return JsonResponse(data = result)
     else:
         return JsonResponse(data = 'error')
+
+
+class UsageView(View):
+    '''
+    VM使用说明类视图
+    '''
+    def get(self, request):
+        article = VMUsageDescription.objects.first()
+        return render(request, 'base_usage_article.html', context={'article': article})
+

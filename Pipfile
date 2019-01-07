@@ -14,6 +14,7 @@ djangorestframework-jwt = "*"
 django-rest-swagger = "*"
 mysqlclient = "*"
 raven = "*"
+django-ckeditor = "*"
 
 [dev-packages]
 uwsgi = "*"
