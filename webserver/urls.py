@@ -33,6 +33,7 @@ urlpatterns = [
     url(r'', include('buckets.urls', namespace='buckets')), # 注意顺序
     url(r'', include(router.urls, namespace='obs')),        # 注意顺序
     url(r'^users/', include('users.urls', namespace='users')),
+    url(r'vpn/', include('vpn.urls', namespace='vpn')),
     url(r'^admin/', admin.site.urls),
     url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
     url(r'apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),

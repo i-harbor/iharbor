@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*',]
 
@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_swagger',
+    'ckeditor',
+    # 'ckeditor_uploader',
     # 'raven.contrib.django.raven_compat',
 
     #自定义apps
@@ -52,6 +54,7 @@ INSTALLED_APPS = [
     'api',
     'evcloud',
     'docs',
+    'vpn',
 ]
 
 MIDDLEWARE = [
@@ -267,6 +270,64 @@ LOGGING = {
         #     'level': 'ERROR',
         #     'propagate': False,
         # },
+    },
+}
+
+# ckeditor
+# CKEDITOR_UPLOAD_PATH = "upload/"
+CKEDITOR_CONFIGS = {
+    'default': {
+        'skin': 'moono',
+        # 'skin': 'office2013',
+        'toolbar_Basic': [
+            ['Source', '-', 'Bold', 'Italic']
+        ],
+        'toolbar_YourCustomToolbarConfig': [
+            {'name': 'document', 'items': ['Source', '-', 'Save', 'NewPage', 'Preview', 'Print', '-', 'Templates']},
+            {'name': 'clipboard', 'items': ['Cut', 'Copy', 'Paste', 'PasteText', 'PasteFromWord', '-', 'Undo', 'Redo']},
+            {'name': 'editing', 'items': ['Find', 'Replace', '-', 'SelectAll']},
+            {'name': 'forms',
+             'items': ['Form', 'Checkbox', 'Radio', 'TextField', 'Textarea', 'Select', 'Button', 'ImageButton',
+                       'HiddenField']},
+            '/',
+            {'name': 'basicstyles',
+             'items': ['Bold', 'Italic', 'Underline', 'Strike', 'Subscript', 'Superscript', '-', 'RemoveFormat']},
+            {'name': 'paragraph',
+             'items': ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote', 'CreateDiv', '-',
+                       'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock', '-', 'BidiLtr', 'BidiRtl',
+                       'Language']},
+            {'name': 'links', 'items': ['Link', 'Unlink', 'Anchor']},
+            {'name': 'insert',
+             'items': ['Image', 'Flash', 'Table', 'HorizontalRule', 'Smiley', 'SpecialChar', 'PageBreak', 'Iframe']},
+            '/',
+            {'name': 'styles', 'items': ['Styles', 'Format', 'Font', 'FontSize']},
+            {'name': 'colors', 'items': ['TextColor', 'BGColor']},
+            {'name': 'tools', 'items': ['Maximize', 'ShowBlocks']},
+            {'name': 'about', 'items': ['About']},
+            '/',  # put this to force next toolbar on new line
+            {'name': 'yourcustomtools', 'items': [
+                # put the name of your editor.ui.addButton here
+                'Preview',
+                'Maximize',
+            ]},
+        ],
+        'toolbar': 'YourCustomToolbarConfig',  # put selected toolbar config here
+        'tabSpaces': 4,
+    },
+    'custom': {
+        'toolbar': 'Custom',
+        'toolbar_Custom': [
+            {'name': 'styles', 'items': ['Format', 'Bold', 'Italic', 'Underline']},
+            {'name': 'paragraph',
+             'items': ['NumberedList', 'Outdent', 'Indent', 'JustifyLeft',
+                       'JustifyCenter', 'JustifyRight', 'JustifyBlock']},
+            {'name': 'colors', 'items': ['TextColor', 'BGColor']},
+            {'name': 'insert', 'items': ['Link', 'Unlink', 'Image', 'Smiley', 'SpecialChar']},
+            {'name': 'tools',
+             'items': ['RemoveFormat', 'Undo', 'Redo', 'SelectAll', 'Maximize', 'Source']},
+        ],
+        # 配置上传图片时不需要的内联样式属性
+        'disallowedContent': 'img{width,height,margin-left, margin-right};img[width,height,margin-left, margin-right];'
     },
 }
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import VMLimit, VMConfig, APIAuth, EvcloudVM
+from .models import (VMLimit, VMConfig, APIAuth, EvcloudVM, VMUsageDescription)
 # Register your models here.
 
 @admin.register(VMLimit)
@@ -25,3 +25,11 @@ class EvcloudVMAdmin(admin.ModelAdmin):
     list_display = ('vm_id', 'user', 'created_time', 'end_time', 'api', 'deleted')
     list_display_links = ('vm_id', 'user', 'created_time', 'end_time', 'api', 'deleted')
     list_filter = ('vm_id', 'user', 'created_time', 'end_time')
+
+
+@admin.register(VMUsageDescription)
+class VMUsageDescAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'modified_time')
+    list_display_links = ('id', 'title')
+    search_fields = ('title', 'content')  # 搜索字段
+
