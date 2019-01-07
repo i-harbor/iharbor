@@ -70,11 +70,12 @@ def evcloud_add(request):
     #print(request.method)
     user = request.user
     if request.method == "GET":
+        image_list = []
         try:
             vms = evcloud_operations()
             image_list = vms.get_image_list()
         except:
-            image_list[0] = {'name': '服务出错'}
+            image_list.append({'name': '服务出错'})
             pass
         config_list = VMConfig.objects.all().values()
         config_list_dict = {}

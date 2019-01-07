@@ -22,10 +22,13 @@ def get_api_config(config_name=API_CONFIG_NAME_DEFAULT):
 
 class evcloud_operations():
 
-    def __init__(self, api_config_name=API_CONFIG_NAME_DEFAULT):
-        api_config = get_api_config(api_config_name)
-        if not api_config:
-            raise Exception("Can't get api_config")
+    def __init__(self, api_config=API_CONFIG_NAME_DEFAULT):
+        if not isinstance(api_config, APIAuth):
+            if not isinstance(api_config, str):
+                raise Exception("param api_config is invalid")
+            api_config = get_api_config(api_config)
+            if not api_config:
+                raise Exception("Can't get api_config")
 
         self.group_id = api_config.group_id
         self.vlan_id = api_config.vlan_id
