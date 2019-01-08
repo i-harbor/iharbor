@@ -12,8 +12,8 @@ git clone https://github.com/evobstore/webserver.git
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```pipenv install```
 ### 1.4 数据库安装
-请自行安装MongoDB数据库。
-根据自己的情况修改webserver/settings.py文件中有关MongoDB数据库的配置代码
+请自行安装MongoDB和mysql数据库。
+根据自己的情况修改webserver/settings.py文件中有关数据库的配置示例代码
 ```python
 #mongodb数据库连接
 from mongoengine import connect
@@ -27,6 +27,16 @@ connect(
     # password='pwd123',
     # authentication_source='admin'
 )
+
+# Mysql
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',   # 数据库引擎
+        'NAME': 'webdata',       # 数据的库名，事先要创建之
+        'HOST': 'localhost',    # 主机
+        'PORT': '3306',         # 数据库使用的端口
+    },
+}
 ```
 ### 1.5 ceph配置
 从[rados_io](https://github.com/evobstore/rados_io)下载rados.so库文件，放于项目‘utils/oss/’路径下；以下配置根据实际情况自行修改。
@@ -47,7 +57,7 @@ CEPH_RADOS = {
 ### 2.1 激活python虚拟环境  
 ```pipenv shell```
 ### 2.2 数据库迁移
-django用户管理、验证、session等使用sqlite3数据库，需要数据库迁移创建对应的数据库表,在项目根目录下运行如下命令完成数据库迁移。  
+django用户管理、验证、session等使用mysql(sqlite3)数据库，需要数据库迁移创建对应的数据库表,在项目根目录下运行如下命令完成数据库迁移。  
 ```
 python manage.py migrate
 ```
@@ -55,4 +65,5 @@ python manage.py migrate
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```python manage.py runserver 0.0.0.0:8000```   
 如果一切正常，打开浏览器输入url(主机IP:8000, 如：127.0.0.1：8000)即可查看站点;
+
 
