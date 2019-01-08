@@ -43,7 +43,7 @@
                                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
                                        aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
                                     <ul class="dropdown-menu">
-                                        <li><a href="{% url 'users:logout' %}">注销</a></li>
+                                        <li><a href="{% url 'users:logout' %}">登出</a></li>
                                         <li><a href="{% url 'users:change_password' %}">修改密码</a></li>
                                         <li><a href="{% url 'users:security' %}">安全凭证</a></li>
                                         <li role="separator" class="divider"></li>
@@ -67,7 +67,7 @@
     </div>
     <footer class="navbar-fixed-bottom" style="background: #dddddd">
         <div class="text-center">
-            <p>© 2018 all rights reserved <a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 科技云部 京ICP备xxxxxxxx号</p>
+            <p><a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 科技云部</p>
         </div>
     </footer>
     <script type="text/javascript" src="{% static 'jquery2.2.4/dist/jquery-2.2.4.min.js' %}"></script>

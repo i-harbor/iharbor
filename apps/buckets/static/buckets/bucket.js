@@ -1062,7 +1062,7 @@
     //
     //分片上传文件
     //
-    function uploadFileChunk(url, file, offset, overwrite=true) {
+    function uploadFileChunk(url, file, offset, overwrite=true, reset=true) {
         let chunk_size = 5 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
@@ -1088,8 +1088,12 @@
         formData.append("chunk_size", chunk.size);
         // formData.append("overwrite", overwrite);
 
+        let put_url = url;
+        if (reset)
+            put_url = put_url + '?reset=true';
+
         $.ajax({
-            url: url,
+            url: put_url,
             type: "PUT",
             data: formData,
             contentType: false,//必须false才会自动加上正确的Content-Type
@@ -1101,7 +1105,7 @@
                     overwrite = false;
                 }
                 offset = end;
-                uploadFileChunk(url, file, offset, overwrite);
+                uploadFileChunk(url, file, offset, overwrite, false);
             },
             error: function (err) {
                 // if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){

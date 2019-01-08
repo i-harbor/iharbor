@@ -392,9 +392,16 @@ class ObjViewSet(viewsets.GenericViewSet):
     通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
 
         说明：
-        * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB，
+        * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
+          如果覆盖（已存在同名的对象）上传了一个新文件，新文件的大小小于原同名对象，上传完成后的对象大小仍然保持
+          原对象大小（即对象大小只增不减），如果这不符合你的需求，参考以下2种方法：
+          (1)先尝试删除对象（对象不存在返回404，成功删除返回204），再上传；
+          (2)访问API时，提交reset参数，reset=true时，再保存分片数据前会先调整对象大小（如果对象已存在），为提供reset参
+            数或参数为其他值，忽略之。
+          ## 特别提醒：切记在需要时只在上传第一个分片时提交reset参数，否者在上传其他分片提交此参数会调整对象大小，
+          已上传的分片数据会丢失。
 
         注意：
         分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片
@@ -521,7 +528,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 ),
             ],
             'DELETE': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+                coreapi.Field(
+                    name='reset',
+                    required=False,
+                    location='query',
+                    schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
+                ),
+            ],
             'POST': VERSION_METHOD_FEILD,
             'PATCH': VERSION_METHOD_FEILD + [
                 coreapi.Field(
@@ -571,7 +585,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
-        # overwrite = data.get('overwrite')
+        reset = request.query_params.get('reset', '').lower()
 
         collection_name = bucket.get_bucket_mongo_collection_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
@@ -580,14 +594,11 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         rados = CephRadosObject(obj_key)
-        # if created is False: # 对象存在
-        #     if chunk_offset == 0:
-        #         if not overwrite: # 不覆盖
-        #             return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
-        #         else:
-        #             response = self.pre_overwrite_upload(obj=obj, rados=rados)
-        #             if response is not True:
-        #                 return response
+        if created is False: # 对象已存在，不是新建的
+            if reset == 'true': # 重置对象大小
+                response = self.pre_reset_upload(obj=obj, rados=rados)
+                if response is not True:
+                    return response
 
         response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
         if response is not True:
@@ -919,7 +930,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         reponse['evob_obj_size'] = obj.si
         return reponse
 
-    def pre_overwrite_upload(self, obj, rados):
+    def pre_reset_upload(self, obj, rados):
         '''
         覆盖上传前的一些操作
 
