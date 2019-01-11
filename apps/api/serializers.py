@@ -107,8 +107,8 @@ class BucketCreateSerializer(serializers.Serializer):
     '''
     创建存储桶序列化器
     '''
-    name = serializers.CharField(label='存储桶名称', max_length=63,
-                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，不超过63个字符')
+    name = serializers.CharField(label='存储桶名称', min_length=3, max_length=63,
+                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符')
     # user = serializers.CharField(label='所属用户', help_text='所创建的存储桶的所属用户，可输入用户名或用户id')
 
     def validate(self, data):
@@ -133,7 +133,7 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_limit_validator(user=user)
 
         if Bucket.get_bucket_by_name(bucket_name):
-            raise serializers.ValidationError("存储桶名称已存在")
+            raise serializers.ValidationError("存储桶名称已存在", code='existing')
         return data
 
     def create(self, validated_data):
@@ -307,7 +307,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
         # 目录已存在
         if dir:
-            raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+            raise serializers.ValidationError(detail={'error_text': f'"{dir_name}"目录已存在'}, code='existing')
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
         return data

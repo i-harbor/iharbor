@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from django.http import Http404
 from mongoengine.queryset.visitor import Q as mQ
@@ -30,6 +31,8 @@ def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ish
     try:
         admin_db.command('shardCollection', db_collection, key={sharding_colunm: sharding_type}, unique=unique)
     except Exception as e:
+        msg = traceback.format_exc()
+        logger.error(msg)
         return False
 
     return True

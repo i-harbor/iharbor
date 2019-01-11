@@ -174,6 +174,8 @@
             title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-',
             input: 'text',
             inputAttributes: {
+                minlength: 3,
+                maxlength: 63,
                 autocapitalize: 'off'
             },
             showCloseButton: true,
@@ -1282,13 +1284,13 @@
                             return result;
                         }else{
                             swal.showValidationMessage(
-                            `Request failed: ${result.code_text.error_text}`
+                            `Request failed: ${result.code_text}`
                             );
                         }
                     },
                     error: (error) => {
                         swal.showValidationMessage(
-                            `Request failed: ${error.responseJSON.error_text}`
+                            `Request failed: ${error.responseJSON.code_text}`
                         );
                     },
                     headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
@@ -1307,7 +1309,7 @@
              },
             (error) => {
                 if(error.status<500)
-                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text.error_text);
+                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text);
                 else
                     show_warning_dialog(`创建失败:` + error.statusText);
             }

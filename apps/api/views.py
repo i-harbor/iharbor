@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermiss
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
+from rest_framework.exceptions import ErrorDetail
 
 from buckets.utils import BucketFileManagement, create_shard_collection
 from users.views import send_active_url_email
@@ -194,6 +195,7 @@ class BucketViewSet(viewsets.GenericViewSet):
                 'code': 400,
                 'code_text': 'xxx',      //错误码表述信息
                 'data': serializer.data, //请求时提交数据
+                'existing': true or  false  // true表示资源已存在
             }
 
     delete:
@@ -273,11 +275,24 @@ class BucketViewSet(viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
+            code_text = '参数验证有误'
+            existing = False
+            try:
+                for key, err_list in serializer.errors.items():
+                    for err in err_list:
+                        code_text = err
+                        if err.code == 'existing':
+                            existing = True
+            except:
+                pass
+
             data = {
                 'code': 400,
-                'code_text': serializer.errors.get('non_field_errors', '参数验证未通过'),
+                'code_text': code_text,
+                'existing': existing,
                 'data': serializer.data,
             }
+
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
         # 创建bucket,创建bucket的shard集合
@@ -1036,9 +1051,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         >>Http Code: 状态码400, 请求参数有误:
             {
                 "code": 400,
-                "code_text": {
-                    "error_text": ["xxxx", ] // 错误列表
-                }
+                "code_text": 'xxxxx'        //错误信息
+                "existing": true or  false  // true表示资源已存在
             }
         >>Http Code: 状态码201,创建文件夹成功：
             {
@@ -1129,7 +1143,18 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if not serializer.is_valid(raise_exception=False):
-            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            code_text = '参数验证有误'
+            existing = False
+            try:
+                for key, err_list in serializer.errors.items():
+                    for err in err_list:
+                        code_text = err
+                        if err.code == 'existing':
+                            existing = True
+            except:
+                pass
+
+            return Response({'code': 400, 'code_text': code_text, 'existing': existing}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
         dir_path = validated_data.get('dir_path', '')
