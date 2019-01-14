@@ -48,6 +48,10 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
+    last_name = serializers.CharField(label='姓氏', max_length=30, default='')
+    first_name = serializers.CharField(label='名字', max_length=30, default='')
+    telephone = serializers.CharField(label='电话', max_length=11, default='')
+    company = serializers.CharField(label='公司/单位', max_length=255, default='')
 
     def validate(self, data):
         username = data.get('username')
@@ -63,19 +67,28 @@ class UserCreateSerializer(serializers.Serializer):
         """
         email = username = validated_data.get('username')
         password = validated_data.get('password')
+        last_name = validated_data.get('last_name')
+        first_name = validated_data.get('first_name')
+        telephone = validated_data.get('telephone')
+        company = validated_data.get('company')
 
         user = User.objects.filter(username=username).first()
         if user:
             if user.is_active:
-                raise serializers.ValidationError(detail={'code_text': '用户名已存在'})
+                raise serializers.ValidationError(detail={'code_text': '用户名已存在', 'existing': True})
             else:
                 user.email = email
                 user.set_password(password)
+                user.last_name = last_name
+                user.first_name = first_name
+                user.telephone = telephone
+                user.company = company
                 user.save()
                 return user # 未激活用户
 
         # 创建非激活状态新用户并保存
-        return User.objects.create_user(username=username, password=password, email=email, is_active=False)
+        return User.objects.create_user(username=username, password=password, email=email, is_active=False,
+                                        last_name=last_name, first_name=first_name, telephone=telephone, company=company)
 
 
 class BucketSerializer(serializers.ModelSerializer):
