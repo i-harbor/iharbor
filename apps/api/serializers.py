@@ -416,7 +416,7 @@ class ObjInfoSerializer(serializers.Serializer):
         try:
             if obj.is_shared_and_in_shared_time():
                 return '公有'
-        except:
+        except Exception as e:
             pass
         return '私有'
 

@@ -1,41 +1,83 @@
 import logging
 import traceback
 
-from django.http import Http404
-from mongoengine.queryset.visitor import Q as mQ
-from mongoengine.queryset import DoesNotExist, MultipleObjectsReturned
-from mongoengine.connection import DEFAULT_CONNECTION_NAME, get_connection
+from django.db.backends.mysql.schema import DatabaseSchemaEditor
+from django.db import connections, router
+from django.db.models.query import Q
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.apps import apps
 
-from .models import BucketFileInfoBase
+
+from .models import BucketFileBase
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
-def create_shard_collection(db_name, collection_name, sharding_colunm='_id', ishashed=False, unique=True):
-    '''
-    为一个集合进行分片、集合所在的数据库需要有分片权限、分片的 key 需要有对应的索引
 
-    :param db_name: 分片集合所在的数据库
-    :param collection_name: 分片集合的名字
-    :param sharding_colunm: 分片的 key
-    :param ishashed: 是否为 hash 分片
+def create_table_for_model_class(model):
+    '''
+    创建Model类对应的数据库表
+
+    :param model: Model类
     :return:
-        success: True
-        failure: False
+            True: success
+            False: failure
     '''
-    conn = get_connection(alias=DEFAULT_CONNECTION_NAME)
-    admin_db = conn['admin']
-
-    db_collection = '{}.{}'.format(db_name, collection_name)
-    sharding_type = 'hashed' if ishashed else 1
-
     try:
-        admin_db.command('shardCollection', db_collection, key={sharding_colunm: sharding_type}, unique=unique)
+        using = router.db_for_write(model)
+        with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
+            schema_editor.create_model(model)
     except Exception as e:
         msg = traceback.format_exc()
         logger.error(msg)
         return False
 
     return True
+
+def delete_table_for_model_class(model):
+    '''
+    删除Model类对应的数据库表
+
+    :param model: Model类
+    :return:
+            True: success
+            False: failure
+    '''
+    try:
+        using = router.db_for_write(model)
+        with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
+            schema_editor.delete_model(model)
+    except Exception as e:
+        msg = traceback.format_exc()
+        logger.error(msg)
+        return False
+
+    return True
+
+
+def get_obj_model_class(table_name):
+    '''
+    动态创建存储桶对应的对象模型类
+
+    RuntimeWarning: Model 'xxxxx_' was already registered. Reloading models is not advised as it can
+    lead to inconsistencies most notably with related models.
+    如上述警告所述, Django 不建议重复创建Model 的定义.可以直接通过get_obj_model_class创建，无视警告.
+    这里先通过 get_registered_model 获取已经注册的 Model, 如果获取不到， 再生成新的模型类.
+
+    :param table_name: 数据库表名，模型类对应的数据库表名
+    :return: Model class
+    '''
+    model_name = 'ObjModel' + table_name
+    app_leble = BucketFileBase.Meta.app_label
+    try:
+        cls = apps.get_registered_model(app_label=app_leble, model_name=model_name)
+        return cls
+    except LookupError:
+        pass
+
+    meta = BucketFileBase.Meta
+    meta.abstract = False
+    meta.db_table = table_name  # 数据库表名
+    return type(model_name, (BucketFileBase,), {'Meta': meta, '__module__': BucketFileBase.__module__})
 
 
 class BucketFileManagement():
@@ -49,16 +91,11 @@ class BucketFileManagement():
         self._bucket_file_class = self.creat_bucket_file_class()
 
     def creat_bucket_file_class(self):
-        '''动态创建类，以避免mongoengine switch_collection的线程安全问题'''
-        return type('BucketFile', (BucketFileInfoBase,), {
-            'meta': {
-                # 'db_alias': 'default',
-                # 'indexes': ['did', 'ult', 'fod', ('na', 'fod')],#索引
-                # 'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
-                'collection': self.get_collection_name(),
-                'shard_key': ('na', )  # 分片键
-            }
-        })
+        '''
+        动态创建各存储桶数据库表对应的模型类
+        '''
+        db_table = self.get_collection_name() # 数据库表名
+        return get_obj_model_class(db_table)
 
     def get_bucket_file_class(self):
         if not self._bucket_file_class:
@@ -94,9 +131,10 @@ class BucketFileManagement():
         if not path:
             return (False, None) # path参数有误
 
+        model_class = self.get_bucket_file_class()
         try:
-            dir = self.get_bucket_file_class().objects.get(mQ(na=path) & mQ(fod=False))  # 查找目录记录
-        except DoesNotExist as e:
+            dir = model_class.objects.get(Q(na=path) & Q(fod=False))  # 查找目录记录
+        except model_class.DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
             return (False, None)  # path参数有误,未找到对应目录信息
@@ -123,12 +161,13 @@ class BucketFileManagement():
             if not ok:
                 return False, None
 
+        model_class = self.get_bucket_file_class()
         try:
             if dir_id:
-                files = self.get_bucket_file_class().objects(mQ(did=dir_id) & mQ(na__exists=True)).all()
+                files = model_class.objects.filter(Q(did=dir_id) & Q(na__isnull=False)).all()
             else:
                 #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-                files = self.get_bucket_file_class().objects(mQ(did__exists=False) & mQ(na__exists=True)).all()
+                files = model_class.objects.filter(Q(did__lte=0) & Q(na__isnull=False)).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None
@@ -143,7 +182,7 @@ class BucketFileManagement():
         '''
         file_name = file_name.strip('/')
         full_file_name = self.build_dir_full_name(file_name)
-        bfis = self.get_bucket_file_class().objects((mQ(na=full_file_name) & mQ(fod=True)))
+        bfis = self.get_bucket_file_class().objects.filter((Q(na=full_file_name) & Q(fod=True)))
         bfi = bfis.first()
 
         return bfi
@@ -163,9 +202,10 @@ class BucketFileManagement():
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
+        model_class = self.get_bucket_file_class()
         try:
-            dir = self.get_bucket_file_class().objects.get((mQ(na=dir_path_name) & mQ(fod=False)))  # 查找目录记录
-        except DoesNotExist as e:
+            dir = model_class.objects.get((Q(na=dir_path_name) & Q(fod=False)))  # 查找目录记录
+        except model_class.DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
             logger.error(f'In get_dir_exists({dir_name}):' + str(e))
@@ -174,6 +214,12 @@ class BucketFileManagement():
         return True, dir
 
     def build_dir_full_name(self, dir_name):
+        '''
+        拼接全路径
+
+        :param dir_name: 目录名
+        :return: 目录绝对路径
+        '''
         dir_name.strip('/')
         path = self._hand_path(self._path)
         return (path + '/' + dir_name) if path else dir_name
@@ -183,9 +229,10 @@ class BucketFileManagement():
         通过id获取文件对象
         :return:
         '''
+        model_class = self.get_bucket_file_class()
         try:
-            bfis = self.get_bucket_file_class().objects((mQ(id=id)))  # 目录下是否存在给定文件名的文件
-        except:
+            bfis = model_class.objects.get(id=id)
+        except model_class.DoesNotExist:
             return None
 
         return bfis.first()
@@ -195,21 +242,21 @@ class BucketFileManagement():
         获取集合的对象文档数量
         :return:
         '''
-        return self.get_bucket_file_class().objects().count()
+        return self.get_bucket_file_class().objects.count()
 
     def get_obj_document_count(self):
         '''
         获取集合的对象文档数量
         :return:
         '''
-        return self.get_bucket_file_class().objects(fod=True).count()
+        return self.get_bucket_file_class().objects.filter(fod=True).count()
 
     def get_valid_obj_document_count(self):
         '''
         获取集合的有效（未删除状态）对象文档数量
         :return:
         '''
-        return self.get_bucket_file_class().objects(mQ(fod=True) & (mQ(sds__exists=False) | mQ(sds=False))).count()
+        return self.get_bucket_file_class().objects.filter(Q(fod=True) & Q(sds=False)).count()
 
     def cur_dir_is_empty(self):
         '''
@@ -225,7 +272,7 @@ class BucketFileManagement():
         if did is None:
             return None
 
-        if self.get_bucket_file_class().objects(did=did).count() > 0:
+        if self.get_bucket_file_class().objects.filter(did=did).count() > 0:
             return False
 
         return True
@@ -237,7 +284,7 @@ class BucketFileManagement():
         '''
         did = dir_obj.id
 
-        if self.get_bucket_file_class().objects(did=did).count() > 0:
+        if self.get_bucket_file_class().objects.filter(did=did).count() > 0:
             return False
 
         return True

@@ -1,10 +1,10 @@
-from bson import ObjectId
 from collections import OrderedDict
-from datetime import datetime
+# from datetime import datetime
 import logging
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
+from django.utils import timezone
 from django.db.models import Q as dQ
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
@@ -14,7 +14,7 @@ from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
 from rest_framework.exceptions import ErrorDetail
 
-from buckets.utils import BucketFileManagement, create_shard_collection
+from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
 from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
@@ -298,8 +298,14 @@ class BucketViewSet(viewsets.GenericViewSet):
         # 创建bucket,创建bucket的shard集合
         bucket = serializer.save()
         col_name = bucket.get_bucket_mongo_collection_name()
-        if not create_shard_collection(db_name='metadata', collection_name=col_name, sharding_colunm='na'):
-            logger.error(f'创建桶“{bucket.name}”的shard集合失败')
+        bfm = BucketFileManagement(collection_name=col_name)
+        model_class = bfm.get_bucket_file_class()
+        if not create_table_for_model_class(model=model_class):
+            if not create_table_for_model_class(model=model_class):
+                bucket.delete()
+                delete_table_for_model_class(model=model_class)
+                logger.error(f'创建桶“{bucket.name}”的数据库表失败')
+                return Response(data={'code': 500, 'code_text': '创建桶失败，数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,
@@ -804,10 +810,11 @@ class ObjViewSet(viewsets.GenericViewSet):
                                 si=0)  # 文件大小
         # 有父节点
         if did:
-            bfinfo.did = ObjectId(did)
+            bfinfo.did = did
 
         try:
-            obj = bfinfo.save()
+            bfinfo.save()
+            obj = bfinfo
         except:
             logger.error(f'新建对象元数据保存数据库错误：{bfinfo.na}')
             raise Http404
@@ -963,7 +970,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         old_ult = obj.ult
         old_size = obj.si
 
-        obj.ult = datetime.utcnow()
+        obj.ult = timezone.now()
         obj.si = 0
         if not obj.do_save():
             logger.error('修改对象元数据失败')
@@ -997,7 +1004,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         # 更新文件修改时间和对象大小
         old_size = obj.si if obj.si else 0
         old_upt = obj.upt
-        obj.upt = datetime.utcnow()
+        obj.upt = timezone.now()
         obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
 
         if not obj.do_save():

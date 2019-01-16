@@ -331,6 +331,11 @@ CKEDITOR_CONFIGS = {
     },
 }
 
+
+DATABASE_ROUTERS = [
+    'webserver.db_routers.MetadataRouter',
+]
+
 # 导入安全相关的settings
 from .security_settings import *
 
@@ -374,3 +379,5 @@ from .security_settings import *
 # RAVEN_CONFIG = {
 #     'dsn': 'sentry上面创建项目的时候得到的dsn'
 # }
+
+
