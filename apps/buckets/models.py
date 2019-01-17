@@ -367,7 +367,7 @@ class BucketFileBase(models.Model):
         :return: type:str; 无效的参数返回None
         '''
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
-            return str(bucket_id) + str(self.id)
+            return f'{str(bucket_id)}_{str(self.id)}'
         return None
 
     def do_save(self, **kwargs):

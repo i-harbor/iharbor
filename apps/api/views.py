@@ -1052,7 +1052,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 'code_text': xxx  //错误码描述
             }
 
-    create:
+    create_detail:
         创建一个目录
 
         >>Http Code: 状态码400, 请求参数有误:
@@ -1108,6 +1108,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     schema = CustomAutoSchema(
         manual_fields={
             'GET': BASE_METHOD_FIELDS,
+            'POST': BASE_METHOD_FIELDS,
             'DELETE': BASE_METHOD_FIELDS,
         }
     )
@@ -1147,23 +1148,17 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data_dict['files'] = serializer.data
         return Response(data_dict)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        if not serializer.is_valid(raise_exception=False):
-            code_text = '参数验证有误'
-            existing = False
-            try:
-                for key, err_list in serializer.errors.items():
-                    for err in err_list:
-                        code_text = err
-                        if err.code == 'existing':
-                            existing = True
-            except:
-                pass
+    # def create(self, request, *args, **kwargs):
+    #     pass
 
-            return Response({'code': 400, 'code_text': code_text, 'existing': existing}, status=status.HTTP_400_BAD_REQUEST)
+    def create_detail(self, request, *args, **kwargs):
+        ab_path = kwargs.get(self.lookup_field, '')
 
-        validated_data = serializer.validated_data
+        validated_data, response = self.post_detail_params_validate_or_response(request=request, kwargs=kwargs)
+        if response:
+            return response
+
+        bucket_name = validated_data.get('bucket_name', '')
         dir_path = validated_data.get('dir_path', '')
         dir_name = validated_data.get('dir_name', '')
         did = validated_data.get('did', None)
@@ -1186,7 +1181,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data = {
             'code': 201,
             'code_text': '创建文件夹成功',
-            'data': serializer.data,
+            'data': {'dir_name': dir_name, 'bucket_name': bucket_name, 'dir_path': dir_path},
             'dir': serializers.ObjInfoSerializer(bfinfo).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
@@ -1234,6 +1229,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         """
         if self.action in ['create', 'delete']:
             return serializers.DirectoryCreateSerializer
+        elif self.action in ['create_detail']:
+            return Serializer
         return serializers.ObjInfoSerializer
 
     def get_dir_object(self, path, dir_name, collection_name):
@@ -1245,4 +1242,49 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not ok:
             return None
         return obj
+
+    def post_detail_params_validate_or_response(self, request, kwargs):
+        '''
+        post_detail参数验证
+
+        :param request:
+        :param kwargs:
+        :return:
+                success: ({data}, None)
+                failure: (None, Response())
+        '''
+        data = {}
+
+        ab_path = kwargs.get(self.lookup_field, '')
+        bucket_name, dir_path, dir_name = PathParser(filepath=ab_path).get_bucket_path_and_dirname()
+
+        if not bucket_name or not dir_name:
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，要同时包含有效的存储桶和目录名称'},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        if '/' in dir_name:
+            return None, Response({'code': 400, 'code_text': 'dir_name不能包含‘/’'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        _collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not _collection_name and response:
+            return None, response
+
+        data['collection_name'] = _collection_name
+
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        if not ok:
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'})
+        # 目录已存在
+        if dir:
+            return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+        data['bucket_name'] = bucket_name
+        data['dir_path'] = dir_path
+        data['dir_name'] = dir_name
+        return data, None
+
 

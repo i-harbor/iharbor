@@ -5,6 +5,7 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from .auth import obtain_auth_token
 from . import views
+from .routers import DetailPostRouter
 
 
 # Create a router and register our viewsets with it.
@@ -12,11 +13,14 @@ router = DefaultRouter()
 router.register(r'(?P<version>(v1|v2))/users', views.UserViewSet, base_name='user')
 router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name='buckets')
 router.register(r'(?P<version>(v1|v2))/obj', views.ObjViewSet, base_name='obj')
-router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
+# router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
 
+detail_router = DetailPostRouter()
+detail_router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
 
 urlpatterns = [
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
+    url(r'^', include(detail_router.urls)),
     url(r'^(?P<version>(v1|v2))/jwt-token/', obtain_jwt_token),
     url(r'^(?P<version>(v1|v2))/jwt-token-refresh/', refresh_jwt_token),
     url(r'^(?P<version>(v1|v2))/auth-token/', obtain_auth_token),
