@@ -53,6 +53,15 @@ def delete_table_for_model_class(model):
 
     return True
 
+def is_model_table_exists(model):
+    '''
+    检查模型类Model的数据库表是否已存在
+    :param model:
+    :return: True(existing); False(not existing)
+    '''
+    using = router.db_for_write(model)
+    connection = connections[using]
+    return model.Meta.db_table in connection.introspection.table_names()
 
 def get_obj_model_class(table_name):
     '''
