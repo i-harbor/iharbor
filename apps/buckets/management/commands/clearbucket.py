@@ -1,12 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Q as dQ
-from mongoengine.queryset.visitor import Q as mQ
+from django.db.models import Q
+from django.db.utils import ProgrammingError
 
-from buckets.utils import BucketFileManagement
+from buckets.utils import BucketFileManagement, delete_table_for_model_class
 from buckets.models import Bucket
 from utils.oss.rados_interfaces import CephRadosObject
+
 
 class Command(BaseCommand):
     '''
@@ -42,7 +44,7 @@ class Command(BaseCommand):
         except:
             raise CommandError("Clearing buckets cancelled.")
 
-        self._clear_datetime = datetime.utcnow() - timedelta(days=daysago)
+        self._clear_datetime = timezone.now() - timedelta(days=daysago)
 
         buckets = self.get_buckets(**options)
 
@@ -98,12 +100,12 @@ class Command(BaseCommand):
         '''
         try:
             if not by_filters:
-                objs = modelclass.objects().limit(num)
+                objs = modelclass.objects.all()[:num]
             else:
-                objs = modelclass.objects(mQ(sds=True) & mQ(upt__lt=self._clear_datetime)).limit(num)
+                objs = modelclass.objects.filter(Q(sds=True) & Q(upt__lt=self._clear_datetime))[:num]
         except Exception as e:
-            self.stdout.write(self.style.ERROR('Error when clearing bucket collection named {0},'.format(
-                modelclass._get_collection_name()) + str(e)))
+            self.stdout.write(self.style.ERROR('Error when clearing bucket table named {0},'.format(
+                modelclass.Meta.db_table) + str(e)))
             return None
         return objs
 
@@ -122,30 +124,48 @@ class Command(BaseCommand):
         # 如果bucket是已删除的, 并且满足删除条件
         by_filters = True
         modified_time = bucket.modified_time.replace(tzinfo=None)
+
+        if timezone.is_aware(self._clear_datetime):
+            if not timezone.is_aware(modified_time):
+                modified_time = timezone.make_aware(modified_time)
+        else:
+            if not timezone.is_naive(modified_time):
+                modified_time = timezone.make_naive(modified_time)
+
         if bucket.is_soft_deleted() and  modified_time < self._clear_datetime:
             by_filters = False
 
         cro = CephRadosObject(obj_id='')
-        while True:
-            objs = self.get_objs_and_dirs(modelclass=modelclass, by_filters=by_filters)
-            if objs is None or objs.count() <= 0:
-                break
 
-            for obj in objs:
-                if obj.is_file():
-                    obj_key = obj.get_obj_key(bucket.id)
-                    cro.reset_obj_id(obj_key)
-                    if cro.delete():
+        try:
+            while True:
+                objs = self.get_objs_and_dirs(modelclass=modelclass, by_filters=by_filters)
+                if objs is None or objs.count() <= 0:
+                    break
+
+                for obj in objs:
+                    if obj.is_file():
+                        obj_key = obj.get_obj_key(bucket.id)
+                        cro.reset_obj_id(obj_key)
+                        if cro.delete():
+                            obj.delete()
+                    else:
                         obj.delete()
-                else:
-                    obj.delete()
 
-        # 如果bucket对应集合已空，删除bucket和collection
-        if by_filters == False:
-            if modelclass.objects().count() == 0:
-                modelclass.drop_collection()
+            # 如果bucket对应集合已空，删除bucket和collection
+            if by_filters == False:
+                if modelclass.objects.count() == 0:
+                    if delete_table_for_model_class(modelclass):
+                        bucket.delete()
+                        self.stdout.write(self.style.WARNING(f"deleted bucket and it's table:{bucket.name}"))
+                    else:
+                        self.stdout.write(self.style.ERROR(f'deleted bucket table error:{bucket.name}'))
+
+            self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
+        except ProgrammingError as e:
+            if e.args[0] == 1146: # table not exists
                 bucket.delete()
-                self.stdout.write(self.style.WARNING(f'deleted bucket and collection:{bucket.name}'))
-
-        self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
+                self.stdout.write(self.style.WARNING(f"only deleted bucket({bucket.name}),{e}"))
+            else:
+                self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}' ))
 

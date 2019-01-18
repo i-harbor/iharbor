@@ -189,6 +189,7 @@
             },
             showCloseButton: true,
             showCancelButton: true,
+            cancelButtonText: '取消',
             confirmButtonText: '创建',
             showLoaderOnConfirm: true,
             preConfirm: (input_name) => {
@@ -1273,6 +1274,7 @@
             },
             showCancelButton: true,
             confirmButtonText: '创建',
+            cancelButtonText: '取消',
             showLoaderOnConfirm: true,
             inputValidator: (value) => {
                 if (value==='')

@@ -1152,8 +1152,6 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     #     pass
 
     def create_detail(self, request, *args, **kwargs):
-        ab_path = kwargs.get(self.lookup_field, '')
-
         validated_data, response = self.post_detail_params_validate_or_response(request=request, kwargs=kwargs)
         if response:
             return response
