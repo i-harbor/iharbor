@@ -276,8 +276,8 @@ LOGGING = {
             'propagate': False,
         },
         'debug': {
-            'handlers': ['debug', 'console'],
-            'level': 'DEBUG',
+            'handlers': ['debug'],
+            'level': 'INFO',
             'propagate': False,
         },
     },

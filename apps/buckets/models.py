@@ -204,7 +204,7 @@ class BucketFileBase(models.Model):
     '''
     存储桶bucket文件信息模型基类
 
-    @ na : name，若该doc代表文件，则na为文件名，若该doc代表目录，则na为目录路径;
+    @ na : name，若该doc代表文件，则na为全路径文件名，若该doc代表目录，则na为目录路径;
     @ fos: file_or_dir，用于判断该doc代表的是一个文件还是一个目录，若fod为True，则是文件，若fod为False，则是目录;
     @ did: 所在目录的objectID，若该doc代表文件，则did为该文件所属目录的id，若该doc代表目录，则did为该目录的上一级
                 目录(父目录)的id;
@@ -225,7 +225,8 @@ class BucketFileBase(models.Model):
         (False, '正常'),
     )
     id = models.BigAutoField(auto_created=True, primary_key=True)
-    na = models.TextField(verbose_name='文件名或目录名')
+    na = models.TextField(verbose_name='全路径文件名或目录名')
+    # name = models.CharField(verbose_name='文件名或目录名', max_length=255)
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, db_index=True, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
@@ -244,6 +245,7 @@ class BucketFileBase(models.Model):
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-ult']
         indexes = [models.Index(fields=['fod'])]
+        # unique_together = ('did', 'name',)
         verbose_name = '对象模型抽象基类'
         verbose_name_plural = verbose_name
 

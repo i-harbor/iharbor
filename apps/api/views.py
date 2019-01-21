@@ -624,7 +624,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados = CephRadosObject(obj_key)
+        rados = CephRadosObject(obj_key, obj_size=obj.si)
         if created is False: # 对象已存在，不是新建的
             if reset == 'true': # 重置对象大小
                 response = self.pre_reset_upload(obj=obj, rados=rados)
@@ -705,7 +705,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         obj_key = fileobj.get_obj_key(bucket.id)
-        cro = CephRadosObject(obj_key)
+        cro = CephRadosObject(obj_key, obj_size=fileobj.si)
         if not cro.delete():
             # 恢复元数据
             fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
@@ -841,7 +841,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id)
+        cro = CephRadosObject(file_id, obj_size=filesize)
         file_generator = cro.read_obj_generator
         if not file_generator:
             return None
@@ -949,7 +949,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             chunk = bytes()
         else:
             obj_key = obj.get_obj_key(bucket_id)
-            rados = CephRadosObject(obj_key)
+            rados = CephRadosObject(obj_key, obj_size=obj.si)
             ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
                 data = {'code':500, 'code_text': 'server error,文件块读取失败'}

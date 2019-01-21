@@ -118,7 +118,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id)
+        cro = CephRadosObject(file_id, obj_size=filesize)
         file_generator = cro.read_obj_generator
         if not file_generator:
             return None
