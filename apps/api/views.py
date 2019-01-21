@@ -1,5 +1,5 @@
 from collections import OrderedDict
-# from datetime import datetime
+from datetime import datetime
 import logging
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
@@ -18,12 +18,14 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
+from utils.log.decorators import log_used_time
 from .models import User, Bucket
 from . import serializers
 from . import paginations
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 class IsSuperUser(BasePermission):
     '''
@@ -63,6 +65,7 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
+@log_used_time(debug_logger, mark_text='select bucket')
 def get_user_own_bucket(bucket_name, request):
     '''
     获取当前用户的存储桶
@@ -581,7 +584,11 @@ class ObjViewSet(viewsets.GenericViewSet):
     #     serializer.save()
     #     return Response(serializer.response_data, status=status.HTTP_201_CREATED)
 
+    @log_used_time(debug_logger, mark_text='upload chunks')
     def update(self, request, *args, **kwargs):
+        start_time = datetime.now()
+        debug_logger.debug(f'Enter upload view time: {start_time}.')
+
         objpath = kwargs.get(self.lookup_field, '')
 
         # 对象路径分析
@@ -597,6 +604,9 @@ class ObjViewSet(viewsets.GenericViewSet):
                 'code': 400,
                 'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        end_time = datetime.now()
+        debug_logger.debug(f'All used time: {end_time - start_time} PathParser and valid data.')
 
         # 存储桶验证和获取桶对象
         bucket = get_user_own_bucket(bucket_name, request)
@@ -776,6 +786,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
+    @log_used_time(debug_logger, mark_text='select obj info')
     def get_obj_and_check_limit_or_create_or_404(self, collection_name, path, filename):
         '''
         获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
@@ -988,6 +999,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
+    @log_used_time(debug_logger, 'save_one_chunk')
     def save_one_chunk(self, obj, rados, chunk_offset, chunk):
         '''
         保存一个上传的分片
@@ -1112,8 +1124,11 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             'DELETE': BASE_METHOD_FIELDS,
         }
     )
-
+    @log_used_time(debug_logger, mark_text='get dir files list')
     def retrieve(self, request, *args, **kwargs):
+        start_time = datetime.now()
+        debug_logger.debug(f'Enter dir view time: {start_time}.')
+
         ab_path = kwargs.get(self.lookup_field, '')
         pp = PathParser(filepath=ab_path)
         bucket_name, dir_path = pp.get_bucket_and_dirpath()
@@ -1136,8 +1151,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('breadcrumb', pp.get_path_breadcrumb(dir_path))
         ])
 
+        start_time = datetime.now()
+
         queryset = files
         page = self.paginate_queryset(queryset)
+
+        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page.')
+
         if page is not None:
             serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
             data_dict['files'] = serializer.data

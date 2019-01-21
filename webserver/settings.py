@@ -223,6 +223,9 @@ LOGGING = {
         'simple': {
             'format': '%(levelname)s %(message)s'
         },
+        'dubug_formatter': {
+            'format': '%(levelname)s %(asctime)s %(message)s'
+        },
     },
     'filters': {
         'require_debug_false': {
@@ -247,6 +250,13 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
         },
+        # debug logging file settings
+        'debug': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'log/debug.log'),
+            'formatter': 'dubug_formatter'
+        },
         # 邮件通知
         # 'mail_admins': {
         #     'level': 'ERROR',
@@ -265,11 +275,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        # 'django.server': {
-        #     'handlers': ['file', 'console'],
-        #     'level': 'ERROR',
-        #     'propagate': False,
-        # },
+        'debug': {
+            'handlers': ['debug', 'console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
 

@@ -255,7 +255,7 @@ class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
+    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0, max_value=100*1024**4,
                                             help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
     chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,

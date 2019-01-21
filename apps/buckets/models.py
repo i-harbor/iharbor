@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import timedelta, datetime
 
 from django.db import models
@@ -6,6 +7,10 @@ from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from ckeditor.fields import RichTextField
+
+from utils.log.decorators import log_used_time
+
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
 #获取用户模型
@@ -370,6 +375,7 @@ class BucketFileBase(models.Model):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None
 
+    @log_used_time(debug_logger, 'save obj info to database')
     def do_save(self, **kwargs):
         '''
         创建一个文档或更新一个已存在的文档
