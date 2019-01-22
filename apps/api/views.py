@@ -586,9 +586,6 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     @log_used_time(debug_logger, mark_text='upload chunks')
     def update(self, request, *args, **kwargs):
-        start_time = datetime.now()
-        debug_logger.debug(f'Enter upload view time: {start_time}.')
-
         objpath = kwargs.get(self.lookup_field, '')
 
         # 对象路径分析
@@ -598,15 +595,20 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         # 数据验证
-        serializer = self.get_serializer(data=request.data)
+        try:
+            put_data = self.get_data(request)
+        except Exception as e:
+            logger.error(f'in request.data during upload file: {e}')
+            return Response({
+                'code': 500, 'code_text': 'SERVER ERROR',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = self.get_serializer(data=put_data)
         if not serializer.is_valid(raise_exception=False):
             return Response({
                 'code': 400,
                 'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
             }, status=status.HTTP_400_BAD_REQUEST)
-
-        end_time = datetime.now()
-        debug_logger.debug(f'All used time: {end_time - start_time} PathParser and valid data.')
 
         # 存储桶验证和获取桶对象
         bucket = get_user_own_bucket(bucket_name, request)
@@ -1037,6 +1039,10 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
+    @log_used_time(debug_logger, mark_text='get request.data during upload file')
+    def get_data(self, request):
+        return request.data
+
 
 class DirectoryViewSet(viewsets.GenericViewSet):
     '''
@@ -1126,9 +1132,6 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     )
     @log_used_time(debug_logger, mark_text='get dir files list')
     def retrieve(self, request, *args, **kwargs):
-        start_time = datetime.now()
-        debug_logger.debug(f'Enter dir view time: {start_time}.')
-
         ab_path = kwargs.get(self.lookup_field, '')
         pp = PathParser(filepath=ab_path)
         bucket_name, dir_path = pp.get_bucket_and_dirpath()
@@ -1156,7 +1159,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         queryset = files
         page = self.paginate_queryset(queryset)
 
-        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page.')
+        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page in dir.')
 
         if page is not None:
             serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})

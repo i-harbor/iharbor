@@ -1,4 +1,4 @@
-import os
+import logging
 from bson import ObjectId
 
 from rest_framework import serializers
@@ -8,9 +8,11 @@ from buckets.utils import BucketFileManagement
 from .models import User, Bucket
 from utils.storagers import PathParser
 from utils.time import to_localtime_string_naive_by_utc
+from utils.log.decorators import log_used_time
 from .validators import DNSStringValidator, bucket_limit_validator
 
 
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 def get_bucket_collection_name_or_ValidationError(bucket_name, request):
     '''
@@ -284,6 +286,10 @@ class ObjPutSerializer(serializers.Serializer):
         #     overwrite = False
 
         return data
+
+    @log_used_time(debug_logger, mark_text='upload data is_valid')
+    def is_valid(self, raise_exception=False):
+        return super(ObjPutSerializer, self).is_valid(raise_exception)
 
 
 class DirectoryCreateSerializer(serializers.Serializer):
