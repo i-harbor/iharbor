@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
 import logging
+from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
@@ -853,6 +854,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
         response['Content-Length'] = filesize
         response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        response['evob_obj_size'] = filesize
         return response
 
     def get_obj_info_response(self, request, fileobj, bucket_name, path):
@@ -901,8 +903,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 response = Response(data={'code': 400, 'code_text': 'offset或size参数有误'},
                                 status=status.HTTP_400_BAD_REQUEST)
                 return None, response
-        else:
+        # 未提交参数
+        elif chunk_offset is None and chunk_size is None:
             return None, None
+        # 参数提交不全
+        else:
+            response = Response(data={'code': 400, 'code_text': 'offset和size参数必须同时提交'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            return None, response
         return validated_data, None
 
     def shared_param_validate_or_response(self, request):
@@ -961,7 +969,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         if offset == 0:
             obj.download_cound_increase()
 
-        response = StreamingHttpResponse(chunk, status=status.HTTP_200_OK)
+        response = StreamingHttpResponse(BytesIO(chunk), status=status.HTTP_200_OK)
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
         response['evob_chunk_size'] = len(chunk)
         response['Content-Length'] = len(chunk)
