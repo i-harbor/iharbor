@@ -253,6 +253,7 @@ LOGGING = {
         # debug logging file settings
         'debug': {
             'level': 'DEBUG',
+            'filters': ['require_debug_true'],# working with debug mode
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'log/debug.log'),
             'formatter': 'dubug_formatter'
@@ -277,7 +278,7 @@ LOGGING = {
         },
         'debug': {
             'handlers': ['debug'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': False,
         },
     },

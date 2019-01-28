@@ -13,9 +13,9 @@ class BucketAdmin(admin.ModelAdmin):
     search_fields = ('name', 'user__username')  # 搜索字段
 
     def get_collection_name(self, obj):
-        return obj.get_bucket_mongo_collection_name()
+        return obj.get_bucket_table_name()
 
-    get_collection_name.short_description = '桶的集合名'
+    get_collection_name.short_description = '桶的表名'
 
 
 @admin.register(BucketLimitConfig)

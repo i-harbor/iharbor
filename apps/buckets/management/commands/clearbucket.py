@@ -118,8 +118,8 @@ class Command(BaseCommand):
         '''
         self.stdout.write('Now clearing bucket named {0}'.format(bucket.name))
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
-        modelclass = BucketFileManagement(collection_name=collection_name).get_bucket_file_class()
+        collection_name = bucket.get_bucket_table_name()
+        modelclass = BucketFileManagement(collection_name=collection_name).get_obj_model_class()
 
         # 如果bucket是已删除的, 并且满足删除条件
         by_filters = True

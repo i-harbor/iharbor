@@ -95,20 +95,20 @@ class BucketFileManagement():
     '''
     def __init__(self, path='', collection_name='', *args, **kwargs):
         self._path = path if path else ''
-        self._collection_name = collection_name
+        self._collection_name = collection_name # bucket's database table name
         self.cur_dir_id = None
-        self._bucket_file_class = self.creat_bucket_file_class()
+        self._bucket_file_class = self.creat_obj_model_class()
 
-    def creat_bucket_file_class(self):
+    def creat_obj_model_class(self):
         '''
         动态创建各存储桶数据库表对应的模型类
         '''
         db_table = self.get_collection_name() # 数据库表名
         return get_obj_model_class(db_table)
 
-    def get_bucket_file_class(self):
+    def get_obj_model_class(self):
         if not self._bucket_file_class:
-            self._bucket_file_class = self.creat_bucket_file_class()
+            self._bucket_file_class = self.creat_obj_model_class()
 
         return self._bucket_file_class
 
@@ -140,7 +140,7 @@ class BucketFileManagement():
         if not path:
             return (False, None) # path参数有误
 
-        model_class = self.get_bucket_file_class()
+        model_class = self.get_obj_model_class()
         try:
             dir = model_class.objects.get(Q(na=path) & Q(fod=False))  # 查找目录记录
         except model_class.DoesNotExist as e:
@@ -170,7 +170,7 @@ class BucketFileManagement():
             if not ok:
                 return False, None
 
-        model_class = self.get_bucket_file_class()
+        model_class = self.get_obj_model_class()
         try:
             if dir_id:
                 files = model_class.objects.filter(Q(did=dir_id) & Q(na__isnull=False)).all()
@@ -191,7 +191,7 @@ class BucketFileManagement():
         '''
         file_name = file_name.strip('/')
         full_file_name = self.build_dir_full_name(file_name)
-        bfis = self.get_bucket_file_class().objects.filter((Q(na=full_file_name) & Q(fod=True)))
+        bfis = self.get_obj_model_class().objects.filter((Q(na=full_file_name) & Q(fod=True)))
         bfi = bfis.first()
 
         return bfi
@@ -211,7 +211,7 @@ class BucketFileManagement():
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
-        model_class = self.get_bucket_file_class()
+        model_class = self.get_obj_model_class()
         try:
             dir = model_class.objects.get((Q(na=dir_path_name) & Q(fod=False)))  # 查找目录记录
         except model_class.DoesNotExist as e:
@@ -238,7 +238,7 @@ class BucketFileManagement():
         通过id获取文件对象
         :return:
         '''
-        model_class = self.get_bucket_file_class()
+        model_class = self.get_obj_model_class()
         try:
             bfis = model_class.objects.get(id=id)
         except model_class.DoesNotExist:
@@ -246,26 +246,26 @@ class BucketFileManagement():
 
         return bfis.first()
 
-    def get_document_count(self):
+    def get_count(self):
         '''
-        获取集合的对象文档数量
+        获取存储桶数据库表的对象和目录记录总数量
         :return:
         '''
-        return self.get_bucket_file_class().objects.count()
+        return self.get_obj_model_class().objects.count()
 
-    def get_obj_document_count(self):
+    def get_obj_count(self):
         '''
-        获取集合的对象文档数量
+        获取存储桶中的对象总数量
         :return:
         '''
-        return self.get_bucket_file_class().objects.filter(fod=True).count()
+        return self.get_obj_model_class().objects.filter(fod=True).count()
 
-    def get_valid_obj_document_count(self):
+    def get_valid_obj_count(self):
         '''
-        获取集合的有效（未删除状态）对象文档数量
+        获取存储桶中的有效（未删除状态）对象数量
         :return:
         '''
-        return self.get_bucket_file_class().objects.filter(Q(fod=True) & Q(sds=False)).count()
+        return self.get_obj_model_class().objects.filter(Q(fod=True) & Q(sds=False)).count()
 
     def cur_dir_is_empty(self):
         '''
@@ -281,7 +281,7 @@ class BucketFileManagement():
         if did is None:
             return None
 
-        if self.get_bucket_file_class().objects.filter(did=did).count() > 0:
+        if self.get_obj_model_class().objects.filter(did=did).count() > 0:
             return False
 
         return True
@@ -293,7 +293,7 @@ class BucketFileManagement():
         '''
         did = dir_obj.id
 
-        if self.get_bucket_file_class().objects.filter(did=did).count() > 0:
+        if self.get_obj_model_class().objects.filter(did=did).count() > 0:
             return False
 
         return True

@@ -96,7 +96,7 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     if not isinstance(bucket, Bucket):
         return None, Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
 
-    collection_name = bucket.get_bucket_mongo_collection_name()
+    collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
 
 
@@ -301,9 +301,9 @@ class BucketViewSet(viewsets.GenericViewSet):
 
         # 创建bucket,创建bucket的shard集合
         bucket = serializer.save()
-        col_name = bucket.get_bucket_mongo_collection_name()
+        col_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=col_name)
-        model_class = bfm.get_bucket_file_class()
+        model_class = bfm.get_obj_model_class()
         if not create_table_for_model_class(model=model_class):
             if not create_table_for_model_class(model=model_class):
                 bucket.delete()
@@ -621,7 +621,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         chunk = request.data.get('chunk')
         reset = request.query_params.get('reset', '').lower()
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
@@ -665,7 +665,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 返回文件对象详细信息
@@ -700,7 +700,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
@@ -784,7 +784,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         :return: True(验证通过); False(未通过)
         '''
         # 存储桶对象和文件夹数量上限验证
-        if bfm.get_document_count() >= 10**7:
+        if bfm.get_count() >= 10**7:
             return False
 
         return True
@@ -817,7 +817,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         #     return None, None
 
         # 创建文件对象
-        BucketFileClass = bfm.get_bucket_file_class()
+        BucketFileClass = bfm.get_obj_model_class()
         full_filename = bfm.build_dir_full_name(filename)
         bfinfo = BucketFileClass(na=full_filename,  # 文件名
                                 fod=True,  # 文件
@@ -1195,7 +1195,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
-        BucketFileClass = bfm.get_bucket_file_class()
+        BucketFileClass = bfm.get_obj_model_class()
         bfinfo = BucketFileClass(na=dir_path_name,  # 目录名
                                 fod=False,  # 目录
                                 )

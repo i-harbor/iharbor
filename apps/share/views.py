@@ -70,7 +70,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'},
                                 status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 是否有文件对象的访问权限

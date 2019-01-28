@@ -30,7 +30,7 @@ def get_bucket_collection_name_or_ValidationError(bucket_name, request):
         vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
         return (None, vali_error)
 
-    collection_name = bucket.get_bucket_mongo_collection_name()
+    collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
 
 
@@ -249,7 +249,7 @@ class ObjPostSerializer(serializers.Serializer):
         _, did = bfm.get_cur_dir_id()
         data['_did'] = did
         data['_collection_name'] = _collection_name
-        data['BucketFileClass'] = bfm.get_bucket_file_class()
+        data['BucketFileClass'] = bfm.get_obj_model_class()
         return data
 
 
