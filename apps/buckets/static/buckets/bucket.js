@@ -39,7 +39,7 @@
         if (!bucket_path)
             return '';
 
-        return get_obj_base_api() + bucket_path + params.filename + '/';
+        return get_obj_base_api() + encodeURIComponent(bucket_path + params.filename) + '/';
     }
 
     //
@@ -80,18 +80,29 @@
 
     //构建目录detail api
     function build_dir_detail_api(params={bucket_name: '', dir_path: ''}){
-        return get_dir_base_api() + get_cur_path_startwith_bucket(params);
+        let path = get_cur_path_startwith_bucket(params);
+         path = encodeURIComponent(path);
+        return get_dir_base_api() + path;
     }
 
     //构建目录detail url
-    function build_dir_detail_url(params={bucket_name: '', dir_path: ''}){
+    function build_dir_detail_url(params={bucket_name: '', dir_path: '', dir_name: ''}){
+        if (params.hasOwnProperty('dir_name')){
+            let dir_path = params.dir_path;
+            let dir_name = params.dir_name;
+            delete params.dir_name;
+            if (dir_path)
+                params.dir_path = dir_path + '/' + dir_name;
+            else
+                params.dir_path = dir_name;
+        }
         let api = build_dir_detail_api(params);
         return build_url_with_domain_name(api);
     }
 
     //构建目录url
     function build_dir_url(path_with_bucket){
-        let api = get_dir_base_api() + path_with_bucket;
+        let api = get_dir_base_api() + encodeURIComponent(path_with_bucket);
         return build_url_with_domain_name(api);
     }
 
@@ -173,11 +184,12 @@
         swal({
             title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-',
             input: 'text',
-            inputAttributes: {
-                autocapitalize: 'off'
+            inputValidator: (value) => {
+                return (value.length<3 || value.length>63) && '请输入3-63个字符';
             },
             showCloseButton: true,
             showCancelButton: true,
+            cancelButtonText: '取消',
             confirmButtonText: '创建',
             showLoaderOnConfirm: true,
             preConfirm: (input_name) => {
@@ -252,7 +264,7 @@
                 btn_del_bucket.attr('disabled', true); //失能对应按钮
             }
         }
-    })
+    });
 
 
     //
@@ -1062,7 +1074,7 @@
     //
     //分片上传文件
     //
-    function uploadFileChunk(url, file, offset, overwrite=true) {
+    function uploadFileChunk(url, file, offset, overwrite=true, reset=true) {
         let chunk_size = 5 * 1024 * 1024;//5MB
         let end = get_file_chunk_end(offset, file.size, chunk_size);
         //进度条
@@ -1088,8 +1100,12 @@
         formData.append("chunk_size", chunk.size);
         // formData.append("overwrite", overwrite);
 
+        let put_url = url;
+        if (reset)
+            put_url = put_url + '?reset=true';
+
         $.ajax({
-            url: url,
+            url: put_url,
             type: "PUT",
             data: formData,
             contentType: false,//必须false才会自动加上正确的Content-Type
@@ -1101,7 +1117,7 @@
                     overwrite = false;
                 }
                 offset = end;
-                uploadFileChunk(url, file, offset, overwrite);
+                uploadFileChunk(url, file, offset, overwrite, false);
             },
             error: function (err) {
                 // if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){
@@ -1252,40 +1268,38 @@
         swal({
             title: '请输入一个文件夹名称',
             input: 'text',
+            inputAutoTrim: true,
             inputAttributes: {
                 autocapitalize: 'off'
             },
             showCancelButton: true,
             confirmButtonText: '创建',
+            cancelButtonText: '取消',
             showLoaderOnConfirm: true,
+            inputValidator: (value) => {
+                if (value==='')
+                    return !value && '请输入一些内容, 前后空格会自动去除';
+                return !(value.indexOf('/') === -1) && '目录名不能包含‘/’'
+              },
             preConfirm: (input_name) => {
                 let obj = get_bucket_name_and_cur_path();
-                let bucket_name = obj.bucket_name;
-                let dir_path = obj.dir_path;
-                var formdata = new FormData();
-                formdata.append('bucket_name', bucket_name);
-                formdata.append('dir_path', dir_path);
-                formdata.append('dir_name', input_name);
+                obj.dir_name = input_name;
+
                 return $.ajax({
-                    url: build_url_with_domain_name(get_dir_base_api()),
+                    url: build_dir_detail_url(obj),
                     type: 'post',
-                    data: formdata,
-                    timeout: 200000,
-                    contentType: false,//必须false才会自动加上正确的Content-Type
-                    processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
+                    data: {},
+                    timeout: 20000,
+                    // contentType: false,//必须false才会自动加上正确的Content-Type
+                    // processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
                     success: (result) => {
                         if (result.code === 201){
                             return result;
                         }else{
                             swal.showValidationMessage(
-                            `Request failed: ${result.code_text.error_text}`
+                            `Request failed: ${result.code_text}`
                             );
                         }
-                    },
-                    error: (error) => {
-                        swal.showValidationMessage(
-                            `Request failed: ${error.responseJSON.error_text}`
-                        );
                     },
                     headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
                     clearForm: false,//禁止清除表单
@@ -1302,10 +1316,20 @@
                 }
              },
             (error) => {
+                let msg;
+                try{
+                    msg = error.responseJSON.code_text;
+                }
+                catch (e) {
+                    msg = error.statusText;
+                }
+                swal.showValidationMessage(
+                    `Request failed: ${msg}`
+                );
                 if(error.status<500)
-                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text.error_text);
+                    show_warning_dialog(`创建失败:`+ msg);
                 else
-                    show_warning_dialog(`创建失败:` + error.statusText);
+                    show_warning_dialog(`创建失败:` + msg);
             }
         )
     }

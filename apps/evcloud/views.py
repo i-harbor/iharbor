@@ -4,6 +4,7 @@ import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
+from django.core.exceptions import ObjectDoesNotExist
 
 from .models import (EvcloudVM, VMLimit, VMConfig, APIAuth, VMUsageDescription)
 from .utils import evcloud_operations
@@ -135,7 +136,49 @@ class UsageView(View):
     '''
     VM使用说明类视图
     '''
-    def get(self, request):
+    def get(self, request, *args, **kwargs):
         article = VMUsageDescription.objects.first()
         return render(request, 'base_usage_article.html', context={'article': article})
 
+
+class VMRemarksView(View):
+    '''
+    vm备注类视图
+    '''
+    def post(self, request, *args, **kwargs):
+        ok, ret = self.post_validate(request)
+        if not ok:
+            return ret
+
+        vm_id = ret.get('vm_id')
+        remarks = ret.get('remarks')
+        try:
+            vm = EvcloudVM.objects.get(vm_id=vm_id)
+        except ObjectDoesNotExist as e:
+            return JsonResponse({'code': 404, 'code_text': '虚拟机不存在'}, status=404)
+
+        vm.remarks = remarks
+        try:
+            vm.save()
+        except:
+            return JsonResponse({'code': 500, 'code_text': '虚拟机备注信息修改失败'}, status=500)
+
+        return JsonResponse({'code': 200, 'code_text': '虚拟机备注信息修改成功'}, status=200)
+
+    def post_validate(self, request):
+        '''
+        请求参数验证
+        :param request:
+        :return:
+            success: True, { data }
+            failed: False, JsonResponse()
+        '''
+        vm_id = request.POST.get('vm_id', None)
+        remarks = request.POST.get('remarks', None)
+        if not vm_id or not remarks:
+            return False, JsonResponse({'code': 400, 'code_text': '错误的请求，vm_id或者remarks参数未提交'}, status=400)
+
+        if not isinstance(remarks, str) or not isinstance(vm_id, str):
+            return False, JsonResponse({'code': 400, 'code_text': '错误的请求，vm_id或者remarks参数有误'}, status=400)
+
+        return True, {'vm_id': vm_id, 'remarks': remarks}

@@ -19,13 +19,14 @@ class CephRadosObject():
     '''
     ERROR_CODE_NO_FILE_OR_DIR = 2
 
-    def __init__(self, obj_id, cluster_name=None , user_name=None, conf_file='', pool_name=None, *args, **kwargs):
+    def __init__(self, obj_id, obj_size=0, cluster_name=None , user_name=None, conf_file='', pool_name=None, *args, **kwargs):
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', '')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get(
                                                                             'CONF_FILE_PATH', '')
         self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
         self._obj_id = obj_id
+        self._obj_size = obj_size
         self._rados_dll = rados_dll
 
     def reset_obj_id(self, obj_id):
@@ -104,49 +105,26 @@ class CephRadosObject():
         if offset < 0 or not isinstance(data_block, bytes):
             return False, 'offset must be >=0 and data input must be bytes'
 
-        return self.write_by_chunk(data_block=data_block, offset=offset, mode='w')
+        return self.write_by_chunk(data_block=data_block, offset=offset)
 
-    def overwrite(self, data_block):
-        '''
-        重写对象，创建新对象并写入数据块，如果对象已存在，会删除旧对象
-
-        :param data_block: 数据块
-        :return: Tuple
-            正常时：(True, str) str是正常结果描述
-            错误时：(False, str) str是错误描述
-        '''
-        if not isinstance(data_block, bytes):
-            return None
-
-        return self.write_by_chunk(data_block=data_block, mode='wf')
-
-    def append(self, data_block):
-        '''
-        向对象追加数据
-
-        :param data_block: 数据块
-        :return: Tuple
-            正常时：(True, str) str是正常结果描述
-            错误时：(False, str) str是错误描述
-        '''
-        if not isinstance(data_block, bytes):
-            return None
-
-        return self.write_by_chunk(data_block=data_block, mode='wa')
-
-    def delete(self):
+    def delete(self, obj_size=None):
         '''
         删除对象
         :return: Tuple
             成功时：(True, str) str是成功结果描述
             错误时：(False, str) str是错误描述
         '''
+        size = self._obj_size
+        if isinstance(obj_size, int):
+            size = obj_size
+
         self._rados_dll.DelObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.DelObj(self._cluster_name.encode('utf-8'),
                                        self._user_name.encode('utf-8'),
                                        self._conf_file.encode('utf-8'),
                                        self._pool_name.encode('utf-8'),
-                                       self._obj_id.encode('utf-8'))
+                                       self._obj_id.encode('utf-8'),
+                                        ctypes.c_ulonglong(size))
         data = ctypes.string_at(result.data_ptr, result.data_len)
         # 有错误
         if not result.ok:
@@ -181,21 +159,17 @@ class CephRadosObject():
             else:
                 break
 
-    def write_by_chunk(self, data_block, mode, offset=0, chunk_size=20*1024**2):
+    def write_by_chunk(self, data_block, offset=0, chunk_size=20*1024**2):
         '''
         分片写入一个数据块，默认分片大小20MB
         :param data_block: 要写入的数据块; type: bytes
         :param offset: 写入起始偏移量; type: int
-        :param mode: 写入模式; type: str; value: 'w', 'wf', 'wa'
         :return:
             正常时：(True, str) str是正常结果描述
             错误时：(False, str) str是错误描述
         '''
         if offset < 0 or chunk_size < 0:
             return (False, "error:offset or chunk_size don't less than 0")
-
-        if mode not in ('w', 'wf', 'wa'):
-            return (False, "error:write mode not in ('w', 'wf', 'wa')")
 
         block_size = len(data_block)
         start = 0
@@ -213,7 +187,6 @@ class CephRadosObject():
                                                self._obj_id.encode('utf-8'),
                                                chunk,
                                                ctypes.c_int(len(chunk)),
-                                               mode.encode('utf-8'),
                                                ctypes.c_ulonglong(offset+ start))
                 data = ctypes.string_at(result.data_ptr, result.data_len)
                 if not result.ok:
@@ -222,6 +195,7 @@ class CephRadosObject():
                 start += len(chunk)
                 end = start + chunk_size
 
+        self._obj_size = max(offset + block_size, self._obj_size)
         return (True, 'writed successfull')
 
     def parse_error_bytes(self, error: bytes):

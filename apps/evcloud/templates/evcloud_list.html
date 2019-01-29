@@ -16,8 +16,12 @@
         <div class="row">
             <div class="col-xs-12 col-sm-12">
                 <div>
-                    <button class="btn btn-primary disabled" id="btn-evcloud-list"><span class="glyphicon glyphicon-th-list"></span> 我的云主机</button>
-                    <button class="btn btn-danger" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span> 创建云主机</button>
+                    <button class="btn btn-primary disabled" id="btn-evcloud-list"><span
+                            class="glyphicon glyphicon-th-list"></span> 我的云主机
+                    </button>
+                    <button class="btn btn-danger" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span>
+                        创建云主机
+                    </button>
                 </div>
             </div>
         </div>
@@ -37,6 +41,7 @@
                         <th>类型</th>
                         <th>状态</th>
                         <th>任务</th>
+                        <th>备注(双击修改)</th>
                         <th>操作</th>
                     </tr>
                     {% for vm in vm_list_dict.values %}
@@ -58,9 +63,11 @@
                                 </div>
                             </td>
                             <td name="mission"></td>
+                            <td class="vm-remarks" title="双击修改备注" data-vm-id="{{ vm.vm_id }}">{{ vm.remarks }}</td>
                             <td name="operate">
                                 <div class="btn-group">
-                                    <button name="vnc" type="button" class="btn btn-danger vnc-btn" value="5">VNC</button>
+                                    <button name="vnc" type="button" class="btn btn-danger vnc-btn" value="5">VNC
+                                    </button>
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown"
                                             aria-haspopup="true" aria-expanded="false">
                                         <span class="caret"></span>

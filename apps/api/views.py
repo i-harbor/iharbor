@@ -1,10 +1,11 @@
-from bson import ObjectId
 from collections import OrderedDict
 from datetime import datetime
 import logging
+from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
+from django.utils import timezone
 from django.db.models import Q as dQ
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
@@ -12,17 +13,20 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermiss
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
+from rest_framework.exceptions import ErrorDetail
 
-from buckets.utils import BucketFileManagement, create_shard_collection
+from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
 from users.views import send_active_url_email
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
+from utils.log.decorators import log_used_time
 from .models import User, Bucket
 from . import serializers
 from . import paginations
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 class IsSuperUser(BasePermission):
     '''
@@ -62,6 +66,7 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
+@log_used_time(debug_logger, mark_text='select bucket')
 def get_user_own_bucket(bucket_name, request):
     '''
     获取当前用户的存储桶
@@ -91,7 +96,7 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     if not isinstance(bucket, Bucket):
         return None, Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
 
-    collection_name = bucket.get_bucket_mongo_collection_name()
+    collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
 
 
@@ -194,6 +199,7 @@ class BucketViewSet(viewsets.GenericViewSet):
                 'code': 400,
                 'code_text': 'xxx',      //错误码表述信息
                 'data': serializer.data, //请求时提交数据
+                'existing': true or  false  // true表示资源已存在
             }
 
     delete:
@@ -273,18 +279,37 @@ class BucketViewSet(viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
+            code_text = '参数验证有误'
+            existing = False
+            try:
+                for key, err_list in serializer.errors.items():
+                    for err in err_list:
+                        code_text = err
+                        if err.code == 'existing':
+                            existing = True
+            except:
+                pass
+
             data = {
                 'code': 400,
-                'code_text': serializer.errors.get('non_field_errors', '参数验证未通过'),
+                'code_text': code_text,
+                'existing': existing,
                 'data': serializer.data,
             }
+
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
         # 创建bucket,创建bucket的shard集合
         bucket = serializer.save()
-        col_name = bucket.get_bucket_mongo_collection_name()
-        if not create_shard_collection(db_name='metadata', collection_name=col_name, sharding_colunm='na'):
-            logger.error(f'创建桶“{bucket.name}”的shard集合失败')
+        col_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(collection_name=col_name)
+        model_class = bfm.get_obj_model_class()
+        if not create_table_for_model_class(model=model_class):
+            if not create_table_for_model_class(model=model_class):
+                bucket.delete()
+                delete_table_for_model_class(model=model_class)
+                logger.error(f'创建桶“{bucket.name}”的数据库表失败')
+                return Response(data={'code': 500, 'code_text': '创建桶失败，数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,
@@ -392,9 +417,16 @@ class ObjViewSet(viewsets.GenericViewSet):
     通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
 
         说明：
-        * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB，
+        * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
+          如果覆盖（已存在同名的对象）上传了一个新文件，新文件的大小小于原同名对象，上传完成后的对象大小仍然保持
+          原对象大小（即对象大小只增不减），如果这不符合你的需求，参考以下2种方法：
+          (1)先尝试删除对象（对象不存在返回404，成功删除返回204），再上传；
+          (2)访问API时，提交reset参数，reset=true时，再保存分片数据前会先调整对象大小（如果对象已存在），为提供reset参
+            数或参数为其他值，忽略之。
+          ## 特别提醒：切记在需要时只在上传第一个分片时提交reset参数，否者在上传其他分片提交此参数会调整对象大小，
+          已上传的分片数据会丢失。
 
         注意：
         分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片
@@ -521,7 +553,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 ),
             ],
             'DELETE': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+                coreapi.Field(
+                    name='reset',
+                    required=False,
+                    location='query',
+                    schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
+                ),
+            ],
             'POST': VERSION_METHOD_FEILD,
             'PATCH': VERSION_METHOD_FEILD + [
                 coreapi.Field(
@@ -546,6 +585,7 @@ class ObjViewSet(viewsets.GenericViewSet):
     #     serializer.save()
     #     return Response(serializer.response_data, status=status.HTTP_201_CREATED)
 
+    @log_used_time(debug_logger, mark_text='upload chunks')
     def update(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
 
@@ -556,7 +596,15 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         # 数据验证
-        serializer = self.get_serializer(data=request.data)
+        try:
+            put_data = self.get_data(request)
+        except Exception as e:
+            logger.error(f'in request.data during upload file: {e}')
+            return Response({
+                'code': 500, 'code_text': 'SERVER ERROR',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = self.get_serializer(data=put_data)
         if not serializer.is_valid(raise_exception=False):
             return Response({
                 'code': 400,
@@ -571,23 +619,20 @@ class ObjViewSet(viewsets.GenericViewSet):
         data = serializer.data
         chunk_offset = data.get('chunk_offset')
         chunk = request.data.get('chunk')
-        # overwrite = data.get('overwrite')
+        reset = request.query_params.get('reset', '').lower()
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados = CephRadosObject(obj_key)
-        # if created is False: # 对象存在
-        #     if chunk_offset == 0:
-        #         if not overwrite: # 不覆盖
-        #             return Response({'code': 400, 'exists': True, 'code_text': 'objpath参数有误，已存在同名文件'}, status=status.HTTP_400_BAD_REQUEST)
-        #         else:
-        #             response = self.pre_overwrite_upload(obj=obj, rados=rados)
-        #             if response is not True:
-        #                 return response
+        rados = CephRadosObject(obj_key, obj_size=obj.si)
+        if created is False: # 对象已存在，不是新建的
+            if reset == 'true': # 重置对象大小
+                response = self.pre_reset_upload(obj=obj, rados=rados)
+                if response is not True:
+                    return response
 
         response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
         if response is not True:
@@ -620,7 +665,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 返回文件对象详细信息
@@ -635,7 +680,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 下载整个文件对象
         obj_key = fileobj.get_obj_key(bucket.id)
-        response = self.get_file_download_response(obj_key, filename)
+        response = self.get_file_download_response(obj_key, filename, filesize=fileobj.si)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -655,7 +700,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
@@ -663,7 +708,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         obj_key = fileobj.get_obj_key(bucket.id)
-        cro = CephRadosObject(obj_key)
+        cro = CephRadosObject(obj_key, obj_size=fileobj.si)
         if not cro.delete():
             # 恢复元数据
             fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
@@ -739,11 +784,12 @@ class ObjViewSet(viewsets.GenericViewSet):
         :return: True(验证通过); False(未通过)
         '''
         # 存储桶对象和文件夹数量上限验证
-        if bfm.get_document_count() >= 10**7:
+        if bfm.get_count() >= 10**7:
             return False
 
         return True
 
+    @log_used_time(debug_logger, mark_text='select obj info')
     def get_obj_and_check_limit_or_create_or_404(self, collection_name, path, filename):
         '''
         获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
@@ -771,24 +817,25 @@ class ObjViewSet(viewsets.GenericViewSet):
         #     return None, None
 
         # 创建文件对象
-        BucketFileClass = bfm.get_bucket_file_class()
+        BucketFileClass = bfm.get_obj_model_class()
         full_filename = bfm.build_dir_full_name(filename)
         bfinfo = BucketFileClass(na=full_filename,  # 文件名
                                 fod=True,  # 文件
                                 si=0)  # 文件大小
         # 有父节点
         if did:
-            bfinfo.did = ObjectId(did)
+            bfinfo.did = did
 
         try:
-            obj = bfinfo.save()
+            bfinfo.save()
+            obj = bfinfo
         except:
             logger.error(f'新建对象元数据保存数据库错误：{bfinfo.na}')
             raise Http404
         return obj, True
 
 
-    def get_file_download_response(self, file_id, filename):
+    def get_file_download_response(self, file_id, filename, filesize):
         '''
         获取文件下载返回对象
         :param file_id: 文件Id, type: str
@@ -797,7 +844,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id)
+        cro = CephRadosObject(file_id, obj_size=filesize)
         file_generator = cro.read_obj_generator
         if not file_generator:
             return None
@@ -805,7 +852,9 @@ class ObjViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Length'] = filesize
         response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        response['evob_obj_size'] = filesize
         return response
 
     def get_obj_info_response(self, request, fileobj, bucket_name, path):
@@ -854,8 +903,14 @@ class ObjViewSet(viewsets.GenericViewSet):
                 response = Response(data={'code': 400, 'code_text': 'offset或size参数有误'},
                                 status=status.HTTP_400_BAD_REQUEST)
                 return None, response
-        else:
+        # 未提交参数
+        elif chunk_offset is None and chunk_size is None:
             return None, None
+        # 参数提交不全
+        else:
+            response = Response(data={'code': 400, 'code_text': 'offset和size参数必须同时提交'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            return None, response
         return validated_data, None
 
     def shared_param_validate_or_response(self, request):
@@ -904,7 +959,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             chunk = bytes()
         else:
             obj_key = obj.get_obj_key(bucket_id)
-            rados = CephRadosObject(obj_key)
+            rados = CephRadosObject(obj_key, obj_size=obj.si)
             ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
                 data = {'code':500, 'code_text': 'server error,文件块读取失败'}
@@ -914,12 +969,14 @@ class ObjViewSet(viewsets.GenericViewSet):
         if offset == 0:
             obj.download_cound_increase()
 
-        reponse = StreamingHttpResponse(chunk, content_type='application/octet-stream', status=status.HTTP_200_OK)
-        reponse['evob_chunk_size'] = len(chunk)
-        reponse['evob_obj_size'] = obj.si
-        return reponse
+        response = StreamingHttpResponse(BytesIO(chunk), status=status.HTTP_200_OK)
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['evob_chunk_size'] = len(chunk)
+        response['Content-Length'] = len(chunk)
+        response['evob_obj_size'] = obj.si
+        return response
 
-    def pre_overwrite_upload(self, obj, rados):
+    def pre_reset_upload(self, obj, rados):
         '''
         覆盖上传前的一些操作
 
@@ -934,7 +991,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         old_ult = obj.ult
         old_size = obj.si
 
-        obj.ult = datetime.utcnow()
+        obj.ult = timezone.now()
         obj.si = 0
         if not obj.do_save():
             logger.error('修改对象元数据失败')
@@ -952,6 +1009,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
+    @log_used_time(debug_logger, 'save_one_chunk')
     def save_one_chunk(self, obj, rados, chunk_offset, chunk):
         '''
         保存一个上传的分片
@@ -968,7 +1026,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         # 更新文件修改时间和对象大小
         old_size = obj.si if obj.si else 0
         old_upt = obj.upt
-        obj.upt = datetime.utcnow()
+        obj.upt = timezone.now()
         obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
 
         if not obj.do_save():
@@ -988,6 +1046,10 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return True
+
+    @log_used_time(debug_logger, mark_text='get request.data during upload file')
+    def get_data(self, request):
+        return request.data
 
 
 class DirectoryViewSet(viewsets.GenericViewSet):
@@ -1016,15 +1078,14 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 'code_text': xxx  //错误码描述
             }
 
-    create:
+    create_detail:
         创建一个目录
 
         >>Http Code: 状态码400, 请求参数有误:
             {
                 "code": 400,
-                "code_text": {
-                    "error_text": ["xxxx", ] // 错误列表
-                }
+                "code_text": 'xxxxx'        //错误信息
+                "existing": true or  false  // true表示资源已存在
             }
         >>Http Code: 状态码201,创建文件夹成功：
             {
@@ -1073,10 +1134,11 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     schema = CustomAutoSchema(
         manual_fields={
             'GET': BASE_METHOD_FIELDS,
+            'POST': BASE_METHOD_FIELDS,
             'DELETE': BASE_METHOD_FIELDS,
         }
     )
-
+    @log_used_time(debug_logger, mark_text='get dir files list')
     def retrieve(self, request, *args, **kwargs):
         ab_path = kwargs.get(self.lookup_field, '')
         pp = PathParser(filepath=ab_path)
@@ -1100,8 +1162,13 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('breadcrumb', pp.get_path_breadcrumb(dir_path))
         ])
 
+        start_time = datetime.now()
+
         queryset = files
         page = self.paginate_queryset(queryset)
+
+        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page in dir.')
+
         if page is not None:
             serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
             data_dict['files'] = serializer.data
@@ -1112,12 +1179,15 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data_dict['files'] = serializer.data
         return Response(data_dict)
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        if not serializer.is_valid(raise_exception=False):
-            return Response({'code': 400, 'code_text': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    # def create(self, request, *args, **kwargs):
+    #     pass
 
-        validated_data = serializer.validated_data
+    def create_detail(self, request, *args, **kwargs):
+        validated_data, response = self.post_detail_params_validate_or_response(request=request, kwargs=kwargs)
+        if response:
+            return response
+
+        bucket_name = validated_data.get('bucket_name', '')
         dir_path = validated_data.get('dir_path', '')
         dir_name = validated_data.get('dir_name', '')
         did = validated_data.get('did', None)
@@ -1125,7 +1195,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
-        BucketFileClass = bfm.get_bucket_file_class()
+        BucketFileClass = bfm.get_obj_model_class()
         bfinfo = BucketFileClass(na=dir_path_name,  # 目录名
                                 fod=False,  # 目录
                                 )
@@ -1140,7 +1210,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data = {
             'code': 201,
             'code_text': '创建文件夹成功',
-            'data': serializer.data,
+            'data': {'dir_name': dir_name, 'bucket_name': bucket_name, 'dir_path': dir_path},
             'dir': serializers.ObjInfoSerializer(bfinfo).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
@@ -1188,6 +1258,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         """
         if self.action in ['create', 'delete']:
             return serializers.DirectoryCreateSerializer
+        elif self.action in ['create_detail']:
+            return Serializer
         return serializers.ObjInfoSerializer
 
     def get_dir_object(self, path, dir_name, collection_name):
@@ -1199,4 +1271,49 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not ok:
             return None
         return obj
+
+    def post_detail_params_validate_or_response(self, request, kwargs):
+        '''
+        post_detail参数验证
+
+        :param request:
+        :param kwargs:
+        :return:
+                success: ({data}, None)
+                failure: (None, Response())
+        '''
+        data = {}
+
+        ab_path = kwargs.get(self.lookup_field, '')
+        bucket_name, dir_path, dir_name = PathParser(filepath=ab_path).get_bucket_path_and_dirname()
+
+        if not bucket_name or not dir_name:
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，要同时包含有效的存储桶和目录名称'},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        if '/' in dir_name:
+            return None, Response({'code': 400, 'code_text': 'dir_name不能包含‘/’'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        _collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
+        if not _collection_name and response:
+            return None, response
+
+        data['collection_name'] = _collection_name
+
+        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
+        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        if not ok:
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'})
+        # 目录已存在
+        if dir:
+            return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+        data['bucket_name'] = bucket_name
+        data['dir_path'] = dir_path
+        data['dir_name'] = dir_name
+        return data, None
+
 

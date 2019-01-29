@@ -1,4 +1,4 @@
-import os
+import logging
 from bson import ObjectId
 
 from rest_framework import serializers
@@ -8,9 +8,11 @@ from buckets.utils import BucketFileManagement
 from .models import User, Bucket
 from utils.storagers import PathParser
 from utils.time import to_localtime_string_naive_by_utc
+from utils.log.decorators import log_used_time
 from .validators import DNSStringValidator, bucket_limit_validator
 
 
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 def get_bucket_collection_name_or_ValidationError(bucket_name, request):
     '''
@@ -28,7 +30,7 @@ def get_bucket_collection_name_or_ValidationError(bucket_name, request):
         vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
         return (None, vali_error)
 
-    collection_name = bucket.get_bucket_mongo_collection_name()
+    collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
 
 
@@ -48,6 +50,10 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
     password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
+    last_name = serializers.CharField(label='姓氏', max_length=30, default='')
+    first_name = serializers.CharField(label='名字', max_length=30, default='')
+    telephone = serializers.CharField(label='电话', max_length=11, default='')
+    company = serializers.CharField(label='公司/单位', max_length=255, default='')
 
     def validate(self, data):
         username = data.get('username')
@@ -63,19 +69,28 @@ class UserCreateSerializer(serializers.Serializer):
         """
         email = username = validated_data.get('username')
         password = validated_data.get('password')
+        last_name = validated_data.get('last_name')
+        first_name = validated_data.get('first_name')
+        telephone = validated_data.get('telephone')
+        company = validated_data.get('company')
 
         user = User.objects.filter(username=username).first()
         if user:
             if user.is_active:
-                raise serializers.ValidationError(detail={'code_text': '用户名已存在'})
+                raise serializers.ValidationError(detail={'code_text': '用户名已存在', 'existing': True})
             else:
                 user.email = email
                 user.set_password(password)
+                user.last_name = last_name
+                user.first_name = first_name
+                user.telephone = telephone
+                user.company = company
                 user.save()
                 return user # 未激活用户
 
         # 创建非激活状态新用户并保存
-        return User.objects.create_user(username=username, password=password, email=email, is_active=False)
+        return User.objects.create_user(username=username, password=password, email=email, is_active=False,
+                                        last_name=last_name, first_name=first_name, telephone=telephone, company=company)
 
 
 class BucketSerializer(serializers.ModelSerializer):
@@ -107,8 +122,8 @@ class BucketCreateSerializer(serializers.Serializer):
     '''
     创建存储桶序列化器
     '''
-    name = serializers.CharField(label='存储桶名称', max_length=63,
-                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，不超过63个字符')
+    name = serializers.CharField(label='存储桶名称', min_length=3, max_length=63,
+                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符')
     # user = serializers.CharField(label='所属用户', help_text='所创建的存储桶的所属用户，可输入用户名或用户id')
 
     def validate(self, data):
@@ -133,7 +148,7 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_limit_validator(user=user)
 
         if Bucket.get_bucket_by_name(bucket_name):
-            raise serializers.ValidationError("存储桶名称已存在")
+            raise serializers.ValidationError("存储桶名称已存在", code='existing')
         return data
 
     def create(self, validated_data):
@@ -234,7 +249,7 @@ class ObjPostSerializer(serializers.Serializer):
         _, did = bfm.get_cur_dir_id()
         data['_did'] = did
         data['_collection_name'] = _collection_name
-        data['BucketFileClass'] = bfm.get_bucket_file_class()
+        data['BucketFileClass'] = bfm.get_obj_model_class()
         return data
 
 
@@ -242,7 +257,7 @@ class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0,
+    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0, max_value=100*1024**4,
                                             help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
     chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
     chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
@@ -271,6 +286,10 @@ class ObjPutSerializer(serializers.Serializer):
         #     overwrite = False
 
         return data
+
+    @log_used_time(debug_logger, mark_text='upload data is_valid')
+    def is_valid(self, raise_exception=False):
+        return super(ObjPutSerializer, self).is_valid(raise_exception)
 
 
 class DirectoryCreateSerializer(serializers.Serializer):
@@ -307,7 +326,7 @@ class DirectoryCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
         # 目录已存在
         if dir:
-            raise serializers.ValidationError(detail={'error_text': f'{dir_name}目录已存在'})
+            raise serializers.ValidationError(detail={'error_text': f'"{dir_name}"目录已存在'}, code='existing')
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
 
         return data
@@ -403,7 +422,7 @@ class ObjInfoSerializer(serializers.Serializer):
         try:
             if obj.is_shared_and_in_shared_time():
                 return '公有'
-        except:
+        except Exception as e:
             pass
         return '私有'
 

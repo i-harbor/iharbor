@@ -1,11 +1,16 @@
 import uuid
-from datetime import datetime, timedelta
+import logging
+from datetime import timedelta, datetime
 
 from django.db import models
+from django.db.models import F
 from django.contrib.auth import get_user_model
-from mongoengine import DynamicDocument, OperationError
-from mongoengine import fields,QuerySet
+from django.utils import timezone
 from ckeditor.fields import RichTextField
+
+from utils.log.decorators import log_used_time
+
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
 #获取用户模型
@@ -34,7 +39,7 @@ class Bucket(models.Model):
     name = models.CharField(max_length=63, db_index=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    collection_name = models.CharField(max_length=50, default=get_uuid1_hex_string, editable=False, verbose_name='存储桶对应的集合表名')
+    collection_name = models.CharField(max_length=50, default='', verbose_name='存储桶对应的表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
@@ -42,11 +47,12 @@ class Bucket(models.Model):
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
 
     class Meta:
+        ordering = ['-created_time']
         verbose_name = '存储桶'
         verbose_name_plural = verbose_name
 
     def __str__(self):
-        return self.name
+        return self.name if isinstance(self.name, str) else str(self.name)
 
     def __repr__(self):
         return f'<Bucket>{self.name}'
@@ -80,12 +86,16 @@ class Bucket(models.Model):
         # bucket是否属于当前用户
         return request.user.id == self.user.id
 
-    def get_bucket_mongo_collection_name(self):
+    def get_bucket_table_name(self):
         '''
-        获得bucket对应的mongodb集合名
-        :return: 集合名
+        获得bucket对应的数据库表名
+        :return: 表名
         '''
-        return f'bucket_{self.id}'
+        if not self.collection_name:
+            name = f'bucket_{self.id}'
+            self.collection_name = name
+
+        return self.collection_name
 
     def set_permission(self, public=False):
         '''
@@ -174,11 +184,31 @@ class BucketLimitConfig(models.Model):
         return obj.limit
 
 
-class BucketFileInfoBase(DynamicDocument):
+class ApiUsageDescription(models.Model):
+    '''
+    EVHarbor API使用说明
+    '''
+    title = models.CharField(verbose_name='标题', default='EVHarbor API使用说明', max_length=255)
+    content = RichTextField(verbose_name='说明内容', default='')
+    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
+
+    class Meta:
+        verbose_name = 'API使用说明'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f'<ApiUsageDescription>{self.title}'
+
+    def __repr__(self):
+        return f'<ApiUsageDescription>{self.title}'
+
+
+class BucketFileBase(models.Model):
     '''
     存储桶bucket文件信息模型基类
 
-    @ na : name，若该doc代表文件，则na为文件名，若该doc代表目录，则na为目录路径;
+    @ na : name，若该doc代表文件，则na为全路径文件名，若该doc代表目录，则na为目录路径;
     @ fos: file_or_dir，用于判断该doc代表的是一个文件还是一个目录，若fod为True，则是文件，若fod为False，则是目录;
     @ did: 所在目录的objectID，若该doc代表文件，则did为该文件所属目录的id，若该doc代表目录，则did为该目录的上一级
                 目录(父目录)的id;
@@ -198,33 +228,33 @@ class BucketFileInfoBase(DynamicDocument):
         (True, '删除'),
         (False, '正常'),
     )
+    id = models.BigAutoField(auto_created=True, primary_key=True)
+    na = models.TextField(verbose_name='全路径文件名或目录名')
+    # name = models.CharField(verbose_name='文件名或目录名', max_length=255)
+    fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
+    did = models.BigIntegerField(default=0, db_index=True, verbose_name='父节点id')
+    si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
+    ult = models.DateTimeField(default=timezone.now) # 文件的上传时间，或目录的创建时间
+    upt = models.DateTimeField(blank=True, null=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
+    dlc = models.IntegerField(default=0, verbose_name='下载次数')  # 该文件的下载次数，目录时dlc为0
+    sh = models.BooleanField(default=False, verbose_name='是否可共享') # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
+    shp = models.CharField(default='', max_length=10, verbose_name='共享密码') # 该文件的共享密码，目录时为空
+    stl = models.BooleanField(default=True, verbose_name='是否有共享时间限制') # True: 文件有共享时间限制; False: 则文件无共享时间限制
+    sst = models.DateTimeField(blank=True, null=True, verbose_name='共享起始时间') # share_start_time, 该文件的共享起始时间
+    set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
+    sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
 
-    na = fields.StringField(required=True, unique=True) # name,文件名或目录名
-    fod = fields.BooleanField(required=True) # file_or_dir; True==文件，False==目录
-    did = fields.ObjectIdField() #父节点objectID
-    si = fields.LongField() # 文件大小,字节数
-    ult = fields.DateTimeField(default=datetime.utcnow) # 文件的上传时间，或目录的创建时间
-    upt = fields.DateTimeField() # 文件的最近修改时间，目录，则upt为空
-    dlc = fields.IntField() # 该文件的下载次数，目录时dlc为空
-    bac = fields.ListField(fields.StringField()) # backup，该文件的备份地址，目录时为空
-    arc = fields.ListField(fields.StringField()) # archive，该文件的归档地址，目录时arc为空
-    sh = fields.BooleanField(default=False) # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
-    shp = fields.StringField() # 该文件的共享密码，目录时为空
-    stl = fields.BooleanField(default=True) # True: 文件有共享时间限制; False: 则文件无共享时间限制
-    sst = fields.DateTimeField() # share_start_time, 该文件的共享起始时间
-    set = fields.DateTimeField() # share_end_time,该文件的共享终止时间
-    sds = fields.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
+    class Meta:
+        abstract = True
+        app_label = 'metadata' # 用于db路由指定此模型对应的数据库
+        ordering = ['fod', '-ult']
+        indexes = [models.Index(fields=['fod'])]
+        # unique_together = ('did', 'name',)
+        verbose_name = '对象模型抽象基类'
+        verbose_name_plural = verbose_name
 
-    meta = {
-        'abstract': True,
-        #db_alias用于指定当前模型默认绑定的mongodb连接，但可以用switch_db(Model, 'db2')临时改变对应的数据库连接
-        'db_alias': 'default',
-        'indexes': ['did', 'ult', ('fod', 'na')],  # 索引
-        'ordering': ['fod', '-ult'], #文档降序，最近日期靠前
-        # 'collection':'uploadfileinfo',#集合名字，默认为小写字母的类名
-        # 'max_documents': 10000, #集合存储文档最大数量
-        # 'max_size': 2000000, #集合的最大字节数
-    }
+    def __str__(self):
+        return self.na if isinstance(self.na, str) else str(self.na)
 
     def do_soft_delete(self):
         '''
@@ -233,7 +263,7 @@ class BucketFileInfoBase(DynamicDocument):
         :return: True(success); False(error)
         '''
         self.sds = True
-        self.upt = datetime.utcnow() # 修改时间标记删除时间
+        self.upt = timezone.now() # 修改时间标记删除时间
 
         try:
             self.save()
@@ -251,7 +281,7 @@ class BucketFileInfoBase(DynamicDocument):
         '''
         if sh == True:
             self.sh = True          # 共享
-            now = datetime.utcnow()
+            now = timezone.now()
             self.sst = now          # 共享时间
             if days == 0:
                 self.stl = False    # 永久共享,没有共享时间限制
@@ -298,10 +328,19 @@ class BucketFileInfoBase(DynamicDocument):
     def is_shared_end_time_out(self):
         '''
         是否超过分享终止时间
-        :return: True(超时)，False(未超时)
+        :return: True(已过共享终止时间)，False(未超时)
         '''
-        td = datetime.utcnow() - self.set
-        return td.total_seconds() > 0
+        ret = True
+        if not isinstance(self.set, datetime):
+            return ret
+
+        try:
+            td = timezone.now() - self.set
+            ret = td.total_seconds() > 0
+        except:
+            pass
+
+        return ret
 
     def download_cound_increase(self):
         '''
@@ -309,7 +348,7 @@ class BucketFileInfoBase(DynamicDocument):
 
         :return: True(success); False(error)
         '''
-        self.dlc = (self.dlc or 0) + 1  # 下载次数+1
+        self.dlc = F('dlc') + 1 # (self.dlc or 0) + 1  # 下载次数+1
         try:
             self.save()
         except:
@@ -326,7 +365,7 @@ class BucketFileInfoBase(DynamicDocument):
         '''
         try:
             self.delete()
-        except OperationError:
+        except Exception:
             return False
 
         return True
@@ -339,9 +378,10 @@ class BucketFileInfoBase(DynamicDocument):
         :return: type:str; 无效的参数返回None
         '''
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
-            return str(bucket_id) + str(self.id)
+            return f'{str(bucket_id)}_{str(self.id)}'
         return None
 
+    @log_used_time(debug_logger, 'save obj info to database')
     def do_save(self, **kwargs):
         '''
         创建一个文档或更新一个已存在的文档
@@ -355,22 +395,3 @@ class BucketFileInfoBase(DynamicDocument):
 
         return True
 
-
-class ApiUsageDescription(models.Model):
-    '''
-    EVHarbor API使用说明
-    '''
-    title = models.CharField(verbose_name='标题', default='EVHarbor API使用说明', max_length=255)
-    content = RichTextField(verbose_name='说明内容', default='')
-    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
-
-    class Meta:
-        verbose_name = 'API使用说明'
-        verbose_name_plural = verbose_name
-
-    def __str__(self):
-        return f'<ApiUsageDescription>{self.title}'
-
-    def __repr__(self):
-        return f'<ApiUsageDescription>{self.title}'

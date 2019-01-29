@@ -16,7 +16,7 @@ function show_auto_close_warning_dialog(title, type='warning', position='center'
     return swal({
         position: position,
         type: type,
-        title: title,
+        text: title,
         showConfirmButton: showBtn,
         timer: timer
     });

@@ -223,6 +223,9 @@ LOGGING = {
         'simple': {
             'format': '%(levelname)s %(message)s'
         },
+        'dubug_formatter': {
+            'format': '%(levelname)s %(asctime)s %(message)s'
+        },
     },
     'filters': {
         'require_debug_false': {
@@ -247,6 +250,14 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
         },
+        # debug logging file settings
+        'debug': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],# working with debug mode
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'log/debug.log'),
+            'formatter': 'dubug_formatter'
+        },
         # 邮件通知
         # 'mail_admins': {
         #     'level': 'ERROR',
@@ -265,11 +276,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        # 'django.server': {
-        #     'handlers': ['file', 'console'],
-        #     'level': 'ERROR',
-        #     'propagate': False,
-        # },
+        'debug': {
+            'handlers': ['debug'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
 
@@ -331,6 +342,11 @@ CKEDITOR_CONFIGS = {
     },
 }
 
+
+DATABASE_ROUTERS = [
+    'webserver.db_routers.MetadataRouter',
+]
+
 # 导入安全相关的settings
 from .security_settings import *
 
@@ -374,3 +390,5 @@ from .security_settings import *
 # RAVEN_CONFIG = {
 #     'dsn': 'sentry上面创建项目的时候得到的dsn'
 # }
+
+

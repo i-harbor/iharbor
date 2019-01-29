@@ -96,7 +96,7 @@ class PathParser():
         分割一个绝对路径，获取文件名和父路径,优先获取文件名
         :return: Tuple(path, filename)
         '''
-        fullpath = self._path.strip('/')
+        fullpath = self._path #.strip('/')
         if not fullpath:
             return ('', '')
         l = fullpath.rsplit('/', maxsplit=1)

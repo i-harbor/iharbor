@@ -70,7 +70,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'},
                                 status=status.HTTP_404_NOT_FOUND)
 
-        collection_name = bucket.get_bucket_mongo_collection_name()
+        collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
 
         # 是否有文件对象的访问权限
@@ -79,7 +79,7 @@ class ObsViewSet(viewsets.GenericViewSet):
 
         # 下载整个文件对象
         obj_key = fileobj.get_obj_key(bucket.id)
-        response = self.get_file_download_response(obj_key, filename)
+        response = self.get_file_download_response(obj_key, filename, filesize=fileobj.si)
         if not response:
             return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -109,7 +109,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             return serializers.SharedPostSerializer
         return serializers.SharedPostSerializer
 
-    def get_file_download_response(self, file_id, filename):
+    def get_file_download_response(self, file_id, filename, filesize):
         '''
         获取文件下载返回对象
         :param file_id: 文件Id, type: str
@@ -118,7 +118,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id)
+        cro = CephRadosObject(file_id, obj_size=filesize)
         file_generator = cro.read_obj_generator
         if not file_generator:
             return None
@@ -126,6 +126,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         filename = urlquote(filename)# 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Length'] = filesize
         response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
         return response
 

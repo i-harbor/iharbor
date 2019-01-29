@@ -63,6 +63,7 @@ class EvcloudVM(models.Model):
     class Meta:
         verbose_name = '虚拟机列表'
         verbose_name_plural = verbose_name
+        ordering = ['-created_time']
 
 class VMUsageDescription(models.Model):
     '''
