@@ -149,7 +149,7 @@
     //
     // 虚拟机备注双击修改事件
     //
-    $("#id_vm_remarks").dblclick(function () {
+    $(".vm-remarks").dblclick(function () {
         let remarks = $(this);
         let old_html = remarks.text();
 
