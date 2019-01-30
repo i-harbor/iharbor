@@ -152,7 +152,7 @@ class BucketFileManagement():
             return (False, None)  # path参数有误,未找到对应目录信息
         if dir:
             self.cur_dir_id = dir.id
-        return (True, self.cur_dir_id)  
+        return (True, self.cur_dir_id)
 
 
     def get_cur_dir_files(self, cur_dir_id=None):
