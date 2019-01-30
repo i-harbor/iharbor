@@ -126,7 +126,8 @@ class BucketFileManagement():
         '''
         获得当前目录节点id
         @ return: (ok, id)，ok指示是否有错误(路径参数错误)
-            正常返回(True, path目录的id)；未找到记录返回(False, None)，即参数有误
+            正常返回：(True, id)，顶级目录时id=None
+            未找到记录返回(False, None)，即参数有误
         '''
         if self.cur_dir_id:
             return (True, self.cur_dir_id)
@@ -146,10 +147,12 @@ class BucketFileManagement():
         except model_class.DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
+            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{path}')
+            # dir = model_class.objects.filter(Q(na=path) & Q(fod=False)).first()
             return (False, None)  # path参数有误,未找到对应目录信息
         if dir:
             self.cur_dir_id = dir.id
-        return (True, self.cur_dir_id)  # None->未找到对应目录
+        return (True, self.cur_dir_id)  
 
 
     def get_cur_dir_files(self, cur_dir_id=None):
@@ -205,9 +208,9 @@ class BucketFileManagement():
             第二个返回值：如果存在返回文件记录对象，否则None
         '''
         # 先检测当前目录存在
-        # ok, did = self.get_cur_dir_id()
-        # if not ok:
-        #     return False, None
+        ok, did = self.get_cur_dir_id()
+        if not ok:
+            return False, None
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
@@ -217,7 +220,8 @@ class BucketFileManagement():
         except model_class.DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
-            logger.error(f'In get_dir_exists({dir_name}):' + str(e))
+            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{dir_path_name}')
+            # dir = model_class.objects.filter(Q(na=dir_path_name) & Q(fod=False)).first()
             return False, None
 
         return True, dir

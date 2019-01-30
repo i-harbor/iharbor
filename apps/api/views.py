@@ -595,6 +595,9 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if len(filename) > 255:
+            return Response(data={'code': 400, 'code_text': '对象名称长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
+
         # 数据验证
         try:
             put_data = self.get_data(request)
@@ -819,7 +822,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         # 创建文件对象
         BucketFileClass = bfm.get_obj_model_class()
         full_filename = bfm.build_dir_full_name(filename)
-        bfinfo = BucketFileClass(na=full_filename,  # 文件名
+        bfinfo = BucketFileClass(na=full_filename,  # 全路径文件名
+                                 name=filename, #  文件名
                                 fod=True,  # 文件
                                 si=0)  # 文件大小
         # 有父节点
@@ -1196,7 +1200,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
         BucketFileClass = bfm.get_obj_model_class()
-        bfinfo = BucketFileClass(na=dir_path_name,  # 目录名
+        bfinfo = BucketFileClass(na=dir_path_name,  # 全路经目录名
+                                 name=dir_name, # 目录名
                                 fod=False,  # 目录
                                 )
         # 有父节点
@@ -1293,6 +1298,9 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         if '/' in dir_name:
             return None, Response({'code': 400, 'code_text': 'dir_name不能包含‘/’'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(dir_name) > 255:
+            return None, Response({'code': 400, 'code_text': 'dir_name长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         _collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
