@@ -5,7 +5,7 @@ from django.utils.translation import ugettext_lazy as _
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework import exceptions
 
-from .auth_key import urlsafe_base64_decode, generate_token, b
+from .auth_key import urlsafe_base64_decode, generate_token
 
 
 class AuthKeyAuthentication(BaseAuthentication):
@@ -69,7 +69,7 @@ class AuthKeyAuthentication(BaseAuthentication):
             raise exceptions.AuthenticationFailed(_('Invalid access_key. Key is inactive and unavailable'))
 
         # 验证加密token
-        if generate_token(data_b64, b(auth_key.secret_key)) != token:
+        if generate_token(data_b64, auth_key.secret_key) != token:
             raise exceptions.AuthenticationFailed(_('Invalid auth header'))
 
         return (auth_key.user, auth_key) # request.user, request.auth

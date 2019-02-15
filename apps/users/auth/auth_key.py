@@ -53,6 +53,9 @@ def generate_token(data_b64, secret_key):
     :return: 解码后的token字符串
     '''
     data = b(data_b64)
+    if isinstance(secret_key, str):
+        secret_key = b(secret_key)
+
     hashed = hmac.new(secret_key, data, sha1)
     return urlsafe_base64_encode(hashed.digest())
 

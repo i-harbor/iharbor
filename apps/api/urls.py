@@ -6,6 +6,7 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 from .auth import obtain_auth_token
 from . import views
 from .routers import DetailPostRouter
+from users.auth.views import ObtainAuthKey
 
 
 # Create a router and register our viewsets with it.
@@ -13,6 +14,7 @@ router = DefaultRouter()
 router.register(r'(?P<version>(v1|v2))/users', views.UserViewSet, base_name='user')
 router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name='buckets')
 router.register(r'(?P<version>(v1|v2))/obj', views.ObjViewSet, base_name='obj')
+router.register(r'(?P<version>(v1|v2))/auth-key', ObtainAuthKey, base_name='auth-key')
 # router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
 
 detail_router = DetailPostRouter()

@@ -42,10 +42,3 @@ class AuthKeyAdmin(admin.ModelAdmin):
     list_editable = ('state', 'permission')  # 列表可编辑字段
     search_fields = ('id', 'secret_key', 'user__username')  # 搜索字段
 
-    # def get_permission(self, obj):
-    #     if obj.permission == AuthKey.READ_WRITE:
-    #         return '可读可写'
-    #     elif obj.permission == AuthKey.READ_ONLY:
-    #         return '只读'
-    #
-    #     return '无效值'
