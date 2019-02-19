@@ -5,7 +5,7 @@ import json
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 import requests
 
-def b(data):
+def to_bytes_by_utf8(data):
     '''
     str to bytes by utf-8
     '''
@@ -14,7 +14,7 @@ def b(data):
     return data
 
 
-def s(data):
+def to_str_by_utf8(data):
     '''
     bytes to str by utf-8
     '''
@@ -30,8 +30,8 @@ def urlsafe_base64_encode(data):
     :param data: 待编码的数据，一般为字符串
     :return: 编码后的字符串
     '''
-    ret = urlsafe_b64encode(b(data))
-    return s(ret)
+    ret = urlsafe_b64encode(to_bytes_by_utf8(data))
+    return to_str_by_utf8(ret)
 
 
 def urlsafe_base64_decode(data):
@@ -41,7 +41,7 @@ def urlsafe_base64_decode(data):
     :param data: 待解码的数据，一般为字符串
     :return: 解码后的字符串
     '''
-    ret = urlsafe_b64decode(s(data))
+    ret = urlsafe_b64decode(to_str_by_utf8(data))
     return ret
 
 def generate_token(data_b64, secret_key):
@@ -52,9 +52,9 @@ def generate_token(data_b64, secret_key):
     :param secret_key: 密钥
     :return: 解码后的token字符串
     '''
-    data = b(data_b64)
+    data = to_bytes_by_utf8(data_b64)
     if isinstance(secret_key, str):
-        secret_key = b(secret_key)
+        secret_key = to_bytes_by_utf8(secret_key)
 
     hashed = hmac.new(secret_key, data, sha1)
     return urlsafe_base64_encode(hashed.digest())
@@ -66,7 +66,7 @@ class AuthKey(object):
     def __init__(self, access_key, secret_key):
         self.__check_key(access_key, secret_key)
         self.__access_key = access_key
-        self.__secret_key = b(secret_key)
+        self.__secret_key = to_bytes_by_utf8(secret_key)
 
     @staticmethod
     def __check_key(access_key, secret_key):
@@ -76,10 +76,11 @@ class AuthKey(object):
     def get_access_key(self):
         return self.__access_key
 
-    def auth_key(self, path_of_url, data=None, timedelta=None):
+    def auth_key(self, path_of_url, method, data=None, timedelta=None):
         '''
         生成安全凭证
         :param path_of_url: url的全路径, 如url为http://abc.com/api/?a=b时，path_of_url为 /api/?a=b
+        :param method: 请求方法字符串，GET, POST, PUT, PATCH 等
         :param body: 请求时提交的数据（如果需要），类型dict，只包含普通数据，不包含文件等流数据
         :param timedelta: 安全凭证的有效期时间增量（基于当前时间戳）
         :return:
@@ -90,7 +91,7 @@ class AuthKey(object):
         else:
             deadline = self.get_deadline()
 
-        body = dict(path_of_url=path_of_url, deadline=deadline)
+        body = dict(path_of_url=path_of_url, method=method.upper(), deadline=deadline)
         if data is not None and isinstance(data, dict):
             body.update(data)
 

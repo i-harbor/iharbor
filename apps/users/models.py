@@ -88,6 +88,7 @@ class AuthKey(models.Model):
     class Meta:
         verbose_name = '访问密钥'
         verbose_name_plural = '访问密钥'
+        ordering = ['-create_time']
 
     def _get_access_key_val(self):
         return self.id

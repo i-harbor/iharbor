@@ -38,12 +38,25 @@ class ObtainAuthKey(viewsets.GenericViewSet):
     partial_update:
     停用或激活访问密钥，需要通过身份认证权限
 
-        此外，可选Path参数,“new”，?new=true用于刷新生成一个新token；
+        Path参数,“active”，active=true用于激活启用访问密钥，active=false用于停用访问密钥；
 
     create:
     创建一个新的访问密钥
 
         需要通过身份认证权限(如session，basic认证)，或直接提交用户名和密码
+        返回内容：
+        {
+            'code': 201,
+            'code_text': 'Create key successfully',
+            'key':{
+              "access_key": "1cc2174a30e511e9a004c800a000655d",
+              "secret_key": "0cf91e146740c73a3959b9ab85195e294b0663df",
+              "user": "869588058@qq.com",
+              "create_time": "2019-02-15 13:46:59",
+              "state": true,
+              "permission": "可读可写"
+            }
+        }
 
     delete:
     删除一个访问密钥
@@ -138,7 +151,7 @@ class ObtainAuthKey(viewsets.GenericViewSet):
                 })
             user = serializer.validated_data['user']
 
-        if AuthKey.objects.filter(user=user).count() >= 5:
+        if AuthKey.objects.filter(user=user).count() >= 2:
             return Response({'code': 403, 'code_text': 'The key you can have has reached the upper limit.'}, status=status.HTTP_403_FORBIDDEN)
 
         key = AuthKey(user=user)

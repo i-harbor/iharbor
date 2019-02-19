@@ -54,6 +54,7 @@ class AuthKeyAuthentication(BaseAuthentication):
         data = self.parse_data(data_b64) # 解析data
         self.validate_url_path(request, data) # 验证path of url
         self.validate_deadline(data) # 验证有效期
+        self.validate_method(request, data) # 验证请求方法
 
         model = self.get_model()
         try:
@@ -117,6 +118,15 @@ class AuthKeyAuthentication(BaseAuthentication):
         deadline = data.get('deadline', 0)
         if int(time.time()) > deadline:
             raise exceptions.AuthenticationFailed(_('Invalid auth header. Now the deadline has passed.'))
+
+    def validate_method(self, request, data):
+        '''
+        验证 认证key的有效期
+        '''
+        method = data.get('method', '')
+        m = request.method
+        if method.upper() != m:
+            raise exceptions.AuthenticationFailed(_('Invalid auth header. Request method is different.'))
 
     def authenticate_header(self, request):
         return self.keyword

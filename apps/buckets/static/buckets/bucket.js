@@ -1,7 +1,7 @@
 ;(function() {
 
     //API域名
-    let DOMAIN_NAME = ''; //'http://10.0.86.213:8000/';
+    let DOMAIN_NAME = get_domain_url(); //'http://10.0.86.213:8000/';
 
     // 获取API域名
     function get_api_domain_name(){
