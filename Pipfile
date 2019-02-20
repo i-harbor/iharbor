@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "==1.11.18"
+django = "==1.11.20"
 pillow = "*"
 mongoengine = "*"
 django-rest-framework = "*"
@@ -15,6 +15,7 @@ django-rest-swagger = "*"
 mysqlclient = "*"
 raven = "*"
 django-ckeditor = "*"
+django-debug-toolbar = "*"
 
 [dev-packages]
 uwsgi = "*"

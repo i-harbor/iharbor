@@ -1166,12 +1166,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('breadcrumb', pp.get_path_breadcrumb(dir_path))
         ])
 
-        start_time = datetime.now()
-
         queryset = files
         page = self.paginate_queryset(queryset)
-
-        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page in dir.')
 
         if page is not None:
             serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
@@ -1324,4 +1320,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data['dir_name'] = dir_name
         return data, None
 
+    @log_used_time(debug_logger, 'paginate in dir')
+    def paginate_queryset(self, queryset):
+        return super(DirectoryViewSet, self).paginate_queryset(queryset)
 

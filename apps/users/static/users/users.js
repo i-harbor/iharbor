@@ -216,7 +216,7 @@
                 {{else if !key.state }}
                     <span class="btn btn-info btn-active-auth-key">启用</span>
                 {{/if}}
-                <span class="btn btn-danger btn-remove-auth-key"><span class="glyphicon glyphicon-remove"></span>删除</span>
+                <span class="btn btn-danger btn-remove-auth-key"><span class="glyphicon glyphicon-remove"></span></span>
             </td>
         </tr>
     `);
