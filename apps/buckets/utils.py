@@ -143,7 +143,7 @@ class BucketFileManagement():
 
         model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get(Q(na=path) & Q(fod=False))  # 查找目录记录
+            dir = model_class.objects.get(Q(fod=False) & Q(na=path))  # 查找目录记录
         except model_class.DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
@@ -176,10 +176,10 @@ class BucketFileManagement():
         model_class = self.get_obj_model_class()
         try:
             if dir_id:
-                files = model_class.objects.filter(Q(did=dir_id) & Q(na__isnull=False)).all()
+                files = model_class.objects.filter(did=dir_id).all()
             else:
-                #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-                files = model_class.objects.filter(Q(did__lte=0) & Q(na__isnull=False)).all()
+                #存储桶下文件目录,did=0表示是存储桶下的文件目录
+                files = model_class.objects.filter(did=0).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None
@@ -194,7 +194,7 @@ class BucketFileManagement():
         '''
         file_name = file_name.strip('/')
         full_file_name = self.build_dir_full_name(file_name)
-        bfis = self.get_obj_model_class().objects.filter((Q(na=full_file_name) & Q(fod=True)))
+        bfis = self.get_obj_model_class().objects.filter(Q(fod=True) & Q(na=full_file_name))
         bfi = bfis.first()
 
         return bfi
@@ -216,7 +216,7 @@ class BucketFileManagement():
 
         model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get((Q(na=dir_path_name) & Q(fod=False)))  # 查找目录记录
+            dir = model_class.objects.get(Q(fod=False) & Q(na=dir_path_name))  # 查找目录记录
         except model_class.DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:

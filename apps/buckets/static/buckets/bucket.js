@@ -1001,7 +1001,7 @@
                         {{/if}}
                     {{/if}}
                     <strong>下载连接：</strong>
-                    <p><a href="{{ obj.download_url }}">{{ obj.download_url }}</a></p>
+                    <p><a href="{{ obj.download_url }}" class="text-auto-break">{{ obj.download_url }}</a></p>
                 </div>
             </div>
         </div>
