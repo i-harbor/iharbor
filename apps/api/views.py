@@ -335,7 +335,9 @@ class BucketViewSet(viewsets.GenericViewSet):
         for bucket in buckets:
             # 只删除用户自己的buckets
             if bucket.user.id == request.user.id:
-                bucket.do_soft_delete()  # 软删除
+                if not bucket.do_soft_delete():  # 软删除
+                    if not bucket.do_soft_delete():
+                        return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

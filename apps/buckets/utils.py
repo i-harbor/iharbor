@@ -3,6 +3,7 @@ import traceback
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
+from django.db.models import Sum
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
@@ -302,5 +303,11 @@ class BucketFileManagement():
 
         return True
 
-
+    def get_bucket_space_use(self):
+        '''
+        获取存储桶中的对象占用总空间大小
+        :return:
+        '''
+        a = self.get_obj_model_class().objects.filter(fod=True).aggregate(space=Sum('si'))
+        return a['space']
 
