@@ -1310,7 +1310,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
         ok, dir = bfm.get_dir_exists(dir_name=dir_name)
         if not ok:
-            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'})
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'},
+                                  status=status.HTTP_400_BAD_REQUEST)
         # 目录已存在
         if dir:
             return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},

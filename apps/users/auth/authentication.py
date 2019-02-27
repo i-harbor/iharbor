@@ -1,5 +1,6 @@
 import time
 import json
+from urllib.parse import unquote
 
 from django.utils.translation import ugettext_lazy as _
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
@@ -108,7 +109,9 @@ class AuthKeyAuthentication(BaseAuthentication):
         验证 访问的url的路径和当前路径是否一致
         '''
         full_path = data.get('path_of_url', None)
-        if request.get_full_path() != full_path:
+        local_url_path = request.get_full_path()
+        local_url_path = unquote(local_url_path) # 解码url
+        if local_url_path != full_path:
             raise exceptions.AuthenticationFailed(_('Invalid auth header. Invalid path of request url.'))
 
     def validate_deadline(self, data):
