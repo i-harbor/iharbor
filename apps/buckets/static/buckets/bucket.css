@@ -22,3 +22,7 @@
 	/*color: rgba(33, 38, 39, 0.92);*/
 }
 
+.text-auto-break {
+	word-break:break-all;
+	word-wrap:break-word;
+}

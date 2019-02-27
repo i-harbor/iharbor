@@ -130,3 +130,12 @@ function getFormJson(form_node) {
 
     return o;
 }
+
+//
+// 从当前url中获取域名
+// 如http://abc.com/
+function get_domain_url() {
+    let origin = window.location.origin;
+    origin = origin.rightStrip('/');
+    return origin + '/';
+}

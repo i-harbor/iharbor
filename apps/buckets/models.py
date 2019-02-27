@@ -36,7 +36,7 @@ class Bucket(models.Model):
         (False, '正常'),
     )
 
-    name = models.CharField(max_length=63, db_index=True, verbose_name='bucket名称')
+    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', verbose_name='存储桶对应的表名')
@@ -76,8 +76,21 @@ class Bucket(models.Model):
         return None
 
     def do_soft_delete(self):
+        '''
+        软删除
+        :return:
+            success: True
+            failed: False
+        '''
+        bucket_name = '_' + get_uuid1_hex_string()
+        self.name = bucket_name # 桶名具有唯一性约束，所以改为一个无效的桶名
         self.soft_delete = True
-        self.save()
+        try:
+            self.save()
+        except :
+            return False
+
+        return True
 
     def is_soft_deleted(self):
         return self.soft_delete
@@ -230,9 +243,9 @@ class BucketFileBase(models.Model):
     )
     id = models.BigAutoField(auto_created=True, primary_key=True)
     na = models.TextField(verbose_name='全路径文件名或目录名')
-    # name = models.CharField(verbose_name='文件名或目录名', max_length=255)
+    name = models.CharField(verbose_name='文件名或目录名', max_length=255)
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
-    did = models.BigIntegerField(default=0, db_index=True, verbose_name='父节点id')
+    did = models.BigIntegerField(default=0, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
     ult = models.DateTimeField(default=timezone.now) # 文件的上传时间，或目录的创建时间
     upt = models.DateTimeField(blank=True, null=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
@@ -249,7 +262,7 @@ class BucketFileBase(models.Model):
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-ult']
         indexes = [models.Index(fields=['fod'])]
-        # unique_together = ('did', 'name',)
+        unique_together = ('did', 'fod', 'name',)
         verbose_name = '对象模型抽象基类'
         verbose_name_plural = verbose_name
 

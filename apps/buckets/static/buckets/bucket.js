@@ -1,7 +1,7 @@
 ;(function() {
 
     //API域名
-    let DOMAIN_NAME = ''; //'http://10.0.86.213:8000/';
+    let DOMAIN_NAME = get_domain_url(); //'http://10.0.86.213:8000/';
 
     // 获取API域名
     function get_api_domain_name(){
@@ -567,7 +567,7 @@
                                 {{ if $value.fod }}
                                     <td class="bucket-files-table-item">
                                         <span class="glyphicon glyphicon-file"></span>
-                                        <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.na }}</a>
+                                        <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
                                     <td>{{ $value.si }}</td>
@@ -576,7 +576,7 @@
                                 {{ if !$value.fod }}
                                     <td>
                                         <span class="glyphicon glyphicon-folder-open"></span>
-                                        <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.dir_name }}</strong></a>
+                                        <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
                                     <td>--</td>
@@ -595,8 +595,8 @@
                                             <!--文件-->
                                             {{ if $value.fod }}
                                                 <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
-                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.na}}">删除</a></li>
-                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.na}}">分享公开</a></li>
+                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">删除</a></li>
+                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">分享公开</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
@@ -651,7 +651,7 @@
             <td><input type="checkbox" class="item-checkbox" value=""></td>
             <td class="bucket-files-table-item">
                 <span class="glyphicon glyphicon-file"></span>
-                <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.na }}</a>
+                <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.name }}</a>
             </td>
             <td>{{ obj.ult }}</td>
             <td>{{ obj.si }}</td>
@@ -662,8 +662,8 @@
                aria-expanded="false">操作<span class="caret"></span></a>
                     <ul class="dropdown-menu">
                         <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >下载</a></li>
-                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.na}}">删除</a></li>
-                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.na}}">分享公开</a></li>
+                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">删除</a></li>
+                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</a></li>
                     </ul>
                 </li>
             </td>
@@ -969,19 +969,19 @@
                             <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                         {{/each}}
                     </ol>
-                    <p><h3>{{ obj.na }}</h3></p>
+                    <p><h3>{{ obj.name }}</h3></p>
                 </div>
             </div>
             <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>
             <div class="col-xs-12 col-sm-12">
                 <div>
                     <a class="btn btn-info" href="{{ obj.download_url }}">下载</a>
-                    <button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.na}}">分享公开</button>
+                    <button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</button>
                 </div>
                 <hr/>
                 <div>
                     <strong>对象名称：</strong>
-                    <p>{{ obj.na }}</p>
+                    <p>{{ obj.name }}</p>
                     <p><strong>对象大小：</strong>{{ obj.si }}</p>                   
                     <p><strong>创建日期：</strong>{{ obj.ult }}</p>                   
                     <p><strong>修改日期：</strong>{{ obj.upt }}</p> 
@@ -1001,7 +1001,7 @@
                         {{/if}}
                     {{/if}}
                     <strong>下载连接：</strong>
-                    <p><a href="{{ obj.download_url }}">{{ obj.download_url }}</a></p>
+                    <p><a href="{{ obj.download_url }}" class="text-auto-break">{{ obj.download_url }}</a></p>
                 </div>
             </div>
         </div>
@@ -1342,7 +1342,7 @@
             <td><input type="checkbox" class="item-checkbox" value=""></td>
             <td>
                 <span class="glyphicon glyphicon-folder-open"></span>
-                <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong class="bucket-files-table-item">{{ dir.dir_name }}</strong></a>
+                <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong class="bucket-files-table-item">{{ dir.name }}</strong></a>
             </td>
             <td>{{ dir.ult }}</td>
             <td>--</td>

@@ -12,32 +12,28 @@ git clone https://github.com/evobstore/webserver.git
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```pipenv install```
 ### 1.4 数据库安装
-请自行安装MongoDB和mysql数据库。
-根据自己的情况修改webserver/settings.py文件中有关数据库的配置示例代码
+请自行安装mysql数据库。  
+根据自己的情况修改webserver/settings.py文件中有关数据库的配置示例代码   
 ```python
-#mongodb数据库连接
-from mongoengine import connect
-
-connect(
-    alias='default',
-    db='metadata',
-    host='10.0.86.213',
-    port=27017,
-    # username='root',
-    # password='pwd123',
-    # authentication_source='admin'
-)
-
-# Mysql
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',   # 数据库引擎
-        'NAME': 'webdata',       # 数据的库名，事先要创建之
+        'NAME': 'xxx',       # 数据的库名，事先要创建之
         'HOST': 'localhost',    # 主机
         'PORT': '3306',         # 数据库使用的端口
+        'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
+    },
+    'metadata': {
+        'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+        'NAME': 'metadata',  # 数据的库名，事先要创建之
+        'USER': 'xxx',  # 数据库用户名
+        'PASSWORD': 'xxx',  # 密码
+        'HOST': '127.0.0.1',  # 主机
+        'PORT': '3306',  # 数据库使用的端口
+        'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
     },
 }
-```
+```   
 ### 1.5 ceph配置
 从[rados_io](https://github.com/evobstore/rados_io)下载rados.so库文件，放于项目‘utils/oss/’路径下；以下配置根据实际情况自行修改。
 ```

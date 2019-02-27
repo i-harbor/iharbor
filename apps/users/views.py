@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool
 from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
-from .models import Email
+from .models import Email, AuthKey
 
 #获取用户模型
 User = get_user_model()
@@ -342,6 +342,7 @@ def security(request, *args, **kwargs):
     '''
     user = request.user
     token = get_or_create_token(user=user)
-    return render(request, 'security.html', context={'token': token})
+    auth_keys = AuthKey.objects.filter(user=user).all()
+    return render(request, 'security.html', context={'token': token, 'auth_keys': auth_keys})
 
 

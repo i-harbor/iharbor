@@ -28,8 +28,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 DEBUG = False
 
 ALLOWED_HOSTS = ['*',]
-
-
+INTERNAL_IPS = []
 # Application definition
 
 INSTALLED_APPS = [
@@ -65,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
 ]
 
 ROOT_URLCONF = 'webserver.urls'
@@ -88,6 +88,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'webserver.wsgi.application'
+
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -173,6 +174,7 @@ REST_FRAMEWORK = {
         # 'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'users.auth.authentication.AuthKeyAuthentication',
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
@@ -391,4 +393,11 @@ from .security_settings import *
 #     'dsn': 'sentry上面创建项目的时候得到的dsn'
 # }
 
-
+if DEBUG:
+    # django debug toolbar
+    INSTALLED_APPS.append('debug_toolbar')
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+    DEBUG_TOOLBAR_CONFIG = {
+        # 'SHOW_COLLAPSED': True,
+    }
+    INTERNAL_IPS += ['159.226.50.246', '127.0.0.1'] # 通过这些IP地址访问时，页面才会出现django debug toolbar面板

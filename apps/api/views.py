@@ -335,7 +335,9 @@ class BucketViewSet(viewsets.GenericViewSet):
         for bucket in buckets:
             # 只删除用户自己的buckets
             if bucket.user.id == request.user.id:
-                bucket.do_soft_delete()  # 软删除
+                if not bucket.do_soft_delete():  # 软删除
+                    if not bucket.do_soft_delete():
+                        return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -595,6 +597,9 @@ class ObjViewSet(viewsets.GenericViewSet):
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if len(filename) > 255:
+            return Response(data={'code': 400, 'code_text': '对象名称长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
+
         # 数据验证
         try:
             put_data = self.get_data(request)
@@ -819,7 +824,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         # 创建文件对象
         BucketFileClass = bfm.get_obj_model_class()
         full_filename = bfm.build_dir_full_name(filename)
-        bfinfo = BucketFileClass(na=full_filename,  # 文件名
+        bfinfo = BucketFileClass(na=full_filename,  # 全路径文件名
+                                 name=filename, #  文件名
                                 fod=True,  # 文件
                                 si=0)  # 文件大小
         # 有父节点
@@ -1162,12 +1168,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('breadcrumb', pp.get_path_breadcrumb(dir_path))
         ])
 
-        start_time = datetime.now()
-
         queryset = files
         page = self.paginate_queryset(queryset)
-
-        debug_logger.debug(f'All used time: {datetime.now() - start_time} get files list page in dir.')
 
         if page is not None:
             serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
@@ -1196,7 +1198,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
         BucketFileClass = bfm.get_obj_model_class()
-        bfinfo = BucketFileClass(na=dir_path_name,  # 目录名
+        bfinfo = BucketFileClass(na=dir_path_name,  # 全路经目录名
+                                 name=dir_name, # 目录名
                                 fod=False,  # 目录
                                 )
         # 有父节点
@@ -1294,6 +1297,9 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if '/' in dir_name:
             return None, Response({'code': 400, 'code_text': 'dir_name不能包含‘/’'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if len(dir_name) > 255:
+            return None, Response({'code': 400, 'code_text': 'dir_name长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
+
         # bucket是否属于当前用户,检测存储桶名称是否存在
         _collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not _collection_name and response:
@@ -1304,7 +1310,8 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
         ok, dir = bfm.get_dir_exists(dir_name=dir_name)
         if not ok:
-            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'})
+            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'},
+                                  status=status.HTTP_400_BAD_REQUEST)
         # 目录已存在
         if dir:
             return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
@@ -1316,4 +1323,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data['dir_name'] = dir_name
         return data, None
 
+    @log_used_time(debug_logger, 'paginate in dir')
+    def paginate_queryset(self, queryset):
+        return super(DirectoryViewSet, self).paginate_queryset(queryset)
 

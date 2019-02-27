@@ -342,10 +342,10 @@ class ObjInfoSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
-    na = serializers.SerializerMethodField() # 文件名或目录名
-    dir_name = serializers.SerializerMethodField()  # 非全路径目录名
+    na = serializers.CharField() # 全路径的文件名或目录名
+    name = serializers.CharField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
-    did = serializers.CharField()  # 父节点objectID
+    did = serializers.IntegerField()  # 父节点ID
     si = serializers.IntegerField()  # 文件大小,字节数
     # ult = serializers.DateTimeField(default=datetime.utcnow)  # 文件的上传时间，或目录的创建时间
     ult = serializers.SerializerMethodField()  # 自定义字段序列化方法
@@ -363,26 +363,26 @@ class ObjInfoSerializer(serializers.Serializer):
     download_url = serializers.SerializerMethodField()
     access_permission = serializers.SerializerMethodField() # 公共读权限
 
-    def get_na(self, obj):
-        # 文件
-        if obj.fod:
-            pp = PathParser(obj.na)
-            _, name = pp.get_path_and_filename()
-            return name
-
-        return obj.na
+    # def get_na(self, obj):
+    #     # 文件
+    #     if obj.fod:
+    #         pp = PathParser(obj.na)
+    #         _, name = pp.get_path_and_filename()
+    #         return name
+    #
+    #     return obj.na
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
 
-    def get_dir_name(self, obj):
-        # 文件
-        if obj.fod:
-            return ''
-
-        pp = PathParser(obj.na)
-        _, name = pp.get_path_and_filename()
-        return name
+    # def get_dir_name(self, obj):
+    #     # 文件
+    #     if obj.fod:
+    #         return ''
+    #
+    #     pp = PathParser(obj.na)
+    #     _, name = pp.get_path_and_filename()
+    #     return name
 
     def get_sds(self, obj):
         return obj.get_sds_display()

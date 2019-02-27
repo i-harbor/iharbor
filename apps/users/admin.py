@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import UserProfile, Email
+from .models import UserProfile, Email, AuthKey
 # Register your models here.
 
 admin.site.site_header = 'EVHarbor管理'
@@ -32,3 +32,13 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display_links = ('id',)
     list_filter = ('send_time',)
     search_fields = ('receiver',)  # 搜索字段
+
+
+@admin.register(AuthKey)
+class AuthKeyAdmin(admin.ModelAdmin):
+    list_display = ('id', 'secret_key', 'create_time', 'state', 'permission', 'user')
+    list_display_links = ('id',)
+    list_filter = ('state', 'create_time')
+    list_editable = ('state', 'permission')  # 列表可编辑字段
+    search_fields = ('id', 'secret_key', 'user__username')  # 搜索字段
+

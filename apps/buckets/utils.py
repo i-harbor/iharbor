@@ -3,6 +3,7 @@ import traceback
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
+from django.db.models import Sum
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
@@ -126,7 +127,8 @@ class BucketFileManagement():
         '''
         获得当前目录节点id
         @ return: (ok, id)，ok指示是否有错误(路径参数错误)
-            正常返回(True, path目录的id)；未找到记录返回(False, None)，即参数有误
+            正常返回：(True, id)，顶级目录时id=None
+            未找到记录返回(False, None)，即参数有误
         '''
         if self.cur_dir_id:
             return (True, self.cur_dir_id)
@@ -142,14 +144,16 @@ class BucketFileManagement():
 
         model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get(Q(na=path) & Q(fod=False))  # 查找目录记录
+            dir = model_class.objects.get(Q(fod=False) & Q(na=path))  # 查找目录记录
         except model_class.DoesNotExist as e:
             return (False, None)  # path参数有误,未找到对应目录信息
         except MultipleObjectsReturned as e:
+            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{path}')
+            # dir = model_class.objects.filter(Q(na=path) & Q(fod=False)).first()
             return (False, None)  # path参数有误,未找到对应目录信息
         if dir:
             self.cur_dir_id = dir.id
-        return (True, self.cur_dir_id)  # None->未找到对应目录
+        return (True, self.cur_dir_id)
 
 
     def get_cur_dir_files(self, cur_dir_id=None):
@@ -173,10 +177,10 @@ class BucketFileManagement():
         model_class = self.get_obj_model_class()
         try:
             if dir_id:
-                files = model_class.objects.filter(Q(did=dir_id) & Q(na__isnull=False)).all()
+                files = model_class.objects.filter(did=dir_id).all()
             else:
-                #存储桶下文件目录,did不存在表示是存储桶下的文件目录
-                files = model_class.objects.filter(Q(did__lte=0) & Q(na__isnull=False)).all()
+                #存储桶下文件目录,did=0表示是存储桶下的文件目录
+                files = model_class.objects.filter(did=0).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None
@@ -191,7 +195,7 @@ class BucketFileManagement():
         '''
         file_name = file_name.strip('/')
         full_file_name = self.build_dir_full_name(file_name)
-        bfis = self.get_obj_model_class().objects.filter((Q(na=full_file_name) & Q(fod=True)))
+        bfis = self.get_obj_model_class().objects.filter(Q(fod=True) & Q(na=full_file_name))
         bfi = bfis.first()
 
         return bfi
@@ -205,19 +209,20 @@ class BucketFileManagement():
             第二个返回值：如果存在返回文件记录对象，否则None
         '''
         # 先检测当前目录存在
-        # ok, did = self.get_cur_dir_id()
-        # if not ok:
-        #     return False, None
+        ok, did = self.get_cur_dir_id()
+        if not ok:
+            return False, None
 
         dir_path_name = self.build_dir_full_name(dir_name)
 
         model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get((Q(na=dir_path_name) & Q(fod=False)))  # 查找目录记录
+            dir = model_class.objects.get(Q(fod=False) & Q(na=dir_path_name))  # 查找目录记录
         except model_class.DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
-            logger.error(f'In get_dir_exists({dir_name}):' + str(e))
+            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{dir_path_name}')
+            # dir = model_class.objects.filter(Q(na=dir_path_name) & Q(fod=False)).first()
             return False, None
 
         return True, dir
@@ -298,5 +303,11 @@ class BucketFileManagement():
 
         return True
 
-
+    def get_bucket_space_use(self):
+        '''
+        获取存储桶中的对象占用总空间大小
+        :return:
+        '''
+        a = self.get_obj_model_class().objects.filter(fod=True).aggregate(space=Sum('si'))
+        return a['space']
 
