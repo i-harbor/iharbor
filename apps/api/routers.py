@@ -10,7 +10,7 @@ class DetailPostRouter(SimpleRouter):
         Route(
             url=r'^{prefix}{trailing_slash}$',
             mapping={
-                'get': 'list',
+                # 'get': 'list',
                 'post': 'create'
             },
             name='{basename}-list',
@@ -29,7 +29,7 @@ class DetailPostRouter(SimpleRouter):
         Route(
             url=r'^{prefix}/{lookup}{trailing_slash}$',
             mapping={
-                'get': 'retrieve',
+                'get': 'list',
                 'post': 'create_detail',
                 'put': 'update',
                 'patch': 'partial_update',

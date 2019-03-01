@@ -1062,7 +1062,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     目录视图集
 
-    retrieve:
+    list:
     获取一个目录下的文件和文件夹信息
 
         >>Http Code: 状态码200:
@@ -1145,7 +1145,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         }
     )
     @log_used_time(debug_logger, mark_text='get dir files list')
-    def retrieve(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         ab_path = kwargs.get(self.lookup_field, '')
         pp = PathParser(filepath=ab_path)
         bucket_name, dir_path = pp.get_bucket_and_dirpath()

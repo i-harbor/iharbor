@@ -18,7 +18,7 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 #### 凭证格式和用法  
 安全凭证auth_key的格式为“evhb-auth {access_key}:{token}:{data_base64}”，包含在HTTP标头Authorization中，
 凭证应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。  
-例如：Authorization: evhb-auth xxx:xxx:xxx   
+例如：`Authorization: evhb-auth xxx:xxx:xxx`  
 
 #### 凭证生成  
 

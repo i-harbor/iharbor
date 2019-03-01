@@ -47,8 +47,8 @@
                     <span class="glyphicon glyphicon-record"></span><span>访问密钥(访问密钥和秘密访问密钥)</span></div>
                 <div class="panel-body collapse in"  id="nav-list-auth-key-body">
                     <div class="">
-                        <p>每个访问密钥包含access_key和secret_key密钥对，访问密钥不只是简单的身份认证，每次http请求前都需要根据请求的url的path和有效期时间戳重新计算auth_key字符串，此认证方式安全性高，使用稍微复杂一些。
-                            auth_key的格式为“evhb-auth {access_key}:{token}:{data_base64}”，应包含在Authorization HTTP标头中，密钥应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。
+                        <p>每个访问密钥包含access_key和secret_key密钥对，访问密钥不只是简单的身份认证，每次http请求前都需要根据请求的url的path和有效期时间戳重新计算auth_key字符串，此认证方式安全性高，使用稍微复杂一些(具体生成过程请参考帮助文档)。
+                            auth_key的格式为“evhb-auth {access_key}:{hmac_sha1}:{data_base64}”，应包含在Authorization HTTP标头中，密钥应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。
                             <p class="text-info">例如：Authorization: evhb-auth xxx:xxx:xxx</p>
                         </p>
                         <table class="table table-hover" id="auth-key-table">
