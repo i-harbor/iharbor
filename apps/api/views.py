@@ -66,7 +66,7 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
-@log_used_time(debug_logger, mark_text='select bucket')
+
 def get_user_own_bucket(bucket_name, request):
     '''
     获取当前用户的存储桶
@@ -1327,3 +1327,69 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     def paginate_queryset(self, queryset):
         return super(DirectoryViewSet, self).paginate_queryset(queryset)
 
+
+class BucketStatsViewSet(viewsets.GenericViewSet):
+    '''
+        视图集
+
+        retrieve:
+            统计存储桶所占容量，字节
+
+            >>Http Code: 状态码200:
+                {
+                    "stats": {
+                      "space": 12500047770969,             # 桶内对象总大小，单位字节
+                      "count": 5000004,                    # 桶内对象总数量
+                    },
+                    "stats_time": "2019-03-06 08:19:43", # 统计时间
+                    "code": 200,
+                    "bucket_name": "xxx"    # 存储桶名称
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': xxx  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'bucket_name'
+    lookup_value_regex = '[a-z0-9-]{3,64}'
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+        coreapi.Field(
+            name='bucket_name',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='存储桶名称')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        bucket_name = kwargs.get(self.lookup_field)
+
+        bucket = get_user_own_bucket(bucket_name, request)
+        if not isinstance(bucket, Bucket):
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                                  status=status.HTTP_404_NOT_FOUND)
+
+        data = bucket.get_stats()
+        data.update({
+            'code': 200,
+            'bucket_name': bucket_name,
+        })
+
+        return Response(data)

@@ -8,9 +8,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from ckeditor.fields import RichTextField
 
-from utils.log.decorators import log_used_time
+# from utils.log.decorators import log_used_time
+from utils.time import to_localtime_string_naive_by_utc
 
-debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+# debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
 #获取用户模型
@@ -45,6 +46,7 @@ class Bucket(models.Model):
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
     objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
+    stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
 
     class Meta:
         ordering = ['-created_time']
@@ -172,6 +174,44 @@ class Bucket(models.Model):
                 return False
 
         return True
+
+    def __update_stats(self):
+        from buckets.utils import get_bfmanager
+
+        table_name = self.get_bucket_table_name()
+        bfm = get_bfmanager(table_name=table_name)
+        data = bfm.get_bucket_space_and_count()
+        count = data.get('count')
+        space = data.get('space')
+        if (self.objs_count != count) or (self.size != space):
+            self.objs_count = count
+            self.size = space
+            self.stats_time = timezone.now()
+            try:
+                self.save()
+            except:
+                pass
+
+    def get_stats(self, now=False):
+        '''
+        获取存储桶统计数据
+
+        :param now:  重新统计
+        :return: dict
+            {
+                'stats': {
+                    'space': xxx, 'count': xxx
+                },
+                'stats_time': xxxx-xx-xx xx:xx:xx
+            }
+        '''
+        # 强制重新统计，或者对象数量较小，或者旧的统计结果时间超过了一天， 满足其一条件重新统计
+        if now or (self.objs_count < 500000) or (timezone.now().date()  > self.stats_time.date()):
+            self.__update_stats()
+
+        stats = {'space': self.size, 'count': self.objs_count}
+        time_str =  to_localtime_string_naive_by_utc(self.stats_time)
+        return {'stats': stats, 'stats_time': time_str}
 
 
 class BucketLimitConfig(models.Model):
@@ -394,7 +434,6 @@ class BucketFileBase(models.Model):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None
 
-    @log_used_time(debug_logger, 'save obj info to database')
     def do_save(self, **kwargs):
         '''
         创建一个文档或更新一个已存在的文档

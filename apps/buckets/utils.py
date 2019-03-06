@@ -3,13 +3,13 @@ import traceback
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
 
-
 from .models import BucketFileBase
+
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
@@ -88,6 +88,10 @@ def get_obj_model_class(table_name):
     meta.abstract = False
     meta.db_table = table_name  # 数据库表名
     return type(model_name, (BucketFileBase,), {'Meta': meta, '__module__': BucketFileBase.__module__})
+
+
+def get_bfmanager(path='', table_name=''):
+    return BucketFileManagement(path=path, collection_name=table_name)
 
 
 class BucketFileManagement():
@@ -286,7 +290,7 @@ class BucketFileManagement():
         if did is None:
             return None
 
-        if self.get_obj_model_class().objects.filter(did=did).count() > 0:
+        if self.get_obj_model_class().objects.filter(did=did).exists():
             return False
 
         return True
@@ -298,16 +302,20 @@ class BucketFileManagement():
         '''
         did = dir_obj.id
 
-        if self.get_obj_model_class().objects.filter(did=did).count() > 0:
+        if self.get_obj_model_class().objects.filter(did=did).exists():
             return False
 
         return True
 
-    def get_bucket_space_use(self):
+    def get_bucket_space_and_count(self):
         '''
-        获取存储桶中的对象占用总空间大小
+        获取存储桶中的对象占用总空间大小和对象数量
         :return:
+            {'space': 123, 'count: 456}
         '''
-        a = self.get_obj_model_class().objects.filter(fod=True).aggregate(space=Sum('si'))
-        return a['space']
+        data = self.get_obj_model_class().objects.filter(fod=True).aggregate(space=Sum('si'), count=Count('fod'))
+        return data
+
+
+
 

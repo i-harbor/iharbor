@@ -16,7 +16,7 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 的安全凭证中更换密钥。
 
 #### 凭证格式和用法  
-安全凭证auth_key的格式为“evhb-auth {access_key}:{token}:{data_base64}”，包含在HTTP标头Authorization中，
+安全凭证auth_key的格式为“evhb-auth {access_key}:{hmac_sha1}:{data_base64}”，包含在HTTP标头Authorization中，
 凭证应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。  
 例如：`Authorization: evhb-auth xxx:xxx:xxx`  
 
@@ -25,9 +25,9 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 安全凭证是客户端请求内容的一部分，不带凭证或带非法凭证的请求将返回HTTP错误码401，代表认证失败。
 
 生成安全凭证时需要指定以下要素：  
- >* 请求的url的全路径非编码path，不包含域名，如url为“http://abc.com/a/d?b=1”，取path为“/a/d?b=1”；   
- >* 请求方法method, 如GET,POST,PUT,PATCH,DELETE等；   
- >* 有效期时间戳；  
+ >* __请求的url的全路径非编码path__，不包含域名，如url为`“http://abc.com/a/d?b=1”`，取path为`“/a/d?b=1”`；   
+ >* __请求方法method__, 如GET,POST,PUT,PATCH,DELETE等；   
+ >* __有效期时间戳__；  
 
 以下python为例，说明生成安全凭证的过程，所需数据如下： 
 >* path_of_url = '/a/d?b=1';   
@@ -48,10 +48,10 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 3、 然后以secret_key为密钥参数，对data_base64字符串utf8编码后的bytes做HMAC-SHA1哈希签名，得到sha1哈希bytes如下：   
 `b'A\xb0g\xd6\x99\xc8\xa2\xc1DfH\n\xcdP\x1e\xfa\xe6\xca\xee\xb8'`  
 
-4、 然后再对sha1哈希签名bytes做base64编码，以uft8解码为字符串token如下:  
+4、 然后再对sha1哈希签名bytes做base64编码，以uft8解码为字符串hmac_sha1如下:  
 `'QbBn1pnIosFEZkgKzVAe-ubK7rg='`   
 
-5、 安全凭证auth_key的格式为“evhb-auth {access_key}:{token}:{data_base64}”,最后按格式拼接各字符串得到安全凭证auth_key如下：  
+5、 安全凭证auth_key的格式为“evhb-auth {access_key}:{hmac_sha1}:{data_base64}”,最后按格式拼接各字符串得到安全凭证auth_key如下：  
 `'evhb-auth 4203ecc034d411e9b31bc800a000655d:QbBn1pnIosFEZkgKzVAe-ubK7rg=:eyJwYXRoX29mX3VybCI6Ii9hL2Q_Yj0xIiwibWV0aG9kIjoiR0VUIiwiZGVhZGxpbmUiOjE1NTEyNTM3NzF9'`   
 
 具体请参考[Python代码](https://github.com/evharbor/webserver/blob/master/apps/users/auth/auth_key.py)  
