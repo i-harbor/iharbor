@@ -215,6 +215,10 @@ CEPH_RADOS = {
 }
 
 # 日志配置
+LOGGING_FILES_DIR = '/var/log/evharbor'
+if not os.path.exists(LOGGING_FILES_DIR):
+    os.makedirs(LOGGING_FILES_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -242,7 +246,7 @@ LOGGING = {
         'file': {
             'level': 'WARNING',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
+            'filename': os.path.join(LOGGING_FILES_DIR, 'webserver.log'),
             'formatter': 'verbose'
         },
         # output to console settings
@@ -257,7 +261,7 @@ LOGGING = {
             'level': 'DEBUG',
             'filters': ['require_debug_true'],# working with debug mode
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'log/debug.log'),
+            'filename': os.path.join(LOGGING_FILES_DIR, '/debug.log'),
             'formatter': 'dubug_formatter'
         },
         # 邮件通知
