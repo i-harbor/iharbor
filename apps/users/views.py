@@ -1,14 +1,15 @@
 from django.shortcuts import render, redirect, reverse
 from django.contrib.auth.views import redirect_to_login
-from django.contrib.auth import logout, login
+from django.contrib.auth import logout, login, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import get_user_model
+from django.http import JsonResponse
 from django.template.loader import get_template
 from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool
 from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
 from .models import Email, AuthKey
+from webserver.views import get_kjy_login_url
 
 #获取用户模型
 User = get_user_model()
@@ -69,6 +70,7 @@ def login_user(request):
     content['submit_text'] = '登录'
     content['action_url'] = reverse('users:login')
     content['form'] = form
+    content['kjy_url'] = get_kjy_login_url()
     return render(request, 'login.html', content)
 
 
@@ -344,5 +346,6 @@ def security(request, *args, **kwargs):
     token = get_or_create_token(user=user)
     auth_keys = AuthKey.objects.filter(user=user).all()
     return render(request, 'security.html', context={'token': token, 'auth_keys': auth_keys})
+
 
 

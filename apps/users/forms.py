@@ -184,7 +184,7 @@ class PasswordChangeForm(forms.Form):
     def __init__(self, *args, **kwargs):
         if 'user' in kwargs:
             self.user = kwargs.pop('user')
-        return super(PasswordChangeForm, self).__init__(*args, **kwargs)
+        super(PasswordChangeForm, self).__init__(*args, **kwargs)
 
     def clean(self):
         '''

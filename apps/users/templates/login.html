@@ -3,6 +3,16 @@
 {% block form_extend %}
     <a class="btn text-warning" href="{% url 'users:forget' %}">忘记密码</a>
     <a class="btn btn-success pull-right" href="{% url 'users:register' %}">注册</a>
+    <div class="clearfix"></div>
+    {% if kjy_url %}
+        <hr>
+        <div class="third-part">
+            <div class="text-center">第三方帐号登录:</div>
+            <div>
+                <h3 class="text-center"><a href="{{ kjy_url }}" class="text-info">中国科技云通行证</a></h3>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}
 
 
