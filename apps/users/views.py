@@ -9,7 +9,7 @@ from rest_framework.authtoken.models import Token
 from utils.jwt_token import JWTokenTool
 from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
 from .models import Email, AuthKey
-from webserver.views import get_kjy_login_url
+from webserver.views import get_kjy_login_url, kjy_logout
 
 #获取用户模型
 User = get_user_model()
@@ -79,8 +79,18 @@ def logout_user(request):
     '''
     注销用户
     '''
+    next = request.GET.get('next', reverse('buckets:bucket_view')) # 登出后重定向url
+    user = request.user
+    # 科技云通行证用户登录
+    if user.third_app == user.THIRD_APP_KJY:
+        user.third_app = user.LOCAL_USER
+        user.save()
+        logout(request)
+        next_url = request.build_absolute_uri(location=next)
+        return kjy_logout(next=next_url)
+
     logout(request)
-    return redirect(to=request.GET.get('next', reverse('buckets:bucket_view')))
+    return redirect(to=next)
 
 
 @login_required
@@ -98,8 +108,15 @@ def change_password(request):
             user.save()
 
             #注销当前用户，重新登陆
+            login_url = reverse('users:login')
+
+            if user.third_app == user.THIRD_APP_KJY: # 如果当前未第三方科技云通行证登录认证
+                logout(request)
+                next = request.build_absolute_uri(location=login_url)
+                return kjy_logout(next=next)
+
             logout(request)
-            return redirect(to=reverse('users:login'))
+            return redirect(to=login_url)
     else:
         form = PasswordChangeForm()
 
@@ -108,6 +125,18 @@ def change_password(request):
     content['submit_text'] = '修改'
     content['action_url'] = reverse('users:change_password')
     content['form'] = form
+
+    user = request.user
+    # 当前用户为第三方应用登录认证
+    if (user.third_app != user.LOCAL_USER):
+        if user.password:
+            tips_msg = f'您当前是通过第三方应用"{user.get_third_app_display()}"登录认证，并且您曾经为此用户设置过本地密码，' \
+                       f'若忘记密码，请通过登录页面找回密码。'
+        else:
+            tips_msg = f'您当前是通过第三方应用"{user.get_third_app_display()}"登录认证，您还未为此用户设置本地密码，' \
+                       f'你可以通过此页面为此用户设置本地密码，以便以后直接本地登录；原密码输入框可以输入8-20个任意字符。'
+        content['tips_msg'] = tips_msg
+
     return render(request, 'form.html', content)
 
 def forget_password(request):

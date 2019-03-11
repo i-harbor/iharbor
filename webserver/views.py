@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
 import requests
+import json
 
 #获取用户模型
 User = get_user_model()
@@ -15,11 +16,7 @@ def kjy_login_callback(request, *args, **kwargs):
     if not code:
         return kjy_logout()
 
-    token_url = get_kjy_token_url(code=code)
-    if not token_url:
-        return kjy_logout()
-
-    token = get_kjy_auth_token(url=token_url)
+    token = get_kjy_auth_token(code=code)
     if not token:
         return kjy_logout()
 
@@ -27,6 +24,10 @@ def kjy_login_callback(request, *args, **kwargs):
     if not user:
         return kjy_logout()
 
+    # 标记当前为科技云通行证登录用户
+    if user.third_app != user.THIRD_APP_KJY:
+        user.third_app = user.THIRD_APP_KJY
+        user.save()
     # 登录用户
     login(request, user)
     return redirect(to='/')
@@ -41,7 +42,10 @@ def create_kjy_auth_user(request, token):
         success: User()
         failed: None
     '''
-    user_info = token.get('userInfo')
+    user_info = get_user_info_from_token(token)
+    if not user_info:
+        return None
+
     is_active = user_info.get('cstnetIdStatus')
     email = user_info.get('cstnetId')
     truename = user_info.get('truename')
@@ -122,43 +126,11 @@ def get_kjy_login_url():
 
     return url
 
-def get_kjy_token_url(code):
-    '''
-    获取 中国科技云通行证 认证结果token的url
-
-    :param code: 认证成功后回调url中的param参数code
-    :return:
-        success: url
-        failed: None
-    '''
-    kjy_settings = settings.THIRD_PARTY_APP_AUTH.get('SCIENCE_CLOUD')
-    kjy_security_settings = settings.THIRD_PARTY_APP_AUTH_SECURITY.get('SCIENCE_CLOUD')
-    if not kjy_settings or not kjy_security_settings:
-        return None
-
-    client_id = kjy_security_settings.get('client_id')
-    client_secret = kjy_security_settings.get('client_secret')
-    client_callback_url = kjy_settings.get('client_callback_url')
-    token_url = kjy_settings.get('token_url')
-    params = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'redirect_uri': client_callback_url,
-        'code': code
-    }
-    try:
-        url = prepare_url(url=token_url, params=params)
-    except:
-        return None
-
-    return url
-
-
-def get_kjy_auth_token(url):
+def get_kjy_auth_token(code):
     '''
     获取登录认证后的token
 
-    :param url: token的uri
+    :param code: 认证成功后回调url中的param参数code
     :return:
         success:
         {
@@ -179,8 +151,25 @@ def get_kjy_auth_token(url):
 
         failed: None
     '''
+    kjy_settings = settings.THIRD_PARTY_APP_AUTH.get('SCIENCE_CLOUD')
+    kjy_security_settings = settings.THIRD_PARTY_APP_AUTH_SECURITY.get('SCIENCE_CLOUD')
+    if not kjy_settings or not kjy_security_settings:
+        return None
+
+    client_id = kjy_security_settings.get('client_id')
+    client_secret = kjy_security_settings.get('client_secret')
+    client_callback_url = kjy_settings.get('client_callback_url')
+    token_url = kjy_settings.get('token_url')
+    data = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'redirect_uri': client_callback_url,
+        'code': code,
+        'grant_type': 'authorization_code'
+    }
+
     try:
-        r = requests.get(url=url)
+        r = requests.post(url=token_url, data=data)
         if r.status_code == 200:
             token = r.json()
         else:
@@ -190,7 +179,26 @@ def get_kjy_auth_token(url):
 
     return token
 
-def get_kjy_logout_url():
+def get_user_info_from_token(token):
+    '''
+    从token中获取用户信息
+
+    :param token:
+    :return:
+        success: user_info ; type:dict
+        failed: None
+    '''
+    user_info = token.get('userInfo')
+    if isinstance(user_info, str):
+        try:
+            user_info = json.loads(user_info)
+        except:
+            user_info = None
+
+    return user_info
+
+
+def get_kjy_logout_url(redirect_uri=None):
     '''
     科技云通行证登出url
 
@@ -204,22 +212,24 @@ def get_kjy_logout_url():
         return None
 
     logout_url = kjy_settings.get('logout_url')
-    client_home_url = kjy_settings.get('client_home_url')
+    if not redirect_uri:
+        redirect_uri = kjy_settings.get('client_home_url')
 
     try:
-        url = prepare_url(url=logout_url, params={'WebServerURL': client_home_url})
+        url = prepare_url(url=logout_url, params={'WebServerURL': redirect_uri})
     except:
         return None
 
     return url
 
-def kjy_logout():
+def kjy_logout(next=None):
     '''
     登出科技云账户
 
+    :param next: 登出后重定向的url
     :return:
     '''
-    url = get_kjy_logout_url()
+    url = get_kjy_logout_url(next)
     return redirect(to=url)
 
 def prepare_url(url, params=None):
@@ -232,5 +242,5 @@ def prepare_url(url, params=None):
     '''
     pr = requests.PreparedRequest()
     pr.prepare_url(url=url, params=params)
-    url = requests.utils.unquote(pr.url)  # 解码url
-    return url
+    # url = requests.utils.unquote(pr.url)  # 解码url
+    return pr.url

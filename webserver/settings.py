@@ -363,7 +363,7 @@ THIRD_PARTY_APP_AUTH = {
         'client_home_url': 'http://obs.casearth.cn',
         'client_callback_url': 'http://obs.casearth.cn/callback/', # 认证回调地址
         'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
-        'token_url': 'https://passport.escience.cn/oauth2/token?grant_type=authorization_code',
+        'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'
     },
 }
