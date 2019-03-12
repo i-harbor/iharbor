@@ -215,6 +215,10 @@ CEPH_RADOS = {
 }
 
 # 日志配置
+LOGGING_FILES_DIR = '/var/log/evharbor'
+if not os.path.exists(LOGGING_FILES_DIR):
+    os.makedirs(LOGGING_FILES_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -241,8 +245,8 @@ LOGGING = {
         # logging file settings
         'file': {
             'level': 'WARNING',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'log/webserver.log'),
+            'class': 'logging.handlers.WatchedFileHandler',
+            'filename': os.path.join(LOGGING_FILES_DIR, 'webserver.log'),
             'formatter': 'verbose'
         },
         # output to console settings
@@ -256,8 +260,8 @@ LOGGING = {
         'debug': {
             'level': 'DEBUG',
             'filters': ['require_debug_true'],# working with debug mode
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'log/debug.log'),
+            'class': 'logging.handlers.WatchedFileHandler',
+            'filename': os.path.join(LOGGING_FILES_DIR, '/debug.log'),
             'formatter': 'dubug_formatter'
         },
         # 邮件通知
@@ -349,6 +353,22 @@ DATABASE_ROUTERS = [
     'webserver.db_routers.MetadataRouter',
 ]
 
+
+# 第三方应用登录认证
+THIRD_PARTY_APP_AUTH = {
+    # 科技云通行证
+    'SCIENCE_CLOUD': {
+        # 'client_id': 000,
+        # 'client_secret': 'xxx',
+        'client_home_url': 'http://obs.casearth.cn',
+        'client_callback_url': 'http://obs.casearth.cn/callback/', # 认证回调地址
+        'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
+        'token_url': 'https://passport.escience.cn/oauth2/token',
+        'logout_url': 'https://passport.escience.cn/logout'
+    },
+}
+
+
 # 导入安全相关的settings
 from .security_settings import *
 
@@ -362,24 +382,23 @@ from .security_settings import *
 #
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': 'db.sqlite3',
-#     }
-# }
-
-#mongodb数据库连接
-# from mongoengine import connect
+#         'ENGINE': 'django.db.backends.mysql',   # 数据库引擎
+#             'NAME': 'xxx',       # 数据的库名，事先要创建之
+#             'USER': 'xxx',         # 数据库用户名
+#             'PASSWORD': 'xxx',     # 密码
+#             'HOST': '0.0.0.0',    # 主机
+#             'PORT': '3306',         # 数据库使用的端口
 #
-# connect(
-#     alias='default',
-#     db='metadata',
-#     host='10.0.86.213',
-#     port=27017,
-#     # username='***',
-#     # password='***',
-#     # authentication_source='admin'
-# )
-# connect(alias='db2', db='testdb2', host='10.0.86.213', port=27017)
+#     },
+#     'metadata': {
+#         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+#         'NAME': 'xxx',  # 数据的库名，事先要创建之
+#         'USER': 'xxx',  # 数据库用户名
+#         'PASSWORD': 'xxx',  # 密码
+#         'HOST': '0.0.0.0',  # 主机
+#         'PORT': '3306',  # 数据库使用的端口
+#     },
+# }
 
 # 邮箱配置
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -391,6 +410,15 @@ from .security_settings import *
 
 # RAVEN_CONFIG = {
 #     'dsn': 'sentry上面创建项目的时候得到的dsn'
+# }
+
+# 第三方应用登录认证敏感信息
+# THIRD_PARTY_APP_AUTH_SECURITY = {
+#     # 科技云通行证
+#     'SCIENCE_CLOUD': {
+#         'client_id': 000,
+#         'client_secret': 'xxx',
+#     },
 # }
 
 if DEBUG:

@@ -150,6 +150,9 @@ class LoginForm(forms.Form):
         if not user:
             raise forms.ValidationError('用户名或密码有误，请注意区分字母大小写')
         else:
+            if user.third_app != user.LOCAL_USER:
+                user.third_app = user.LOCAL_USER # 本地用户登录
+                user.save()
             self.cleaned_data['user'] = user
         return self.cleaned_data
 
@@ -184,7 +187,7 @@ class PasswordChangeForm(forms.Form):
     def __init__(self, *args, **kwargs):
         if 'user' in kwargs:
             self.user = kwargs.pop('user')
-        return super(PasswordChangeForm, self).__init__(*args, **kwargs)
+        super(PasswordChangeForm, self).__init__(*args, **kwargs)
 
     def clean(self):
         '''
@@ -202,6 +205,11 @@ class PasswordChangeForm(forms.Form):
         验证原密码
         '''
         old_password = self.cleaned_data.get('old_password')
+
+        # 如果当前用户为第三方登录，且还未设置本地密码，跳过原密码检验
+        if self.user.third_app != self.user.LOCAL_USER and not self.user.password:
+            return old_password
+
         if not self.user.check_password(old_password):
             raise forms.ValidationError('原密码有误')
         return old_password
@@ -285,4 +293,5 @@ class PasswordResetForm(forms.Form):
         self.cleaned_data['user'] = user
 
         return self.cleaned_data
+
 

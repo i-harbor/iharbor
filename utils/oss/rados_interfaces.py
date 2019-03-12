@@ -22,8 +22,7 @@ class CephRadosObject():
     def __init__(self, obj_id, obj_size=0, cluster_name=None , user_name=None, conf_file='', pool_name=None, *args, **kwargs):
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', '')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
-        self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get(
-                                                                            'CONF_FILE_PATH', '')
+        self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
         self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
         self._obj_id = obj_id
         self._obj_size = obj_size
@@ -31,6 +30,10 @@ class CephRadosObject():
 
     def reset_obj_id(self, obj_id):
         self._obj_id = obj_id
+
+    def get_obj_size(self):
+        '''获取对象大小'''
+        return self._obj_size
 
     def read(self, offset, size):
         '''
@@ -145,6 +148,7 @@ class CephRadosObject():
         :param block_size: 每次读取数据块长度；type: int
         :return:
         '''
+        obj_size = self.get_obj_size()
         offset = offset
         while True:
             ok, data_block = self.read(offset=offset, size=block_size)
@@ -156,6 +160,10 @@ class CephRadosObject():
                 l = len(data_block)
                 offset = offset + l
                 yield data_block
+
+                # 下载完成
+                if offset >= obj_size:
+                    break
             else:
                 break
 

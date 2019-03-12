@@ -6,6 +6,15 @@
     <div class="container">
         <div class="row">
             <div class="col-sm-offset-4 col-sm-4">
+                {% if tips_msg %}
+                    <div>
+                        <div class="alert alert-warning alert-dismissible" role="alert">
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
+                                    aria-hidden="true">&times;</span></button>
+                            {{ tips_msg }}
+                        </div>
+                    </div>
+                {% endif %}
                 <div class="panel panel-default panel-info">
                     <div class="panel-heading">
                         <h3 class="panel-title">{{ form_title }}</h3>

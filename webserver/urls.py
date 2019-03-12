@@ -21,6 +21,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 
 from apps.share.views import ObsViewSet
+from .views import kjy_login_callback
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter(trailing_slash=False)
@@ -39,7 +40,9 @@ urlpatterns = [
     url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
     url(r'apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),
     url(r'^docs/', include('docs.urls', namespace='docs')),
+    url(r'callback', kjy_login_callback, name='callback'),
 ]
+
 
 if settings.DEBUG:
     import debug_toolbar

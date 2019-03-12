@@ -13,10 +13,23 @@ class UserProfile(AbstractUser):
     '''
     自定义用户模型
     '''
+    NON_THIRD_APP = 0
+    LOCAL_USER = NON_THIRD_APP
+    THIRD_APP_KJY = 1       # 第三方科技云通行证
+
+    THIRD_APP_CHOICES = (
+        (NON_THIRD_APP, 'Local user.'),
+        (THIRD_APP_KJY, '科技云通行证')
+    )
+
     telephone = models.CharField(verbose_name='电话', max_length=11, default='')
     company = models.CharField(verbose_name='公司/单位', max_length=255, default='')
+    third_app = models.SmallIntegerField(verbose_name='第三方应用登录', choices=THIRD_APP_CHOICES, default=NON_THIRD_APP)
 
     def get_full_name(self):
+        if self.last_name.encode('UTF-8').isalpha() and self.first_name.encode('UTF-8').isalpha():
+            return f'{self.first_name} {self.last_name}'
+
         return f'{self.last_name}{self.first_name}'
 
 
