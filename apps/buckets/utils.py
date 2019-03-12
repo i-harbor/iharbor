@@ -98,6 +98,8 @@ class BucketFileManagement():
     '''
     存储桶相关的操作方法类
     '''
+    ROOT_DIR_ID = 0 # 根目录ID
+
     def __init__(self, path='', collection_name='', *args, **kwargs):
         self._path = path if path else ''
         self._collection_name = collection_name # bucket's database table name
@@ -131,7 +133,7 @@ class BucketFileManagement():
         '''
         获得当前目录节点id
         @ return: (ok, id)，ok指示是否有错误(路径参数错误)
-            正常返回：(True, id)，顶级目录时id=None
+            正常返回：(True, id)，顶级目录时id=ROOT_DIR_ID
             未找到记录返回(False, None)，即参数有误
         '''
         if self.cur_dir_id:
@@ -140,7 +142,7 @@ class BucketFileManagement():
         path = dir_path if dir_path else self._path
         # path为空，根目录为存储桶
         if path == '':
-            return (True, None)
+            return (True, self.ROOT_DIR_ID)
 
         path = self._hand_path(path)
         if not path:
@@ -168,10 +170,10 @@ class BucketFileManagement():
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
         '''
         dir_id = None
-        if cur_dir_id:
+        if cur_dir_id is not None:
             dir_id = cur_dir_id
 
-        if not dir_id and self._path:
+        if dir_id is None and self._path:
             ok, dir_id = self.get_cur_dir_id()
 
             # path路径有误
@@ -184,7 +186,7 @@ class BucketFileManagement():
                 files = model_class.objects.filter(did=dir_id).all()
             else:
                 #存储桶下文件目录,did=0表示是存储桶下的文件目录
-                files = model_class.objects.filter(did=0).all()
+                files = model_class.objects.filter(did=self.ROOT_DIR_ID).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None
@@ -198,8 +200,11 @@ class BucketFileManagement():
         :return: 如果存在返回文件记录对象，否则None
         '''
         file_name = file_name.strip('/')
-        full_file_name = self.build_dir_full_name(file_name)
-        bfis = self.get_obj_model_class().objects.filter(Q(fod=True) & Q(na=full_file_name))
+        ok, did = self.get_cur_dir_id()
+        if not ok:
+            return None
+
+        bfis = self.get_obj_model_class().objects.filter(Q(did=did) & Q(fod=True) & Q(name=file_name))
         bfi = bfis.first()
 
         return bfi
@@ -217,15 +222,13 @@ class BucketFileManagement():
         if not ok:
             return False, None
 
-        dir_path_name = self.build_dir_full_name(dir_name)
-
         model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get(Q(fod=False) & Q(na=dir_path_name))  # 查找目录记录
+            dir = model_class.objects.get(Q(did=did) & Q(fod=False) & Q(name=dir_name))  # 查找目录记录
         except model_class.DoesNotExist as e:
             return (True, None)  # 未找到对应目录信息
         except MultipleObjectsReturned as e:
-            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{dir_path_name}')
+            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{self.build_dir_full_name(dir_name)}')
             # dir = model_class.objects.filter(Q(na=dir_path_name) & Q(fod=False)).first()
             return False, None
 
@@ -298,6 +301,8 @@ class BucketFileManagement():
     def dir_is_empty(self, dir_obj):
         '''
         给定目录是否为空目录
+
+        :params dir_obj: 目录对象
         :return:True(空); False(非空)
         '''
         did = dir_obj.id

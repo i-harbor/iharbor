@@ -10,7 +10,7 @@ class BucketFileCursorPagination(CursorPagination):
     '''
     cursor_query_param = 'cursor'
     page_size = 100
-    ordering = ('-ult',) # 日期降序，最近日期靠前
+    ordering = ('fod', '-ult',) # 日期降序，最近日期靠前
 
     # Client can control the page size using this query parameter.
     # Default is 'None'. Set to eg 'page_size' to enable usage.
@@ -74,7 +74,6 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
             current = final
 
         return (current, final)
-
 
 
 class BucketsLimitOffsetPagination(LimitOffsetPagination):
