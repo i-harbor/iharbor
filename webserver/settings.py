@@ -180,6 +180,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser', # 支持解析application/json方式的json数据
+        'rest_framework.parsers.FormParser', # 支持解析application/x-www-form-urlencoded方式的form表单数据，request.data将填充一个QueryDict
+        'rest_framework.parsers.MultiPartParser' # 支持解析multipart/form-data方式多部分HTML表单内容，支持文件上载，request.data将填充一个QueryDict
+    ),
     # 'DEFAULT_THROTTLE_CLASSES': (
     #     'rest_framework.throttling.AnonRateThrottle',  # 未登陆认证的用户默认访问限制
     #     'rest_framework.throttling.UserRateThrottle'  # 登陆认证的用户默认访问限制
