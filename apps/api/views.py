@@ -36,6 +36,18 @@ class IsSuperUser(BasePermission):
         return request.user and request.user.is_superuser
 
 
+class IsOwnBucket(BasePermission):
+    '''
+    是否是自己的bucket
+    '''
+    message = '您没有操作此存储桶的权限。'
+    def has_object_permission(self, request, view, obj):
+        if request.user == obj.user:
+            return True
+
+        return False
+
+
 class CustomAutoSchema(AutoSchema):
     '''
     自定义Schema
@@ -238,7 +250,7 @@ class BucketViewSet(viewsets.GenericViewSet):
 
     '''
     queryset = Bucket.objects.filter(soft_delete=False).all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnBucket]
     pagination_class = paginations.BucketsLimitOffsetPagination
 
     # api docs
@@ -248,8 +260,8 @@ class BucketViewSet(viewsets.GenericViewSet):
                 coreapi.Field(
                     name='ids',
                     required=False,
-                    location='body',
-                    schema=coreschema.String(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
+                    location='form',
+                    schema=coreschema.Array(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
                 ),
             ],
             'PATCH': [
@@ -258,6 +270,12 @@ class BucketViewSet(viewsets.GenericViewSet):
                     required=True,
                     location='query',
                     schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
+                ),
+                coreapi.Field(
+                    name='ids',
+                    required=False,
+                    location='form',
+                    schema=coreschema.Array(description='存储桶id列表或数组，设置多个存储桶时，通过此参数传递其他存储桶id'),
                 ),
             ]
         }
@@ -356,12 +374,12 @@ class BucketViewSet(viewsets.GenericViewSet):
 
         buckets = Bucket.objects.filter(id__in=ids)
         if not buckets.exists():
-            return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
         for bucket in buckets:
-            # 只删除用户自己的buckets
+            # 只设置用户自己的buckets
             if bucket.user.id == request.user.id:
                 if not bucket.set_permission(public=public):
-                    return Response(data={'code': 500, 'code_text': '保存到数据库时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
@@ -379,7 +397,13 @@ class BucketViewSet(viewsets.GenericViewSet):
             success:[ids], None
         '''
         id = kwargs.get(self.lookup_field, None)
-        ids = request.POST.getlist('ids')
+        if isinstance(request.data, QueryDict): # form表单方式提交的数据
+            ids = request.data.getlist('ids')
+        else:
+            ids = request.data.get('ids') # json方式提交的数据
+
+        if not isinstance(ids, list):
+            ids = []
 
         if id and id not in ids:
             ids.append(id)
@@ -425,7 +449,7 @@ class ObjViewSet(viewsets.GenericViewSet):
           如果覆盖（已存在同名的对象）上传了一个新文件，新文件的大小小于原同名对象，上传完成后的对象大小仍然保持
           原对象大小（即对象大小只增不减），如果这不符合你的需求，参考以下2种方法：
           (1)先尝试删除对象（对象不存在返回404，成功删除返回204），再上传；
-          (2)访问API时，提交reset参数，reset=true时，再保存分片数据前会先调整对象大小（如果对象已存在），为提供reset参
+          (2)访问API时，提交reset参数，reset=true时，再保存分片数据前会先调整对象大小（如果对象已存在），未提供reset参
             数或参数为其他值，忽略之。
           ## 特别提醒：切记在需要时只在上传第一个分片时提交reset参数，否者在上传其他分片提交此参数会调整对象大小，
           已上传的分片数据会丢失。
