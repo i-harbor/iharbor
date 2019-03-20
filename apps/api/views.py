@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from datetime import datetime
 import logging
 from io import BytesIO
 
@@ -9,11 +8,10 @@ from django.utils import timezone
 from django.db.models import Q as dQ
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, BasePermission
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
-from rest_framework.exceptions import ErrorDetail
 
 from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
 from users.views import send_active_url_email
@@ -23,29 +21,11 @@ from utils.log.decorators import log_used_time
 from .models import User, Bucket
 from . import serializers
 from . import paginations
+from . import permissions
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
-
-class IsSuperUser(BasePermission):
-    '''
-    Allows access only to super users.
-    '''
-    def has_permission(self, request, view):
-        return request.user and request.user.is_superuser
-
-
-class IsOwnBucket(BasePermission):
-    '''
-    是否是自己的bucket
-    '''
-    message = '您没有操作此存储桶的权限。'
-    def has_object_permission(self, request, view, obj):
-        if request.user == obj.user:
-            return True
-
-        return False
 
 
 class CustomAutoSchema(AutoSchema):
@@ -118,25 +98,99 @@ class UserViewSet(mixins.DestroyModelMixin,
     '''
     用户类视图
     list:
-    获取用户列表,需要管理员权限
+    获取用户列表,需要超级用户权限
+
+        http code 200 返回内容:
+            {
+              "count": 2,  # 总数
+              "next": null, # 下一页url
+              "previous": null, # 上一页url
+              "results": [
+                {
+                  "id": 3,
+                  "username": "xx@xx.com",
+                  "email": "xx@xx.com",
+                  "date_joined": "2018-12-03T17:03:00+08:00",
+                  "last_login": "2019-03-15T09:36:49+08:00",
+                  "first_name": "",
+                  "last_name": "",
+                  "is_active": true,
+                  "telephone": "",
+                  "company": ""
+                },
+                {
+                  ...
+                }
+              ]
+            }
 
     retrieve:
-    获取一个用户详细信息，需要管理员权限，或当前用户信息
+    获取一个用户详细信息，需要超级用户权限，或当前用户信息
+
+        http code 200 返回内容:
+            {
+              "id": 3,
+              "username": "xx@xx.com",
+              "email": "xx@xx.com",
+              "date_joined": "2018-12-03T17:03:00+08:00",
+              "last_login": "2019-03-15T09:36:49+08:00",
+              "first_name": "",
+              "last_name": "",
+              "is_active": true,
+              "telephone": "",
+              "company": ""
+            }
+        http code 403 返回内容:
+            {
+                "detail": "您没有执行该操作的权限。"
+            }
 
     create:
     注册一个用户
 
+        http code 201 返回内容:
+            {
+                'code': 201,
+                'code_text': '用户注册成功，请登录邮箱访问收到的连接以激活用户',
+                'data': { }  # 请求提交的数据
+            }
+        http code 500:
+            {
+                'detail': '激活链接邮件发送失败'
+            }
+
     destroy:
-    删除一个用户，需要管理员权限
+    删除一个用户，需要超级管理员权限
+
+        http code 204 无返回内容
+
+    partial_update:
+    修改用户信息
+    1、超级职员用户拥有所有权限；
+    2、用户拥有修改自己信息的权限；
+    3、超级用户只有修改普通用户信息的权限
+
+        http code 200 返回内容:
+            {
+                'code': 200,
+                'code_text': '修改成功',
+                'data':{ }   # 请求时提交的数据
+            }
+        http code 403:
+            {
+                'detail': 'xxx'
+            }
     '''
     queryset = User.objects.all()
+    lookup_field = 'username'
+    lookup_value_regex = '.+'
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         if not send_active_url_email(request._request, user.email, user):
-            return Response('激活链接邮件发送失败', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'detail': '激活链接邮件发送失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         data = {
             'code': 201,
             'code_text': '用户注册成功，请登录邮箱访问收到的连接以激活用户',
@@ -151,12 +205,62 @@ class UserViewSet(mixins.DestroyModelMixin,
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self.has_update_user_permission(request, instance=instance):
+            return Response(data={'detail': 'You do not have permission to change this user information'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.data})
+
+    def has_update_user_permission(self, request, instance):
+        '''
+        当前用户是否有修改给定用户信息的权限
+        1、超级职员用户拥有所有权限；
+        2、用户拥有修改自己信息的权限；
+        3、超级用户只有修改普通用户信息的权限；
+
+        :param request:
+        :param instance: 用户实例
+        :return:
+            True: has permission
+            False: has not permission
+        '''
+        # 当前用户不是超级用户，只有修改自己信息的权限
+        if not bool(request.user and request.user.is_superuser):
+            # 当前用户修改自己的信息
+            if request.user.id == instance.id:
+                return True
+
+            return False
+
+         # 当前用户既是超级用户又是职员，有超级权限
+        if request.user.is_staff:
+            return True
+        # 当前超级用户，只有修改普通用户的权限
+        elif not instance.is_superuser:
+            return True
+
+        return False
+
+
     def get_serializer_class(self):
         '''
         动态加载序列化器
         '''
         if self.action == 'create':
             return serializers.UserCreateSerializer
+        elif self.action == 'partial_update':
+            return serializers.UserUpdateSerializer
 
         return serializers.UserDeitalSerializer
 
@@ -164,13 +268,15 @@ class UserViewSet(mixins.DestroyModelMixin,
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action in ['list', 'delete']:
-            return [IsAuthenticated(), IsSuperUser()]
+        if self.action =='list':
+            return [permissions.IsSuperUser()]
         elif self.action == 'create':
             return []
-        elif self.action == 'retrieve':
+        elif self.action in ['retrieve', 'update', 'partial_update']:
             return [IsAuthenticated()]
-        return [IsSuperUser()]
+        elif self.action == 'delete':
+            return [permissions.IsSuperAndStaffUser()]
+        return [permissions.IsSuperUser()]
 
 
 class BucketViewSet(viewsets.GenericViewSet):
@@ -250,7 +356,7 @@ class BucketViewSet(viewsets.GenericViewSet):
 
     '''
     queryset = Bucket.objects.filter(soft_delete=False).all()
-    permission_classes = [IsAuthenticated, IsOwnBucket]
+    permission_classes = [IsAuthenticated, permissions.IsOwnBucket]
     pagination_class = paginations.BucketsLimitOffsetPagination
 
     # api docs
@@ -605,12 +711,6 @@ class ObjViewSet(viewsets.GenericViewSet):
         }
     )
 
-    # def create(self, request, *args, **kwargs):
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     serializer.save()
-    #     return Response(serializer.response_data, status=status.HTTP_201_CREATED)
-
     @log_used_time(debug_logger, mark_text='upload chunks')
     def update(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
@@ -783,9 +883,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action == 'create':
-            return serializers.ObjPostSerializer
-        elif self.action == 'update':
+        if self.action == 'update':
             return serializers.ObjPutSerializer
         return Serializer
 
@@ -1283,9 +1381,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create', 'delete']:
-            return serializers.DirectoryCreateSerializer
-        elif self.action in ['create_detail']:
+        if self.action in ['create_detail']:
             return Serializer
         return serializers.ObjInfoSerializer
 
@@ -1357,7 +1453,7 @@ class BucketStatsViewSet(viewsets.GenericViewSet):
         视图集
 
         retrieve:
-            统计存储桶所占容量，字节
+            统计存储桶对象数量和所占容量，字节
 
             >>Http Code: 状态码200:
                 {
@@ -1417,3 +1513,6 @@ class BucketStatsViewSet(viewsets.GenericViewSet):
         })
 
         return Response(data)
+
+
+

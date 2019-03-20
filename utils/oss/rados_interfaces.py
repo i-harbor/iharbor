@@ -4,8 +4,7 @@ import os
 from django.conf import settings
 
 
-# rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', ''))
-rados_dll = ctypes.CDLL("utils/oss/rados.so")
+rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', 'utils/oss/rados.so'))
 
 
 # Return type for rados_dll interfaces.
