@@ -6,15 +6,20 @@ from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
 from django.db.models import Q as dQ
+from django.core.validators import validate_email
+from django.core import exceptions
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer
+from rest_framework.authtoken.models import Token
 
 from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
 from users.views import send_active_url_email
+from users.models import AuthKey
+from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject
 from utils.log.decorators import log_used_time
@@ -1515,4 +1520,128 @@ class BucketStatsViewSet(viewsets.GenericViewSet):
         return Response(data)
 
 
+class SecurityViewSet(viewsets.GenericViewSet):
+    '''
+    安全凭证视图集
+
+    retrieve:
+        获取指定用户的安全凭证，需要超级用户权限
+        *注：默认只返回用户Token，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
+
+            >>Http Code: 状态码200:
+                {
+                  "user": {
+                    "id": 3,
+                    "username": "xxx"
+                  },
+                  "token": "xxx"
+                  "keys": [                                 # 此内容只在携带query参数key时存在
+                    {
+                      "access_key": "xxx",
+                      "secret_key": "xxxx",
+                      "user": "xxx",
+                      "create_time": "2019-02-20 13:56:25",
+                      "state": true,                        # true(使用中) false(停用)
+                      "permission": "可读可写"
+                    },
+                  ]
+                }
+
+            >>Http Code: 状态码400:
+                {
+                    'username': 'Must be a valid email.'
+                }
+
+            >>Http Code: 状态码403:
+                {
+                    "detail":"您没有执行该操作的权限。"
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    lookup_field = 'username'
+    lookup_value_regex = '.+'
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+        coreapi.Field(
+            name='username',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='用户名')
+        ),
+        coreapi.Field(
+            name='key',
+            required=False,
+            location='query',
+            schema=coreschema.String(description='访问密钥对')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        username = kwargs.get(self.lookup_field)
+        key = request.query_params.get('key', None)
+
+        try:
+            self.validate_username(username)
+        except exceptions.ValidationError as e:
+            msg = e.message or 'Must be a valid email.'
+            return Response({'username': msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = self.get_user_or_create(username)
+        token, created = Token.objects.get_or_create(user=user)
+
+        data = {
+            'user': {
+                'id': user.id,
+                'username': user.username
+            },
+            'token': token.key,
+        }
+
+        # param key exists
+        if key is not None:
+            authkeys = AuthKey.objects.filter(user=user).all()
+            serializer = AuthKeyDumpSerializer(authkeys, many=True)
+            data['keys'] = serializer.data
+
+        return Response(data)
+
+    def get_user_or_create(self, username):
+        '''
+        通过用户名获取用户，或创建用户
+        :param username:  用户名
+        :return:
+        '''
+        try:
+            user = User.objects.get(username=username)
+        except exceptions.ObjectDoesNotExist:
+            user = None
+
+        if user:
+            return user
+
+        user = User(username=username, email=username)
+        user.save()
+
+        return user
+
+    def validate_username(self, username):
+        '''
+        验证用户名是否是邮箱
+
+        failed: raise ValidationError
+        '''
+        validate_email(username)
 

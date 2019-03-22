@@ -1,26 +1,26 @@
 
 安全凭证是用于用户身份认证的凭证，EVHarbor云对象存储服务提供了多种安全认证方式，如Session,Token,访问密钥。
 
-### Token认证 
+## Token认证 
 Token密钥认证方式，使用简单，安全性相对较低，token的获取可以通过开放的API获取,或者去EVHarbor站点通过浏览器端网页获取。
 刷新创建新token，旧token会失效，如果token泄露，请及时创建新的token，以防数据泄露丢失。    
 
 Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
 例如：Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b   
 
-### 访问密钥  
+## 访问密钥  
 访问密钥是一个密钥对（AccessKey和SecretKey），AccessKey会在网络中传输，SecretKey不在网络上传输，需要用户妥善保管。
 密钥对用于安全凭证的生成，通过一些签名算法，以SecretKey为加密参数，对一些适当的数据内容进行加密生成安全凭证。访问密钥认证
 方式安全性高，使用会复杂一些。  
 若SecretKey意外泄露或被恶意第三方窃取，可能导致数据泄漏风险。若发生密钥泄露等安全问题，密钥拥有着应第一时间在EBHarbor平台
 的安全凭证中更换密钥。
 
-#### 凭证格式和用法  
-安全凭证auth_key的格式为“evhb-auth {access_key}:{hmac_sha1}:{data_base64}”，包含在HTTP标头Authorization中，
+### 访问密钥凭证格式和用法  
+安全凭证auth_key的格式为`evhb-auth {access_key}:{hmac_sha1}:{data_base64}`，包含在HTTP标头Authorization中，
 凭证应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。  
 例如：`Authorization: evhb-auth xxx:xxx:xxx`  
 
-#### 凭证生成  
+### 访问密钥凭证生成  
 
 安全凭证是客户端请求内容的一部分，不带凭证或带非法凭证的请求将返回HTTP错误码401，代表认证失败。
 

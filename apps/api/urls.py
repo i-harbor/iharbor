@@ -16,6 +16,7 @@ router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name=
 router.register(r'(?P<version>(v1|v2))/obj', views.ObjViewSet, base_name='obj')
 router.register(r'(?P<version>(v1|v2))/auth-key', ObtainAuthKey, base_name='auth-key')
 router.register(r'(?P<version>(v1|v2))/stats', views.BucketStatsViewSet, base_name='stats')
+router.register(r'(?P<version>(v1|v2))/security', views.SecurityViewSet, base_name='security')
 
 detail_router = DetailPostRouter()
 detail_router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
