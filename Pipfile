@@ -16,6 +16,7 @@ mysqlclient = "*"
 raven = "*"
 django-ckeditor = "*"
 django-debug-toolbar = "*"
+django-cors-headers = "*"
 
 [dev-packages]
 uwsgi = "*"

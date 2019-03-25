@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # 第三方apps
     'rest_framework',
     'rest_framework.authtoken',
+    'corsheaders',
     'rest_framework_swagger',
     'ckeditor',
     # 'ckeditor_uploader',
@@ -59,13 +60,22 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
 ]
+
+# 允许所有主机执行跨站点请求
+CORS_ORIGIN_ALLOW_ALL = True
+
+# 有权发出跨站点HTTP请求的源主机名列表
+# CORS_ORIGIN_WHITELIST  =(
+#     'localhost:8000 ',
+#     '10.0.86.213:8000',
+# )
 
 ROOT_URLCONF = 'webserver.urls'
 
