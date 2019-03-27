@@ -14,25 +14,6 @@ from .validators import DNSStringValidator, bucket_limit_validator
 
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
-def get_bucket_collection_name_or_ValidationError(bucket_name, request):
-    '''
-    获取存储通对应集合名称，或者ValidationError对象
-    :param bucket_name: 存储通名称
-    :return: (collection_name, ValidationError)
-            collection_name=None时，存储通不存在，ValidationError有效；
-            collection_name!=''时，存储通存在，ValidationError=None；
-    '''
-    bucket = Bucket.get_bucket_by_name(bucket_name)
-    if not bucket:
-        vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
-        return (None, vali_error)
-    if not bucket.check_user_own_bucket(request):
-        vali_error = serializers.ValidationError(detail={'error_text': 'bucket_name参数有误,存储桶不存在'})
-        return (None, vali_error)
-
-    collection_name = bucket.get_bucket_table_name()
-    return (collection_name, None)
-
 
 class UserDeitalSerializer(serializers.ModelSerializer):
     '''
@@ -41,7 +22,33 @@ class UserDeitalSerializer(serializers.ModelSerializer):
     # id = serializers.IntegerField(label='用户ID', help_text='用户的Id号')
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'date_joined', 'last_login',)
+        fields = ('id', 'username', 'email', 'date_joined', 'last_login', 'first_name', 'last_name', 'is_active',
+                  'telephone', 'company')
+        read_only_fields = ('id', 'username', 'email', 'date_joined', 'last_login')
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    '''
+    用户信息更新序列化器
+    '''
+    class Meta:
+        model = User
+        fields = ('is_active', 'password', 'first_name', 'last_name',  'telephone', 'company')
+
+    def update(self, instance, validated_data):
+        '''
+        修改用户信息
+        '''
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.is_active = validated_data.get('is_active', instance.is_active)
+        instance.telephone = validated_data.get('telephone', instance.telephone)
+        instance.company = validated_data.get('company', instance.company)
+        password = validated_data.get('password', None)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
 
 
 class UserCreateSerializer(serializers.Serializer):
@@ -163,96 +170,6 @@ class BucketCreateSerializer(serializers.Serializer):
         return bucket
 
 
-class ObjPostSerializer(serializers.Serializer):
-    '''
-    文件分块上传序列化器
-    '''
-    bucket_name = serializers.CharField(label='存储桶名称', required=True,
-                                        help_text='文件上传到的存储桶名称，类型string')
-    dir_path = serializers.CharField(label='文件上传路径', required=False,
-                                     help_text='存储桶下的目录路径，指定文件上传到那个目录下，为空或者‘/’表示在存储桶下，类型string')
-    file_name = serializers.CharField(label='文件名', required=True, help_text='上传文件的文件名，类型string')
-    # file_size = serializers.IntegerField(label='文件大小', required=True, min_value=1, help_text='上传文件的字节大小')
-    # file_md5 = serializers.CharField(label='文件MD5码', required=False, min_length=32, max_length=32,
-    #                                  help_text='由文件内容生成的MD5码字符串')
-    overwrite = serializers.BooleanField(label='是否覆盖',
-                                         help_text='存在同名文件时是否覆盖，类型boolean,True(覆盖)，False(不覆盖)')
-
-    def create(self, validated_data):
-        file_name = validated_data.get('file_name')
-        # file_size = validated_data.get('file_size')
-        # file_md5 = validated_data.get('file_md5')
-
-        did = validated_data.get('_did')
-        old_bfinfo = validated_data.get('finfo')
-        _collection_name = validated_data.get('_collection_name')
-        BucketFileClass = validated_data.get('BucketFileClass')
-
-        # 存在同名文件对象，覆盖上传删除原文件
-        if old_bfinfo:
-            old_bfinfo.do_soft_delete()
-
-        # 创建文件对象
-        bfinfo = BucketFileClass(na=file_name,# 文件名
-                                fod = True, # 文件
-                                si = 0 )# 文件大小
-        # 有父节点
-        if did:
-            bfinfo.did = ObjectId(did)
-        bfinfo.save()
-
-        # 构造返回数据
-        res = {}
-        res['data'] = self.data
-        res['id'] = str(bfinfo.id)
-        self.context['_res'] = res
-
-        return bfinfo
-
-    @property
-    def response_data(self):
-        return self.context.get('_res')
-
-    def validate(self, data):
-        """
-        复杂验证
-        """
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name')
-        dir_path = data.get('dir_path')
-        file_name = data.get('file_name')
-        overwrite = data.get('overwrite', False)
-
-        if '/' in file_name:
-            raise serializers.ValidationError(detail={'error_text': 'file_name有误，文件名不能包含/'})
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
-        # 当前目录下是否已存在同文件名文件
-        finfo = bfm.get_file_exists(file_name)
-        #
-        # if not ok:
-        #     raise serializers.ValidationError(detail={'error_text': 'dir_path路径有误，路径不存在'})
-
-        if finfo:
-            # 同名文件覆盖上传
-            if overwrite:
-                # 文件记录删除动作在create中
-                data['finfo'] = finfo
-            else:
-                raise serializers.ValidationError(detail={'error_text': 'file_name参数有误，已存在同名文件'})
-
-        _, did = bfm.get_cur_dir_id()
-        data['_did'] = did
-        data['_collection_name'] = _collection_name
-        data['BucketFileClass'] = bfm.get_obj_model_class()
-        return data
-
-
 class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
@@ -291,52 +208,6 @@ class ObjPutSerializer(serializers.Serializer):
     def is_valid(self, raise_exception=False):
         return super(ObjPutSerializer, self).is_valid(raise_exception)
 
-
-class DirectoryCreateSerializer(serializers.Serializer):
-    '''
-    创建目录序列化器
-    '''
-    bucket_name = serializers.CharField(label='存储桶名称', required=True, help_text='文件上传到的存储桶名称')
-    dir_path = serializers.CharField(label='目录路径', required=False, help_text='存储桶下的目录路径，指定创建目录的父目录')
-    dir_name = serializers.CharField(label='目录名', required=True, help_text='要创建的目录名称')
-
-    def validate(self, data):
-        '''校验参数'''
-        request = self.context.get('request')
-        bucket_name = data.get('bucket_name', '')
-        dir_path = data.get('dir_path', '')
-        dir_name = data.get('dir_name', '')
-
-        if not bucket_name or not dir_name:
-            raise serializers.ValidationError(detail={'error_text': 'bucket_name or dir_name不能为空'})
-
-        if '/' in dir_name:
-            raise serializers.ValidationError(detail={'error_text': 'dir_name不能包含‘/’'})
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, vali_error = get_bucket_collection_name_or_ValidationError(bucket_name, request)
-        if not _collection_name and vali_error:
-            raise vali_error
-
-        data['collection_name'] = _collection_name
-
-        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
-        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
-        if not ok:
-            raise serializers.ValidationError(detail={'error_text': 'dir_path参数有误，对应目录不存在'})
-        # 目录已存在
-        if dir:
-            raise serializers.ValidationError(detail={'error_text': f'"{dir_name}"目录已存在'}, code='existing')
-        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
-
-        return data
-
-    @property
-    def data(self):
-        self.instance = None
-        # data = self.validated_data
-        data = super(DirectoryCreateSerializer, self).data
-        return data
 
 class ObjInfoSerializer(serializers.Serializer):
     '''
