@@ -759,6 +759,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
+        elif created is None:
+            return Response({'code': 400, 'code_text': '指定的对象名称与已有的目录重名，请重新指定一个名称'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
         rados = CephRadosObject(obj_key, obj_size=obj.si)
@@ -905,10 +907,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         获取文件对象
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        obj = bfm.get_file_exists(file_name=filename)
-        if not obj:
-            raise Http404
-        return obj
+        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
+        if ok and obj and obj.is_file():
+            return obj
+
+        raise Http404
 
     def do_bucket_limit_validate(self, bfm:BucketFileManagement):
         '''
@@ -926,19 +929,29 @@ class ObjViewSet(viewsets.GenericViewSet):
         '''
         获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
 
-        :param collection_name:
-        :param path:
-        :param filename:
+        :param collection_name: 桶对应的数据库表名
+        :param path: 文件对象所在的父路径
+        :param filename: 文件对象名称
         :return: (obj, created); obj: 对象; created: 指示对象是否是新创建的，True(是)
                 (obj, False) # 对象存在
                 (obj, True)  # 对象不存在，创建一个新对象
                 (None, None) # 集合文档数量已达上限，不允许再创建新的对象
+                (dir, None)  # 已存在同名的目录
         '''
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
 
-        obj = bfm.get_file_exists(file_name=filename)
-        if obj:
+        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
+        # 父路经不存在或有错误
+        if not ok:
+            raise Http404
+
+        # 文件对象已存在
+        if obj and obj.is_file():
             return obj, False
+
+        # 已存在同名的目录
+        if obj and obj.is_dir():
+            return obj, None
 
         ok, did = bfm.get_cur_dir_id()
         if not ok:
@@ -1279,10 +1292,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not bucket_name:
             return Response(data={'code': 400, 'code_text': 'ab_path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
+        bucket = get_user_own_bucket(bucket_name, request)
+        if not isinstance(bucket, Bucket):
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                                  status=status.HTTP_404_NOT_FOUND)
 
+        collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=dir_path, collection_name=collection_name)
         ok, files = bfm.get_cur_dir_files()
         if not ok:
@@ -1299,11 +1314,11 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         page = self.paginate_queryset(queryset)
 
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
             data_dict['files'] = serializer.data
             return self.get_paginated_response(data_dict)
 
-        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
 
         data_dict['files'] = serializer.data
         return Response(data_dict)
@@ -1358,7 +1373,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         obj = self.get_dir_object(path, dir_name, collection_name)
         if not obj:
-            return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data = {'code': 404, 'code_text': '目录不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         bfm = BucketFileManagement(collection_name=collection_name)
         if not bfm.dir_is_empty(obj):
@@ -1395,10 +1410,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         Returns the object the view is displaying.
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_dir_exists(dir_name=dir_name)
-        if not ok:
-            return None
-        return obj
+        ok, obj = bfm.get_dir_or_obj_exists(name=dir_name)
+        if ok and obj:
+            return obj
+        return None
 
     def post_detail_params_validate_or_response(self, request, kwargs):
         '''
@@ -1433,13 +1448,18 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data['collection_name'] = _collection_name
 
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
-        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        ok, dir = bfm.get_dir_or_obj_exists(name=dir_name)
         if not ok:
             return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'},
                                   status=status.HTTP_400_BAD_REQUEST)
         # 目录已存在
-        if dir:
+        if dir and dir.is_dir():
             return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        # 同名对象已存在
+        if dir and dir.is_file():
+            return None, Response({'code': 400, 'code_text': f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称'},
                                   status=status.HTTP_400_BAD_REQUEST)
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
