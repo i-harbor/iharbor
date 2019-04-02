@@ -20,6 +20,7 @@ router.register(r'(?P<version>(v1|v2))/security', views.SecurityViewSet, base_na
 
 detail_router = DetailPostRouter()
 detail_router.register(r'(?P<version>(v1|v2))/dir', views.DirectoryViewSet, base_name='dir')
+detail_router.register(r'(?P<version>(v1|v2))/move', views.MoveViewSet, base_name='move')
 
 urlpatterns = [
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.

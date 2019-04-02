@@ -233,17 +233,21 @@ class BucketFileManagement():
 
         return True, dir
 
-    def get_dir_or_obj_exists(self, name):
+    def get_dir_or_obj_exists(self, name, cur_dir_id=None):
         '''
         通过名称获取当前路径下的子目录或对象
         :param name: 目录名或对象名称
+        :param cur_dir_id: 如果给定ID,基于此ID的目录查找；默认基于当前路径查找,
         :return:
             第一个返回值：表示是否有错误发生，(可能错误：当前目录参数有误，对应目录不存在)
             第二个返回值：如果存在返回文件记录对象，否则None
         '''
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
+        if cur_dir_id is None:
+            ok, did = self.get_cur_dir_id()
+            if not ok:
+                return False, None
+        else:
+            did = cur_dir_id
 
         model_class = self.get_obj_model_class()
         try:
