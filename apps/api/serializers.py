@@ -290,6 +290,11 @@ class ObjInfoSerializer(serializers.Serializer):
         if not obj.fod:
             return ''
 
+        # 桶公有权限，对象都为公有权限
+        bucket = self._context.get('bucket')
+        if bucket and bucket.is_public_permission():
+            return '公有'
+
         try:
             if obj.is_shared_and_in_shared_time():
                 return '公有'

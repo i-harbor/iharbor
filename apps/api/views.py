@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
-from rest_framework.serializers import Serializer
+from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.authtoken.models import Token
 
 from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
@@ -759,6 +759,8 @@ class ObjViewSet(viewsets.GenericViewSet):
         obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
         if obj is None:
             return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
+        elif created is None:
+            return Response({'code': 400, 'code_text': '指定的对象名称与已有的目录重名，请重新指定一个名称'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
         rados = CephRadosObject(obj_key, obj_size=obj.si)
@@ -905,10 +907,11 @@ class ObjViewSet(viewsets.GenericViewSet):
         获取文件对象
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        obj = bfm.get_file_exists(file_name=filename)
-        if not obj:
-            raise Http404
-        return obj
+        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
+        if ok and obj and obj.is_file():
+            return obj
+
+        raise Http404
 
     def do_bucket_limit_validate(self, bfm:BucketFileManagement):
         '''
@@ -926,19 +929,29 @@ class ObjViewSet(viewsets.GenericViewSet):
         '''
         获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
 
-        :param collection_name:
-        :param path:
-        :param filename:
+        :param collection_name: 桶对应的数据库表名
+        :param path: 文件对象所在的父路径
+        :param filename: 文件对象名称
         :return: (obj, created); obj: 对象; created: 指示对象是否是新创建的，True(是)
                 (obj, False) # 对象存在
                 (obj, True)  # 对象不存在，创建一个新对象
                 (None, None) # 集合文档数量已达上限，不允许再创建新的对象
+                (dir, None)  # 已存在同名的目录
         '''
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
 
-        obj = bfm.get_file_exists(file_name=filename)
-        if obj:
+        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
+        # 父路经不存在或有错误
+        if not ok:
+            raise Http404
+
+        # 文件对象已存在
+        if obj and obj.is_file():
             return obj, False
+
+        # 已存在同名的目录
+        if obj and obj.is_dir():
+            return obj, None
 
         ok, did = bfm.get_cur_dir_id()
         if not ok:
@@ -1279,10 +1292,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         if not bucket_name:
             return Response(data={'code': 400, 'code_text': 'ab_path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
+        bucket = get_user_own_bucket(bucket_name, request)
+        if not isinstance(bucket, Bucket):
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                                  status=status.HTTP_404_NOT_FOUND)
 
+        collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=dir_path, collection_name=collection_name)
         ok, files = bfm.get_cur_dir_files()
         if not ok:
@@ -1299,11 +1314,11 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         page = self.paginate_queryset(queryset)
 
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
             data_dict['files'] = serializer.data
             return self.get_paginated_response(data_dict)
 
-        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path})
+        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
 
         data_dict['files'] = serializer.data
         return Response(data_dict)
@@ -1358,7 +1373,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         obj = self.get_dir_object(path, dir_name, collection_name)
         if not obj:
-            return Response(data = {'code': 404, 'code_text': '文件不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data = {'code': 404, 'code_text': '目录不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         bfm = BucketFileManagement(collection_name=collection_name)
         if not bfm.dir_is_empty(obj):
@@ -1395,10 +1410,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         Returns the object the view is displaying.
         """
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_dir_exists(dir_name=dir_name)
-        if not ok:
-            return None
-        return obj
+        ok, obj = bfm.get_dir_or_obj_exists(name=dir_name)
+        if ok and obj:
+            return obj
+        return None
 
     def post_detail_params_validate_or_response(self, request, kwargs):
         '''
@@ -1433,13 +1448,18 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         data['collection_name'] = _collection_name
 
         bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
-        ok, dir = bfm.get_dir_exists(dir_name=dir_name)
+        ok, dir = bfm.get_dir_or_obj_exists(name=dir_name)
         if not ok:
             return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'},
                                   status=status.HTTP_400_BAD_REQUEST)
         # 目录已存在
-        if dir:
+        if dir and dir.is_dir():
             return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
+                                  status=status.HTTP_400_BAD_REQUEST)
+
+        # 同名对象已存在
+        if dir and dir.is_file():
+            return None, Response({'code': 400, 'code_text': f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称'},
                                   status=status.HTTP_400_BAD_REQUEST)
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
@@ -1644,4 +1664,265 @@ class SecurityViewSet(viewsets.GenericViewSet):
         failed: raise ValidationError
         '''
         validate_email(username)
+
+
+class MoveViewSet(viewsets.GenericViewSet):
+    '''
+    对象移动或重命名
+
+    create_detail:
+        移动或重命名一个对象
+
+        参数move_to指定对象移动的目标路径（bucket桶下的目录路径），/或空字符串表示桶下根目录；参数rename指定重命名对象的新名称；
+        请求时至少提交其中一个参数，亦可同时提交两个参数；只提交参数move_to只移动对象，只提交参数rename只重命名对象；
+
+        >>Http Code: 状态码201,成功：
+            {
+                'code': 201,
+                'code_text': '操作成功',
+                'data': {},      //请求时提交的数据
+                'obj': {},       //移动操作成功后文件对象详细信息
+            }
+        >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
+            {
+                "code": 400,
+                "code_text": 'xxxxx'        //错误信息
+            }
+        >>Http Code: 状态码404, bucket桶、对象或移动目标路径不存在:
+            {
+                "code": 404,
+                "code_text": 'xxxxx'        //错误信息
+            }
+        >>Http Code: 状态码500, 服务器错误，无法完成操作:
+            {
+                "code": 500,
+                "code_text": 'xxxxx'        //错误信息
+            }
+    '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'objpath'
+    lookup_value_regex = '.+'
+
+    # api docs
+    VERSION_METHOD_FEILD = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+
+    OBJ_PATH_METHOD_FEILD = [
+        coreapi.Field(
+            name='objpath',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'POST': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+                coreapi.Field(
+                    name='move_to',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='移动对象到此目录路径下，/或空字符串表示桶下根目录，类型String'),
+                ),
+                coreapi.Field(
+                    name='rename',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='重命名对象的新名称，类型String'),
+                ),
+            ],
+        }
+    )
+
+    def create_detail(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.create_detail_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def create_detail_v1(self, request, *args, **kwargs):
+        objpath = kwargs.get(self.lookup_field, '')
+        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
+        if not bucket_name or not filename:
+            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            params = self.validate_params(request)
+        except ValidationError as e:
+            if isinstance(e.detail, list) and len(e.detail) > 0:
+                msg = e.detail[0]
+            else:
+                msg = e.default_detail
+            return Response(data={'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        move_to = params.get('move_to')
+        rename = params.get('rename')
+        if move_to is None and rename is None:
+            return Response(data={'code': 400, 'code_text': '请至少提交一个要执行操作的参数'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        table_name = bucket.get_bucket_table_name()
+        try:
+            obj = self.get_obj_or_404(table_name, path, filename)
+        except Http404:
+            return Response(data={'code': 404, 'code_text': '指定对象不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        return self.move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
+
+    def move_rename_obj(self, bucket, obj, move_to, rename):
+        '''
+        移动重命名对象
+
+        :param bucket: 对象所在桶
+        :param obj: 文件对象
+        :param move_to: 移动目标路径
+        :param rename: 重命名的新名称
+        :return:
+            Response()
+        '''
+        table_name = bucket.get_bucket_table_name()
+        new_obj_name = rename if rename else obj.name # 移动后对象的名称，对象名称不变或重命名
+
+        # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
+        if move_to is None: # 仅仅重命名对象，不移动
+            bfm = BucketFileManagement( collection_name=table_name)
+            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
+        else: # 需要移动对象
+            bfm = BucketFileManagement(path=move_to, collection_name=table_name)
+            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
+
+        if not ok:
+            return Response(data={'code': 404, 'code_text': '无法完成对象的移动操作，指定的目标路径未找到'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if target_obj:
+            return Response(data={'code': 400, 'code_text': '无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # 仅仅重命名对象，不移动
+        if move_to is None:
+            path, _ = PathParser(filepath=obj.na).get_path_and_filename()
+            obj.na = path + '/' + new_obj_name if path else  new_obj_name
+            obj.name = new_obj_name
+        else: # 移动对象或重命名
+            _, did = bfm.get_cur_dir_id()
+            obj.did = did
+            obj.na = bfm.build_dir_full_name(new_obj_name)
+            obj.name = new_obj_name
+
+        if not obj.do_save():
+            return Response(data={'code': 500, 'code_text': '移动对象操作失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        context = self.get_serializer_context()
+        context.update({'bucket_name': bucket.name, 'bucket': bucket})
+        return Response(data={'code': 201, 'code_text': '移动对象操作成功',
+                              'obj': serializers.ObjInfoSerializer(obj, context=context).data}, status=status.HTTP_201_CREATED)
+
+    def validate_params(self, request):
+        '''
+        校验请求参数
+        :param request:
+        :return:
+            {
+                'move_to': xxx, # None(未提交此参数) 或 string
+                'rename': xxx   # None(未提交此参数) 或 string
+            }
+        '''
+        validated_data = {'move_to': None, 'rename': None}
+        move_to = request.query_params.get('move_to')
+        rename = request.query_params.get('rename')
+
+        # 移动对象参数
+        if move_to is not None:
+            validated_data['move_to'] = move_to.strip('/')
+
+        # 重命名对象参数
+        if rename is not None:
+            if '/' in rename:
+                raise ValidationError('对象名称不能含“/”')
+
+            if len(rename) > 255:
+                raise ValidationError('对象名称不能大于255个字符长度')
+
+            validated_data['rename'] = rename
+
+        return validated_data
+
+    def get_obj_or_dir_404(self, table_name, path, name):
+        '''
+        获取文件对象或目录
+
+        :param table_name: 数据库表名
+        :param path: 父目录路经
+        :param name: 对象名称或目录名称
+        :return:
+            None: 父目录路径错误，不存在
+            obj: 对象或目录
+            raise Http404: 目录或对象不存在
+        '''
+        bfm = BucketFileManagement(path=path, collection_name=table_name)
+        ok, obj = bfm.get_dir_or_obj_exists(name=name)
+        if not ok:
+            return None
+
+        if obj:
+            return obj
+
+        raise Http404
+
+    def get_obj_or_404(self, table_name, path, name):
+        '''
+        获取文件对象
+
+        :param table_name: 数据库表名
+        :param path: 父目录路经
+        :param name: 对象名称
+        :return:
+            None: 父目录路径错误，不存在
+            obj: 对象
+            raise Http404: 对象不存在
+        '''
+        obj = self.get_obj_or_dir_404(table_name=table_name, path=path, name=name)
+        if not obj:
+            return None
+
+        if obj.is_file():
+            return obj
+        else:
+            raise Http404
+
+    def get_serializer(self, *args, **kwargs):
+        """
+        Return the serializer instance that should be used for validating and
+        deserializing input, and for serializing output.
+        """
+        serializer_class = self.get_serializer_class()
+        context = self.get_serializer_context()
+        context.update(kwargs.get('context', {}))
+        kwargs['context'] = context
+        return serializer_class(*args, **kwargs)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        if self.action in ['create_detail']:
+            return Serializer
+        return Serializer
+
 
