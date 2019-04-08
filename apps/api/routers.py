@@ -3,14 +3,14 @@ from rest_framework.routers import SimpleRouter, DefaultRouter, Route, DynamicRo
 
 class DetailPostRouter(SimpleRouter):
     '''
-    自定义路由器，增加detail POST 方法url
+    自定义路由器，增加detail POST 方法url，detail GET方法和GET方法同为list
     '''
     routes = [
         # List route.
         Route(
             url=r'^{prefix}{trailing_slash}$',
             mapping={
-                # 'get': 'list',
+                'get': 'list',
                 'post': 'create'
             },
             name='{basename}-list',
