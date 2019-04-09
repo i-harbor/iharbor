@@ -450,3 +450,5 @@ class BucketFileBase(models.Model):
 
         return True
 
+class ModelSaveError(Exception):
+    pass

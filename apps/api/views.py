@@ -5,6 +5,7 @@ from io import BytesIO
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q as dQ
 from django.core.validators import validate_email
 from django.core import exceptions
@@ -21,9 +22,10 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import FileStorage, PathParser
-from utils.oss.rados_interfaces import CephRadosObject
+from utils.oss.rados_interfaces import CephRadosObject, RadosWriteError
 from utils.log.decorators import log_used_time
 from .models import User, Bucket
+from buckets.models import ModelSaveError
 from . import serializers
 from . import paginations
 from . import permissions
@@ -1159,7 +1161,6 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
-    @log_used_time(debug_logger, 'save_one_chunk')
     def save_one_chunk(self, obj, rados, chunk_offset, chunk):
         '''
         保存一个上传的分片
@@ -1172,28 +1173,30 @@ class ObjViewSet(viewsets.GenericViewSet):
             成功：True
             失败：Response
         '''
-        # 先更新元数据，后写rados数据（如果写入失败，恢复元数据）
-        # 更新文件修改时间和对象大小
-        old_size = obj.si if obj.si else 0
-        old_upt = obj.upt
-        obj.upt = timezone.now()
-        obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+        # 先更新元数据，后写rados数据（如果写入失败，事务回滚恢复元数据）
+        try:
+            with transaction.atomic(using='metadata'): # 开启事务
+                model = obj._meta.model
+                obj_lock = model.objects.select_for_update().get(pk=obj.pk) # 获取对象并加锁，并行数据一致性
 
-        if not obj.do_save():
-            logger.error('修改对象元数据失败')
-            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # 更新文件修改时间和对象大小
+                old_size = obj.si if obj.si else 0
+                obj_lock.upt = timezone.now()
+                obj_lock.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+                if not obj_lock.do_save():
+                    raise ModelSaveError()
 
-        # 存储文件块
-        # ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
-        ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
-        if not ok:
-            obj.si = old_size
-            obj.upt = old_upt
-            obj.do_save()
-
-            error = '文件块rados写入失败:' + msg
+                # 存储文件块
+                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+                if not ok:
+                    raise RadosWriteError(msg)
+        except RadosWriteError as e:
+            error = '文件块rados写入失败:' + str(e)
             logger.error(error)
             return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ModelSaveError:
+            logger.error('修改对象元数据失败')
+            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return True
 
