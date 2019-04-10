@@ -1789,6 +1789,10 @@ class MoveViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': '指定对象不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
+        if obj is None:
+            return Response(data={'code': 404, 'code_text': '对象父目录不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
         return self.move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
 
     def move_rename_obj(self, bucket, obj, move_to, rename):
