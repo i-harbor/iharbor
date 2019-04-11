@@ -1026,7 +1026,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             'bucket_name': bucket_name,
             'dir_path': path,
             'obj': serializer.data,
-            'breadcrumb': PathParser(path).get_path_breadcrumb()
+            # 'breadcrumb': PathParser(path).get_path_breadcrumb()
         })
 
     def custom_read_param_validate_or_response(self, request):
@@ -1313,7 +1313,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('code', 200),
             ('bucket_name', bucket_name),
             ('dir_path', dir_path),
-            ('breadcrumb', PathParser(filepath='').get_path_breadcrumb(dir_path))
+            # ('breadcrumb', PathParser(filepath='').get_path_breadcrumb(dir_path))
         ])
 
         queryset = files
