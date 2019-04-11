@@ -4,22 +4,20 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "==1.11.20"
+django = "==1.11.*"
 pillow = "*"
-mongoengine = "*"
 django-rest-framework = "*"
 coreapi = "*"
 requests = "*"
 djangorestframework-jwt = "*"
 django-rest-swagger = "*"
 mysqlclient = "*"
-raven = "*"
 django-ckeditor = "*"
 django-debug-toolbar = "*"
 django-cors-headers = "*"
+uwsgi = "*"
 
 [dev-packages]
-uwsgi = "*"
 
 [requires]
 python_version = "3.6"

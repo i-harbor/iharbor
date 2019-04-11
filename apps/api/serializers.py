@@ -1,12 +1,9 @@
 import logging
-from bson import ObjectId
 
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from buckets.utils import BucketFileManagement
 from .models import User, Bucket
-from utils.storagers import PathParser
 from utils.time import to_localtime_string_naive_by_utc
 from utils.log.decorators import log_used_time
 from .validators import DNSStringValidator, bucket_limit_validator

@@ -587,7 +587,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             }
 
     retrieve:
-        通过文件对象绝对路径,下载文件对象,可通过query参数获取文件对象详细信息，或者自定义读取对象数据块
+        通过文件对象绝对路径,下载文件对象,可通过参数获取文件对象详细信息，或者自定义读取对象数据块
 
         *注：可选参数优先级判定顺序：info > offset && size
         1. 如果携带了info参数，info=true时,返回文件对象详细信息，其他返回400错误；
@@ -1835,6 +1835,7 @@ class MoveViewSet(viewsets.GenericViewSet):
             obj.did = did
             obj.na = bfm.build_dir_full_name(new_obj_name)
             obj.name = new_obj_name
+            path = move_to
 
         if not obj.do_save():
             return Response(data={'code': 500, 'code_text': '移动对象操作失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1842,6 +1843,8 @@ class MoveViewSet(viewsets.GenericViewSet):
         context = self.get_serializer_context()
         context.update({'bucket_name': bucket.name, 'bucket': bucket})
         return Response(data={'code': 201, 'code_text': '移动对象操作成功',
+                              'bucket_name': bucket.name,
+                              'dir_path': path,
                               'obj': serializers.ObjInfoSerializer(obj, context=context).data}, status=status.HTTP_201_CREATED)
 
     def validate_params(self, request):
