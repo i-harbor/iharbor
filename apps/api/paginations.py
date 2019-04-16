@@ -9,8 +9,8 @@ class BucketFileCursorPagination(CursorPagination):
     存储通文件对象分页器
     '''
     cursor_query_param = 'cursor'
-    page_size = 100
-    ordering = ('fod', '-ult',) # 日期降序，最近日期靠前
+    page_size = 200
+    ordering = ('id', )
 
     # Client can control the page size using this query parameter.
     # Default is 'None'. Set to eg 'page_size' to enable usage.
@@ -19,6 +19,7 @@ class BucketFileCursorPagination(CursorPagination):
     # Set to an integer to limit the maximum page size the client may request.
     # Only relevant if 'page_size_query_param' has also been set.
     max_page_size = 1000
+    offset_cutoff = None
 
     def get_paginated_response(self, data):
         if isinstance(data, OrderedDict):
@@ -31,7 +32,7 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
     '''
     存储桶分页器
     '''
-    default_limit = 100
+    default_limit = 200
     limit_query_param = 'limit'
     offset_query_param = 'offset'
     max_limit = 1000
@@ -121,3 +122,4 @@ class BucketsLimitOffsetPagination(LimitOffsetPagination):
             current = final
 
         return (current, final)
+

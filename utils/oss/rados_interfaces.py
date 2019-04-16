@@ -6,6 +6,9 @@ from django.conf import settings
 
 rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', 'utils/oss/rados.so'))
 
+class RadosWriteError(Exception):
+    pass
+
 
 # Return type for rados_dll interfaces.
 class BaseReturnType(ctypes.Structure):

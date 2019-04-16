@@ -223,13 +223,7 @@ class BucketFileManagement():
             return False, None
 
         model_class = self.get_obj_model_class()
-        try:
-            dir = model_class.objects.get(Q(did=did) & Q(name=dir_name) & Q(fod=False))  # 查找目录记录
-        except model_class.DoesNotExist as e:
-            return (True, None)  # 未找到对应目录信息
-        except MultipleObjectsReturned as e:
-            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{self.build_dir_full_name(dir_name)}')
-            return False, None
+        dir = model_class.objects.filter(Q(did=did) & Q(name=dir_name) & Q(fod=False)).first()  # 查找目录记录
 
         return True, dir
 
@@ -250,13 +244,7 @@ class BucketFileManagement():
             did = cur_dir_id
 
         model_class = self.get_obj_model_class()
-        try:
-            dir_or_obj = model_class.objects.get(Q(did=did) & Q(name=name))  # 查找目录或对象记录
-        except model_class.DoesNotExist as e:
-            return True, None  # 当前路径下不存在给定名称的目录或对象
-        except MultipleObjectsReturned as e:
-            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录或对象：{self.build_dir_full_name(name)}')
-            return False, None
+        dir_or_obj = model_class.objects.filter(Q(did=did) & Q(name=name)).first()  # 查找目录或对象记录
 
         return True, dir_or_obj
 

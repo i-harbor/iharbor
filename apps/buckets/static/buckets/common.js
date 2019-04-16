@@ -65,6 +65,18 @@ function change_url_no_refresh(new_url, new_title) {
     history.replaceState(state, new_title, new_url);
 }
 
+/**
+ * 去除字符串前后给定字符，不改变原字符串
+ * @param char
+ * @returns { String }
+ */
+String.prototype.strip = function (char) {
+  if (char){
+    return this.replace(new RegExp('^\\'+char+'+|\\'+char+'+$', 'g'), '');
+  }
+  return this.replace(/^\s+|\s+$/g, '');
+};
+
 //返回一个去除右边的给定字符的字符串，不改变原字符串
 String.prototype.rightStrip = function(searchValue){
     if(this.endsWith(searchValue)){

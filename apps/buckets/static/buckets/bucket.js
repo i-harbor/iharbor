@@ -31,15 +31,8 @@
         if (!params.hasOwnProperty('bucket_name') || !params.hasOwnProperty('dir_path') || !params.hasOwnProperty('filename'))
             return '';
 
-        let bucket_path = get_cur_path_startwith_bucket({
-            bucket_name: params.bucket_name,
-            dir_path: params.dir_path
-        });
-
-        if (!bucket_path)
-            return '';
-
-        return get_obj_base_api() + encodeURIComponent(bucket_path + params.filename) + '/';
+        let path = encode_paths([params.bucket_name, params.dir_path, params.filename]);
+        return get_obj_base_api() + path + '/';
     }
 
     //
@@ -80,9 +73,8 @@
 
     //构建目录detail api
     function build_dir_detail_api(params={bucket_name: '', dir_path: ''}){
-        let path = get_cur_path_startwith_bucket(params);
-         path = encodeURIComponent(path);
-        return get_dir_base_api() + path;
+        let path = encode_paths([params.bucket_name, params.dir_path]);
+        return get_dir_base_api() + path + '/';
     }
 
     //构建目录detail url
@@ -97,12 +89,6 @@
                 params.dir_path = dir_name;
         }
         let api = build_dir_detail_api(params);
-        return build_url_with_domain_name(api);
-    }
-
-    //构建目录url
-    function build_dir_url(path_with_bucket){
-        let api = get_dir_base_api() + encodeURIComponent(path_with_bucket);
         return build_url_with_domain_name(api);
     }
 
@@ -130,26 +116,57 @@
     }
 
     //
-    // 获取以存储桶开头的当前路径
-    //传入参数无效或未传入参数时将尝试获取
-    // 获取失败返回空字符串
+    // 对象移动重命名base api
     //
-    function get_cur_path_startwith_bucket(params={bucket_name:'', dir_path: ''}) {
-        let obj = params;
-        //传入参数无效或未传入
-        if(!params.hasOwnProperty('bucket_name') || (params.bucket_name==='')){
-            obj = get_bucket_name_and_cur_path();
-        }
-
-        if(!obj.bucket_name)
-            return '';
-
-        let path = obj.bucket_name + '/';
-        if (obj.dir_path)
-            path = path + obj.dir_path + '/';
-        return path;
+    function get_move_base_api() {
+        return "/api/v1/move/";
     }
 
+    //
+    // 构建移动和重命名url
+    //
+    function build_move_rename_url(paths=[], params={ move_to: '', rename: ''}) {
+        let obj_path = encode_paths(paths);
+        let param_str = encode_params(params);
+        let api = get_move_base_api() + obj_path + '/?' + param_str;
+        return build_url_with_domain_name(api);
+    }
+
+    /**
+     * 拼接数组为url字符串
+     * @param {Array} arr - 待拼接的数组
+     * @returns {string} - 拼接成的请求字符串
+     */
+    function encode_paths(arr) {
+        const newArr = [];
+        arr.forEach((value) => {
+            if (value !== '')
+                newArr.push(encodeURIComponent(value));
+        }) ;
+
+        return newArr.join('/');
+    }
+
+    /**
+     * 拼接params对象为url参数字符串
+     * @param {Object} obj - 待拼接的对象
+     * @returns {string} - 拼接成的请求字符串
+     */
+    function encode_params(obj) {
+        const params = [];
+
+        Object.keys(obj).forEach((key) => {
+            let value = obj[key];
+            // 如果值为undefined我们将其置空
+            if (typeof value === 'undefined') {
+                value = ''
+            }
+            // 对于需要编码的文本我们要进行编码
+            params.push([key, encodeURIComponent(value)].join('='))
+        });
+
+        return params.join('&');
+    }
 
     //
     //所有ajax的请求的全局设置
@@ -170,12 +187,30 @@
     //网页内容显示区div
     $content_display_div = $("#content-display-div");
 
+    /**
+     * 路径字符串分割面包屑
+     * @param path
+     * @returns { [[], []] }
+     */
+    function get_breadcrumb(path) {
+        let breadcrumb = [];
+        path = path.strip('/');
+        if (path !== '') {
+            arr = path.split('/');
+            for (var i = 0, j = arr.length; i < j; i++) {
+                breadcrumb.push([arr[i], arr.slice(0, i + 1).join('/')]);
+            }
+        }
+        return breadcrumb;
+    }
+
+    //art-template渲染模板注册过滤器
+    template.defaults.imports.get_breadcrumb = get_breadcrumb;
+
     //
     // 创建存储桶按钮点击事件
     //
     $("#content-display-div").on('click', "#btn-new-bucket", on_create_bucket);//对话框方式
-
-
 
     //
     // 创建新的存储桶点击事件处理（对话框方式）
@@ -298,10 +333,10 @@
     //
     function delete_selected_buckets(){
         //获取选中的存储桶的id
-        var arr = new Array();
+        var arr = [];
         let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
         bucket_list_checked.each(function (i) {
-            arr[i] = $(this).val();
+            arr.push($(this).val());
         });
         if (arr.length > 0) {
             $.ajax({
@@ -357,10 +392,10 @@
     //
     function selected_buckets_permission_set(publiced=false){
         //获取选中的存储桶的id
-        var arr = new Array();
+        var arr = [];
         let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
         bucket_list_checked.each(function (i) {
-            arr[i] = $(this).val();
+            arr.push($(this).val());
         });
         if (arr.length > 0) {
             $.ajax({
@@ -526,7 +561,8 @@
                             <a href="#" id="btn-path-bucket">存储桶</a>
                             <span>></span>
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
-                            {{each breadcrumb}}
+                            {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
+                            {{ each breadcrumbs }}
                                 <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path={{$value[1]}}>{{ $value[0] }}</a></li>
                             {{/each}}
                         </ol>
@@ -597,6 +633,7 @@
                                                 <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
                                                 <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">删除</a></li>
                                                 <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">分享公开</a></li>
+                                                <li class="btn-info"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">重命名</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
@@ -664,6 +701,7 @@
                         <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >下载</a></li>
                         <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">删除</a></li>
                         <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</a></li>
+                        <li class="btn-info"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">重命名</a></li>
                     </ul>
                 </li>
             </td>
@@ -738,6 +776,81 @@
                 })
             },
         });
+    });
+
+
+    //
+    // 文件重命名事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-obj-rename', function (e) {
+        e.preventDefault();
+
+        let list_item_dom = $(this).parents("tr.bucket-files-table-item");
+        let btn_dom = $(this);
+        let filename = btn_dom.attr("filename");
+        let bucket_name = btn_dom.attr('bucket_name');
+        let dir_path = btn_dom.attr('dir_path');
+        let paths=[bucket_name, dir_path, filename];
+
+        swal({
+            title: '请修改对象名称',
+            input: 'text',
+            inputValue: filename,
+            inputAutoTrim: true,
+            inputAttributes: {
+                autocapitalize: 'off'
+            },
+            showCancelButton: true,
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            showLoaderOnConfirm: true,
+            inputValidator: (value) => {
+                if (value==='')
+                    return !value && '请输入一些内容, 前后空格会自动去除';
+                else if (value.length > 255)
+                    return "对象名长度不能大于255字符";
+                return !(value.indexOf('/') === -1) && '对象名不能包含‘/’';
+              },
+            preConfirm: (input_name) => {
+                let url = build_move_rename_url(paths=[bucket_name, dir_path, filename], params={rename: input_name});
+                return $.ajax({
+                    url: url,
+                    type: 'post',
+                    data: {},
+                    timeout: 20000,
+                    success: (result) => {
+                        if (result.code === 201){
+                            return result;
+                        }else{
+                            swal.showValidationMessage(
+                            `Request failed: ${result.code_text}`
+                            );
+                        }
+                    },
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},//判断是否是异步请求时需要此响应头
+                });
+            },
+            allowOutsideClick: () => !swal.isLoading()
+        }).then(
+            (result) => {
+                if (result.value) {
+                    let html = render_bucket_file_item(result.value);
+                    list_item_dom.after(html);
+                    list_item_dom.remove();
+                    show_warning_dialog('重命名成功', 'success');
+                }
+             },
+            (error) => {
+                let msg;
+                try{
+                    msg = error.responseJSON.code_text;
+                }
+                catch (e) {
+                    msg = error.statusText;
+                }
+                show_warning_dialog('重命名失败:'+ msg);
+            }
+        )
     });
 
     //
@@ -965,7 +1078,8 @@
                         <a href="#" id="btn-path-bucket">存储桶</a>
                         <span>></span>
                         <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
-                        {{each breadcrumb}}
+                        {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
+                        {{each breadcrumbs}}
                             <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                         {{/each}}
                     </ol>
@@ -1323,13 +1437,8 @@
                 catch (e) {
                     msg = error.statusText;
                 }
-                swal.showValidationMessage(
-                    `Request failed: ${msg}`
-                );
-                if(error.status<500)
-                    show_warning_dialog(`创建失败:`+ msg);
-                else
-                    show_warning_dialog(`创建失败:` + msg);
+
+                show_warning_dialog(`创建失败:`+ msg);
             }
         )
     }
@@ -1359,7 +1468,6 @@
             </td>
         </tr>
     `);
-
 
 })();
 

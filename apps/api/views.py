@@ -5,6 +5,7 @@ from io import BytesIO
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q as dQ
 from django.core.validators import validate_email
 from django.core import exceptions
@@ -21,9 +22,10 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import FileStorage, PathParser
-from utils.oss.rados_interfaces import CephRadosObject
+from utils.oss.rados_interfaces import CephRadosObject, RadosWriteError
 from utils.log.decorators import log_used_time
 from .models import User, Bucket
+from buckets.models import ModelSaveError
 from . import serializers
 from . import paginations
 from . import permissions
@@ -551,7 +553,7 @@ class ObjViewSet(viewsets.GenericViewSet):
     文件对象视图集
 
     update:
-    通过文件对象绝对路径（以存储桶名开始）分片上传文件对象
+    通过文件对象绝对路径分片上传文件对象
 
         说明：
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
@@ -585,7 +587,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             }
 
     retrieve:
-        通过文件对象绝对路径（以存储桶名开始）,下载文件对象,可通过query参数获取文件对象详细信息，或者自定义读取对象数据块
+        通过文件对象绝对路径,下载文件对象,可通过参数获取文件对象详细信息，或者自定义读取对象数据块
 
         *注：可选参数优先级判定顺序：info > offset && size
         1. 如果携带了info参数，info=true时,返回文件对象详细信息，其他返回400错误；
@@ -617,13 +619,13 @@ class ObjViewSet(viewsets.GenericViewSet):
         >>Http Code: 状态码500：服务器内部错误;
 
     destroy:
-        通过文件对象绝对路径（以存储桶名开始）,删除文件对象；
+        通过文件对象绝对路径,删除文件对象；
 
         >>Http Code: 状态码204：删除成功，NO_CONTENT；
         >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
             {
                 'code': 400,
-                'code_text': 'objpath参数有误'
+                'code_text': '参数有误'
             }
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
@@ -663,7 +665,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             name='objpath',
             required=True,
             location='path',
-            schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+            schema=coreschema.String(description='文件对象绝对路径，类型String'),
         ),
     ]
 
@@ -722,9 +724,10 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         # 对象路径分析
         pp = PathParser(filepath=objpath)
-        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        bucket_name = kwargs.get('bucket_name', '')
+        path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         if len(filename) > 255:
             return Response(data={'code': 400, 'code_text': '对象名称长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
@@ -787,7 +790,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 400, 'code_text': 'info参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         pp = PathParser(filepath=objpath)
-        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        bucket_name = kwargs.get('bucket_name','')
+        path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -826,7 +830,8 @@ class ObjViewSet(viewsets.GenericViewSet):
 
     def destroy(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
+        bucket_name = kwargs.get('bucket_name','')
+        path, filename = PathParser(filepath=objpath).get_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -862,8 +867,9 @@ class ObjViewSet(viewsets.GenericViewSet):
         share = validated_param.get('share')
         days = validated_param.get('days')
 
+        bucket_name = kwargs.get('bucket_name', '')
         pp = PathParser(filepath=objpath)
-        bucket_name, path, filename = pp.get_bucket_path_and_filename()
+        path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
             return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1020,7 +1026,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             'bucket_name': bucket_name,
             'dir_path': path,
             'obj': serializer.data,
-            'breadcrumb': PathParser(path).get_path_breadcrumb()
+            # 'breadcrumb': PathParser(path).get_path_breadcrumb()
         })
 
     def custom_read_param_validate_or_response(self, request):
@@ -1155,7 +1161,6 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
-    @log_used_time(debug_logger, 'save_one_chunk')
     def save_one_chunk(self, obj, rados, chunk_offset, chunk):
         '''
         保存一个上传的分片
@@ -1168,28 +1173,30 @@ class ObjViewSet(viewsets.GenericViewSet):
             成功：True
             失败：Response
         '''
-        # 先更新元数据，后写rados数据（如果写入失败，恢复元数据）
-        # 更新文件修改时间和对象大小
-        old_size = obj.si if obj.si else 0
-        old_upt = obj.upt
-        obj.upt = timezone.now()
-        obj.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+        # 先更新元数据，后写rados数据（如果写入失败，事务回滚恢复元数据）
+        try:
+            with transaction.atomic(using='metadata'): # 开启事务
+                model = obj._meta.model
+                obj_lock = model.objects.select_for_update().get(pk=obj.pk) # 获取对象并加锁，并行数据一致性
 
-        if not obj.do_save():
-            logger.error('修改对象元数据失败')
-            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # 更新文件修改时间和对象大小
+                old_size = obj.si if obj.si else 0
+                obj_lock.upt = timezone.now()
+                obj_lock.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
+                if not obj_lock.do_save():
+                    raise ModelSaveError()
 
-        # 存储文件块
-        # ok, msg = rados.write(offset=chunk_offset, data_block=chunk.read())
-        ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
-        if not ok:
-            obj.si = old_size
-            obj.upt = old_upt
-            obj.do_save()
-
-            error = '文件块rados写入失败:' + msg
+                # 存储文件块
+                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+                if not ok:
+                    raise RadosWriteError(msg)
+        except RadosWriteError as e:
+            error = '文件块rados写入失败:' + str(e)
             logger.error(error)
             return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ModelSaveError:
+            logger.error('修改对象元数据失败')
+            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return True
 
@@ -1216,7 +1223,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         >>Http Code: 状态码400:
             {
                 'code': 400,
-                'code_text': 'ab_path参数有误'
+                'code_text': '参数有误'
             }
         >>Http Code: 状态码404:
             {
@@ -1258,7 +1265,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
-    lookup_field = 'ab_path'
+    lookup_field = 'dirpath'
     lookup_value_regex = '.+'
     pagination_class = paginations.BucketFileLimitOffsetPagination
 
@@ -1271,10 +1278,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             schema=coreschema.String(description='API版本（v1, v2）')
         ),
         coreapi.Field(
-            name='ab_path',
-            required=True,
+            name='dirpath',
+            required=False,
             location='path',
-            schema=coreschema.String(description='以存储桶名称开头的目录绝对路径')
+            schema=coreschema.String(description='目录绝对路径')
         ),
     ]
     schema = CustomAutoSchema(
@@ -1286,11 +1293,10 @@ class DirectoryViewSet(viewsets.GenericViewSet):
     )
     @log_used_time(debug_logger, mark_text='get dir files list')
     def list(self, request, *args, **kwargs):
-        ab_path = kwargs.get(self.lookup_field, '')
-        pp = PathParser(filepath=ab_path)
-        bucket_name, dir_path = pp.get_bucket_and_dirpath()
+        bucket_name = kwargs.get('bucket_name', '')
+        dir_path = kwargs.get(self.lookup_field, '')
         if not bucket_name:
-            return Response(data={'code': 400, 'code_text': 'ab_path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         bucket = get_user_own_bucket(bucket_name, request)
         if not isinstance(bucket, Bucket):
@@ -1307,7 +1313,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
             ('code', 200),
             ('bucket_name', bucket_name),
             ('dir_path', dir_path),
-            ('breadcrumb', pp.get_path_breadcrumb(dir_path))
+            # ('breadcrumb', PathParser(filepath='').get_path_breadcrumb(dir_path))
         ])
 
         queryset = files
@@ -1361,11 +1367,12 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         return Response(data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
-        ab_path = kwargs.get(self.lookup_field, '')
-        bucket_name, path, dir_name = PathParser(filepath=ab_path).get_bucket_path_and_dirname()
+        bucket_name = kwargs.get('bucket_name', '')
+        dirpath = kwargs.get(self.lookup_field, '')
+        path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
         if not bucket_name or not dir_name:
-            return Response(data={'code': 400, 'code_text': 'ab_path参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': '参数无效'}, status=status.HTTP_400_BAD_REQUEST)
 
         collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
         if not collection_name and response:
@@ -1427,8 +1434,9 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         '''
         data = {}
 
-        ab_path = kwargs.get(self.lookup_field, '')
-        bucket_name, dir_path, dir_name = PathParser(filepath=ab_path).get_bucket_path_and_dirname()
+        bucket_name = kwargs.get('bucket_name', '')
+        dirpath = kwargs.get(self.lookup_field, '')
+        dir_path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
         if not bucket_name or not dir_name:
             return None, Response({'code': 400, 'code_text': '目录路径参数无效，要同时包含有效的存储桶和目录名称'},
@@ -1719,7 +1727,7 @@ class MoveViewSet(viewsets.GenericViewSet):
             name='objpath',
             required=True,
             location='path',
-            schema=coreschema.String(description='以存储桶名称开头的文件对象绝对路径，类型String'),
+            schema=coreschema.String(description='文件对象绝对路径，类型String'),
         ),
     ]
     schema = CustomAutoSchema(
@@ -1748,10 +1756,11 @@ class MoveViewSet(viewsets.GenericViewSet):
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
     def create_detail_v1(self, request, *args, **kwargs):
+        bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name, path, filename = PathParser(filepath=objpath).get_bucket_path_and_filename()
+        path, filename = PathParser(filepath=objpath).get_path_and_filename()
         if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             params = self.validate_params(request)
@@ -1778,6 +1787,10 @@ class MoveViewSet(viewsets.GenericViewSet):
             obj = self.get_obj_or_404(table_name, path, filename)
         except Http404:
             return Response(data={'code': 404, 'code_text': '指定对象不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if obj is None:
+            return Response(data={'code': 404, 'code_text': '对象父目录不存在'},
                             status=status.HTTP_404_NOT_FOUND)
 
         return self.move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
@@ -1822,6 +1835,7 @@ class MoveViewSet(viewsets.GenericViewSet):
             obj.did = did
             obj.na = bfm.build_dir_full_name(new_obj_name)
             obj.name = new_obj_name
+            path = move_to
 
         if not obj.do_save():
             return Response(data={'code': 500, 'code_text': '移动对象操作失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1829,6 +1843,8 @@ class MoveViewSet(viewsets.GenericViewSet):
         context = self.get_serializer_context()
         context.update({'bucket_name': bucket.name, 'bucket': bucket})
         return Response(data={'code': 201, 'code_text': '移动对象操作成功',
+                              'bucket_name': bucket.name,
+                              'dir_path': path,
                               'obj': serializers.ObjInfoSerializer(obj, context=context).data}, status=status.HTTP_201_CREATED)
 
     def validate_params(self, request):
@@ -1923,6 +1939,142 @@ class MoveViewSet(viewsets.GenericViewSet):
         """
         if self.action in ['create_detail']:
             return Serializer
+        return Serializer
+
+
+class MetadataViewSet(viewsets.GenericViewSet):
+    '''
+    对象或目录元数据视图集
+
+    retrieve:
+        获取对象或目录元数据
+
+        >>Http Code: 状态码200,成功：
+            {
+                "code": 200,
+                "code_text": "获取元数据成功",
+                "data": {
+                    "na": "upload/Firefox-latest.exe",  # 对象或目录全路径名称
+                    "name": "Firefox-latest.exe",       # 对象或目录名称
+                    "fod": true,                        # true(文件对象)；false(目录)
+                    "did": 42,                          # 父目录节点id
+                    "si": 399336,                       # 对象大小，单位字节； 目录时此字段为0
+                    "ult": "2019-01-31 10:55:51",       # 创建时间
+                    "upt": "2019-01-31 10:55:51",       # 最后修改时间； 目录时此字段为空
+                    "dlc": 2,                           # 下载次数； 目录时此字段为0
+                    "download_url": "http://10.0.86.213/obs/gggg/upload/Firefox-latest.exe", # 对象下载url; 目录此字段为空
+                    "access_permission": "私有"          # 访问权限，‘私有’或‘公有’； 目录此字段为空
+                }
+            }
+        >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
+            {
+                "code": 400,
+                "code_text": 'xxxxx'        //错误信息
+            }
+        >>Http Code: 状态码404, bucket桶、对象或目录不存在:
+            {
+                "code": 404,
+                "code_text": 'xxxxx'        //错误信息，
+    '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'path'
+    lookup_value_regex = '.+'
+
+    # api docs
+    VERSION_METHOD_FEILD = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+
+    OBJ_PATH_METHOD_FEILD = [
+        coreapi.Field(
+            name='path',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='对象或目录绝对路径，类型String'),
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.retrieve_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve_v1(self, request, *args, **kwargs):
+        path_name = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name', '')
+        path, name = PathParser(filepath=path_name).get_path_and_filename()
+        if not bucket_name or not name:
+            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': '存储桶不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        table_name = bucket.get_bucket_table_name()
+        try:
+            obj = self.get_obj_or_dir_404(table_name, path, name)
+        except Http404:
+            return Response(data={'code': 404, 'code_text': '指定对象或目录不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
+        return Response(data={'code': 200, 'code_text': '获取元数据成功', 'data': serializer.data})
+
+    def get_obj_or_dir_404(self, table_name, path, name):
+        '''
+        获取文件对象或目录
+
+        :param table_name: 数据库表名
+        :param path: 父目录路经
+        :param name: 对象名称或目录名称
+        :return:
+            None: 父目录路径错误，不存在
+            obj: 对象或目录
+            raise Http404: 目录或对象不存在
+        '''
+        bfm = BucketFileManagement(path=path, collection_name=table_name)
+        ok, obj = bfm.get_dir_or_obj_exists(name=name)
+        if not ok:
+            return None
+
+        if obj:
+            return obj
+
+        raise Http404
+
+    def get_serializer(self, *args, **kwargs):
+        """
+        Return the serializer instance that should be used for validating and
+        deserializing input, and for serializing output.
+        """
+        serializer_class = self.get_serializer_class()
+        context = self.get_serializer_context()
+        context.update(kwargs.get('context', {}))
+        kwargs['context'] = context
+        return serializer_class(*args, **kwargs)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        if self.action in ['retrieve']:
+            return serializers.ObjInfoSerializer
         return Serializer
 
 

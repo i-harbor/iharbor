@@ -15,7 +15,6 @@ class BucketView(View):
     def get(self, request):
         content = self.get_content(request=request)
         return render(request, 'bucket.html', context=content)
-        # return render(request, 'base_with_sidebar.html', context=content)
 
     def get_content(self, request):
         content = {}
