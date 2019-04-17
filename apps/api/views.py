@@ -6,6 +6,7 @@ from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
 from django.db import transaction
+from django.db.utils import OperationalError
 from django.db.models import Q as dQ
 from django.core.validators import validate_email
 from django.core import exceptions
@@ -1161,6 +1162,7 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         return True
 
+    @log_used_time(debug_logger, mark_text='save_one_chunk')
     def save_one_chunk(self, obj, rados, chunk_offset, chunk):
         '''
         保存一个上传的分片
@@ -1173,24 +1175,24 @@ class ObjViewSet(viewsets.GenericViewSet):
             成功：True
             失败：Response
         '''
-        # 先更新元数据，后写rados数据（如果写入失败，事务回滚恢复元数据）
+        # 先更新元数据，后写rados数据
         try:
-            with transaction.atomic(using='metadata'): # 开启事务
-                model = obj._meta.model
-                obj_lock = model.objects.select_for_update().get(pk=obj.pk) # 获取对象并加锁，并行数据一致性
+            # 更新文件修改时间和对象大小
+            new_size = chunk_offset + chunk.size # 分片数据写入后 对象偏移量大小
+            if not self.update_obj_metadata(obj, size=new_size):
+                raise ModelSaveError()
 
-                # 更新文件修改时间和对象大小
-                old_size = obj.si if obj.si else 0
-                obj_lock.upt = timezone.now()
-                obj_lock.si = max(chunk_offset + chunk.size, old_size)  # 更新文件大小（只增不减）
-                if not obj_lock.do_save():
-                    raise ModelSaveError()
-
-                # 存储文件块
-                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
-                if not ok:
-                    raise RadosWriteError(msg)
+            # 存储文件块
+            ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+            if not ok:
+                raise RadosWriteError(msg)
         except RadosWriteError as e:
+            # 手动回滚对象元数据
+            model = obj._meta.model
+            try:
+                model.objects.filter(id=obj.id).update(si=obj.si, upt=obj.upt)
+            except:
+                pass
             error = '文件块rados写入失败:' + str(e)
             logger.error(error)
             return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1199,6 +1201,29 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return True
+
+    def update_obj_metadata(self, obj, size):
+        '''
+        更新对象元数据
+        :param obj: 对象
+        :param size: 对象大小
+        :return:
+            success: True
+            failed: False
+        '''
+        model = obj._meta.model
+
+        # 更新文件修改时间和对象大小
+        old_size = obj.si if obj.si else 0
+        new_size = max(size, old_size)  # 更新文件大小（只增不减）
+        try:
+            r = model.objects.filter(id=obj.id, si=obj.si).update(si=new_size, upt=timezone.now())  # 乐观锁方式
+        except:
+            return False
+        if r > 0:  # 更新行数
+            return True
+
+        return False
 
     @log_used_time(debug_logger, mark_text='get request.data during upload file')
     def get_data(self, request):
