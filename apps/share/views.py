@@ -1,9 +1,9 @@
 from django.http import FileResponse, Http404
 from django.utils.http import urlquote
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
-from rest_framework.reverse import reverse
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -12,7 +12,9 @@ from buckets.models import Bucket
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
 from utils.oss.rados_interfaces import CephRadosObject
+from utils.jwt_token import JWTokenTool
 from . import serializers
+
 
 # Create your views here.
 
@@ -25,11 +27,12 @@ class ObsViewSet(viewsets.GenericViewSet):
 
         * 跨域访问和安全
             跨域又需要传递token进行权限认证，我们推荐token通过header传递，不推荐在url中传递token,处理不当会增加token泄露等安全问题的风险。
-            我们支持token通过url参数传递，但出于安全考虑，请不要直接把token明文写到前端<a>标签href属性中，以防token泄密。请动态拼接token到url，比如如下方式：
+            我们支持token通过url参数传递，auth-token和jwt token两种token对应参数名称分别为token和jwt。出于安全考虑，请不要直接把token明文写到前端<a>标签href属性中，以防token泄密。请动态拼接token到url，比如如下方式：
             $("xxx").on('click', function(e){
                 e.preventDefault();
                 let token = 从SessionStorage、LocalStorage、内存等等存放token的安全地方获取
-                let url = $(this).attr('href') + '?token=' + token;
+                let url = $(this).attr('href') + '?token=' + token; // auth-token
+                let url = $(this).attr('href') + '?jwt=' + token;   // jwt token
                 window.location.href = url;
             }
 
@@ -58,7 +61,7 @@ class ObsViewSet(viewsets.GenericViewSet):
     # api docs
     schema = CustomAutoSchema(
         manual_fields={
-            'GET':[
+            'GET': [
                 coreapi.Field(
                     name='objpath',
                     required=False,
@@ -80,13 +83,10 @@ class ObsViewSet(viewsets.GenericViewSet):
         bucket = Bucket.get_bucket_by_name(bucket_name)
         if not bucket:
             return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'},
-                                status=status.HTTP_404_NOT_FOUND)
+                            status=status.HTTP_404_NOT_FOUND)
 
         collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-
-        # 可能通过url传递token的身份权限认证
-        self.authentication_url_token(request)
 
         # 是否有文件对象的访问权限
         if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
@@ -138,7 +138,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         if not file_generator:
             return None
 
-        filename = urlquote(filename)# 中文文件名需要
+        filename = urlquote(filename)  # 中文文件名需要
         response = FileResponse(file_generator())
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
         response['Content-Length'] = filesize
@@ -169,6 +169,9 @@ class ObsViewSet(viewsets.GenericViewSet):
         if bucket.is_public_permission():
             return True
 
+        # 可能通过url传递token的身份权限认证
+        self.authentication_url_token(request)
+
         # 存储桶是否属于当前用户
         if bucket.check_user_own_bucket(request):
             return True
@@ -185,6 +188,19 @@ class ObsViewSet(viewsets.GenericViewSet):
         :param request:
         :return:
         '''
+        self.authenticate_auth_token(request)
+        self.authenticate_jwt_token(request)
+
+    def authenticate_auth_token(self, request):
+        '''
+        auth-token验证
+        :param request:
+        :return: None
+        '''
+        # 已身份认证
+        if not isinstance(request.user, AnonymousUser):
+            return
+
         key = request.query_params.get('token')
         if not key:
             return
@@ -192,6 +208,28 @@ class ObsViewSet(viewsets.GenericViewSet):
         authenticator = TokenAuthentication()
         try:
             user, token = authenticator.authenticate_credentials(key=key)
+            request._authenticator = authenticator
+            request.user, request.auth = user, token
+        except AuthenticationFailed:
+            pass
+
+    def authenticate_jwt_token(self, request):
+        '''
+        jwt-token验证
+        :param request:
+        :return: None
+        '''
+        # 已身份认证
+        if not isinstance(request.user, AnonymousUser):
+            return
+
+        jwt = request.query_params.get('jwt')
+        if not jwt:
+            return
+
+        authenticator = JWTokenTool()
+        try:
+            user, token = authenticator.authenticate_jwt(jwt_value=jwt)
             request._authenticator = authenticator
             request.user, request.auth = user, token
         except AuthenticationFailed:

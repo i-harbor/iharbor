@@ -228,7 +228,7 @@ class UserViewSet(mixins.DestroyModelMixin,
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
 
-        return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.data})
+        return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.validated_data})
 
     def has_update_user_permission(self, request, instance):
         '''
@@ -534,7 +534,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action == 'list':
+        if self.action in ['list', 'retrieve']:
             return serializers.BucketSerializer
         elif self.action =='create':
             return serializers.BucketCreateSerializer
@@ -602,7 +602,6 @@ class ObjViewSet(viewsets.GenericViewSet):
                 'bucket_name': 'xxx',   //所在存储桶名称
                 'dir_path': 'xxxx',      //所在目录
                 'obj': {},              //文件对象详细信息
-                'breadcrumb': [[xxx, xxx],]    //路径面包屑
             }
             * 自定义读取时：返回bytes数据流，其他信息通过标头headers传递：
             {
@@ -1243,7 +1242,6 @@ class DirectoryViewSet(viewsets.GenericViewSet):
                 'files': [fileobj, fileobj, ...],//文件信息对象列表
                 'bucket_name': xxx,             //存储桶名称
                 'dir_path': xxx,                //当前目录路径
-                'breadcrumb': [[xxx, xxx],],    //路径面包屑
             }
         >>Http Code: 状态码400:
             {

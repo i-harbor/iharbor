@@ -28,6 +28,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     '''
     用户信息更新序列化器
     '''
+    password = serializers.CharField(label='密码', min_length=8, max_length=128, help_text='至少8位密码')
+
     class Meta:
         model = User
         fields = ('is_active', 'password', 'first_name', 'last_name',  'telephone', 'company')
@@ -53,7 +55,7 @@ class UserCreateSerializer(serializers.Serializer):
     用户创建序列化器
     '''
     username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
-    password = serializers.CharField(label='密码', required=True, max_length=128, help_text='至少8位密码')
+    password = serializers.CharField(label='密码', required=True, min_length=8, max_length=128, help_text='至少8位密码')
     last_name = serializers.CharField(label='姓氏', max_length=30, default='')
     first_name = serializers.CharField(label='名字', max_length=30, default='')
     telephone = serializers.CharField(label='电话', max_length=11, default='')
