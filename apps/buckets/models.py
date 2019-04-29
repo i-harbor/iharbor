@@ -300,7 +300,7 @@ class BucketFileBase(models.Model):
     class Meta:
         abstract = True
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
-        ordering = ['fod', ]
+        ordering = ['fod', '-id']
         indexes = [models.Index(fields=['fod'])]
         unique_together = ('did', 'name')
         verbose_name = '对象模型抽象基类'

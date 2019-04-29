@@ -1,3 +1,4 @@
+import threading
 from datetime import timedelta
 
 from django.utils import timezone
@@ -14,6 +15,7 @@ class Command(BaseCommand):
     '''
     清理bucket命令，清理满足彻底删除条件的对象和目录
     '''
+    pool_sem = threading.Semaphore(1000)  # 定义最多同时启用多少个线程
 
     help = 'Really delete objects and directories that have been softly deleted from a bucket'
 
@@ -51,10 +53,7 @@ class Command(BaseCommand):
         if input('Are you sure you want to do this?\n\n' + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
             raise CommandError("Clearing buckets cancelled.")
 
-        for bucket in buckets:
-            self.clear_one_bucket(bucket)
-
-        self.stdout.write(self.style.SUCCESS('Successfully clear {0} buckets'.format(buckets.count())))
+        self.clear_buckets(buckets)
 
     def get_buckets(self, **options):
         '''
@@ -152,7 +151,9 @@ class Command(BaseCommand):
                     else:
                         obj.delete()
 
-            # 如果bucket对应集合已空，删除bucket和collection
+                self.stdout.write(self.style.WARNING(f"Success deleted {objs.count()} objects from bucket {bucket.name}."))
+
+            # 如果bucket对应表已空，删除bucket和表
             if by_filters == False:
                 if modelclass.objects.count() == 0:
                     if delete_table_for_model_class(modelclass):
@@ -169,3 +170,23 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}' ))
 
+        self.pool_sem.release() # 可用线程数+1
+
+    def clear_buckets(self, buckets):
+        '''
+        多线程清理bucket
+        :param buckets:
+        :return: None
+        '''
+        for bucket in buckets:
+            if self.pool_sem.acquire(): # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
+                worker = threading.Thread(target=self.clear_one_bucket, kwargs={'bucket': bucket})
+                worker.start()
+
+        # 等待所有线程结束
+        while True:
+            c = threading.active_count()
+            if c <= 1:
+                break
+
+        self.stdout.write(self.style.SUCCESS('Successfully clear {0} buckets'.format(buckets.count())))

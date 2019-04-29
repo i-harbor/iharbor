@@ -276,7 +276,7 @@ LOGGING = {
             'level': 'DEBUG',
             'filters': ['require_debug_true'],# working with debug mode
             'class': 'logging.handlers.WatchedFileHandler',
-            'filename': os.path.join(LOGGING_FILES_DIR, '/debug.log'),
+            'filename': os.path.join(LOGGING_FILES_DIR, 'debug.log'),
             'formatter': 'dubug_formatter'
         },
         # 邮件通知
