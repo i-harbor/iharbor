@@ -1,12 +1,18 @@
 
-安全凭证是用于用户身份认证的凭证，EVHarbor云对象存储服务提供了多种安全认证方式，如Session,Token,访问密钥。
+安全凭证是用于用户身份认证的凭证，EVHarbor云对象存储服务提供了多种安全认证方式，如Session,Token,JWT,访问密钥。
 
-## Token认证 
-Token密钥认证方式，使用简单，安全性相对较低，token的获取可以通过开放的API获取,或者去EVHarbor站点通过浏览器端网页获取。
-刷新创建新token，旧token会失效，如果token泄露，请及时创建新的token，以防数据泄露丢失。    
+## Auth Token认证 
+Token密钥认证方式，使用简单，安全性相对较低，推荐内网使用，token的获取可以通过开放的API获取,或者去EVHarbor站点通过浏览器端网页获取。
+每个用户同一时刻只有一个有效的token，token永久有效，没有有效期，刷新创建新token，旧token会失效，如果token泄露，请及时创建新的token，以防数据泄露丢失。    
 
 Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
-例如：Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b   
+例如：   
+`Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b`  
+
+## JWT认证
+Json web token认证方式，使用简单,有效期为1天，旧的jwt失效前可以通过对应API携带旧jwt在可刷新时限（2天）内刷新获取新的jwt。
+jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“JWT”为前缀，空格分隔两个字符串，例如：   
+`Authorization: JWT eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
 
 ## 访问密钥  
 访问密钥是一个密钥对（AccessKey和SecretKey），AccessKey会在网络中传输，SecretKey不在网络上传输，需要用户妥善保管。

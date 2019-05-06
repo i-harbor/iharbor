@@ -25,6 +25,7 @@ from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import FileStorage, PathParser
 from utils.oss.rados_interfaces import CephRadosObject, RadosWriteError
 from utils.log.decorators import log_used_time
+from utils.jwt_token import JWTokenTool
 from .models import User, Bucket
 from buckets.models import ModelSaveError
 from . import serializers
@@ -1577,7 +1578,7 @@ class SecurityViewSet(viewsets.GenericViewSet):
 
     retrieve:
         获取指定用户的安全凭证，需要超级用户权限
-        *注：默认只返回用户Token，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
+        *注：默认只返回用户Auth Token和JWT(json web token)，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
 
             >>Http Code: 状态码200:
                 {
@@ -1585,7 +1586,8 @@ class SecurityViewSet(viewsets.GenericViewSet):
                     "id": 3,
                     "username": "xxx"
                   },
-                  "token": "xxx"
+                  "token": "xxx",
+                  "jwt": "xxx",
                   "keys": [                                 # 此内容只在携带query参数key时存在
                     {
                       "access_key": "xxx",
@@ -1653,12 +1655,16 @@ class SecurityViewSet(viewsets.GenericViewSet):
         user = self.get_user_or_create(username)
         token, created = Token.objects.get_or_create(user=user)
 
+        # jwt token
+        jwtoken = JWTokenTool().obtain_one_jwt_token(user=user)
+
         data = {
             'user': {
                 'id': user.id,
                 'username': user.username
             },
             'token': token.key,
+            'jwt': jwtoken
         }
 
         # param key exists
