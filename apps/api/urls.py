@@ -7,6 +7,7 @@ from . import views
 from .routers import DetailPostRouter
 from users.auth.views import ObtainAuthKey
 
+app_name = "api"
 
 # Create a router and register our viewsets with it.
 router = DefaultRouter()

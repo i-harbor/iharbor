@@ -11,6 +11,7 @@
 }
 
 .sidebar {
+	min-height: 100%;
 	/*overflow: auto;*/
 	/*font-size: 12px;*/
 	/*font-weight: 200;*/

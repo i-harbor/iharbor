@@ -7,23 +7,25 @@
 	{% block head %}{% endblock %}
 	<title>{% block title %}{% endblock %}</title>
     <style>
-        html, body {
+        html, body{
             height: 100%;
-            margin: 0;
-            padding: 0;
         }
 
         .page-content {
             min-height: 100%;
-            margin-bottom: -60px;
+            height: auto;
             padding-top: 60px;
+            margin-bottom: -60px;
             padding-bottom: 60px;
         }
 
-        .page-footer {
+        .page-footer{
             height: 60px;
             opacity: 0.8;
             background-color: #ececec;
+        }
+        .page-content-display{
+            margin-bottom: 47%;
         }
     </style>
 </head>
@@ -86,7 +88,7 @@
                 </div><!-- /.navbar-collapse -->
             </div><!-- /.container-fluid -->
         </nav>
-        <div>
+        <div class="page-content-display">
             {% block boby %}{% endblock %}
         </div>
     </div>
