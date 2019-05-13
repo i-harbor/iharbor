@@ -23,7 +23,7 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import FileStorage, PathParser
-from utils.oss.rados_interfaces import CephRadosObject, RadosWriteError
+from utils.oss.pyrados import HarborObject, RadosWriteError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
 from .models import User, Bucket
@@ -767,7 +767,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 400, 'code_text': '指定的对象名称与已有的目录重名，请重新指定一个名称'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados = CephRadosObject(obj_key, obj_size=obj.si)
+        rados = HarborObject(obj_key, obj_size=obj.si)
         if created is False: # 对象已存在，不是新建的
             if reset == 'true': # 重置对象大小
                 response = self.pre_reset_upload(obj=obj, rados=rados)
@@ -844,15 +844,18 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        obj_key = fileobj.get_obj_key(bucket.id)
+        old_id = fileobj.id
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
             logger.error('删除对象数据库原数据时错误')
             return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        obj_key = fileobj.get_obj_key(bucket.id)
-        cro = CephRadosObject(obj_key, obj_size=fileobj.si)
-        if not cro.delete():
+        ho = HarborObject(obj_id=obj_key, obj_size=fileobj.si)
+        ok, _ = ho.delete()
+        if not ok:
             # 恢复元数据
+            fileobj.id = old_id
             fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
             logger.error('删除rados对象数据时错误')
             return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -997,8 +1000,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id, obj_size=filesize)
-        file_generator = cro.read_obj_generator
+        ho = HarborObject(file_id, obj_size=filesize)
+        file_generator = ho.read_obj_generator
         if not file_generator:
             return None
 
@@ -1112,7 +1115,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             chunk = bytes()
         else:
             obj_key = obj.get_obj_key(bucket_id)
-            rados = CephRadosObject(obj_key, obj_size=obj.si)
+            rados = HarborObject(obj_key, obj_size=obj.si)
             ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
                 data = {'code':500, 'code_text': 'server error,文件块读取失败'}
@@ -1150,8 +1153,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             logger.error('修改对象元数据失败')
             return Response({'code': 500, 'code_text': '修改对象元数据失败'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if not rados.delete():
+        ok, _ = rados.delete()
+        if not ok:
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size

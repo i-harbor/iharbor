@@ -433,6 +433,9 @@ class BucketFileBase(models.Model):
         :param bucket_id:
         :return: type:str; 无效的参数返回None
         '''
+        if self.id is None:
+            raise ValueError('get_obj_key cannot be called before the model object is saved or after it is deleted')
+
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None

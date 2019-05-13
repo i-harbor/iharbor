@@ -48,7 +48,7 @@ class CephRadosObject():
             错误时：(False, bytes) bytes是错误描述
         '''
         if offset < 0 or size < 0:
-            return None
+            return False, 'offset or size param is invalid'
 
         self._rados_dll.FromObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.FromObj(self._cluster_name.encode('utf-8'),
