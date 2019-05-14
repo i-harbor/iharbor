@@ -15,13 +15,17 @@ router.register(r'(?P<version>(v1|v2))/users', views.UserViewSet, base_name='use
 router.register(r'(?P<version>(v1|v2))/buckets', views.BucketViewSet, base_name='buckets')
 router.register(r'(?P<version>(v1|v2))/obj/(?P<bucket_name>[a-z0-9-]{3,64})', views.ObjViewSet, base_name='obj')
 router.register(r'(?P<version>(v1|v2))/auth-key', ObtainAuthKey, base_name='auth-key')
-router.register(r'(?P<version>(v1|v2))/stats', views.BucketStatsViewSet, base_name='stats')
+router.register(r'(?P<version>(v1|v2))/stats/bucket', views.BucketStatsViewSet, base_name='stats_bucket')
+router.register(r'(?P<version>(v1|v2))/stats/ceph', views.CephStatsViewSet, base_name='stats_ceph')
 router.register(r'(?P<version>(v1|v2))/security', views.SecurityViewSet, base_name='security')
-router.register(r'(?P<version>(v1|v2))/metadata/(?P<bucket_name>[a-z0-9-]{3,64})', views.MetadataViewSet, base_name='metadata')
+router.register(r'(?P<version>(v1|v2))/metadata/(?P<bucket_name>[a-z0-9-]{3,64})', views.MetadataViewSet,
+                base_name='metadata')
 
 detail_router = DetailPostRouter()
-detail_router.register(r'(?P<version>(v1|v2))/dir/(?P<bucket_name>[a-z0-9-]{3,64})', views.DirectoryViewSet, base_name='dir')
-detail_router.register(r'(?P<version>(v1|v2))/move/(?P<bucket_name>[a-z0-9-]{3,64})', views.MoveViewSet, base_name='move')
+detail_router.register(r'(?P<version>(v1|v2))/dir/(?P<bucket_name>[a-z0-9-]{3,64})', views.DirectoryViewSet,
+                       base_name='dir')
+detail_router.register(r'(?P<version>(v1|v2))/move/(?P<bucket_name>[a-z0-9-]{3,64})', views.MoveViewSet,
+                       base_name='move')
 
 urlpatterns = [
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.

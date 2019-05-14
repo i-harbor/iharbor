@@ -231,7 +231,7 @@ CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
     'USER_NAME': 'client.admin',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
+    # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
     'POOL_NAME': 'p0',
     # 'RADOS_DLL_PATH': os.path.join(BASE_DIR, 'utils/oss/rados.so'),
 }

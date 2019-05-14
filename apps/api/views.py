@@ -5,12 +5,10 @@ from io import BytesIO
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
-from django.db import transaction
-from django.db.utils import OperationalError
 from django.db.models import Q as dQ
 from django.core.validators import validate_email
 from django.core import exceptions
-from rest_framework import viewsets, status, generics, mixins
+from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.schemas import AutoSchema
@@ -22,8 +20,8 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
-from utils.storagers import FileStorage, PathParser
-from utils.oss.pyrados import HarborObject, RadosWriteError
+from utils.storagers import PathParser
+from utils.oss.pyrados import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
 from .models import User, Bucket
@@ -2109,4 +2107,76 @@ class MetadataViewSet(viewsets.GenericViewSet):
             return serializers.ObjInfoSerializer
         return Serializer
 
+
+class CephStatsViewSet(viewsets.GenericViewSet):
+    '''
+        ceph集群视图集
+
+        list:
+            统计ceph集群总容量、已用容量，可用容量、对象数量
+
+            >>Http Code: 状态码200:
+                {
+                  "code": 200,
+                  "code_text": "successful",
+                  "stats": {
+                    "kb": 762765762560,
+                    "kb_used": 369591170304,
+                    "kb_avail": 393174592256,
+                    "num_objects": 40750684
+                  }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+
+            >>Http Code: 状态码500:
+                {
+                    'code': 500,
+                    'code_text': xxx  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        with HarborObject(obj_id='').rados as rados:
+            try:
+                stats = rados.get_cluster_stats()
+            except RadosError as e:
+                return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                'code': 200,
+                'code_text': 'successful',
+                'stats': stats
+            })
 

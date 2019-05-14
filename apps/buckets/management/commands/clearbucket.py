@@ -146,7 +146,8 @@ class Command(BaseCommand):
                     if obj.is_file():
                         obj_key = obj.get_obj_key(bucket.id)
                         ho.reset_obj_id_and_size(obj_id=obj_key, obj_size=obj.si)
-                        if ho.delete(obj_size=obj.si):
+                        ok, _ = ho.delete(obj_size=obj.si)
+                        if ok:
                             obj.delete()
                     else:
                         obj.delete()

@@ -109,7 +109,7 @@ class HarborObjectStructure():
         for num in range(last_part_num + 1):
             self._parts_id.append(build_part_id(obj_id=obj_id, part_num=num))
 
-    def how_many_parts(self):
+    def parts_count(self):
         '''
         对象有多少个part
         :return: int
@@ -300,10 +300,53 @@ class RadosAPI():
         except Exception as e:
             raise RadosError(str(e))
 
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        cluster = self.get_cluster()
+        try:
+            stats = cluster.get_cluster_stats()
+        except rados.Error as e:
+            msg = e.args[0] if e.args else f'Failed to get ceph cluster stats'
+            raise RadosError(msg, errno=e.errno)
+        return stats
+
+
+class HarborObjectBase():
+    '''
+    HarborObject读写相关的封装类，要实现此基类的方法
+    '''
+    def read(self, offset, size):
+        '''从指定字节偏移位置读取指定长度的数据块'''
+        raise NotImplementedError('`read()` must be implemented.')
+
+    def write(self, data_block, offset=0, chunk_size=20*1024**2):
+        '''分片写入一个数据块，默认分片大小20MB'''
+        raise NotImplementedError('`write()` must be implemented.')
+
+    def write_file(self, offset, file, per_size=20*1024**2):
+        '''向对象写入一个类文件数据'''
+        raise NotImplementedError('`write_file()` must be implemented.')
+
+    def delete(self, obj_size=None):
+        '''删除对象'''
+        raise NotImplementedError('`delete()` must be implemented.')
+
+    def read_obj_generator(self, offset=0, block_size=10*1024**2):
+        '''读取对象生成器'''
+        raise NotImplementedError('`read_obj_generator()` must be implemented.')
+
 
 class HarborObject():
     '''
-    EVHarbor对象操作接口封装
+    EVHarbor对象操作接口封装，
     '''
 
     def __init__(self, obj_id, obj_size=0, cluster_name=None, pool_name=None, user_name=None, conf_file='',
@@ -325,6 +368,10 @@ class HarborObject():
     def get_obj_size(self):
         '''获取对象大小'''
         return self._obj_size
+
+    @property
+    def rados(self):
+        return self._rados
 
     def read(self, offset, size):
         '''
