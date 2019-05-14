@@ -7,6 +7,7 @@
 * clearbucket命令启用多线程    
 * ceph集群的访问接口基于官方python包封装实现   
 * 获取ceph集群统计信息API实现   
+* 增加用户资源统计API   
 
 ## v0.2.3
 * 增加用户信息修改API和用户API权限修改

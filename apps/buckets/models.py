@@ -183,6 +183,8 @@ class Bucket(models.Model):
         data = bfm.get_bucket_space_and_count()
         count = data.get('count')
         space = data.get('space')
+        if space is None:
+            space = 0
         if (self.objs_count != count) or (self.size != space):
             self.objs_count = count
             self.size = space

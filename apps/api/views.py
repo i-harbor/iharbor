@@ -2180,3 +2180,137 @@ class CephStatsViewSet(viewsets.GenericViewSet):
                 'stats': stats
             })
 
+class UserStatsViewSet(viewsets.GenericViewSet):
+    '''
+        用户资源统计视图集
+
+        list:
+            获取当前用户的资源统计信息
+
+             >>Http Code: 状态码200:
+            {
+                "code": 200,
+                "space": 12991806596545,  # 已用总容量，byte
+                "count": 5864125,         # 总对象数量
+                "buckets": [              # 每个桶的统计信息
+                    {
+                        "stats": {
+                            "space": 16843103,
+                            "count": 4
+                        },
+                        "stats_time": "2019-05-14 10:49:39",
+                        "bucket_name": "wwww"
+                    },
+                    {
+                        "stats": {
+                            "space": 959820827,
+                            "count": 17
+                        },
+                        "stats_time": "2019-05-14 10:50:02",
+                        "bucket_name": "gggg"
+                    },
+                ]
+            }
+
+        retrieve:
+            获取指定用户的资源统计信息，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "stats": {
+                      "space": 12500047770969,             # 桶内对象总大小，单位字节
+                      "count": 5000004,                    # 桶内对象总数量
+                    },
+                    "stats_time": "2019-03-06 08:19:43", # 统计时间
+                    "code": 200,
+                    "bucket_name": "xxx"    # 存储桶名称
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': xxx  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+    lookup_value_regex = '.+'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        user = request.user
+        data = self.get_user_stats(user)
+        data['code'] = 200
+        data['username'] = user.username
+        return Response(data)
+
+    def retrieve(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.retrieve_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve_v1(self, request, *args, **kwargs):
+        username = kwargs.get(self.lookup_field)
+        try:
+            user = User.objects.get(username=username)
+        except exceptions.ObjectDoesNotExist:
+            return Response(data={'code': 404, 'code_text': 'username参数有误，用户不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        data = self.get_user_stats(user)
+        data['code'] = 200
+        data['username'] = user.username
+        return Response(data)
+
+    def get_user_stats(self, user):
+        '''获取用户的资源统计信息'''
+        all_count = 0
+        all_space = 0
+        li = []
+        buckets = Bucket.objects.filter(dQ(user=user) & dQ(soft_delete=False))
+        for b in buckets:
+            s = b.get_stats()
+            s['bucket_name'] = b.name
+            li.append(s)
+
+            stats = s.get('stats', {})
+            all_space += stats.get('space', 0)
+            all_count += stats.get('count', 0)
+
+        return {
+            'space': all_space,
+            'count': all_count,
+            'buckets': li
+        }
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action =='retrieve':
+            return [permissions.IsSuperUser()]
+
+        return super(UserStatsViewSet, self).get_permissions()
