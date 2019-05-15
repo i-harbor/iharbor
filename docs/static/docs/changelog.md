@@ -6,8 +6,8 @@
 * 列举目录下的对象或子目录时不再按创建时间倒叙排序  
 * clearbucket命令启用多线程    
 * ceph集群的访问接口基于官方python包封装实现   
-* 获取ceph集群统计信息API实现   
-* 增加用户资源统计API   
+* 增加获取ceph集群统计信息API，获取ceph集群组件信息API,获取ceph集群io性能信息API    
+* 增加用户资源统计API，查询用户总量API, 系统可用性监控API   
 
 ## v0.2.3
 * 增加用户信息修改API和用户API权限修改

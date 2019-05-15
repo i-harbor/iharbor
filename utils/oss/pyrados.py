@@ -1,5 +1,6 @@
 import os
 import math
+import json
 
 import rados
 
@@ -121,6 +122,25 @@ class HarborObjectStructure():
 
     def last_part_id(self):
         return self.parts_id[-1]
+
+
+class CephClusterCommand(dict):
+    '''
+    执行ceph 命令
+    '''
+    def __init__(self, cluster, prefix, format='json', **kwargs):
+        dict.__init__(self)
+        kwargs['prefix'] = prefix
+        kwargs['format'] = format
+        try:
+            ret, buf, err = cluster.mon_command(json.dumps(kwargs), '', timeout=5)
+        except rados.Error as e:
+            self['err'] = str(e)
+        else:
+            if ret != 0:
+                self['err'] = err
+            else:
+                self.update(json.loads(buf))
 
 
 class RadosAPI():
@@ -317,6 +337,10 @@ class RadosAPI():
             msg = e.args[0] if e.args else f'Failed to get ceph cluster stats'
             raise RadosError(msg, errno=e.errno)
         return stats
+
+    def command(self, prefix, **kwargs):
+        cluster = self.get_cluster()
+        return CephClusterCommand(cluster, prefix=prefix)
 
 
 class HarborObjectBase():

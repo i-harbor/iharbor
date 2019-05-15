@@ -2314,3 +2314,278 @@ class UserStatsViewSet(viewsets.GenericViewSet):
             return [permissions.IsSuperUser()]
 
         return super(UserStatsViewSet, self).get_permissions()
+
+
+class CephComponentsViewSet(viewsets.GenericViewSet):
+    '''
+        ceph集群组件信息视图集
+
+        list:
+            ceph的mon，osd，mgr，mds组件信息， 需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                  "code": 200,
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'mon': {},
+            'osd': {},
+            'mgr': {},
+            'mds': {}
+        })
+
+
+class CephErrorViewSet(viewsets.GenericViewSet):
+    '''
+        ceph集群当前故障信息查询
+
+        list:
+            ceph集群当前故障信息查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'errors': {
+                    }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'errors': {
+
+            }
+        })
+
+
+class CephPerformanceViewSet(viewsets.GenericViewSet):
+    '''
+        ceph集群性能，需要超级用户权限
+
+        list:
+            ceph集群的IOPS，I/O带宽
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'errors': {
+                    }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'iops': 1000,
+            'iobw': '1.0Gbps'
+        })
+
+
+class UserCountViewSet(viewsets.GenericViewSet):
+    '''
+        对象云存储系统用户总数查询
+
+        list:
+            对象云存储系统用户总数查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'count': xxx
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        count = User.objects.filter(is_active=True).count()
+        return Response({
+            'code': 200,
+            'count': count
+        })
+
+
+class AvailabilityViewSet(viewsets.GenericViewSet):
+    '''
+        系统可用性
+
+        list:
+            系统可用性查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'availability': '100%'
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'availability': '100%'
+        })
+
+

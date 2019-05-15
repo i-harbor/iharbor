@@ -21,6 +21,11 @@ router.register(r'(?P<version>(v1|v2))/stats/user', views.UserStatsViewSet, base
 router.register(r'(?P<version>(v1|v2))/security', views.SecurityViewSet, base_name='security')
 router.register(r'(?P<version>(v1|v2))/metadata/(?P<bucket_name>[a-z0-9-]{3,64})', views.MetadataViewSet,
                 base_name='metadata')
+router.register(r'(?P<version>(v1|v2))/ceph/comp', views.CephComponentsViewSet, base_name='ceph_components')
+router.register(r'(?P<version>(v1|v2))/ceph/perf', views.CephPerformanceViewSet, base_name='ceph_performance')
+router.register(r'(?P<version>(v1|v2))/usercount', views.UserCountViewSet, base_name='usercount')
+router.register(r'(?P<version>(v1|v2))/availability', views.AvailabilityViewSet, base_name='availability')
+
 
 detail_router = DetailPostRouter()
 detail_router.register(r'(?P<version>(v1|v2))/dir/(?P<bucket_name>[a-z0-9-]{3,64})', views.DirectoryViewSet,
