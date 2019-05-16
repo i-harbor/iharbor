@@ -18,6 +18,7 @@ router.register(r'(?P<version>(v1|v2))/auth-key', ObtainAuthKey, base_name='auth
 router.register(r'(?P<version>(v1|v2))/stats/bucket', views.BucketStatsViewSet, base_name='stats_bucket')
 router.register(r'(?P<version>(v1|v2))/stats/ceph', views.CephStatsViewSet, base_name='stats_ceph')
 router.register(r'(?P<version>(v1|v2))/stats/user', views.UserStatsViewSet, base_name='stats_user')
+router.register(r'(?P<version>(v1|v2))/stats/visit', views.VisitStatsViewSet, base_name='stats_visit')
 router.register(r'(?P<version>(v1|v2))/security', views.SecurityViewSet, base_name='security')
 router.register(r'(?P<version>(v1|v2))/metadata/(?P<bucket_name>[a-z0-9-]{3,64})', views.MetadataViewSet,
                 base_name='metadata')

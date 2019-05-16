@@ -1,11 +1,14 @@
 import binascii
 import os
 from uuid import uuid1
+from datetime import timedelta
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
+from django.utils import timezone
+
 
 # Create your models here.
 
@@ -15,7 +18,7 @@ class UserProfile(AbstractUser):
     '''
     NON_THIRD_APP = 0
     LOCAL_USER = NON_THIRD_APP
-    THIRD_APP_KJY = 1       # 第三方科技云通行证
+    THIRD_APP_KJY = 1  # 第三方科技云通行证
 
     THIRD_APP_CHOICES = (
         (NON_THIRD_APP, 'Local user.'),
@@ -25,7 +28,8 @@ class UserProfile(AbstractUser):
     telephone = models.CharField(verbose_name='电话', max_length=11, default='')
     company = models.CharField(verbose_name='公司/单位', max_length=255, default='')
     third_app = models.SmallIntegerField(verbose_name='第三方应用登录', choices=THIRD_APP_CHOICES, default=NON_THIRD_APP)
-    secret_key = models.CharField(verbose_name='个人密钥', max_length=20, blank=True, default='') # jwt加密解密需要
+    secret_key = models.CharField(verbose_name='个人密钥', max_length=20, blank=True, default='')  # jwt加密解密需要
+    last_active = models.DateField(verbose_name='最后活跃日期', db_index=True, default=timezone.now)
 
     def get_full_name(self):
         if self.last_name.encode('UTF-8').isalpha() and self.first_name.encode('UTF-8').isalpha():
@@ -39,6 +43,22 @@ class UserProfile(AbstractUser):
             self.save()
 
         return self.secret_key
+
+    @classmethod
+    def active_user_stats(cls, days=0):
+        '''
+        统计最近days天活跃用户数和注册用户数，默认今日
+
+        :param days: 天数
+        :return: {
+                "active_users": int,
+                "register_users": int
+            }
+        '''
+        t = timezone.now() - timedelta(days=days)
+        u = cls.objects.aggregate(active_users=models.Count('id', filter=models.Q(last_active__gte=t.date())),
+                                  register_users=models.Count('id', filter=models.Q(date_joined__gte=t)))
+        return u
 
 
 class Email(models.Model):
@@ -55,7 +75,7 @@ class Email(models.Model):
         verbose_name = '邮件'
         verbose_name_plural = verbose_name
 
-    def send_email(self, subject='EVHarbor',receiver=None, message=None):
+    def send_email(self, subject='EVHarbor', receiver=None, message=None):
         '''
         发送用户激活邮件
 
@@ -71,22 +91,21 @@ class Email(models.Model):
         self.email_host = settings.EMAIL_HOST
 
         ok = send_mail(
-            subject=subject,         # 标题
-            message=message,                    # 内容
-            from_email=self.sender,             # 发送者
-            recipient_list=[self.receiver],     # 接收者
+            subject=subject,  # 标题
+            message=message,  # 内容
+            from_email=self.sender,  # 发送者
+            recipient_list=[self.receiver],  # 接收者
             # html_message=self.message,        # 内容
-            fail_silently=True,                 # 不抛出异常
+            fail_silently=True,  # 不抛出异常
         )
         if ok == 0:
             return False
 
-        self.save() # 邮件记录
+        self.save()  # 邮件记录
         return True
 
 
 class AuthKey(models.Model):
-
     STATUS_CHOICES = (
         (True, '正常'),
         (False, '停用'),
@@ -147,4 +166,3 @@ class AuthKey(models.Model):
 
     def __str__(self):
         return self.secret_key
-

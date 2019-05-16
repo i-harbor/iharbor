@@ -65,6 +65,20 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
+    def perform_authentication(self, request):
+        super(CustomGenericViewSet, self).perform_authentication(request)
+
+        # 用户最后活跃日期
+        user = request.user
+        if user.id > 0:
+            try:
+                date = timezone.now().date()
+                if user.last_active < date:
+                    user.last_active = date
+                    user.save(update_fields=['last_active'])
+            except:
+                pass
+
 
 def get_user_own_bucket(bucket_name, request):
     '''
@@ -101,7 +115,7 @@ def get_bucket_collection_name_or_response(bucket_name, request):
 
 class UserViewSet(mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
+                  CustomGenericViewSet):
     '''
     用户类视图
     list:
@@ -286,7 +300,7 @@ class UserViewSet(mixins.DestroyModelMixin,
         return [permissions.IsSuperUser()]
 
 
-class BucketViewSet(viewsets.GenericViewSet):
+class BucketViewSet(CustomGenericViewSet):
     '''
     存储桶视图
 
@@ -548,7 +562,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         return [permission() for permission in self.permission_classes]
 
 
-class ObjViewSet(viewsets.GenericViewSet):
+class ObjViewSet(CustomGenericViewSet):
     '''
     文件对象视图集
 
@@ -902,14 +916,6 @@ class ObjViewSet(viewsets.GenericViewSet):
             return serializers.ObjPutSerializer
         return Serializer
 
-    def get_serializer_context(self):
-        """
-        Extra context provided to the serializer class.
-        """
-        context = super(ObjViewSet, self).get_serializer_context()
-        context['kwargs'] = self.kwargs
-        return context
-
     def get_file_obj_or_404(self, collection_name, path, filename):
         """
         获取文件对象
@@ -1231,7 +1237,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         return request.data
 
 
-class DirectoryViewSet(viewsets.GenericViewSet):
+class DirectoryViewSet(CustomGenericViewSet):
     '''
     目录视图集
 
@@ -1416,17 +1422,6 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -1506,7 +1501,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         return super(DirectoryViewSet, self).paginate_queryset(queryset)
 
 
-class BucketStatsViewSet(viewsets.GenericViewSet):
+class BucketStatsViewSet(CustomGenericViewSet):
     '''
         视图集
 
@@ -1573,7 +1568,7 @@ class BucketStatsViewSet(viewsets.GenericViewSet):
         return Response(data)
 
 
-class SecurityViewSet(viewsets.GenericViewSet):
+class SecurityViewSet(CustomGenericViewSet):
     '''
     安全凭证视图集
 
@@ -1704,7 +1699,7 @@ class SecurityViewSet(viewsets.GenericViewSet):
         validate_email(username)
 
 
-class MoveViewSet(viewsets.GenericViewSet):
+class MoveViewSet(CustomGenericViewSet):
     '''
     对象移动或重命名
 
@@ -1950,17 +1945,6 @@ class MoveViewSet(viewsets.GenericViewSet):
         else:
             raise Http404
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -1972,7 +1956,7 @@ class MoveViewSet(viewsets.GenericViewSet):
         return Serializer
 
 
-class MetadataViewSet(viewsets.GenericViewSet):
+class MetadataViewSet(CustomGenericViewSet):
     '''
     对象或目录元数据视图集
 
@@ -2086,17 +2070,6 @@ class MetadataViewSet(viewsets.GenericViewSet):
 
         raise Http404
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -2180,7 +2153,7 @@ class CephStatsViewSet(viewsets.GenericViewSet):
                 'stats': stats
             })
 
-class UserStatsViewSet(viewsets.GenericViewSet):
+class UserStatsViewSet(CustomGenericViewSet):
     '''
         用户资源统计视图集
 
@@ -2588,4 +2561,66 @@ class AvailabilityViewSet(viewsets.GenericViewSet):
             'availability': '100%'
         })
 
+
+class VisitStatsViewSet(viewsets.GenericViewSet):
+    '''
+        访问统计
+
+        list:
+            系统访问统计查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "stats": {
+                        "active_users": 1,  # 日活跃用户数
+                        "register_users": 0,# 日注册用户数
+                        "visitors": 100,    # 访客数
+                        "page_views": 1000  # 访问量
+                    }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        stats = User.active_user_stats()
+        stats.update({
+            'visitors': 100,
+            'page_views': 1000,
+        })
+        return Response({
+            'code': 200,
+            'stats': stats
+        })
 
