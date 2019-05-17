@@ -29,6 +29,7 @@ from buckets.models import ModelSaveError
 from . import serializers
 from . import paginations
 from . import permissions
+from . import throttles
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -113,8 +114,7 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     return (collection_name, None)
 
 
-class UserViewSet(mixins.DestroyModelMixin,
-                   mixins.ListModelMixin,
+class UserViewSet(mixins.ListModelMixin,
                   CustomGenericViewSet):
     '''
     用户类视图
@@ -242,6 +242,13 @@ class UserViewSet(mixins.DestroyModelMixin,
             instance._prefetched_objects_cache = {}
 
         return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.validated_data})
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.is_active != False:
+            user.is_active = False
+            user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def has_update_user_permission(self, request, instance):
         '''
@@ -1190,7 +1197,10 @@ class ObjViewSet(CustomGenericViewSet):
                 raise ModelSaveError()
 
             # 存储文件块
-            ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+            try:
+                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+            except Exception as e:
+                raise RadosWriteError(str(e))
             if not ok:
                 raise RadosWriteError(msg)
         except RadosWriteError as e:
@@ -2081,7 +2091,7 @@ class MetadataViewSet(CustomGenericViewSet):
         return Serializer
 
 
-class CephStatsViewSet(viewsets.GenericViewSet):
+class CephStatsViewSet(CustomGenericViewSet):
     '''
         ceph集群视图集
 
@@ -2093,10 +2103,10 @@ class CephStatsViewSet(viewsets.GenericViewSet):
                   "code": 200,
                   "code_text": "successful",
                   "stats": {
-                    "kb": 762765762560,
-                    "kb_used": 369591170304,
-                    "kb_avail": 393174592256,
-                    "num_objects": 40750684
+                    "kb": 762765762560,     # 总容量，单位kb
+                    "kb_used": 369591170304,# 已用容量
+                    "kb_avail": 393174592256,# 可用容量
+                    "num_objects": 40750684  # rados对象数量
                   }
                 }
 
@@ -2157,8 +2167,8 @@ class UserStatsViewSet(CustomGenericViewSet):
     '''
         用户资源统计视图集
 
-        list:
-            获取当前用户的资源统计信息
+        retrieve:
+            获取指定用户的资源统计信息，需要超级用户权限
 
              >>Http Code: 状态码200:
             {
@@ -2185,8 +2195,8 @@ class UserStatsViewSet(CustomGenericViewSet):
                 ]
             }
 
-        retrieve:
-            获取指定用户的资源统计信息，需要超级用户权限
+        list:
+            获取当前用户的资源统计信息
 
             >>Http Code: 状态码200:
                 {
@@ -2289,7 +2299,7 @@ class UserStatsViewSet(CustomGenericViewSet):
         return super(UserStatsViewSet, self).get_permissions()
 
 
-class CephComponentsViewSet(viewsets.GenericViewSet):
+class CephComponentsViewSet(CustomGenericViewSet):
     '''
         ceph集群组件信息视图集
 
@@ -2298,7 +2308,11 @@ class CephComponentsViewSet(viewsets.GenericViewSet):
 
             >>Http Code: 状态码200:
                 {
-                  "code": 200,
+                    "code": 200,
+                    "mon": {},
+                    "osd": {},
+                    "mgr": {},
+                    "mds": {}
                 }
 
             >>Http Code: 状态码404:
@@ -2344,7 +2358,7 @@ class CephComponentsViewSet(viewsets.GenericViewSet):
         })
 
 
-class CephErrorViewSet(viewsets.GenericViewSet):
+class CephErrorViewSet(CustomGenericViewSet):
     '''
         ceph集群当前故障信息查询
 
@@ -2400,18 +2414,18 @@ class CephErrorViewSet(viewsets.GenericViewSet):
         })
 
 
-class CephPerformanceViewSet(viewsets.GenericViewSet):
+class CephPerformanceViewSet(CustomGenericViewSet):
     '''
         ceph集群性能，需要超级用户权限
 
         list:
-            ceph集群的IOPS，I/O带宽
+            ceph集群的IOPS，I/O带宽，需要超级用户权限
 
             >>Http Code: 状态码200:
                 {
                     "code": 200,
-                    'errors': {
-                    }
+                    "iops": 1000,
+                    "iobw": "1.0Gbps"
                 }
 
             >>Http Code: 状态码404:
@@ -2455,7 +2469,7 @@ class CephPerformanceViewSet(viewsets.GenericViewSet):
         })
 
 
-class UserCountViewSet(viewsets.GenericViewSet):
+class UserCountViewSet(CustomGenericViewSet):
     '''
         对象云存储系统用户总数查询
 
@@ -2509,7 +2523,7 @@ class UserCountViewSet(viewsets.GenericViewSet):
         })
 
 
-class AvailabilityViewSet(viewsets.GenericViewSet):
+class AvailabilityViewSet(CustomGenericViewSet):
     '''
         系统可用性
 
@@ -2562,7 +2576,7 @@ class AvailabilityViewSet(viewsets.GenericViewSet):
         })
 
 
-class VisitStatsViewSet(viewsets.GenericViewSet):
+class VisitStatsViewSet(CustomGenericViewSet):
     '''
         访问统计
 
@@ -2573,10 +2587,11 @@ class VisitStatsViewSet(viewsets.GenericViewSet):
                 {
                     "code": 200,
                     "stats": {
-                        "active_users": 1,  # 日活跃用户数
-                        "register_users": 0,# 日注册用户数
+                        "active_users": 100,  # 日活跃用户数
+                        "register_users": 10,# 日注册用户数
                         "visitors": 100,    # 访客数
-                        "page_views": 1000  # 访问量
+                        "page_views": 1000,  # 访问量
+                        "ips": 50           # IP数
                     }
                 }
 
@@ -2618,9 +2633,66 @@ class VisitStatsViewSet(viewsets.GenericViewSet):
         stats.update({
             'visitors': 100,
             'page_views': 1000,
+            'ips': 50
         })
         return Response({
             'code': 200,
             'stats': stats
+        })
+
+
+class TestViewSet(CustomGenericViewSet):
+    '''
+        系统是否可用查询
+
+        list:
+            系统是否可用查询
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "code_text": "系统可用",
+                    "status": true     # true: 可用；false: 不可用
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = []
+    throttle_classes = (throttles.TestRateThrottle,)
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'code_text': '系统可用',
+            'status': True     # True: 可用；False: 不可用
         })
 

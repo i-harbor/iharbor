@@ -382,8 +382,7 @@ class HarborObject():
         self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
         self._obj_id = obj_id
         self._obj_size = obj_size
-        self._rados = RadosAPI(cluster_name=self._cluster_name, user_name=self._user_name, pool_name=self._pool_name,
-                               conf_file=self._conf_file, keyring_file=self._keyring_file)
+        self._rados = None
 
     def reset_obj_id_and_size(self, obj_id, obj_size):
         self._obj_id = obj_id
@@ -395,6 +394,22 @@ class HarborObject():
 
     @property
     def rados(self):
+        '''
+        :raises: class:`RadosError`
+        '''
+        return self.get_rados_api()
+
+    def get_rados_api(self):
+        '''
+        :raises: class:`RadosError`
+        '''
+        if not self._rados:
+            try:
+                self._rados = RadosAPI(cluster_name=self._cluster_name, user_name=self._user_name, pool_name=self._pool_name,
+                     conf_file=self._conf_file, keyring_file=self._keyring_file)
+            except RadosError as e:
+                raise e
+
         return self._rados
 
     def read(self, offset, size):
@@ -411,7 +426,8 @@ class HarborObject():
             return False, 'offset or size param is invalid'
 
         try:
-            data = self._rados.read(obj_id=self._obj_id, offset=offset, read_size=size)
+            rados = self.get_rados_api()
+            data = rados.read(obj_id=self._obj_id, offset=offset, read_size=size)
         except RadosError as e:
             return False, str(e)
 
@@ -442,7 +458,8 @@ class HarborObject():
             chunk = data_block[start:end]
             if chunk:
                 try:
-                    self._rados.write(obj_id=self._obj_id, offset=offset, data=chunk)
+                    rados = self.get_rados_api()
+                    rados.write(obj_id=self._obj_id, offset=offset, data=chunk)
                 except RadosError as e:
                     return False, str(e)
 
@@ -500,7 +517,8 @@ class HarborObject():
             size = obj_size
 
         try:
-            self._rados.delete(obj_id=self._obj_id, obj_size=size)
+            rados = self.get_rados_api()
+            rados.delete(obj_id=self._obj_id, obj_size=size)
         except RadosError as e:
             return False, str(e)
 
