@@ -233,7 +233,6 @@ CEPH_RADOS = {
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
     # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
     'POOL_NAME': 'p0',
-    # 'RADOS_DLL_PATH': os.path.join(BASE_DIR, 'utils/oss/rados.so'),
 }
 
 # 日志配置

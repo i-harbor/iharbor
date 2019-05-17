@@ -5,7 +5,7 @@ from django.conf import settings
 from .pyrados import HarborObjectBase
 
 
-rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', 'utils/oss/rados.so'))
+rados_dll = ctypes.CDLL(os.path.join(settings.BASE_DIR, 'utils/oss/rados.so'))
 
 class RadosWriteError(Exception):
     pass

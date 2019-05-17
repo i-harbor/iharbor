@@ -2178,11 +2178,11 @@ class UserStatsViewSet(CustomGenericViewSet):
                 "buckets": [              # 每个桶的统计信息
                     {
                         "stats": {
-                            "space": 16843103,
-                            "count": 4
+                            "space": 16843103, # 桶内对象总大小，单位字节
+                            "count": 4          # 桶内对象总数量
                         },
-                        "stats_time": "2019-05-14 10:49:39",
-                        "bucket_name": "wwww"
+                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "bucket_name": "wwww"       # 存储桶名称
                     },
                     {
                         "stats": {
@@ -2199,15 +2199,29 @@ class UserStatsViewSet(CustomGenericViewSet):
             获取当前用户的资源统计信息
 
             >>Http Code: 状态码200:
-                {
-                    "stats": {
-                      "space": 12500047770969,             # 桶内对象总大小，单位字节
-                      "count": 5000004,                    # 桶内对象总数量
+            {
+                "code": 200,
+                "space": 12991806596545,  # 已用总容量，byte
+                "count": 5864125,         # 总对象数量
+                "buckets": [              # 每个桶的统计信息
+                    {
+                        "stats": {
+                            "space": 16843103, # 桶内对象总大小，单位字节
+                            "count": 4          # 桶内对象总数量
+                        },
+                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "bucket_name": "wwww"       # 存储桶名称
                     },
-                    "stats_time": "2019-03-06 08:19:43", # 统计时间
-                    "code": 200,
-                    "bucket_name": "xxx"    # 存储桶名称
-                }
+                    {
+                        "stats": {
+                            "space": 959820827,
+                            "count": 17
+                        },
+                        "stats_time": "2019-05-14 10:50:02",
+                        "bucket_name": "gggg"
+                    },
+                ]
+            }
 
             >>Http Code: 状态码404:
                 {
