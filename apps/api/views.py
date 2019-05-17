@@ -5,12 +5,10 @@ from io import BytesIO
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
-from django.db import transaction
-from django.db.utils import OperationalError
 from django.db.models import Q as dQ
 from django.core.validators import validate_email
 from django.core import exceptions
-from rest_framework import viewsets, status, generics, mixins
+from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.schemas import AutoSchema
@@ -22,14 +20,16 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
-from utils.storagers import FileStorage, PathParser
-from utils.oss.rados_interfaces import CephRadosObject, RadosWriteError
+from utils.storagers import PathParser
+from utils.oss.pyrados import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
+from utils.jwt_token import JWTokenTool
 from .models import User, Bucket
 from buckets.models import ModelSaveError
 from . import serializers
 from . import paginations
 from . import permissions
+from . import throttles
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -66,6 +66,20 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
         kwargs['context'] = context
         return serializer_class(*args, **kwargs)
 
+    def perform_authentication(self, request):
+        super(CustomGenericViewSet, self).perform_authentication(request)
+
+        # 用户最后活跃日期
+        user = request.user
+        if user.id > 0:
+            try:
+                date = timezone.now().date()
+                if user.last_active < date:
+                    user.last_active = date
+                    user.save(update_fields=['last_active'])
+            except:
+                pass
+
 
 def get_user_own_bucket(bucket_name, request):
     '''
@@ -100,9 +114,8 @@ def get_bucket_collection_name_or_response(bucket_name, request):
     return (collection_name, None)
 
 
-class UserViewSet(mixins.DestroyModelMixin,
-                   mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
+class UserViewSet(mixins.ListModelMixin,
+                  CustomGenericViewSet):
     '''
     用户类视图
     list:
@@ -230,6 +243,13 @@ class UserViewSet(mixins.DestroyModelMixin,
 
         return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.validated_data})
 
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user.is_active != False:
+            user.is_active = False
+            user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def has_update_user_permission(self, request, instance):
         '''
         当前用户是否有修改给定用户信息的权限
@@ -287,7 +307,7 @@ class UserViewSet(mixins.DestroyModelMixin,
         return [permissions.IsSuperUser()]
 
 
-class BucketViewSet(viewsets.GenericViewSet):
+class BucketViewSet(CustomGenericViewSet):
     '''
     存储桶视图
 
@@ -549,7 +569,7 @@ class BucketViewSet(viewsets.GenericViewSet):
         return [permission() for permission in self.permission_classes]
 
 
-class ObjViewSet(viewsets.GenericViewSet):
+class ObjViewSet(CustomGenericViewSet):
     '''
     文件对象视图集
 
@@ -766,7 +786,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             return Response({'code': 400, 'code_text': '指定的对象名称与已有的目录重名，请重新指定一个名称'}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados = CephRadosObject(obj_key, obj_size=obj.si)
+        rados = HarborObject(obj_key, obj_size=obj.si)
         if created is False: # 对象已存在，不是新建的
             if reset == 'true': # 重置对象大小
                 response = self.pre_reset_upload(obj=obj, rados=rados)
@@ -843,15 +863,18 @@ class ObjViewSet(viewsets.GenericViewSet):
 
         collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        obj_key = fileobj.get_obj_key(bucket.id)
+        old_id = fileobj.id
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
             logger.error('删除对象数据库原数据时错误')
             return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        obj_key = fileobj.get_obj_key(bucket.id)
-        cro = CephRadosObject(obj_key, obj_size=fileobj.si)
-        if not cro.delete():
+        ho = HarborObject(obj_id=obj_key, obj_size=fileobj.si)
+        ok, _ = ho.delete()
+        if not ok:
             # 恢复元数据
+            fileobj.id = old_id
             fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
             logger.error('删除rados对象数据时错误')
             return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -899,14 +922,6 @@ class ObjViewSet(viewsets.GenericViewSet):
         if self.action == 'update':
             return serializers.ObjPutSerializer
         return Serializer
-
-    def get_serializer_context(self):
-        """
-        Extra context provided to the serializer class.
-        """
-        context = super(ObjViewSet, self).get_serializer_context()
-        context['kwargs'] = self.kwargs
-        return context
 
     def get_file_obj_or_404(self, collection_name, path, filename):
         """
@@ -996,8 +1011,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id, obj_size=filesize)
-        file_generator = cro.read_obj_generator
+        ho = HarborObject(file_id, obj_size=filesize)
+        file_generator = ho.read_obj_generator
         if not file_generator:
             return None
 
@@ -1111,7 +1126,7 @@ class ObjViewSet(viewsets.GenericViewSet):
             chunk = bytes()
         else:
             obj_key = obj.get_obj_key(bucket_id)
-            rados = CephRadosObject(obj_key, obj_size=obj.si)
+            rados = HarborObject(obj_key, obj_size=obj.si)
             ok, chunk = rados.read(offset=offset, size=size)
             if not ok:
                 data = {'code':500, 'code_text': 'server error,文件块读取失败'}
@@ -1149,8 +1164,8 @@ class ObjViewSet(viewsets.GenericViewSet):
             logger.error('修改对象元数据失败')
             return Response({'code': 500, 'code_text': '修改对象元数据失败'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if not rados.delete():
+        ok, _ = rados.delete()
+        if not ok:
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size
@@ -1182,7 +1197,10 @@ class ObjViewSet(viewsets.GenericViewSet):
                 raise ModelSaveError()
 
             # 存储文件块
-            ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+            try:
+                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
+            except Exception as e:
+                raise RadosWriteError(str(e))
             if not ok:
                 raise RadosWriteError(msg)
         except RadosWriteError as e:
@@ -1229,7 +1247,7 @@ class ObjViewSet(viewsets.GenericViewSet):
         return request.data
 
 
-class DirectoryViewSet(viewsets.GenericViewSet):
+class DirectoryViewSet(CustomGenericViewSet):
     '''
     目录视图集
 
@@ -1414,17 +1432,6 @@ class DirectoryViewSet(viewsets.GenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -1504,7 +1511,7 @@ class DirectoryViewSet(viewsets.GenericViewSet):
         return super(DirectoryViewSet, self).paginate_queryset(queryset)
 
 
-class BucketStatsViewSet(viewsets.GenericViewSet):
+class BucketStatsViewSet(CustomGenericViewSet):
     '''
         视图集
 
@@ -1571,13 +1578,13 @@ class BucketStatsViewSet(viewsets.GenericViewSet):
         return Response(data)
 
 
-class SecurityViewSet(viewsets.GenericViewSet):
+class SecurityViewSet(CustomGenericViewSet):
     '''
     安全凭证视图集
 
     retrieve:
         获取指定用户的安全凭证，需要超级用户权限
-        *注：默认只返回用户Token，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
+        *注：默认只返回用户Auth Token和JWT(json web token)，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
 
             >>Http Code: 状态码200:
                 {
@@ -1585,7 +1592,8 @@ class SecurityViewSet(viewsets.GenericViewSet):
                     "id": 3,
                     "username": "xxx"
                   },
-                  "token": "xxx"
+                  "token": "xxx",
+                  "jwt": "xxx",
                   "keys": [                                 # 此内容只在携带query参数key时存在
                     {
                       "access_key": "xxx",
@@ -1653,12 +1661,16 @@ class SecurityViewSet(viewsets.GenericViewSet):
         user = self.get_user_or_create(username)
         token, created = Token.objects.get_or_create(user=user)
 
+        # jwt token
+        jwtoken = JWTokenTool().obtain_one_jwt_token(user=user)
+
         data = {
             'user': {
                 'id': user.id,
                 'username': user.username
             },
             'token': token.key,
+            'jwt': jwtoken
         }
 
         # param key exists
@@ -1697,7 +1709,7 @@ class SecurityViewSet(viewsets.GenericViewSet):
         validate_email(username)
 
 
-class MoveViewSet(viewsets.GenericViewSet):
+class MoveViewSet(CustomGenericViewSet):
     '''
     对象移动或重命名
 
@@ -1943,17 +1955,6 @@ class MoveViewSet(viewsets.GenericViewSet):
         else:
             raise Http404
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -1965,7 +1966,7 @@ class MoveViewSet(viewsets.GenericViewSet):
         return Serializer
 
 
-class MetadataViewSet(viewsets.GenericViewSet):
+class MetadataViewSet(CustomGenericViewSet):
     '''
     对象或目录元数据视图集
 
@@ -2079,17 +2080,6 @@ class MetadataViewSet(viewsets.GenericViewSet):
 
         raise Http404
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -2100,4 +2090,623 @@ class MetadataViewSet(viewsets.GenericViewSet):
             return serializers.ObjInfoSerializer
         return Serializer
 
+
+class CephStatsViewSet(CustomGenericViewSet):
+    '''
+        ceph集群视图集
+
+        list:
+            统计ceph集群总容量、已用容量，可用容量、对象数量
+
+            >>Http Code: 状态码200:
+                {
+                  "code": 200,
+                  "code_text": "successful",
+                  "stats": {
+                    "kb": 762765762560,     # 总容量，单位kb
+                    "kb_used": 369591170304,# 已用容量
+                    "kb_avail": 393174592256,# 可用容量
+                    "num_objects": 40750684  # rados对象数量
+                  }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+
+            >>Http Code: 状态码500:
+                {
+                    'code': 500,
+                    'code_text': xxx  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        with HarborObject(obj_id='').rados as rados:
+            try:
+                stats = rados.get_cluster_stats()
+            except RadosError as e:
+                return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                'code': 200,
+                'code_text': 'successful',
+                'stats': stats
+            })
+
+class UserStatsViewSet(CustomGenericViewSet):
+    '''
+        用户资源统计视图集
+
+        retrieve:
+            获取指定用户的资源统计信息，需要超级用户权限
+
+             >>Http Code: 状态码200:
+            {
+                "code": 200,
+                "space": 12991806596545,  # 已用总容量，byte
+                "count": 5864125,         # 总对象数量
+                "buckets": [              # 每个桶的统计信息
+                    {
+                        "stats": {
+                            "space": 16843103, # 桶内对象总大小，单位字节
+                            "count": 4          # 桶内对象总数量
+                        },
+                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "bucket_name": "wwww"       # 存储桶名称
+                    },
+                    {
+                        "stats": {
+                            "space": 959820827,
+                            "count": 17
+                        },
+                        "stats_time": "2019-05-14 10:50:02",
+                        "bucket_name": "gggg"
+                    },
+                ]
+            }
+
+        list:
+            获取当前用户的资源统计信息
+
+            >>Http Code: 状态码200:
+            {
+                "code": 200,
+                "space": 12991806596545,  # 已用总容量，byte
+                "count": 5864125,         # 总对象数量
+                "buckets": [              # 每个桶的统计信息
+                    {
+                        "stats": {
+                            "space": 16843103, # 桶内对象总大小，单位字节
+                            "count": 4          # 桶内对象总数量
+                        },
+                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "bucket_name": "wwww"       # 存储桶名称
+                    },
+                    {
+                        "stats": {
+                            "space": 959820827,
+                            "count": 17
+                        },
+                        "stats_time": "2019-05-14 10:50:02",
+                        "bucket_name": "gggg"
+                    },
+                ]
+            }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': xxx  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+    lookup_value_regex = '.+'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        user = request.user
+        data = self.get_user_stats(user)
+        data['code'] = 200
+        data['username'] = user.username
+        return Response(data)
+
+    def retrieve(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.retrieve_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve_v1(self, request, *args, **kwargs):
+        username = kwargs.get(self.lookup_field)
+        try:
+            user = User.objects.get(username=username)
+        except exceptions.ObjectDoesNotExist:
+            return Response(data={'code': 404, 'code_text': 'username参数有误，用户不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        data = self.get_user_stats(user)
+        data['code'] = 200
+        data['username'] = user.username
+        return Response(data)
+
+    def get_user_stats(self, user):
+        '''获取用户的资源统计信息'''
+        all_count = 0
+        all_space = 0
+        li = []
+        buckets = Bucket.objects.filter(dQ(user=user) & dQ(soft_delete=False))
+        for b in buckets:
+            s = b.get_stats()
+            s['bucket_name'] = b.name
+            li.append(s)
+
+            stats = s.get('stats', {})
+            all_space += stats.get('space', 0)
+            all_count += stats.get('count', 0)
+
+        return {
+            'space': all_space,
+            'count': all_count,
+            'buckets': li
+        }
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action =='retrieve':
+            return [permissions.IsSuperUser()]
+
+        return super(UserStatsViewSet, self).get_permissions()
+
+
+class CephComponentsViewSet(CustomGenericViewSet):
+    '''
+        ceph集群组件信息视图集
+
+        list:
+            ceph的mon，osd，mgr，mds组件信息， 需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "mon": {},
+                    "osd": {},
+                    "mgr": {},
+                    "mds": {}
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'mon': {},
+            'osd': {},
+            'mgr': {},
+            'mds': {}
+        })
+
+
+class CephErrorViewSet(CustomGenericViewSet):
+    '''
+        ceph集群当前故障信息查询
+
+        list:
+            ceph集群当前故障信息查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'errors': {
+                    }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'errors': {
+
+            }
+        })
+
+
+class CephPerformanceViewSet(CustomGenericViewSet):
+    '''
+        ceph集群性能，需要超级用户权限
+
+        list:
+            ceph集群的IOPS，I/O带宽，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "iops": 1000,
+                    "iobw": "1.0Gbps"
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'iops': 1000,
+            'iobw': '1.0Gbps'
+        })
+
+
+class UserCountViewSet(CustomGenericViewSet):
+    '''
+        对象云存储系统用户总数查询
+
+        list:
+            对象云存储系统用户总数查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'count': xxx
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        count = User.objects.filter(is_active=True).count()
+        return Response({
+            'code': 200,
+            'count': count
+        })
+
+
+class AvailabilityViewSet(CustomGenericViewSet):
+    '''
+        系统可用性
+
+        list:
+            系统可用性查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    'availability': '100%'
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'availability': '100%'
+        })
+
+
+class VisitStatsViewSet(CustomGenericViewSet):
+    '''
+        访问统计
+
+        list:
+            系统访问统计查询，需要超级用户权限
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "stats": {
+                        "active_users": 100,  # 日活跃用户数
+                        "register_users": 10,# 日注册用户数
+                        "visitors": 100,    # 访客数
+                        "page_views": 1000,  # 访问量
+                        "ips": 50           # IP数
+                    }
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = [permissions.IsSuperUser]
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        stats = User.active_user_stats()
+        stats.update({
+            'visitors': 100,
+            'page_views': 1000,
+            'ips': 50
+        })
+        return Response({
+            'code': 200,
+            'stats': stats
+        })
+
+
+class TestViewSet(CustomGenericViewSet):
+    '''
+        系统是否可用查询
+
+        list:
+            系统是否可用查询
+
+            >>Http Code: 状态码200:
+                {
+                    "code": 200,
+                    "code_text": "系统可用",
+                    "status": true     # true: 可用；false: 不可用
+                }
+
+            >>Http Code: 状态码404:
+                {
+                    'code': 404,
+                    'code_text': URL中包含无效的版本  //错误码描述
+                }
+        '''
+    queryset = []
+    permission_classes = []
+    throttle_classes = (throttles.TestRateThrottle,)
+    # lookup_field = 'bucket_name'
+    # lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'GET': BASE_METHOD_FIELDS,
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        return Response({
+            'code': 200,
+            'code_text': '系统可用',
+            'status': True     # True: 可用；False: 不可用
+        })
 

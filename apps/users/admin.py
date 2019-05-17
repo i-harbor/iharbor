@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils.translation import ugettext_lazy as _
 
 from .models import UserProfile, Email, AuthKey
 # Register your models here.
@@ -14,6 +15,14 @@ class UserProfileAdmin(UserAdmin):
     list_display_links = ('id', 'username')
     # list_filter = ('date_joined', 'is_superuser', 'is_staff')
     search_fields = ('username', 'company', 'first_name', 'last_name')  # 搜索字段
+
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email', 'company', 'telephone','secret_key')}),
+        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser',
+                                       'groups', 'user_permissions')}),
+        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
+    )
 
     add_fieldsets = (
         (None, {

@@ -8,7 +8,7 @@ from django.db.utils import ProgrammingError
 
 from buckets.utils import BucketFileManagement, delete_table_for_model_class
 from buckets.models import Bucket
-from utils.oss.rados_interfaces import CephRadosObject
+from utils.oss.pyrados import HarborObject
 
 
 class Command(BaseCommand):
@@ -134,7 +134,7 @@ class Command(BaseCommand):
         if bucket.is_soft_deleted() and  modified_time < self._clear_datetime:
             by_filters = False
 
-        cro = CephRadosObject(obj_id='')
+        ho = HarborObject(obj_id='')
 
         try:
             while True:
@@ -145,8 +145,9 @@ class Command(BaseCommand):
                 for obj in objs:
                     if obj.is_file():
                         obj_key = obj.get_obj_key(bucket.id)
-                        cro.reset_obj_id(obj_key)
-                        if cro.delete(obj_size=obj.si):
+                        ho.reset_obj_id_and_size(obj_id=obj_key, obj_size=obj.si)
+                        ok, _ = ho.delete(obj_size=obj.si)
+                        if ok:
                             obj.delete()
                     else:
                         obj.delete()

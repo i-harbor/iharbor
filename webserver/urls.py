@@ -15,39 +15,29 @@ Including another URLconf
 """
 from django.conf import settings
 from django.contrib import admin
-from django.conf.urls import url, include
-from django.contrib.staticfiles.views import serve
-from rest_framework.routers import DefaultRouter
+from django.urls import path, include
 from rest_framework_swagger.views import get_swagger_view
 
-from apps.share.views import ObsViewSet
 from .views import kjy_login_callback
-
-# Create a router and register our viewsets with it.
-router = DefaultRouter(trailing_slash=False)
-router.register(r'obs', ObsViewSet, base_name='obs')
 
 
 urlpatterns = [
-    url(r'api/', include('api.urls', namespace='api')),
-    url(r'evcloud/', include('evcloud.urls', namespace='evcloud')),
-    url(r'share/', include('share.urls', namespace='share')),
-    url(r'', include('buckets.urls', namespace='buckets')), # 注意顺序
-    url(r'', include(router.urls, namespace='obs')),        # 注意顺序
-    url(r'^users/', include('users.urls', namespace='users')),
-    url(r'vpn/', include('vpn.urls', namespace='vpn')),
-    url(r'^admin/', admin.site.urls),
-    url(r'favicon.ico', view=serve, kwargs={'path': 'images/icon/favicon.ico'}),
-    url(r'apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),
-    url(r'^docs/', include('docs.urls', namespace='docs')),
-    url(r'callback', kjy_login_callback, name='callback'),
+    path('api/', include('api.urls', namespace='api')),
+    path('evcloud/', include('evcloud.urls', namespace='evcloud')),
+    path('obs/', include('share.urls', namespace='obs')),
+    path('', include('buckets.urls', namespace='buckets')),
+    path('users/', include('users.urls', namespace='users')),
+    path('vpn/', include('vpn.urls', namespace='vpn')),
+    path('admin/', admin.site.urls),
+    path('apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),
+    path('docs/', include('docs.urls', namespace='docs')),
+    path('callback', kjy_login_callback, name='callback'),
 ]
 
 
 if settings.DEBUG:
     import debug_toolbar
     urlpatterns = [
-        # For django versions before 2.0:
-        url(r'^__debug__/', include(debug_toolbar.urls)),
+        path('__debug__/', include(debug_toolbar.urls)),
 
     ] + urlpatterns

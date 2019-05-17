@@ -10,6 +10,15 @@ jwt_decode_handler = api_settings.JWT_DECODE_HANDLER
 jwt_get_username_from_payload = api_settings.JWT_PAYLOAD_GET_USERNAME_HANDLER
 
 
+def jwt_get_user_secret_key(user):
+    '''
+    jwt加密解密的对应用户的密钥
+    :param user:
+    :return: string
+    '''
+    return user.get_user_secret_key()
+
+
 class JWTokenTool():
     '''
     JWT token

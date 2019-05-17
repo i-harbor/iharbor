@@ -2,9 +2,10 @@ import ctypes
 import os
 
 from django.conf import settings
+from .pyrados import HarborObjectBase
 
 
-rados_dll = ctypes.CDLL(settings.CEPH_RADOS.get('RADOS_DLL_PATH', 'utils/oss/rados.so'))
+rados_dll = ctypes.CDLL(os.path.join(settings.BASE_DIR, 'utils/oss/rados.so'))
 
 class RadosWriteError(Exception):
     pass
@@ -15,9 +16,9 @@ class BaseReturnType(ctypes.Structure):
     _fields_ = [('ok', ctypes.c_bool), ('data_ptr', ctypes.c_void_p), ('data_len', ctypes.c_int)]
 
 
-class CephRadosObject():
+class HarborObjectGo(HarborObjectBase):
     '''
-    文件对象读写接口
+    文件对象读写接口,通过golang动态库实现
     '''
     ERROR_CODE_NO_FILE_OR_DIR = 2
 
@@ -48,7 +49,7 @@ class CephRadosObject():
             错误时：(False, bytes) bytes是错误描述
         '''
         if offset < 0 or size < 0:
-            return None
+            return False, 'offset or size param is invalid'
 
         self._rados_dll.FromObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.FromObj(self._cluster_name.encode('utf-8'),
@@ -97,7 +98,7 @@ class CephRadosObject():
             else:
                 return False, 'read error'
 
-    def write(self, offset, data_block):
+    def write(self, data_block, offset=0, chunk_size=20*1024**2):
         '''
         从指定字节偏移量写入数据块
 
@@ -110,7 +111,7 @@ class CephRadosObject():
         if offset < 0 or not isinstance(data_block, bytes):
             return False, 'offset must be >=0 and data input must be bytes'
 
-        return self.write_by_chunk(data_block=data_block, offset=offset)
+        return self.write_by_chunk(data_block=data_block, offset=offset, chunk_size=chunk_size)
 
     def delete(self, obj_size=None):
         '''

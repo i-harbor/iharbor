@@ -586,8 +586,8 @@
             </div>
             <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
             <div class="row">
-                <div class="col-xs-12 col-sm-12 table-responsive">
-                    <table class="table" id="bucket-files-table">
+                <div class="col-xs-12 col-sm-12">
+                    <table class="table table-responsive" id="bucket-files-table">
                         <tr class="bg-info">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                             <th>名称</th>
@@ -633,7 +633,7 @@
                                                 <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
                                                 <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">删除</a></li>
                                                 <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">分享公开</a></li>
-                                                <li class="btn-info"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">重命名</a></li>
+                                                <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">重命名</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
@@ -701,7 +701,7 @@
                         <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >下载</a></li>
                         <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">删除</a></li>
                         <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</a></li>
-                        <li class="btn-info"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">重命名</a></li>
+                        <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">重命名</a></li>
                     </ul>
                 </li>
             </td>

@@ -183,6 +183,8 @@ class Bucket(models.Model):
         data = bfm.get_bucket_space_and_count()
         count = data.get('count')
         space = data.get('space')
+        if space is None:
+            space = 0
         if (self.objs_count != count) or (self.size != space):
             self.objs_count = count
             self.size = space
@@ -433,6 +435,9 @@ class BucketFileBase(models.Model):
         :param bucket_id:
         :return: type:str; 无效的参数返回None
         '''
+        if self.id is None:
+            raise ValueError('get_obj_key cannot be called before the model object is saved or after it is deleted')
+
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None

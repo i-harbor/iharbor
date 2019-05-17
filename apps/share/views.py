@@ -11,7 +11,7 @@ from buckets.utils import BucketFileManagement
 from buckets.models import Bucket
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
-from utils.oss.rados_interfaces import CephRadosObject
+from utils.oss.pyrados import HarborObject
 from utils.jwt_token import JWTokenTool
 from . import serializers
 
@@ -133,8 +133,8 @@ class ObsViewSet(viewsets.GenericViewSet):
             success：http返回对象，type: dict；
             error: None
         '''
-        cro = CephRadosObject(file_id, obj_size=filesize)
-        file_generator = cro.read_obj_generator
+        ho = HarborObject(file_id, obj_size=filesize)
+        file_generator = ho.read_obj_generator
         if not file_generator:
             return None
 

@@ -217,7 +217,13 @@ REST_FRAMEWORK = {
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
+    # 刷新jwt的过期时间增量，第一次登录获取jwt（记录了登录的时间戳T），可以通过未过期的jwt刷新获取新jwt(继承了旧jwt登录的时间戳T),
+    # 刷新jwt时会检查当前到登录的时间戳T之间的时间增量，如果超过了此设置时间增量不允许刷新。
+    # 好比每个jwt有效期为1天，但是想N天内免密码登录，就可以通过此参数设置第一次登录以后N天内，可以通过刷新获取新的有效期为1天的jwt
+    # N天后就不允许刷新了，只能重新用户名和密码登录认证
     'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+    'JWT_GET_USER_SECRET_KEY': 'utils.jwt_token.jwt_get_user_secret_key',
+    'JWT_AUTH_HEADER_PREFIX': 'JWT',
 }
 
 # Ceph rados settings
@@ -225,8 +231,8 @@ CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
     'USER_NAME': 'client.admin',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
+    # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
     'POOL_NAME': 'p0',
-    'RADOS_DLL_PATH': os.path.join(BASE_DIR, 'utils/oss/rados.so')
 }
 
 # 日志配置
