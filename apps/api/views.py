@@ -576,6 +576,11 @@ class ObjViewSet(CustomGenericViewSet):
     update:
     通过文件对象绝对路径分片上传文件对象
 
+        同POST方法，请使用POST，此方法后续废除
+
+    create_detail:
+    通过文件对象绝对路径分片上传文件对象
+
         说明：
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
@@ -720,7 +725,14 @@ class ObjViewSet(CustomGenericViewSet):
                     schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
                 ),
             ],
-            'POST': VERSION_METHOD_FEILD,
+            'POST': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+                coreapi.Field(
+                    name='reset',
+                    required=False,
+                    location='query',
+                    schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
+                ),
+            ],
             'PATCH': VERSION_METHOD_FEILD + [
                 coreapi.Field(
                     name='share',
@@ -738,8 +750,20 @@ class ObjViewSet(CustomGenericViewSet):
         }
     )
 
-    @log_used_time(debug_logger, mark_text='upload chunks')
+    def create_detail(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.upload_chunk_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
     def update(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.upload_chunk_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    @log_used_time(debug_logger, mark_text='upload chunks')
+    def upload_chunk_v1(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
 
         # 对象路径分析
@@ -919,7 +943,7 @@ class ObjViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action == 'update':
+        if self.action in  ['update', 'create_detail']:
             return serializers.ObjPutSerializer
         return Serializer
 
