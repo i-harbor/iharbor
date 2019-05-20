@@ -11,7 +11,7 @@ class RadosError(rados.Error):
     '''def __init__(self, message, errno=None)'''
     pass
 
-class RadosWriteError(rados.Error):
+class RadosWriteError(RadosError):
     pass
 
 
@@ -367,6 +367,18 @@ class HarborObjectBase():
         '''读取对象生成器'''
         raise NotImplementedError('`read_obj_generator()` must be implemented.')
 
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        raise NotImplementedError('`get_cluster_stats()` must be implemented.')
+
 
 class HarborObject():
     '''
@@ -512,9 +524,7 @@ class HarborObject():
             成功时：(True, str) str是成功结果描述
             错误时：(False, str) str是错误描述
         '''
-        size = self.get_obj_size()
-        if isinstance(obj_size, int):
-            size = obj_size
+        size = obj_size if isinstance(obj_size, int) else self.get_obj_size()
 
         try:
             rados = self.get_rados_api()
@@ -550,3 +560,15 @@ class HarborObject():
             else:
                 break
 
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        rados = self.get_rados_api()
+        return rados.get_cluster_stats()

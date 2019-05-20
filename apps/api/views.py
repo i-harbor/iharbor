@@ -21,7 +21,7 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import PathParser
-from utils.oss.pyrados import HarborObject, RadosWriteError, RadosError
+from utils.oss import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
 from .models import User, Bucket
@@ -2174,18 +2174,17 @@ class CephStatsViewSet(CustomGenericViewSet):
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
     def list_v1(self, request, *args, **kwargs):
-        with HarborObject(obj_id='').rados as rados:
-            try:
-                stats = rados.get_cluster_stats()
-            except RadosError as e:
-                return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            stats = HarborObject(obj_id='').get_cluster_stats()
+        except RadosError as e:
+            return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            return Response({
-                'code': 200,
-                'code_text': 'successful',
-                'stats': stats
-            })
+        return Response({
+            'code': 200,
+            'code_text': 'successful',
+            'stats': stats
+        })
 
 class UserStatsViewSet(CustomGenericViewSet):
     '''
