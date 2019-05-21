@@ -66,12 +66,19 @@ class HarborObjectGo(HarborObjectBase):
         if offset < 0 or size < 0:
             return False, 'offset or size param is invalid'
 
+        # 读取偏移量超出对象大小，直接返回空bytes
+        obj_size = self.get_obj_size()
+        if offset >= obj_size:
+            return True, bytes()
+        # 读取数据超出对象大小，计算可读取大小
+        read_size = (obj_size - offset) if (offset + size) > obj_size else size
+
         self._rados_dll.FromObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.FromObj(self._cluster_name.encode('utf-8'),
                                           self._user_name.encode('utf-8'),
                                           self._conf_file.encode('utf-8'),
                                           self._pool_name.encode('utf-8'),
-                                         ctypes.c_int(size),
+                                         ctypes.c_int(read_size),
                                           self._obj_id.encode('utf-8'),
                                          ctypes.c_ulonglong(offset))
         data = ctypes.string_at(result.data_ptr, result.data_len)
