@@ -8,7 +8,7 @@ from django.db.utils import ProgrammingError
 
 from buckets.utils import BucketFileManagement, delete_table_for_model_class
 from buckets.models import Bucket
-from utils.oss.pyrados import HarborObject
+from utils.oss import HarborObject
 
 
 class Command(BaseCommand):

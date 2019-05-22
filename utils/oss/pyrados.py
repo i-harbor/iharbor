@@ -11,11 +11,12 @@ class RadosError(rados.Error):
     '''def __init__(self, message, errno=None)'''
     pass
 
-class RadosWriteError(rados.Error):
+
+class RadosWriteError(RadosError):
     pass
 
 
-MAXSIZE_PER_RADOS_OBJ = 2147483648 # 每个rados object 最大2Gb
+MAXSIZE_PER_RADOS_OBJ = 2147483648  # 每个rados object 最大2Gb
 
 
 def build_part_id(obj_id, part_num):
@@ -30,6 +31,7 @@ def build_part_id(obj_id, part_num):
         return obj_id
 
     return f'{obj_id}_{part_num}'
+
 
 def write_part_tasks(obj_id, offset, bytes_len):
     '''
@@ -52,19 +54,20 @@ def write_part_tasks(obj_id, offset, bytes_len):
         raise ValueError('写入或读取长度不能大于一个rados对象的最大长度')
 
     start_part_num = int(offset / MAXSIZE_PER_RADOS_OBJ)
-    end_part_num = int(math.ceil((offset + bytes_len) / MAXSIZE_PER_RADOS_OBJ)) - 1 # 向上取整数-1
+    end_part_num = int(math.ceil((offset + bytes_len) / MAXSIZE_PER_RADOS_OBJ)) - 1  # 向上取整数-1
     start_part_offset = offset % MAXSIZE_PER_RADOS_OBJ
 
     # 要写入的数据在1个part上
     if start_part_num == end_part_num:
         part_id = build_part_id(obj_id=obj_id, part_num=start_part_num)
-        return [(part_id, start_part_offset,  0, bytes_len)]
+        return [(part_id, start_part_offset, 0, bytes_len)]
 
     # 要写入的数据在2个part上
     start_part_id = build_part_id(obj_id=obj_id, part_num=start_part_num)
     end_part_id = build_part_id(obj_id=obj_id, part_num=end_part_num)
     slice_index = MAXSIZE_PER_RADOS_OBJ - start_part_offset
     return [(start_part_id, start_part_offset, 0, slice_index), (end_part_id, 0, slice_index, bytes_len)]
+
 
 def read_part_tasks(obj_id, offset, bytes_len):
     '''
@@ -79,12 +82,14 @@ def read_part_tasks(obj_id, offset, bytes_len):
     read_tasks = [(obj_key, offset, end - start) for obj_key, offset, start, end in tasks]
     return read_tasks
 
+
 class HarborObjectStructure():
     '''
     每个EVHarbor对象可能有多个部分part(rados对象)组成
     OBJ(part0, part1, part2, ...)
     part0 id == obj_id;  partN id == f'{obj_id}_{N}'
     '''
+
     def __init__(self, obj_id, obj_size):
         self._obj_id = obj_id
         self._obj_size = obj_size
@@ -128,6 +133,7 @@ class CephClusterCommand(dict):
     '''
     执行ceph 命令
     '''
+
     def __init__(self, cluster, prefix, format='json', **kwargs):
         dict.__init__(self)
         kwargs['prefix'] = prefix
@@ -147,6 +153,7 @@ class RadosAPI():
     '''
     ceph cluster rados对象接口封装
     '''
+
     def __init__(self, cluster_name, user_name, pool_name, conf_file, keyring_file='', *args, **kwargs):
         ''':raises: class:`RadosError`'''
         self._cluster_name = cluster_name
@@ -169,7 +176,7 @@ class RadosAPI():
     def __exit__(self, type_, value, traceback):
         self.get_cluster().shutdown()
         self._cluster = None
-        return False    #__exit__返回的是False，有异常不被忽略会向上抛出。
+        return False  # __exit__返回的是False，有异常不被忽略会向上抛出。
 
     def __del__(self):
         if self._cluster:
@@ -185,7 +192,8 @@ class RadosAPI():
         '''
         if not self._cluster:
             conf = dict(keyring=self._keyring_file) if self._keyring_file else None
-            self._cluster = rados.Rados(conffile=self._conf_file, conf=conf)
+            self._cluster = rados.Rados(name=self._user_name, clustername=self._cluster_name, conffile=self._conf_file,
+                                        conf=conf)
             try:
                 self._cluster.connect()
             except rados.Error as e:
@@ -194,7 +202,7 @@ class RadosAPI():
 
         return self._cluster
 
-    def write(self, obj_id, offset, data:bytes):
+    def write(self, obj_id, offset, data: bytes):
         '''
         向对象写入数据
 
@@ -240,7 +248,7 @@ class RadosAPI():
         try:
             data = ioctx.read(obj_id, length=read_size, offset=offset)
         except rados.ObjectNotFound as e:
-            return bytes(read_size) # rados对象不存在，构造一个指定长度的bytes
+            return bytes(read_size)  # rados对象不存在，构造一个指定长度的bytes
         except rados.Error as e:
             msg = e.args[0] if e.args else 'Failed to read bytes from rados object'
             raise RadosError(msg, errno=e.errno)
@@ -252,7 +260,7 @@ class RadosAPI():
 
         return data
 
-    def read(self, obj_id,  offset, read_size):
+    def read(self, obj_id, offset, read_size):
         '''
         读对象数据
 
@@ -347,15 +355,16 @@ class HarborObjectBase():
     '''
     HarborObject读写相关的封装类，要实现此基类的方法
     '''
+
     def read(self, offset, size):
         '''从指定字节偏移位置读取指定长度的数据块'''
         raise NotImplementedError('`read()` must be implemented.')
 
-    def write(self, data_block, offset=0, chunk_size=20*1024**2):
+    def write(self, data_block, offset=0, chunk_size=20 * 1024 ** 2):
         '''分片写入一个数据块，默认分片大小20MB'''
         raise NotImplementedError('`write()` must be implemented.')
 
-    def write_file(self, offset, file, per_size=20*1024**2):
+    def write_file(self, offset, file, per_size=20 * 1024 ** 2):
         '''向对象写入一个类文件数据'''
         raise NotImplementedError('`write_file()` must be implemented.')
 
@@ -363,9 +372,21 @@ class HarborObjectBase():
         '''删除对象'''
         raise NotImplementedError('`delete()` must be implemented.')
 
-    def read_obj_generator(self, offset=0, block_size=10*1024**2):
+    def read_obj_generator(self, offset=0, block_size=10 * 1024 ** 2):
         '''读取对象生成器'''
         raise NotImplementedError('`read_obj_generator()` must be implemented.')
+
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        raise NotImplementedError('`get_cluster_stats()` must be implemented.')
 
 
 class HarborObject():
@@ -378,7 +399,8 @@ class HarborObject():
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', '')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
-        self._keyring_file = keyring_file if os.path.exists(keyring_file) else settings.CEPH_RADOS.get('KEYRING_FILE_PATH', '')
+        self._keyring_file = keyring_file if os.path.exists(keyring_file) else settings.CEPH_RADOS.get(
+            'KEYRING_FILE_PATH', '')
         self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
         self._obj_id = obj_id
         self._obj_size = obj_size
@@ -405,8 +427,9 @@ class HarborObject():
         '''
         if not self._rados:
             try:
-                self._rados = RadosAPI(cluster_name=self._cluster_name, user_name=self._user_name, pool_name=self._pool_name,
-                     conf_file=self._conf_file, keyring_file=self._keyring_file)
+                self._rados = RadosAPI(cluster_name=self._cluster_name, user_name=self._user_name,
+                                       pool_name=self._pool_name,
+                                       conf_file=self._conf_file, keyring_file=self._keyring_file)
             except RadosError as e:
                 raise e
 
@@ -422,18 +445,26 @@ class HarborObject():
             正常时：(True, bytes) bytes是读取的数据
             错误时：(False, error_msg) error_msg是错误描述
         '''
+
         if offset < 0 or size < 0:
             return False, 'offset or size param is invalid'
 
+        # 读取偏移量超出对象大小，直接返回空bytes
+        obj_size = self.get_obj_size()
+        if offset >= obj_size:
+            return True, bytes()
+        # 读取数据超出对象大小，计算可读取大小
+        read_size = (obj_size - offset) if (offset + size) > obj_size else size
+
         try:
             rados = self.get_rados_api()
-            data = rados.read(obj_id=self._obj_id, offset=offset, read_size=size)
+            data = rados.read(obj_id=self._obj_id, offset=offset, read_size=read_size)
         except RadosError as e:
             return False, str(e)
 
         return True, data
 
-    def write(self, data_block, offset=0, chunk_size=20*1024**2):
+    def write(self, data_block, offset=0, chunk_size=20 * 1024 ** 2):
         '''
         分片写入一个数据块，默认分片大小20MB
         :param data_block: 要写入的数据块; type: bytes
@@ -469,7 +500,7 @@ class HarborObject():
         self._obj_size = max(offset + block_size, self._obj_size)
         return True, 'write success'
 
-    def write_file(self, offset, file, per_size=20*1024**2):
+    def write_file(self, offset, file, per_size=20 * 1024 ** 2):
         '''
         向对象写入一个类文件数据
 
@@ -485,7 +516,7 @@ class HarborObject():
         except AttributeError:
             return False, 'input is not a file'
 
-        file_offset = 0 # 文件已写入的偏移量
+        file_offset = 0  # 文件已写入的偏移量
         while True:
             # 文件是否已完全写入
             if file_offset == size:
@@ -501,7 +532,7 @@ class HarborObject():
                     if not ok:
                         return False, msg
 
-                file_offset += len(chunk) # 更新已写入大小
+                file_offset += len(chunk)  # 更新已写入大小
             else:
                 return False, 'read error'
 
@@ -512,9 +543,7 @@ class HarborObject():
             成功时：(True, str) str是成功结果描述
             错误时：(False, str) str是错误描述
         '''
-        size = self.get_obj_size()
-        if isinstance(obj_size, int):
-            size = obj_size
+        size = obj_size if isinstance(obj_size, int) else self.get_obj_size()
 
         try:
             rados = self.get_rados_api()
@@ -524,7 +553,7 @@ class HarborObject():
 
         return True, 'delete success'
 
-    def read_obj_generator(self, offset=0, block_size=10*1024**2):
+    def read_obj_generator(self, offset=0, block_size=10 * 1024 ** 2):
         '''
         读取对象生成器
         :param offset: 读起始偏移量；type: int
@@ -550,3 +579,15 @@ class HarborObject():
             else:
                 break
 
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        rados = self.get_rados_api()
+        return rados.get_cluster_stats()

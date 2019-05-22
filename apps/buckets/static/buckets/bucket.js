@@ -1220,7 +1220,7 @@
 
         $.ajax({
             url: put_url,
-            type: "PUT",
+            type: "POST",
             data: formData,
             contentType: false,//必须false才会自动加上正确的Content-Type
             processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理

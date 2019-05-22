@@ -7,7 +7,22 @@ from .pyrados import HarborObjectBase
 
 rados_dll = ctypes.CDLL(os.path.join(settings.BASE_DIR, 'utils/oss/rados.so'))
 
-class RadosWriteError(Exception):
+
+class RadosError(Exception):
+    """ `Error` class, derived from `Exception` """
+
+    def __init__(self, message, errno=None):
+        super(Exception, self).__init__(message)
+        self.errno = errno
+
+    def __str__(self):
+        msg = super(Exception, self).__str__()
+        if self.errno is None:
+            return msg
+        return '[errno {0}] {1}'.format(self.errno, msg)
+
+
+class RadosWriteError(RadosError):
     pass
 
 
@@ -51,12 +66,19 @@ class HarborObjectGo(HarborObjectBase):
         if offset < 0 or size < 0:
             return False, 'offset or size param is invalid'
 
+        # 读取偏移量超出对象大小，直接返回空bytes
+        obj_size = self.get_obj_size()
+        if offset >= obj_size:
+            return True, bytes()
+        # 读取数据超出对象大小，计算可读取大小
+        read_size = (obj_size - offset) if (offset + size) > obj_size else size
+
         self._rados_dll.FromObj.restype = BaseReturnType  # declare the expected type returned
         result = self._rados_dll.FromObj(self._cluster_name.encode('utf-8'),
                                           self._user_name.encode('utf-8'),
                                           self._conf_file.encode('utf-8'),
                                           self._pool_name.encode('utf-8'),
-                                         ctypes.c_int(size),
+                                         ctypes.c_int(read_size),
                                           self._obj_id.encode('utf-8'),
                                          ctypes.c_ulonglong(offset))
         data = ctypes.string_at(result.data_ptr, result.data_len)
@@ -87,10 +109,10 @@ class HarborObjectGo(HarborObjectBase):
             file.seek(file_offset)
             chunk = file.read(per_size)
             if chunk:
-                ok, msg = self.write(offset + file_offset, chunk)
+                ok, msg = self.write(offset=offset + file_offset, data_block=chunk)
                 if not ok:
                     # 写入失败再尝试一次
-                    ok, msg = self.write(offset + file_offset, chunk)
+                    ok, msg = self.write(offset=offset + file_offset, data_block=chunk)
                     if not ok:
                         return False, msg
 
@@ -208,6 +230,23 @@ class HarborObjectGo(HarborObjectBase):
 
         self._obj_size = max(offset + block_size, self._obj_size)
         return (True, 'writed successfull')
+
+    def get_cluster_stats(self):
+        '''
+        获取ceph集群总容量和已使用容量
+
+        :returns: dict - contains the following keys:
+            - ``kb`` (int) - total space
+            - ``kb_used`` (int) - space used
+            - ``kb_avail`` (int) - free space available
+            - ``num_objects`` (int) - number of objects
+        '''
+        return {
+            'kb': 1234567,
+            'kb_used': 123456,
+            'kb_avail': 654321,
+            'num_objects': 12345
+        }
 
     def parse_error_bytes(self, error: bytes):
         '''

@@ -11,7 +11,7 @@ from buckets.utils import BucketFileManagement
 from buckets.models import Bucket
 from api.views import CustomAutoSchema
 from utils.storagers import PathParser
-from utils.oss.pyrados import HarborObject
+from utils.oss import HarborObject
 from utils.jwt_token import JWTokenTool
 from . import serializers
 
