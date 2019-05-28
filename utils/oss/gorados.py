@@ -166,29 +166,36 @@ class HarborObjectGo(HarborObjectBase):
 
         return (True, data.decode())
 
-    def read_obj_generator(self, offset=0, block_size=10*1024**2):
+    def read_obj_generator(self, offset=0, end=None, block_size=10 * 1024 ** 2):
         '''
         读取对象生成器
         :param offset: 读起始偏移量；type: int
+        :param end: 读结束偏移量(包含)；type: int；None:表示对象结尾；
         :param block_size: 每次读取数据块长度；type: int
         :return:
         '''
         obj_size = self.get_obj_size()
-        offset = offset
+        if isinstance(end, int):
+            end_oft = min(end + 1, obj_size)  # 包括end,不大于对象大小
+        else:
+            end_oft = obj_size
+
+        oft = max(offset, 0)
         while True:
-            ok, data_block = self.read(offset=offset, size=block_size)
+            # 下载完成
+            if oft >= end_oft:
+                break
+
+            size = min(end_oft - oft, block_size)
+            ok, data_block = self.read(offset=oft, size=size)
             # 读取发生错误，尝试再读一次
             if not ok:
-                ok, data_block = self.read(offset=offset, size=block_size)
+                ok, data_block = self.read(offset=oft, size=size)
 
             if ok and data_block:
                 l = len(data_block)
-                offset = offset + l
+                oft = oft + l
                 yield data_block
-
-                # 下载完成
-                if offset >= obj_size:
-                    break
             else:
                 break
 

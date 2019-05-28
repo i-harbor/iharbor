@@ -1745,10 +1745,11 @@ class MoveViewSet(CustomGenericViewSet):
 
         >>Http Code: 状态码201,成功：
             {
-                'code': 201,
-                'code_text': '操作成功',
-                'data': {},      //请求时提交的数据
-                'obj': {},       //移动操作成功后文件对象详细信息
+                "code": 201,
+                "code_text": "移动对象操作成功",
+                "bucket_name": "6666",
+                "dir_path": "ddd/动次打次",
+                "obj": {},       //移动操作成功后文件对象详细信息
             }
         >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
             {
