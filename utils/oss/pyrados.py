@@ -18,7 +18,6 @@ class RadosWriteError(RadosError):
 
 MAXSIZE_PER_RADOS_OBJ = 2147483648  # 每个rados object 最大2Gb
 
-
 def build_part_id(obj_id, part_num):
     '''
     构造对象part对应的id
@@ -220,7 +219,7 @@ class RadosAPI():
             with cluster.open_ioctx(self._pool_name) as ioctx:
                 for obj_key, off, start, end in tasks:
                     try:
-                        r = ioctx.write(obj_key, data, offset=off)
+                        r = ioctx.write(obj_key, data[start:end], offset=off)
                     except rados.Error as e:
                         msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
                         raise RadosError(msg, errno=e.errno)
@@ -271,6 +270,9 @@ class RadosAPI():
             success; bytes
         :raises: class:`RadosError`
         '''
+        if offset < 0 or read_size <= 0:
+            return bytes()
+
         tasks = read_part_tasks(obj_id, offset=offset, bytes_len=read_size)
         cluster = self.get_cluster()
 
