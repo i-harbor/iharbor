@@ -18,7 +18,6 @@ class RadosWriteError(RadosError):
 
 MAXSIZE_PER_RADOS_OBJ = 2147483648  # 每个rados object 最大2Gb
 
-
 def build_part_id(obj_id, part_num):
     '''
     构造对象part对应的id
@@ -220,7 +219,7 @@ class RadosAPI():
             with cluster.open_ioctx(self._pool_name) as ioctx:
                 for obj_key, off, start, end in tasks:
                     try:
-                        r = ioctx.write(obj_key, data, offset=off)
+                        r = ioctx.write(obj_key, data[start:end], offset=off)
                     except rados.Error as e:
                         msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
                         raise RadosError(msg, errno=e.errno)
@@ -271,6 +270,9 @@ class RadosAPI():
             success; bytes
         :raises: class:`RadosError`
         '''
+        if offset < 0 or read_size <= 0:
+            return bytes()
+
         tasks = read_part_tasks(obj_id, offset=offset, bytes_len=read_size)
         cluster = self.get_cluster()
 
@@ -372,7 +374,7 @@ class HarborObjectBase():
         '''删除对象'''
         raise NotImplementedError('`delete()` must be implemented.')
 
-    def read_obj_generator(self, offset=0, block_size=10 * 1024 ** 2):
+    def read_obj_generator(self, offset=0, end=None, block_size=10 * 1024 ** 2):
         '''读取对象生成器'''
         raise NotImplementedError('`read_obj_generator()` must be implemented.')
 
@@ -553,29 +555,36 @@ class HarborObject():
 
         return True, 'delete success'
 
-    def read_obj_generator(self, offset=0, block_size=10 * 1024 ** 2):
+    def read_obj_generator(self, offset=0, end=None, block_size=10 * 1024 ** 2):
         '''
         读取对象生成器
         :param offset: 读起始偏移量；type: int
+        :param end: 读结束偏移量(包含)；type: int；None:表示对象结尾；
         :param block_size: 每次读取数据块长度；type: int
         :return:
         '''
         obj_size = self.get_obj_size()
-        offset = offset
+        if isinstance(end, int):
+            end_oft = min(end + 1, obj_size)  # 包括end,不大于对象大小
+        else:
+            end_oft = obj_size
+
+        oft = max(offset, 0)
         while True:
-            ok, data_block = self.read(offset=offset, size=block_size)
+            # 下载完成
+            if oft >= end_oft:
+                break
+
+            size = min(end_oft - oft, block_size)
+            ok, data_block = self.read(offset=oft, size=size)
             # 读取发生错误，尝试再读一次
             if not ok:
-                ok, data_block = self.read(offset=offset, size=block_size)
+                ok, data_block = self.read(offset=oft, size=size)
 
             if ok and data_block:
                 l = len(data_block)
-                offset = offset + l
+                oft = oft + l
                 yield data_block
-
-                # 下载完成
-                if offset >= obj_size:
-                    break
             else:
                 break
 
