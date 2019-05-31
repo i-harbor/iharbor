@@ -37,6 +37,51 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
     offset_query_param = 'offset'
     max_limit = 1000
 
+    def paginate_queryset(self, queryset, request, view=None):
+        self.count = self.get_count(queryset)
+        self.limit = self.get_limit(request)
+        if self.limit is None:
+            return None
+
+        self.offset = self.get_offset(request)
+        self.request = request
+        if self.count > self.limit and self.template is not None:
+            self.display_page_controls = True
+
+        if self.count == 0 or self.offset > self.count:
+            return []
+
+        # 当数据少时
+        if self.count <= 10000:
+            return list(queryset[self.offset:self.offset + self.limit])
+
+        # 当数据很多时，目录和对象分开考虑
+        dirs_queryset = queryset.filter(fod=False).order_by('-id')
+        dirs_count = dirs_queryset.count()
+        # 分页数据只有目录
+        if (self.offset + self.limit) <= dirs_count:
+            return list(dirs_queryset[self.offset:self.offset + self.limit])
+
+        objs_queryset = queryset.filter(fod=True).order_by('-id')
+        # 分页数据只有对象
+        if self.offset >= dirs_count:
+            offset = self.offset - dirs_count
+            # 偏移量offset较小时
+            if offset <= 10000:
+                return list(objs_queryset[offset:offset + self.limit])
+
+            # 偏移量offset较大时
+            id = objs_queryset.values_list('id').order_by('-id')[offset:offset+1].first()
+            if not id:
+                return []
+            return list(objs_queryset.filter(id__lte=id[0])[0:self.limit])
+
+        # 分页数据包含目录和对象
+        dirs = list(dirs_queryset[self.offset:self.offset + self.limit])
+        dir_len = len(dirs)
+        objs = list(objs_queryset[0:self.limit - dir_len])
+        return dirs + objs
+
     def get_paginated_response(self, data):
         # content = self.get_html_context()
         current, final = self.get_current_and_final_page_number()

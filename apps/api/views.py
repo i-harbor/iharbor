@@ -1184,7 +1184,7 @@ class ObjViewSet(CustomGenericViewSet):
 
         obj.ult = timezone.now()
         obj.si = 0
-        if not obj.do_save():
+        if not obj.do_save(update_fields=['ult', 'si']):
             logger.error('修改对象元数据失败')
             return Response({'code': 500, 'code_text': '修改对象元数据失败'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1193,7 +1193,7 @@ class ObjViewSet(CustomGenericViewSet):
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size
-            obj.do_save()
+            obj.do_save(update_fields=['ult', 'si'])
             logger.error('rados文件对象删除失败')
             return Response({'code': 500, 'code_text': 'rados文件对象删除失败'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
