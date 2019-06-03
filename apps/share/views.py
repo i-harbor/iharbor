@@ -73,7 +73,7 @@ class ObsViewSet(viewsets.GenericViewSet):
     # api docs
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': [
+            'retrieve': [
                 coreapi.Field(
                     name='objpath',
                     required=False,

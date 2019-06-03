@@ -33,11 +33,12 @@ router.register(r'(?P<version>(v1|v2))/test', views.TestViewSet, base_name='test
 dlp_router = DetailListPostRouter()
 dlp_router.register(r'(?P<version>(v1|v2))/dir/(?P<bucket_name>[a-z0-9-]{3,64})', views.DirectoryViewSet,
                        base_name='dir')
-dlp_router.register(r'(?P<version>(v1|v2))/move/(?P<bucket_name>[a-z0-9-]{3,64})', views.MoveViewSet,
-                       base_name='move')
 
 detail_router = DetailPostRouter()
 detail_router.register(r'(?P<version>(v1|v2))/obj/(?P<bucket_name>[a-z0-9-]{3,64})', views.ObjViewSet, base_name='obj')
+detail_router.register(r'(?P<version>(v1|v2))/move/(?P<bucket_name>[a-z0-9-]{3,64})', views.MoveViewSet,
+                       base_name='move')
+
 
 urlpatterns = [
     url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.

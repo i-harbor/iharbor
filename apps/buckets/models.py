@@ -303,7 +303,8 @@ class BucketFileBase(models.Model):
         abstract = True
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-id']
-        indexes = [models.Index(fields=['fod'])]
+        # indexes = [models.Index(fields=['fod'])]
+        index_together = ['fod', 'did']
         unique_together = ('did', 'name')
         verbose_name = '对象模型抽象基类'
         verbose_name_plural = verbose_name

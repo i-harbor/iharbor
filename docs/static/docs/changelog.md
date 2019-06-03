@@ -9,6 +9,9 @@
 * 增加获取ceph集群统计信息API，获取ceph集群组件信息API,获取ceph集群io性能信息API    
 * 增加用户资源统计API，查询用户总量API, 系统可用性监控API，系统访问信息统计API，系统是否可用查询API    
 * 对象分片上传由PUT改为POST方法    
+* list dir分页优化    
+* 对象下载支持Range和Content-Range标头参数    
+* 交互式api文档Schema相关修改，用action或method区分manual fields参数    
 
 ## v0.2.3
 * 增加用户信息修改API和用户API权限修改
