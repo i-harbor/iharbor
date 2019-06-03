@@ -42,9 +42,19 @@ class CustomAutoSchema(AutoSchema):
     '''
     def get_manual_fields(self, path, method):
         '''
-        重写方法，为每个方法自定义参数字段
+        重写方法，为每个方法自定义参数字段, action或method做key
         '''
         extra_fields = []
+        action = None
+        try:
+            action = self.view.action
+        except AttributeError:
+            pass
+
+        if action and type(self._manual_fields) is dict and action in self._manual_fields:
+            extra_fields = self._manual_fields[action]
+            return extra_fields
+
         if type(self._manual_fields) is dict and method in self._manual_fields:
             extra_fields = self._manual_fields[method]
 
@@ -390,7 +400,7 @@ class BucketViewSet(CustomGenericViewSet):
     # api docs
     schema = CustomAutoSchema(
         manual_fields={
-            'DELETE': [
+            'destroy': [
                 coreapi.Field(
                     name='ids',
                     required=False,
@@ -398,7 +408,7 @@ class BucketViewSet(CustomGenericViewSet):
                     schema=coreschema.Array(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
                 ),
             ],
-            'PATCH': [
+            'partial_update': [
                 coreapi.Field(
                     name='public',
                     required=True,
@@ -696,7 +706,7 @@ class ObjViewSet(CustomGenericViewSet):
 
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
                 coreapi.Field(
                     name='info',
                     required=False,
@@ -716,8 +726,8 @@ class ObjViewSet(CustomGenericViewSet):
                     schema=coreschema.String(description='要读取的文件块的字节大小, 类型int'),
                 ),
             ],
-            'DELETE': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-            'PUT': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+            'destroy': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+            'update': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
                 coreapi.Field(
                     name='reset',
                     required=False,
@@ -725,7 +735,7 @@ class ObjViewSet(CustomGenericViewSet):
                     schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
                 ),
             ],
-            'POST': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+            'create_detail': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
                 coreapi.Field(
                     name='reset',
                     required=False,
@@ -733,7 +743,7 @@ class ObjViewSet(CustomGenericViewSet):
                     schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
                 ),
             ],
-            'PATCH': VERSION_METHOD_FEILD + [
+            'partial_update': VERSION_METHOD_FEILD + [
                 coreapi.Field(
                     name='share',
                     required=False,
@@ -1335,13 +1345,16 @@ class DirectoryViewSet(CustomGenericViewSet):
     pagination_class = paginations.BucketFileLimitOffsetPagination
 
     # api docs
-    BASE_METHOD_FIELDS = [
+    VERSION_FIELDS = [
         coreapi.Field(
             name='version',
             required=True,
             location='path',
             schema=coreschema.String(description='API版本（v1, v2）')
         ),
+    ]
+
+    BASE_METHOD_FIELDS = VERSION_FIELDS + [
         coreapi.Field(
             name='dirpath',
             required=False,
@@ -1351,13 +1364,20 @@ class DirectoryViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
-            'POST': BASE_METHOD_FIELDS,
-            'DELETE': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
+            'create_detail': BASE_METHOD_FIELDS,
+            'destroy': BASE_METHOD_FIELDS,
         }
     )
-    @log_used_time(debug_logger, mark_text='get dir files list')
+
     def list(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    @log_used_time(debug_logger, mark_text='get dir files list')
+    def list_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
         if not bucket_name:
@@ -1581,7 +1601,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'retrieve': BASE_METHOD_FIELDS,
         }
     )
 
@@ -1668,7 +1688,7 @@ class SecurityViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'retrieve': BASE_METHOD_FIELDS,
         }
     )
 
@@ -1792,7 +1812,7 @@ class MoveViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'POST': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
+            'create_detail': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
                 coreapi.Field(
                     name='move_to',
                     required=False,
@@ -2050,7 +2070,7 @@ class MetadataViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
         }
     )
 
@@ -2164,7 +2184,7 @@ class CephStatsViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2270,7 +2290,7 @@ class UserStatsViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2376,7 +2396,7 @@ class CephComponentsViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2433,7 +2453,7 @@ class CephErrorViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2489,7 +2509,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2543,7 +2563,7 @@ class UserCountViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2597,7 +2617,7 @@ class AvailabilityViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2656,7 +2676,7 @@ class VisitStatsViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
@@ -2717,7 +2737,7 @@ class TestViewSet(CustomGenericViewSet):
     ]
     schema = CustomAutoSchema(
         manual_fields={
-            'GET': BASE_METHOD_FIELDS,
+            'list': BASE_METHOD_FIELDS,
         }
     )
 
