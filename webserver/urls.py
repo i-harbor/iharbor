@@ -31,7 +31,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('apidocs/', get_swagger_view(title='EVHarbor API'), name='apidocs'),
     path('docs/', include('docs.urls', namespace='docs')),
-    path('callback', kjy_login_callback, name='callback'),
+    path('callback/', kjy_login_callback, name='callback'),
 ]
 
 

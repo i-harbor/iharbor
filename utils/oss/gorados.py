@@ -49,6 +49,10 @@ class HarborObjectGo(HarborObjectBase):
     def reset_obj_id(self, obj_id):
         self._obj_id = obj_id
 
+    def reset_obj_id_and_size(self, obj_id, obj_size):
+        self._obj_id = obj_id
+        self._obj_size = obj_size
+
     def get_obj_size(self):
         '''获取对象大小'''
         return self._obj_size

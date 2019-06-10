@@ -390,6 +390,9 @@ class HarborObjectBase():
         '''
         raise NotImplementedError('`get_cluster_stats()` must be implemented.')
 
+    def reset_obj_id_and_size(self, obj_id, obj_size):
+        raise NotImplementedError('`reset_obj_id_and_size()` must be implemented.')
+
 
 class HarborObject():
     '''
