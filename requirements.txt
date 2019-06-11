@@ -2,9 +2,9 @@ certifi==2019.3.9
 chardet==3.0.4
 coreapi==2.3.3
 coreschema==0.0.4
-Django==2.2.1
+Django==2.2.2
 django-ckeditor==5.7.1
-django-cors-headers==3.0.1
+django-cors-headers==3.0.2
 django-debug-toolbar==1.11
 django-js-asset==1.2.2
 django-rest-framework==0.1.0
@@ -24,5 +24,5 @@ requests==2.22.0
 simplejson==3.16.0
 sqlparse==0.3.0
 uritemplate==3.0.0
-urllib3==1.25.2
+urllib3==1.25.3
 uWSGI==2.0.18
