@@ -47,7 +47,7 @@ class ObsViewSet(viewsets.GenericViewSet):
 
         >>Http Code: 状态码416 Requested Range Not Satisfiable:
             {
-                'code': 400,
+                'code': 416,
                 'code_text': 'Header Ranges is invalid'
             }
 
@@ -151,7 +151,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             start, end = self.parse_header_ranges(ranges)
             # 无法解析header ranges,返回整个对象
             if start is None and end is None:
-                return Response({'code': 400, 'code_text': 'Header Ranges is invalid'},
+                return Response({'code': 416, 'code_text': 'Header Ranges is invalid'},
                                 status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE), offset
             # 读最后end个字节
             if (start is None) and (end is not None):

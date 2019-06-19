@@ -16,6 +16,15 @@ class IsSuperAndStaffUser(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_superuser and request.user.is_staff)
 
+class IsAppSuperUser(BasePermission):
+    '''
+    Does the user have both administrator and employee privileges
+    '''
+    def has_permission(self, request, view):
+        if not request.user.id:
+            return False
+        return request.user.is_app_superuser()
+
 
 class IsOwnObject(BasePermission):
     '''

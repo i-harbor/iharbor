@@ -11,7 +11,7 @@ admin.site.site_title = 'EVHarbor站点管理'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(UserAdmin):
-    list_display = ('id', 'username', 'fullname', 'company', 'telephone', 'is_active', 'is_staff')
+    list_display = ('id', 'username', 'fullname', 'company', 'telephone', 'is_active', 'is_staff', 'last_active', 'date_joined')
     list_display_links = ('id', 'username')
     # list_filter = ('date_joined', 'is_superuser', 'is_staff')
     search_fields = ('username', 'company', 'first_name', 'last_name')  # 搜索字段
@@ -19,7 +19,7 @@ class UserProfileAdmin(UserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email', 'company', 'telephone','secret_key')}),
-        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser',
+        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'role',
                                        'groups', 'user_permissions')}),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
