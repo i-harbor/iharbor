@@ -352,6 +352,91 @@ class RadosAPI():
         cluster = self.get_cluster()
         return CephClusterCommand(cluster, prefix=prefix)
 
+    def mgr_command(self, prefix, format='json', **kwargs):
+        '''
+        :return: io status string
+        :raises: class:`RadosError`
+        '''
+        cluster = self.get_cluster()
+        kwargs['prefix'] = prefix
+        kwargs['format'] = format
+        try:
+            ret, buf, err = cluster.mgr_command(json.dumps(kwargs), '', timeout=5)
+        except rados.Error as e:
+            raise RadosError(str(e), errno=e.errno)
+        else:
+            if ret != 0:
+                raise RadosError(err)
+            else:
+                return err
+
+    def get_ceph_io_status(self):
+        '''
+        :return: {
+                'bw_rd': 0.0,   # Kb/s ,float
+                'bw_wr': 0.0,   # Kb/s ,float
+                'bw': 0.0       # Kb/s ,float
+                'op_rd': 0,     # op/s, int
+                'op_wr': 0,     # op/s, int
+                'op': 0,        # op/s, int
+            }
+        :raises: class:`RadosError`
+        '''
+        try:
+            s = self.mgr_command(prefix='iostat')
+        except RadosError as e:
+            raise e
+        return self.parse_io_str(io_str=s)
+
+    def parse_io_str(self, io_str:str):
+        '''
+        :param io_str:  '  | 1623 KiB/s |   20 KiB/s | 1643 KiB/s |          2 |          1 |          4 |  '
+        :return: {
+                'bw_rd': 0.0,   # Kb/s ,float
+                'bw_wr': 0.0,   # Kb/s ,float
+                'bw': 0.0       # Kb/s ,float
+                'op_rd': 0,     # op/s, int
+                'op_wr': 0,     # op/s, int
+                'op': 0,        # op/s, int
+            }
+        '''
+        def to_kb(value, unit):
+            u = unit[0]
+            if u == 'b':
+                value = value / 1024
+            elif u == 'k':
+                value = value
+            elif u == 'm':
+                value = value * 1024
+            elif u == 'g':
+                value = value * 1024 * 1024
+
+            return value
+
+        keys = ['bw_rd', 'bw_wr', 'bw', 'op_rd', 'op_wr', 'op']
+        data = {}
+        items = io_str.strip(' |').split('|')
+        for i, item in enumerate(items):
+            item = item.strip()
+            item = item.lower()
+            units = item.split(' ')
+            try:
+                val = float(units[0])
+            except:
+                data[keys[i]] = 0
+                continue
+
+            # iobw
+            if item.endswith('b/s'):
+                val = to_kb(val, units[-1])
+            # iops
+            else:
+                val = int(val)
+
+            data[keys[i]] = val
+
+        return data
+
 
 class HarborObjectBase():
     '''
@@ -389,6 +474,20 @@ class HarborObjectBase():
             - ``num_objects`` (int) - number of objects
         '''
         raise NotImplementedError('`get_cluster_stats()` must be implemented.')
+
+    def get_ceph_io_status(self):
+        '''
+        :return: {
+                'bw_rd': 0.0,   # Kb/s ,float
+                'bw_wr': 0.0,   # Kb/s ,float
+                'bw': 0.0       # Kb/s ,float
+                'op_rd': 0,     # op/s, int
+                'op_wr': 0,     # op/s, int
+                'op': 0,        # op/s, int
+            }
+        :raises: class:`RadosError`
+        '''
+        raise NotImplementedError('`get_ceph_io_status()` must be implemented.')
 
     def reset_obj_id_and_size(self, obj_id, obj_size):
         raise NotImplementedError('`reset_obj_id_and_size()` must be implemented.')
@@ -603,3 +702,25 @@ class HarborObject():
         '''
         rados = self.get_rados_api()
         return rados.get_cluster_stats()
+
+    def get_ceph_io_status(self):
+        '''
+        :return:
+            success: True, {
+                    'bw_rd': 0.0,   # Kb/s ,float
+                    'bw_wr': 0.0,   # Kb/s ,float
+                    'bw': 0.0       # Kb/s ,float
+                    'op_rd': 0,     # op/s, int
+                    'op_wr': 0,     # op/s, int
+                    'op': 0,        # op/s, int
+                }
+            error: False, err:tsr
+        '''
+        try:
+            rados = self.get_rados_api()
+            status = rados.get_ceph_io_status()
+        except RadosError as e:
+            return False, str(e)
+
+        return True, status
+

@@ -2487,8 +2487,12 @@ class CephPerformanceViewSet(CustomGenericViewSet):
 
             >>Http Code: 状态码200:
                 {
-                    "iops": 1000,
-                    "iobw": 123 # 带宽，单位 Mbps
+                    "bw_rd": 0,     # Kb/s, io读带宽
+                    "bw_wr": 4552,  # Kb/s, io写带宽
+                    "bw": 4552,     # Kb/s, io读写总带宽
+                    "op_rd": 220,   # op/s, io读操作数
+                    "op_wr": 220,   # op/s, io写操作数
+                    "op": 441       # op/s, io读写操作数
                 }
 
             >>Http Code: 状态码404:
@@ -2525,12 +2529,10 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
     def list_v1(self, request, *args, **kwargs):
-        bw = random.randint(20, 200)
-        iops = random.randint(20, 200)
-        return Response({
-            'iops': iops,
-            'iobw': bw  # Mbps
-        })
+        ok, data = HarborObject(obj_id='').get_ceph_io_status()
+        if not ok:
+            return Response(data={'code': 500, 'code_text': 'Get io status error:' + data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(data=data)
 
 
 class UserCountViewSet(CustomGenericViewSet):

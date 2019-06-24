@@ -259,6 +259,28 @@ class HarborObjectGo(HarborObjectBase):
             'num_objects': 12345
         }
 
+    def get_ceph_io_status(self):
+        '''
+        :return:
+            success: True, {
+                    'bw_rd': 0.0,   # Kb/s ,float
+                    'bw_wr': 0.0,   # Kb/s ,float
+                    'bw': 0.0       # Kb/s ,float
+                    'op_rd': 0,     # op/s, int
+                    'op_wr': 0,     # op/s, int
+                    'op': 0,        # op/s, int
+                }
+            error: False, err:tsr
+        '''
+        return True, {
+            'bw_rd': 0.0,
+            'bw_wr': 0.0,
+            'bw': 0.0,
+            'op_rd': 0,
+            'op_wr': 0,
+            'op': 0,
+        }
+
     def parse_error_bytes(self, error: bytes):
         '''
         解析错误数据
