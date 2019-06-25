@@ -24,12 +24,22 @@ class UserProfile(AbstractUser):
         (NON_THIRD_APP, 'Local user.'),
         (THIRD_APP_KJY, '科技云通行证')
     )
+    ROLE_NORMAL = 0
+    ROLE_SUPPER_USER = 1
+    ROLE_APP_SUPPER_USER = 2 # 第三方APP超级用户,有权限获取普通用户安全凭证
+    ROLE_STAFF = 4
+    ROLE_CHOICES = (
+        (ROLE_NORMAL, '普通用户'),
+        (ROLE_SUPPER_USER, '超级用户'),
+        (ROLE_APP_SUPPER_USER, '第三方APP超级用户')
+    )
 
     telephone = models.CharField(verbose_name='电话', max_length=11, default='')
     company = models.CharField(verbose_name='公司/单位', max_length=255, default='')
     third_app = models.SmallIntegerField(verbose_name='第三方应用登录', choices=THIRD_APP_CHOICES, default=NON_THIRD_APP)
     secret_key = models.CharField(verbose_name='个人密钥', max_length=20, blank=True, default='')  # jwt加密解密需要
     last_active = models.DateField(verbose_name='最后活跃日期', db_index=True, default=timezone.now)
+    role = models.SmallIntegerField(verbose_name='角色权限', choices=ROLE_CHOICES, default=ROLE_NORMAL)
 
     def get_full_name(self):
         if self.last_name.encode('UTF-8').isalpha() and self.first_name.encode('UTF-8').isalpha():
@@ -39,10 +49,13 @@ class UserProfile(AbstractUser):
 
     def get_user_secret_key(self):
         if not self.secret_key:
-            self.secret_key = binascii.hexlify(os.urandom(10)).decode()
+            self.secret_key = self.new_user_secret_key()
             self.save()
 
         return self.secret_key
+
+    def new_user_secret_key(self):
+        return binascii.hexlify(os.urandom(10)).decode()
 
     @classmethod
     def active_user_stats(cls, days=0):
@@ -59,6 +72,19 @@ class UserProfile(AbstractUser):
         u = cls.objects.aggregate(active_users=models.Count('id', filter=models.Q(last_active__gte=t.date())),
                                   register_users=models.Count('id', filter=models.Q(date_joined__gte=t)))
         return u
+
+    def set_password(self, raw_password):
+        '''
+        修改密码时，同时修改个人密钥
+        :param raw_password: 新密码
+        :return: None
+        '''
+        super(UserProfile, self).set_password(raw_password)
+        self.secret_key = self.new_user_secret_key()
+
+    def is_app_superuser(self):
+        '''是否是第三方app接入特殊超级用户'''
+        return self.role == self.ROLE_APP_SUPPER_USER
 
 
 class Email(models.Model):

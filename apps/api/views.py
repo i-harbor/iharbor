@@ -1,3 +1,4 @@
+import random
 from collections import OrderedDict
 import logging
 from io import BytesIO
@@ -273,18 +274,23 @@ class UserViewSet(mixins.ListModelMixin,
             True: has permission
             False: has not permission
         '''
-        # 当前用户不是超级用户，只有修改自己信息的权限
-        if not bool(request.user and request.user.is_superuser):
+        user = request.user
+        if not user.id: # 未认证用户
+            return False
+
+        # 当前用户是超级职员用户，有超级权限
+        if user.is_superuser and user.is_staff:
+            return True
+
+        # 当前用户不是APP超级用户，只有修改自己信息的权限
+        if not user.is_app_superuser():
             # 当前用户修改自己的信息
-            if request.user.id == instance.id:
+            if user.id == instance.id:
                 return True
 
             return False
 
-         # 当前用户既是超级用户又是职员，有超级权限
-        if request.user.is_staff:
-            return True
-        # 当前超级用户，只有修改普通用户的权限
+        # 当前APP超级用户，只有修改普通用户的权限
         elif not instance.is_superuser:
             return True
 
@@ -1661,7 +1667,7 @@ class SecurityViewSet(CustomGenericViewSet):
                 }
         '''
     queryset = []
-    permission_classes = [permissions.IsSuperUser]
+    permission_classes = [permissions.IsAppSuperUser, permissions.IsSuperAndStaffUser]
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
@@ -2481,9 +2487,12 @@ class CephPerformanceViewSet(CustomGenericViewSet):
 
             >>Http Code: 状态码200:
                 {
-                    "code": 200,
-                    "iops": 1000,
-                    "iobw": "1.0Gbps"
+                    "bw_rd": 0,     # Kb/s, io读带宽
+                    "bw_wr": 4552,  # Kb/s, io写带宽
+                    "bw": 4552,     # Kb/s, io读写总带宽
+                    "op_rd": 220,   # op/s, io读操作数
+                    "op_wr": 220,   # op/s, io写操作数
+                    "op": 441       # op/s, io读写操作数
                 }
 
             >>Http Code: 状态码404:
@@ -2520,11 +2529,10 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
     def list_v1(self, request, *args, **kwargs):
-        return Response({
-            'code': 200,
-            'iops': 1000,
-            'iobw': '1.0Gbps'
-        })
+        ok, data = HarborObject(obj_id='').get_ceph_io_status()
+        if not ok:
+            return Response(data={'code': 500, 'code_text': 'Get io status error:' + data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(data=data)
 
 
 class UserCountViewSet(CustomGenericViewSet):

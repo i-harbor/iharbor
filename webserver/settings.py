@@ -232,7 +232,7 @@ CEPH_RADOS = {
     'USER_NAME': 'client.admin',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
     # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
-    'POOL_NAME': 'p0',
+    'POOL_NAME': 'obs',
 }
 
 # 日志配置
