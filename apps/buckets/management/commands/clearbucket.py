@@ -146,9 +146,12 @@ class Command(BaseCommand):
                     if obj.is_file():
                         obj_key = obj.get_obj_key(bucket.id)
                         ho.reset_obj_id_and_size(obj_id=obj_key, obj_size=obj.si)
-                        ok, _ = ho.delete(obj_size=obj.si)
+                        ok, err = ho.delete(obj_size=obj.si)
                         if ok:
                             obj.delete()
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                f"Failed to deleted a object from ceph:"+ err))
                     else:
                         obj.delete()
 

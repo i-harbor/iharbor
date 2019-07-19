@@ -82,7 +82,7 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
 
         # 用户最后活跃日期
         user = request.user
-        if user.id > 0:
+        if user.id and user.id > 0:
             try:
                 date = timezone.now().date()
                 if user.last_active < date:
