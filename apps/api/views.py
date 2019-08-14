@@ -629,27 +629,15 @@ class ObjViewSet(CustomGenericViewSet):
             }
 
     retrieve:
-        通过文件对象绝对路径,下载文件对象,可通过参数获取文件对象详细信息，或者自定义读取对象数据块
+        通过文件对象绝对路径,下载文件对象，或者自定义读取对象数据块
 
-        *注：可选参数优先级判定顺序：info > offset && size
-        1. 如果携带了info参数，info=true时,返回文件对象详细信息，其他返回400错误；
-        2. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
-        3. 不带参数时，返回整个文件对象；
+        *注：
+        1. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
+        2. 不带参数时，返回整个文件对象；
 
     	>>Http Code: 状态码200：
-            * info=true,返回文件对象详细信息：
-            {
-                'code': 200,
-                'bucket_name': 'xxx',   //所在存储桶名称
-                'dir_path': 'xxxx',      //所在目录
-                'obj': {},              //文件对象详细信息
-            }
-            * 自定义读取时：返回bytes数据流，其他信息通过标头headers传递：
-            {
-                evhb_chunk_size: 返回文件块大小
-                evhb_obj_size: 文件对象总大小
-            }
-            * 其他,返回FileResponse对象,bytes数据流；
+             evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
+            其他,返回整个文件对象bytes数据流
 
         >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
             {
@@ -713,12 +701,6 @@ class ObjViewSet(CustomGenericViewSet):
     schema = CustomAutoSchema(
         manual_fields={
             'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
-                coreapi.Field(
-                    name='info',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='可选参数，info=true时返回文件对象详细信息，不返回文件对象数据，其他值忽略，类型boolean'),
-                ),
                 coreapi.Field(
                     name='offset',
                     required=False,
@@ -843,12 +825,8 @@ class ObjViewSet(CustomGenericViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
-        info = request.query_params.get('info', None)
+
         objpath = kwargs.get(self.lookup_field, '')
-
-        if (info is not None) and (info.lower() != 'true'):
-            return Response(data={'code': 400, 'code_text': 'info参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-
         pp = PathParser(filepath=objpath)
         bucket_name = kwargs.get('bucket_name','')
         path, filename = pp.get_path_and_filename()
@@ -867,10 +845,6 @@ class ObjViewSet(CustomGenericViewSet):
 
         collection_name = bucket.get_bucket_table_name()
         fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-
-        # 返回文件对象详细信息
-        if info:
-            return self.get_obj_info_response(request=request, fileobj=fileobj, bucket_name=bucket_name, path=path)
 
         # 自定义读取文件对象
         if validated_param:
@@ -2107,7 +2081,8 @@ class MetadataViewSet(CustomGenericViewSet):
                             status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
-        return Response(data={'code': 200, 'code_text': '获取元数据成功', 'data': serializer.data})
+        return Response(data={'code': 200, 'code_text': '获取元数据成功', 'bucket_name': bucket_name,
+                              'dir_path': path, 'obj': serializer.data})
 
     def get_obj_or_dir_404(self, table_name, path, name):
         '''
