@@ -7,6 +7,7 @@ from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
 from django.utils import timezone
 from django.db.models import Q as dQ
+from django.db.models import Case, Value, When, F
 from django.core.validators import validate_email
 from django.core import exceptions
 from rest_framework import viewsets, status, mixins
@@ -1248,8 +1249,10 @@ class ObjViewSet(CustomGenericViewSet):
         old_size = obj.si if obj.si else 0
         new_size = max(size, old_size)  # 更新文件大小（只增不减）
         try:
-            r = model.objects.filter(id=obj.id, si=obj.si).update(si=new_size, upt=timezone.now())  # 乐观锁方式
-        except:
+            # r = model.objects.filter(id=obj.id, si=obj.si).update(si=new_size, upt=timezone.now())  # 乐观锁方式
+            r = model.objects.filter(id=obj.id).update(si=Case(When(si__lt=new_size, then=Value(new_size)),
+                                                               default=F('si')), upt=timezone.now())
+        except Exception as e:
             return False
         if r > 0:  # 更新行数
             return True
@@ -2001,8 +2004,10 @@ class MetadataViewSet(CustomGenericViewSet):
         >>Http Code: 状态码200,成功：
             {
                 "code": 200,
+                "bucket_name": "xxx",
+                "dir_path": "xxx",
                 "code_text": "获取元数据成功",
-                "data": {
+                "obj": {
                     "na": "upload/Firefox-latest.exe",  # 对象或目录全路径名称
                     "name": "Firefox-latest.exe",       # 对象或目录名称
                     "fod": true,                        # true(文件对象)；false(目录)
@@ -2092,14 +2097,13 @@ class MetadataViewSet(CustomGenericViewSet):
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            None: 父目录路径错误，不存在
             obj: 对象或目录
-            raise Http404: 目录或对象不存在
+            raise Http404: 目录或对象不存在，父目录路径错误，不存在
         '''
         bfm = BucketFileManagement(path=path, collection_name=table_name)
         ok, obj = bfm.get_dir_or_obj_exists(name=name)
         if not ok:
-            return None
+            raise Http404
 
         if obj:
             return obj
