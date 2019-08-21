@@ -100,8 +100,8 @@
     // 存储桶权限设置url
     //@param id:存储桶id, type:int
     //@param public: true(公开)；false（私有）
-    function build_buckets_permission_url(params={id: 0, public: false}){
-        let api = build_buckets_detail_api(params.id) + '?public=' + params.public;
+    function build_buckets_permission_url(params={id: 0, public: false, ids:[]}){
+        let api = build_buckets_detail_api(params.id) + '?' + $.param({public: params.public, ids: params.ids}, true);
         return build_url_with_domain_name(api);
     }
 
@@ -348,12 +348,8 @@
         });
         if (arr.length > 0) {
             $.ajax({
-                url: build_url_with_domain_name('/api/v1/buckets/0/'),
+                url: build_url_with_domain_name('/api/v1/buckets/0/?' + $.param({"ids": arr}, true)),
                 type: 'delete',
-                data: {
-                    'ids': arr,// 存储桶id数组
-                },
-                traditional: true,//传递数组时需要设为true
                 success: function (data) {
                     bucket_list_checked.parents('tr').remove();
                     show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
@@ -407,12 +403,8 @@
         });
         if (arr.length > 0) {
             $.ajax({
-                url: build_buckets_permission_url({id: 0, public: publiced}),
+                url: build_buckets_permission_url({id: 0, public: publiced, ids:arr}),
                 type: 'patch',
-                data: {
-                    'ids': arr,// 存储桶id数组
-                },
-                traditional: true,//传递数组时需要设为true
                 success: function (data) {
                     show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
                 },

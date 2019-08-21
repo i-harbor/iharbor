@@ -411,7 +411,7 @@ class BucketViewSet(CustomGenericViewSet):
                 coreapi.Field(
                     name='ids',
                     required=False,
-                    location='form',
+                    location='query',
                     schema=coreschema.Array(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
                 ),
             ],
@@ -425,7 +425,7 @@ class BucketViewSet(CustomGenericViewSet):
                 coreapi.Field(
                     name='ids',
                     required=False,
-                    location='form',
+                    location='query',
                     schema=coreschema.Array(description='存储桶id列表或数组，设置多个存储桶时，通过此参数传递其他存储桶id'),
                 ),
             ]
@@ -548,10 +548,11 @@ class BucketViewSet(CustomGenericViewSet):
             success:[ids], None
         '''
         id = kwargs.get(self.lookup_field, None)
-        if isinstance(request.data, QueryDict): # form表单方式提交的数据
-            ids = request.data.getlist('ids')
+
+        if isinstance(request.query_params, QueryDict):
+            ids = request.query_params.getlist('ids')
         else:
-            ids = request.data.get('ids') # json方式提交的数据
+            ids = request.query_params.get('ids')
 
         if not isinstance(ids, list):
             ids = []
