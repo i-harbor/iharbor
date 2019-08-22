@@ -36,16 +36,6 @@
     }
 
     //
-    //构建对象info api
-    //错误返回空字符串
-    function build_obj_info_api(params={bucket_name: '', dir_path: '', filename: ''}){
-        let detail_api = build_obj_detail_api(params);
-        if (!detail_api)
-            return '';
-        return detail_api + '?info=true';
-    }
-
-    //
     //构造文件对象上传url
     function build_obj_detail_url(params={bucket_name:'', dir_path: '', filename:''}) {
         let api = build_obj_detail_api(params);
@@ -110,8 +100,8 @@
     // 存储桶权限设置url
     //@param id:存储桶id, type:int
     //@param public: true(公开)；false（私有）
-    function build_buckets_permission_url(params={id: 0, public: false}){
-        let api = build_buckets_detail_api(params.id) + '?public=' + params.public;
+    function build_buckets_permission_url(params={id: 0, public: false, ids:[]}){
+        let api = build_buckets_detail_api(params.id) + '?' + $.param({public: params.public, ids: params.ids}, true);
         return build_url_with_domain_name(api);
     }
 
@@ -130,6 +120,24 @@
         let param_str = encode_params(params);
         let api = get_move_base_api() + obj_path + '/?' + param_str;
         return build_url_with_domain_name(api);
+    }
+
+    //
+    // 对象metadata base api
+    //
+    function get_metadata_base_api() {
+        return "/api/v1/metadata/";
+    }
+
+    //
+    //构建对象元数据api
+    //错误返回空字符串
+    function build_metadata_api(params={bucket_name: '', dir_path: '', filename: ''}){
+        if (!params.hasOwnProperty('bucket_name') || !params.hasOwnProperty('dir_path') || !params.hasOwnProperty('filename'))
+            return '';
+
+        let path = encode_paths([params.bucket_name, params.dir_path, params.filename]);
+        return get_metadata_base_api() + path + '/';
     }
 
     /**
@@ -340,12 +348,8 @@
         });
         if (arr.length > 0) {
             $.ajax({
-                url: build_url_with_domain_name('/api/v1/buckets/0/'),
+                url: build_url_with_domain_name('/api/v1/buckets/0/?' + $.param({"ids": arr}, true)),
                 type: 'delete',
-                data: {
-                    'ids': arr,// 存储桶id数组
-                },
-                traditional: true,//传递数组时需要设为true
                 success: function (data) {
                     bucket_list_checked.parents('tr').remove();
                     show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
@@ -399,12 +403,8 @@
         });
         if (arr.length > 0) {
             $.ajax({
-                url: build_buckets_permission_url({id: 0, public: publiced}),
+                url: build_buckets_permission_url({id: 0, public: publiced, ids:arr}),
                 type: 'patch',
-                data: {
-                    'ids': arr,// 存储桶id数组
-                },
-                traditional: true,//传递数组时需要设为true
                 success: function (data) {
                     show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
                 },
@@ -1019,7 +1019,7 @@
         e.preventDefault();
         let obj = get_bucket_name_and_cur_path();
         obj.filename = $(this).text();
-        let url = build_obj_info_api(obj);
+        let url = build_metadata_api(obj);
         url = build_url_with_domain_name(url);
         get_file_obj_info_and_render(url);
     });
@@ -1272,7 +1272,7 @@
         let cur_url = build_obj_detail_url(params);
 
         if (cur_url === obj_url){
-            let info_url = build_obj_info_api(params);
+            let info_url = build_url_with_domain_name(build_metadata_api(params));
             get_file_info_and_list_item_render(info_url, render_bucket_file_item);
         }
     }
