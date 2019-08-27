@@ -45,10 +45,10 @@
                         <th>操作</th>
                     </tr>
                     {% for vm in vm_list_dict.values %}
-                        <tr class="active vm-line" id="{{ vm.vm_id }}">
+                        <tr class="active vm-line" id="{{ vm.vm_id }}" api_id="{{ vm.api_id }}">
                             <!--<td><input type="checkbox" class="item-checkbox"></td> -->
                             <td>{{ vm.vm_ip }}</td>
-                            <td>{{ vm.vm_image_display }}</td>
+                            <td>{{ vm.vm_image_name }}</td>
                             <td>{{ vm.vm_cpu }}</td>
                             <td>{{ vm.vm_mem }}</td>
                             <td>{{ vm.created_time_display }}</td>

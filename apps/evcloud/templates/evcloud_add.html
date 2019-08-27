@@ -29,7 +29,7 @@
                     <label for="api" class="col-sm-2 control-label">类型</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="api" name="api">
-                            {% for api in api_list_dict.values %}
+                            {% for api in api_list_dict %}
                                 <option value="{{ api.id }}">{{ api.description }}</option>
                             {% endfor %}
 
@@ -42,7 +42,7 @@
                     <div class="col-sm-6">
                         <select class="form-control" id="image" name="image">
                             {% for image in image_list.values %}
-                                <option value="{{ image.id }}">{{ image.name }} {{ image.version }}</option>
+                                <option value="{{ image.id }}_{{ image.name }} {{ image.version }}">{{ image.name }} {{ image.version }}</option>
                             {% endfor %}
 
                         </select>
@@ -53,7 +53,7 @@
                     <label for="configure" class="col-sm-2 control-label">配置</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="configure" name="configure">
-                            {% for config in config_list_dict.values %}
+                            {% for config in config_list_dict %}
                                 <option value="{{ config.id }}">{{ config.cpu }} vcpu | {{ config.mem }}MB mem | {{ config.time }} month(s)</option>
                             {% endfor %}
                         </select>

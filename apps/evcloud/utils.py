@@ -1,34 +1,38 @@
 import coreapi
 from .models import APIAuth
 
-API_CONFIG_DICT = {}
-API_CONFIG_NAME_DEFAULT = 'default'
-def get_api_config(config_name=API_CONFIG_NAME_DEFAULT):
-    '''
-    :param config_name: 配置对象名
-    :return:
-        正常：APIAuth()
-        错误：None
-    '''
-    if config_name not in API_CONFIG_DICT:
-        api_cfg = APIAuth.objects.first()
-        if not api_cfg:
-            return None
-
-        API_CONFIG_DICT[config_name] = api_cfg
-
-    return API_CONFIG_DICT.get(config_name)
+# API_CONFIG_DICT = {}
+# API_CONFIG_NAME_DEFAULT = 'default'
+# def get_api_config(config_name=API_CONFIG_NAME_DEFAULT):
+#     '''
+#     :param config_name: 配置对象名
+#     :return:
+#         正常：APIAuth()
+#         错误：None
+#     '''
+#     if config_name not in API_CONFIG_DICT:
+#         api_cfg = APIAuth.objects.first()
+#         if not api_cfg:
+#             return None
+#
+#         API_CONFIG_DICT[config_name] = api_cfg
+#
+#     return API_CONFIG_DICT.get(config_name)
 
 
 class evcloud_operations():
 
-    def __init__(self, api_config=API_CONFIG_NAME_DEFAULT):
-        if not isinstance(api_config, APIAuth):
-            if not isinstance(api_config, str):
-                raise Exception("param api_config is invalid")
-            api_config = get_api_config(api_config)
-            if not api_config:
-                raise Exception("Can't get api_config")
+    def __init__(self, api = 'default'):
+        # if not isinstance(api_config, APIAuth):
+        #     if not isinstance(api_config, str):
+        #         raise Exception("param api_config is invalid")
+        #     api_config = get_api_config(api_config)
+        #     if not api_config:
+        #         raise Exception("Can't get api_config")
+        if api == 'default':
+            api_config = APIAuth.objects.first()
+        else:
+            api_config = APIAuth.objects.get(id = api)
 
         self.group_id = api_config.group_id
         self.vlan_id = api_config.vlan_id

@@ -16,6 +16,7 @@
             data: {
                 "vm_id": vm_id,
                 "vm_operate": '6',
+                "api": click_element.attr('api_id'),
                 "csrfmiddlewaretoken": $('[name="csrfmiddlewaretoken"]').val(),
             },
             datatype: "json",
@@ -64,6 +65,7 @@
         click_element = $(this);
         vm_operate = event.target.getAttribute('value');
         vm_id = click_element.parents('tr').attr('id');
+        vm_api = click_element.parents('tr').attr('api_id');
         click_element.parents('td').siblings('[name="status"]').html(process);
         click_element.parents('td').siblings('[name="mission"]').html(operate_list[vm_operate]);
         $.ajax({
@@ -72,6 +74,7 @@
             data: {
                 "vm_id": vm_id,
                 "vm_operate": vm_operate,
+                "api": vm_api,
                 "csrfmiddlewaretoken": $('[name="csrfmiddlewaretoken"]').val(),
             },
             datatype: "json",
@@ -114,12 +117,14 @@
         }
         vm_operate = this.value;
         vm_id = $(this).parents('tr').attr('id');
+        vm_api = $(this).parents('tr').attr('api_id');
         $.ajax({
             url: "/evcloud/list/",
             type: "POST",
             data: {
                 "vm_id": vm_id,
                 "vm_operate": vm_operate,
+                "api": vm_api,
                 "csrfmiddlewaretoken": $('[name="csrfmiddlewaretoken"]').val(),
             },
             datatype: "json",
