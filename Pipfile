@@ -16,6 +16,7 @@ django-ckeditor = "*"
 django-debug-toolbar = "*"
 django-cors-headers = "*"
 uwsgi = "*"
+pyftpdlib = "*"
 
 [dev-packages]
 
