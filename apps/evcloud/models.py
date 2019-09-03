@@ -44,6 +44,7 @@ class VMLimit(models.Model):
     class Meta:
         verbose_name = '虚拟机限制'
         verbose_name_plural = verbose_name
+        unique_together = ('api', 'user',)
 
 class EvcloudVM(models.Model):
 
