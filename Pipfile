@@ -4,19 +4,19 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "==2.2.2"
-pillow = "*"
-django-rest-framework = "*"
-coreapi = "*"
-requests = "*"
-djangorestframework-jwt = "*"
-django-rest-swagger = "*"
-mysqlclient = "*"
-django-ckeditor = "*"
+django = "==2.2.5"
+pillow = "==6.1.0"
+coreapi = "==2.3.3"
+requests = "==2.22.0"
+djangorestframework-jwt = "==1.11.0"
+django-rest-swagger = "==2.2.0"
+mysqlclient = "==1.4.4"
+django-ckeditor = "==5.7.1"
 django-debug-toolbar = "*"
-django-cors-headers = "*"
-uwsgi = "*"
+django-cors-headers = "==3.1.0"
+uwsgi = "==2.0.18"
 pyftpdlib = "*"
+djangorestframework = "==3.10.2"
 
 [dev-packages]
 

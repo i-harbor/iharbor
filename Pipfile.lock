@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "186c4f11423073437f15f8463e17452525ece9ec681933b628f592af7f96fe13"
+            "sha256": "a9f26eb542e4991987f87c2882fa347567b9b7e856d63d17f879fe8ecc1cb05b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -47,11 +47,11 @@
         },
         "django": {
             "hashes": [
-                "sha256:753d30d3eb078064d2ddadfea65083c9848074a7f93d7b4dc7fa6b1380d278f5",
-                "sha256:7cb67e8b934fab23b6daed7144da52e8a25a47eba7f360ca43d2b448506b01ad"
+                "sha256:148a4a2d1a85b23883b0a4e99ab7718f518a83675e4485e44dc0c1d36988c5fa",
+                "sha256:deb70aa038e59b58593673b15e9a711d1e5ccd941b5973b30750d5d026abfd56"
             ],
             "index": "pypi",
-            "version": "==2.2.2"
+            "version": "==2.2.5"
         },
         "django-ckeditor": {
             "hashes": [
@@ -84,13 +84,6 @@
             ],
             "version": "==1.2.2"
         },
-        "django-rest-framework": {
-            "hashes": [
-                "sha256:47a8f496fa69e3b6bd79f68dd7a1527d907d6b77f009e9db7cf9bb21cc565e4a"
-            ],
-            "index": "pypi",
-            "version": "==0.1.0"
-        },
         "django-rest-swagger": {
             "hashes": [
                 "sha256:48f6aded9937e90ae7cbe9e6c932b9744b8af80cc4e010088b3278c700e0685b",
@@ -104,6 +97,7 @@
                 "sha256:42979bd5441bb4d8fd69d0f385024a114c3cae7df0f110600b718751250f6929",
                 "sha256:aedb48010ebfab9651aaab1df5fd3b4848eb4182afc909852a2110c24f89a359"
             ],
+            "index": "pypi",
             "version": "==3.10.2"
         },
         "djangorestframework-jwt": {

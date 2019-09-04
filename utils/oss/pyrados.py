@@ -194,7 +194,7 @@ class RadosAPI():
             self._cluster = rados.Rados(name=self._user_name, clustername=self._cluster_name, conffile=self._conf_file,
                                         conf=conf)
             try:
-                self._cluster.connect()
+                self._cluster.connect(timeout=5)
             except rados.Error as e:
                 msg = e.args[0] if e.args else 'error connecting to the cluster'
                 raise RadosError(msg, errno=e.errno)
