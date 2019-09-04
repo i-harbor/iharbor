@@ -28,6 +28,7 @@ router.register(r'(?P<version>(v1|v2))/ceph/errors', views.CephErrorViewSet, bas
 router.register(r'(?P<version>(v1|v2))/usercount', views.UserCountViewSet, base_name='usercount')
 router.register(r'(?P<version>(v1|v2))/availability', views.AvailabilityViewSet, base_name='availability')
 router.register(r'(?P<version>(v1|v2))/test', views.TestViewSet, base_name='test')
+router.register(r'(?P<version>(v1|v2))/ftp', views.FtpViewSet, base_name='ftp')
 
 
 dlp_router = DetailListPostRouter()

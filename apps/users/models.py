@@ -41,6 +41,11 @@ class UserProfile(AbstractUser):
     last_active = models.DateField(verbose_name='最后活跃日期', db_index=True, default=timezone.now)
     role = models.SmallIntegerField(verbose_name='角色权限', choices=ROLE_CHOICES, default=ROLE_NORMAL)
 
+    class Meta:
+        ordering = ['-id']
+        verbose_name = '用户'
+        verbose_name_plural = '用户'
+
     def get_full_name(self):
         if self.last_name.encode('UTF-8').isalpha() and self.first_name.encode('UTF-8').isalpha():
             return f'{self.first_name} {self.last_name}'

@@ -1,5 +1,7 @@
 import uuid
 import logging
+import binascii
+import os
 from datetime import timedelta, datetime
 
 from django.db import models
@@ -21,6 +23,9 @@ User = get_user_model()
 
 def get_uuid1_hex_string():
     return uuid.uuid1().hex
+
+def rand_hex_string(len=10):
+    return binascii.hexlify(os.urandom(len//2)).decode()
 
 class Bucket(models.Model):
     '''
@@ -47,6 +52,8 @@ class Bucket(models.Model):
     objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
+    ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
+    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
 
     class Meta:
         ordering = ['-created_time']
@@ -76,6 +83,11 @@ class Bucket(models.Model):
             return query_set.first()
 
         return None
+
+    def save(self, *args, **kwargs):
+        if not self.ftp_password:
+            self.ftp_password = rand_hex_string()
+        super().save(**kwargs)
 
     def do_soft_delete(self):
         '''

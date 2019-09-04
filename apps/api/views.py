@@ -2742,3 +2742,154 @@ class TestViewSet(CustomGenericViewSet):
             'status': True     # True: 可用；False: 不可用
         })
 
+
+class FtpViewSet(CustomGenericViewSet):
+    '''
+    存储桶FTP服务配置相关API
+
+    partial_update:
+    开启或关闭存储桶ftp访问限制，开启存储桶的ftp访问权限后，可以通过ftp客户端访问存储桶
+
+        Http Code: 状态码200，返回数据：
+        {
+            "code": 200,
+            "code_text": "ftp配置成功"，
+            "data": {               # 请求时提交的数据
+                "enable": xxx,      # 此项提交时才存在
+                "password": xxx     # 此项提交时才存在
+            }
+        }
+        Http Code: 状态码400：参数有误时，返回数据：
+            对应参数错误信息;
+        Http Code: 状态码404;
+        Http Code: 500
+    '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'bucket_name'
+    lookup_value_regex = '[a-z0-9-]{3,64}'
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'partial_update': BASE_METHOD_FIELDS + [
+                coreapi.Field(
+                    name='bucket_name',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='存储桶名称')
+                ),
+                coreapi.Field(
+                    name='enable',
+                    required=False,
+                    location='query',
+                    schema=coreschema.Boolean(description='是否使能存储桶ftp访问')
+                ),
+                coreapi.Field(
+                    name='password',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='存储桶ftp新的访问密码')
+                ),
+            ],
+        }
+    )
+
+    def partial_update(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.patch_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch_v1(self, request, *args, **kwargs):
+        bucket_name = kwargs.get(self.lookup_field, '')
+        if not bucket_name:
+            return Response(data={'code': 400, 'code_text': '桶名称有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            params = self.validate_patch_params(request)
+        except ValidationError as e:
+            return Response(data={'code': 400, 'code_text': e.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        enable = params.get('enable')
+        password = params.get('password')
+
+        # 存储桶验证和获取桶对象
+        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        data = {}
+        if enable is not None:
+            bucket.ftp_enable = enable
+            data['enable'] = enable
+
+        if password is not None:
+            bucket.ftp_password = password
+            data['password'] = password
+
+        try:
+            bucket.save()
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': 'ftp配置失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'code': 200,
+            'code_text': '系统可用',
+            'data': data     # 请求提交的参数
+        })
+
+    def validate_patch_params(self, request):
+        '''
+        patch请求方法参数验证
+        :return:
+            {
+                'enable': xxx, # None(未提交此参数) 或 bool
+                'password': xxx   # None(未提交此参数) 或 string
+            }
+        '''
+        validated_data = {'enable': None, 'password': None}
+        enable = request.query_params.get('enable', None)
+        password = request.query_params.get('password', None)
+
+        if not enable and not password:
+            raise ValidationError('参数enable或password必须提交一个')
+
+        if enable is not None:
+            if isinstance(enable, str):
+                enable = enable.lower()
+                if enable == 'true':
+                    enable = True
+                elif enable == 'false':
+                    enable = False
+                else:
+                    raise ValidationError('无效的enable参数')
+
+            validated_data['enable'] = enable
+
+        if password is not None:
+            password = password.strip()
+            if not (6 <= len(password) <= 20):
+                raise ValidationError('密码长度必须为6-20个字符')
+
+            validated_data['password'] = password
+
+        return validated_data
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        return Serializer

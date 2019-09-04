@@ -27,3 +27,19 @@
 	word-break:break-all;
 	word-wrap:break-word;
 }
+
+.ftp-enable-btn {
+	display: none;
+}
+
+.ftp-enable:hover .ftp-enable-btn{
+	display: inline-block;
+}
+
+.ftp-password-value {
+	display: none;
+}
+
+.ftp-password:hover .ftp-password-value{
+	display: inline-block;
+}

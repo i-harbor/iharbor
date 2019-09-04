@@ -36,7 +36,7 @@ class UserProfileAdmin(UserAdmin):
     fullname.short_description = '姓名'
 
 @admin.register(Email)
-class UserProfileAdmin(admin.ModelAdmin):
+class EmailAdmin(admin.ModelAdmin):
     list_display = ('id', 'sender', 'receiver', 'send_time')
     list_display_links = ('id',)
     list_filter = ('send_time',)
