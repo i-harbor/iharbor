@@ -226,7 +226,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         self.authentication_url_token(request)
 
         # 存储桶是否属于当前用户
-        if bucket.check_user_own_bucket(request):
+        if bucket.check_user_own_bucket(request.user):
             return True
 
         # 对象是否共享的，并且在有效共享事件内

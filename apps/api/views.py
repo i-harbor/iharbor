@@ -106,7 +106,7 @@ def get_user_own_bucket(bucket_name, request):
     bucket = Bucket.get_bucket_by_name(bucket_name)
     if not bucket:
         return None
-    if not bucket.check_user_own_bucket(request):
+    if not bucket.check_user_own_bucket(request.user):
         return None
     return bucket
 

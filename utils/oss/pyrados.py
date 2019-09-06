@@ -82,6 +82,31 @@ def read_part_tasks(obj_id, offset, bytes_len):
     return read_tasks
 
 
+def get_size(fd):
+    '''
+    获取文件大小
+    :param fd: 文件描述符(file descriptor)
+    :return:
+        size:int
+
+    :raise AttributeError
+    '''
+    if hasattr(fd, 'size'):
+        return fd.size
+    if hasattr(fd, 'name'):
+        try:
+            return os.path.getsize(fd.name)
+        except (OSError, TypeError):
+            pass
+    if hasattr(fd, 'tell') and hasattr(fd, 'seek'):
+        pos = fd.tell()
+        fd.seek(0, os.SEEK_END)
+        size = fd.tell()
+        fd.seek(pos)
+        return size
+    raise AttributeError("Unable to determine the file's size.")
+
+
 class HarborObjectStructure():
     '''
     每个EVHarbor对象可能有多个部分part(rados对象)组成
@@ -173,8 +198,9 @@ class RadosAPI():
         return self
 
     def __exit__(self, type_, value, traceback):
-        self.get_cluster().shutdown()
-        self._cluster = None
+        if self._cluster is not None:
+            self.get_cluster().shutdown()
+            self._cluster = None
         return False  # __exit__返回的是False，有异常不被忽略会向上抛出。
 
     def __del__(self):

@@ -109,9 +109,9 @@ class Bucket(models.Model):
     def is_soft_deleted(self):
         return self.soft_delete
 
-    def check_user_own_bucket(self, request):
+    def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
-        return request.user.id == self.user.id
+        return user.id == self.user.id
 
     def get_bucket_table_name(self):
         '''
@@ -226,6 +226,17 @@ class Bucket(models.Model):
         stats = {'space': self.size, 'count': self.objs_count}
         time_str =  to_localtime_string_naive_by_utc(self.stats_time)
         return {'stats': stats, 'stats_time': time_str}
+
+    def is_ftp_enable(self):
+        '''是否开启了ftp'''
+        return self.ftp_enable
+
+    def check_ftp_password(self, password):
+        '''检查ftp密码是否一致'''
+        if self.ftp_password == password:
+            return True
+
+        return False
 
 
 class BucketLimitConfig(models.Model):
