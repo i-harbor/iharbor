@@ -32,6 +32,7 @@ from . import serializers
 from . import paginations
 from . import permissions
 from . import throttles
+from .harbor import HarborError, HarborManager
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -764,17 +765,14 @@ class ObjViewSet(CustomGenericViewSet):
 
     @log_used_time(debug_logger, mark_text='upload chunks')
     def upload_chunk_v1(self, request, *args, **kwargs):
+
         objpath = kwargs.get(self.lookup_field, '')
-
-        # 对象路径分析
-        pp = PathParser(filepath=objpath)
         bucket_name = kwargs.get('bucket_name', '')
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if len(filename) > 255:
-            return Response(data={'code': 400, 'code_text': '对象名称长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
+        reset = request.query_params.get('reset', '').lower()
+        if reset == 'true':
+            reset = True
+        else:
+            reset = False
 
         # 数据验证
         try:
@@ -792,37 +790,19 @@ class ObjViewSet(CustomGenericViewSet):
                 'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name, request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
-
         data = serializer.data
-        chunk_offset = data.get('chunk_offset')
-        chunk = request.data.get('chunk')
-        reset = request.query_params.get('reset', '').lower()
+        offset = data.get('chunk_offset')
+        file = request.data.get('chunk')
+        chunk = file.read(file.size)
 
-        collection_name = bucket.get_bucket_table_name()
-        obj, created = self.get_obj_and_check_limit_or_create_or_404(collection_name, path, filename)
-        if obj is None:
-            return Response({'code': 400, 'code_text': '存储桶内对象数量已达容量上限'}, status=status.HTTP_400_BAD_REQUEST)
-        elif created is None:
-            return Response({'code': 400, 'code_text': '指定的对象名称与已有的目录重名，请重新指定一个名称'}, status=status.HTTP_400_BAD_REQUEST)
 
-        obj_key = obj.get_obj_key(bucket.id)
-        rados = HarborObject(obj_key, obj_size=obj.si)
-        if created is False: # 对象已存在，不是新建的
-            if reset == 'true': # 重置对象大小
-                response = self.pre_reset_upload(obj=obj, rados=rados)
-                if response is not True:
-                    return response
+        hManager = HarborManager()
+        try:
+            created = hManager.write_chunk(bucket_name=bucket_name, obj_path=objpath, offset=offset, chunk=chunk,
+                                           reset=reset, user=request.user)
+        except HarborError as e:
+            return Response(data={'code':e.code, 'code_text': e.msg})
 
-        response = self.save_one_chunk(obj=obj, rados=rados, chunk_offset=chunk_offset, chunk=chunk)
-        if response is not True:
-            # 如果对象是新创建的，上传失败删除对象元数据
-            if created is True:
-                obj.do_delete()
-            return response
         data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
 

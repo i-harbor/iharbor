@@ -231,9 +231,9 @@ JWT_AUTH = {
 # Ceph rados settings
 CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
-    'USER_NAME': 'client.admin',
+    'USER_NAME': 'client.obs',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
+    'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.obs.keyring',
     'POOL_NAME': 'obs',
 }
 

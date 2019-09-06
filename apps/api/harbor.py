@@ -5,11 +5,11 @@ from rest_framework import status
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
 from utils.storagers import PathParser
-from utils.oss import HarborObject
+from utils.oss import HarborObject, get_size
 from.paginations import BucketFileLimitOffsetPagination
 
 
-class HarborError():
+class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
         self.code = code    # 错误码
         self.msg = msg      # 错误描述
@@ -447,7 +447,7 @@ class HarborManager():
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
         :param offset: 写入对象偏移量
-        :param chunk: 要写入的数据
+        :param chunk: 要写入的数据，bytes
         :param reset: 为True时，先重置对象大小为0后再写入数据；
         :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
         :return:
@@ -457,6 +457,40 @@ class HarborManager():
         if not isinstance(chunk, bytes):
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='数据不是bytes类型')
 
+        return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=chunk,
+                                    reset=reset, user=user)
+
+    def write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
+        '''
+        向对象写入一个文件
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param offset: 写入对象偏移量
+        :param chunk: 要写入的数据，bytes
+        :param reset: 为True时，先重置对象大小为0后再写入数据；
+        :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                created             # created==True表示对象是新建的；created==False表示对象不是新建的
+                raise HarborError   # 写入失败
+        '''
+        return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=file,
+                                    reset=reset, user=user)
+
+    def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, reset:bool=False, user=None):
+        '''
+        向对象写入一个数据
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param offset: 写入对象偏移量
+        :param data: 要写入的数据，file或bytes
+        :param reset: 为True时，先重置对象大小为0后再写入数据；
+        :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                created             # created==True表示对象是新建的；created==False表示对象不是新建的
+                raise HarborError   # 写入失败
+        '''
         # 对象路径分析
         pp = PathParser(filepath=obj_path)
         path, filename = pp.get_path_and_filename()
@@ -477,12 +511,13 @@ class HarborManager():
         rados = HarborObject(obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
-                response = self._pre_reset_upload(obj=obj, rados=rados)
-                if response is not True:
-                    return response
+                self._pre_reset_upload(obj=obj, rados=rados)
 
         try:
-            self._save_one_chunk(obj=obj, rados=rados, chunk_offset=offset, chunk=chunk)
+            if isinstance(data, bytes):
+                self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data)
+            else:
+                self._save_one_file(obj=obj, rados=rados, offset=offset, file=data)
         except HarborError as e:
             # 如果对象是新创建的，上传失败删除对象元数据
             if created is True:
@@ -577,13 +612,13 @@ class HarborManager():
 
         return True
 
-    def _save_one_chunk(self, obj, rados, chunk_offset, chunk:bytes):
+    def _save_one_chunk(self, obj, rados, offset:int, chunk:bytes):
         '''
         保存一个上传的分片
 
         :param obj: 对象元数据
         :param rados: rados接口
-        :param chunk_offset: 分片偏移量
+        :param offset: 分片偏移量
         :param chunk: 分片数据
         :return:
             成功：True
@@ -591,13 +626,50 @@ class HarborManager():
         '''
         # 先更新元数据，后写rados数据
         # 更新文件修改时间和对象大小
-        new_size = chunk_offset + len(chunk) # 分片数据写入后 对象偏移量大小
+        new_size = offset + len(chunk) # 分片数据写入后 对象偏移量大小
         if not self._update_obj_metadata(obj, size=new_size):
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
 
         # 存储文件块
         try:
-            ok, msg = rados.write(offset=chunk_offset, data_block=chunk)
+            ok, msg = rados.write(offset=offset, data_block=chunk)
+        except Exception as e:
+            ok = False
+            msg = str(e)
+
+        if not ok:
+            # 手动回滚对象元数据
+            self._update_obj_metadata(obj, obj.si, obj.upt)
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块rados写入失败:' + msg)
+
+        return True
+
+    def _save_one_file(self, obj, rados, offset:int, file):
+        '''
+        向对象写入一个文件
+
+        :param obj: 对象元数据
+        :param rados: rados接口
+        :param offset: 分片偏移量
+        :param file: 文件
+        :return:
+            成功：True
+            失败：raise HarborError
+        '''
+        # 先更新元数据，后写rados数据
+        # 更新文件修改时间和对象大小
+        try:
+            file_size = get_size(file)
+        except AttributeError:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='输入必须是一个文件')
+
+        new_size = offset + file_size # 分片数据写入后 对象偏移量大小
+        if not self._update_obj_metadata(obj, size=new_size):
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
+
+        # 存储文件块
+        try:
+            ok, msg = rados.write_file(offset=offset, file=file)
         except Exception as e:
             ok = False
             msg = str(e)
@@ -808,6 +880,23 @@ class FtpHarborManager():
                 raise HarborError   # 写入失败
         '''
         return self.__hbManager.write_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, chunk=chunk)
+
+    def ftp_write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
+        '''
+        向对象写入一个文件
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param offset: 写入对象偏移量
+        :param file: 要写入的数据，类文件
+        :param reset: 为True时，先重置对象大小为0后再写入数据；
+        :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                created             # created==True表示对象是新建的；created==False表示对象不是新建的
+                raise HarborError   # 写入失败
+        '''
+        return self.__hbManager.write_file(bucket_name=bucket_name, obj_path=obj_path, offset=offset,
+                                           file=file, reset=reset, user=user)
 
     def ftp_move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None):
         '''

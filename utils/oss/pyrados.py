@@ -642,7 +642,7 @@ class HarborObject():
                  (False msg) 错误
         '''
         try:
-            size = file.size
+            size = get_size(file)
         except AttributeError:
             return False, 'input is not a file'
 
