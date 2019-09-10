@@ -12,6 +12,7 @@ from ckeditor.fields import RichTextField
 
 # from utils.log.decorators import log_used_time
 from utils.time import to_localtime_string_naive_by_utc
+from utils.storagers import PathParser
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
@@ -85,7 +86,7 @@ class Bucket(models.Model):
         return None
 
     def save(self, *args, **kwargs):
-        if not self.ftp_password:
+        if not self.ftp_password or len(self.ftp_password) < 6:
             self.ftp_password = rand_hex_string()
         super().save(**kwargs)
 
@@ -478,6 +479,11 @@ class BucketFileBase(models.Model):
             return False
 
         return True
+
+    def get_parent_path(self):
+        '''获取父路经字符串'''
+        path, _ = PathParser(filepath=self.na).get_path_and_filename()
+        return path
 
 class ModelSaveError(Exception):
     pass

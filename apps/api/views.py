@@ -793,15 +793,13 @@ class ObjViewSet(CustomGenericViewSet):
         data = serializer.data
         offset = data.get('chunk_offset')
         file = request.data.get('chunk')
-        chunk = file.read(file.size)
-
 
         hManager = HarborManager()
         try:
-            created = hManager.write_chunk(bucket_name=bucket_name, obj_path=objpath, offset=offset, chunk=chunk,
+            created = hManager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
                                            reset=reset, user=request.user)
         except HarborError as e:
-            return Response(data={'code':e.code, 'code_text': e.msg})
+            return Response(data={'code':e.code, 'code_text': e.msg}, status=e.code)
 
         data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
@@ -809,75 +807,58 @@ class ObjViewSet(CustomGenericViewSet):
     def retrieve(self, request, *args, **kwargs):
 
         objpath = kwargs.get(self.lookup_field, '')
-        pp = PathParser(filepath=objpath)
         bucket_name = kwargs.get('bucket_name','')
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_param, valid_response = self.custom_read_param_validate_or_response(request)
         if not validated_param and valid_response:
             return valid_response
 
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        collection_name = bucket.get_bucket_table_name()
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-
         # 自定义读取文件对象
         if validated_param:
             offset = validated_param.get('offset')
             size = validated_param.get('size')
-            return self.get_custom_read_obj_response(obj=fileobj, offset=offset, size=size, bucket_id=bucket.id)
+            hManager = HarborManager()
+            try:
+                chunk, obj = hManager.read_chunk(bucket_name=bucket_name, obj_path=objpath,
+                                                      offset=offset, size=size, user = request.user)
+            except HarborError as e:
+                return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+            return self.wrap_chunk_response(chunk=chunk, obj_size=obj.si)
 
         # 下载整个文件对象
-        obj_key = fileobj.get_obj_key(bucket.id)
-        response = self.get_file_download_response(obj_key, filename, filesize=fileobj.si)
-        if not response:
-            return Response(data={'code': 500, 'code_text': '服务器发生错误，获取文件返回对象错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        hManager = HarborManager()
+        try:
+            file_generator, obj = hManager.get_obj_generator(bucket_name=bucket_name, obj_path=objpath,
+                                                                  user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-        # 增加一次下载次数
-        fileobj.download_cound_increase()
+        filename = obj.name
+        filename = urlquote(filename)  # 中文文件名需要
+        response = FileResponse(file_generator)
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Length'] = obj.si
+        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        response['evob_obj_size'] = obj.si
         return response
 
     def destroy(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name','')
-        path, filename = PathParser(filepath=objpath).get_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+        hManager = HarborManager()
+        try:
+            ok = hManager.delete_object(bucket_name=bucket_name, obj_path=objpath, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        collection_name = bucket.get_bucket_table_name()
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        obj_key = fileobj.get_obj_key(bucket.id)
-        old_id = fileobj.id
-        # 先删除元数据，后删除rados对象（删除失败恢复元数据）
-        if not fileobj.do_delete():
-            logger.error('删除对象数据库原数据时错误')
-            return Response(data={'code': 500, 'code_text': '对象数据已删除，删除对象数据库原数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        ho = HarborObject(obj_id=obj_key, obj_size=fileobj.si)
-        ok, _ = ho.delete()
         if not ok:
-            # 恢复元数据
-            fileobj.id = old_id
-            fileobj.do_save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
-            logger.error('删除rados对象数据时错误')
-            return Response(data={'code': 500, 'code_text': '删除对象数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': '删除失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
+        bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
 
         validated_param, valid_response = self.shared_param_validate_or_response(request)
@@ -886,19 +867,14 @@ class ObjViewSet(CustomGenericViewSet):
         share = validated_param.get('share')
         days = validated_param.get('days')
 
-        bucket_name = kwargs.get('bucket_name', '')
-        pp = PathParser(filepath=objpath)
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+        hManager = HarborManager()
+        try:
+            ok = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
-
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
-        if not fileobj.set_shared(sh=share, days=days):
-            return Response(data={'code': 500, 'code_text': '更新数据库数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if not ok:
+            return Response(data={'code': 500, 'code_text': '对象共享权限设置失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
@@ -997,29 +973,6 @@ class ObjViewSet(CustomGenericViewSet):
             raise Http404
         return obj, True
 
-
-    def get_file_download_response(self, file_id, filename, filesize):
-        '''
-        获取文件下载返回对象
-        :param file_id: 文件Id, type: str
-        :filename: 文件名， type: str
-        :return:
-            success：http返回对象，type: dict；
-            error: None
-        '''
-        ho = HarborObject(file_id, obj_size=filesize)
-        file_generator = ho.read_obj_generator
-        if not file_generator:
-            return None
-
-        filename = urlquote(filename)# 中文文件名需要
-        response = FileResponse(file_generator())
-        response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Length'] = filesize
-        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
-        response['evob_obj_size'] = filesize
-        return response
-
     def get_obj_info_response(self, request, fileobj, bucket_name, path):
         '''
         文件对象信息Response
@@ -1109,34 +1062,20 @@ class ObjViewSet(CustomGenericViewSet):
         validated_data['days'] = days
         return (validated_data, None)
 
-    def get_custom_read_obj_response(self, obj, offset, size, bucket_id):
+    def wrap_chunk_response(self, chunk:bytes, obj_size:int):
         '''
         文件对象自定义读取response
-        :param obj: 文件对象
-        :param offset: 读起始偏移量
-        :param size: 读取大小
-        :param bucket_id: 桶id
+
+        :param chunk: 数据块
+        :param size: 文件对象总大小
         :return: HttpResponse
         '''
-        if size == 0:
-            chunk = bytes()
-        else:
-            obj_key = obj.get_obj_key(bucket_id)
-            rados = HarborObject(obj_key, obj_size=obj.si)
-            ok, chunk = rados.read(offset=offset, size=size)
-            if not ok:
-                data = {'code':500, 'code_text': 'server error,文件块读取失败'}
-                return Response(data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # 如果从0读文件就增加一次下载次数
-        if offset == 0:
-            obj.download_cound_increase()
-
+        c_len = len(chunk)
         response = StreamingHttpResponse(BytesIO(chunk), status=status.HTTP_200_OK)
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['evob_chunk_size'] = len(chunk)
-        response['Content-Length'] = len(chunk)
-        response['evob_obj_size'] = obj.si
+        response['evob_chunk_size'] = c_len
+        response['Content-Length'] = c_len
+        response['evob_obj_size'] = obj_size
         return response
 
     def pre_reset_upload(self, obj, rados):
@@ -1344,99 +1283,57 @@ class DirectoryViewSet(CustomGenericViewSet):
     def list_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
-        if not bucket_name:
-            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        bucket = get_user_own_bucket(bucket_name, request)
-        if not isinstance(bucket, Bucket):
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
-                                  status=status.HTTP_404_NOT_FOUND)
+        paginator = self.paginator
+        try:
+            offset = paginator.get_offset(request)
+            limit = paginator.get_limit(request)
+        except Exception as e:
+            return Response(data={'code': 400, 'code_text': 'offset或limit参数无效'}, status=status.HTTP_400_BAD_REQUEST)
 
-        collection_name = bucket.get_bucket_table_name()
-        bfm = BucketFileManagement(path=dir_path, collection_name=collection_name)
-        ok, files = bfm.get_cur_dir_files()
-        if not ok:
-            return Response({'code': 404, 'code_text': '参数有误，未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
+        hManager = HarborManager()
+        try:
+            files, bucket = hManager.list_dir(bucket_name=bucket_name, path=dir_path, offset=offset, limit=limit,
+                                              user=request.user, paginator=paginator)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         data_dict = OrderedDict([
             ('code', 200),
             ('bucket_name', bucket_name),
             ('dir_path', dir_path),
-            # ('breadcrumb', PathParser(filepath='').get_path_breadcrumb(dir_path))
         ])
 
-        queryset = files
-        page = self.paginate_queryset(queryset)
-
-        if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
-            data_dict['files'] = serializer.data
-            return self.get_paginated_response(data_dict)
-
-        serializer = self.get_serializer(queryset, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
-
+        serializer = self.get_serializer(files, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
         data_dict['files'] = serializer.data
-        return Response(data_dict)
-
-    # def create(self, request, *args, **kwargs):
-    #     pass
+        return paginator.get_paginated_response(data_dict)
 
     def create_detail(self, request, *args, **kwargs):
-        validated_data, response = self.post_detail_params_validate_or_response(request=request, kwargs=kwargs)
-        if response:
-            return response
-
-        bucket_name = validated_data.get('bucket_name', '')
-        dir_path = validated_data.get('dir_path', '')
-        dir_name = validated_data.get('dir_name', '')
-        did = validated_data.get('did', None)
-        collection_name = validated_data.get('collection_name')
-
-        bfm = BucketFileManagement(dir_path, collection_name=collection_name)
-        dir_path_name = bfm.build_dir_full_name(dir_name)
-        BucketFileClass = bfm.get_obj_model_class()
-        bfinfo = BucketFileClass(na=dir_path_name,  # 全路经目录名
-                                 name=dir_name, # 目录名
-                                fod=False,  # 目录
-                                )
-        # 有父节点
-        if did:
-            bfinfo.did = did
+        bucket_name = kwargs.get('bucket_name', '')
+        path = kwargs.get(self.lookup_field, '')
+        hManager = HarborManager()
         try:
-            bfinfo.save(force_insert=True) # 仅尝试创建文档，不修改已存在文档
-        except:
-            return Response(data={'code': 500, 'code_text': '数据存入数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            ok, dir = hManager.mkdir(bucket_name=bucket_name, path=path, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         data = {
             'code': 201,
             'code_text': '创建文件夹成功',
-            'data': {'dir_name': dir_name, 'bucket_name': bucket_name, 'dir_path': dir_path},
-            'dir': serializers.ObjInfoSerializer(bfinfo).data
+            'data': {'dir_name': dir.name, 'bucket_name': bucket_name, 'dir_path': dir.get_parent_path()},
+            'dir': serializers.ObjInfoSerializer(dir).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
-        path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
-        if not bucket_name or not dir_name:
-            return Response(data={'code': 400, 'code_text': '参数无效'}, status=status.HTTP_400_BAD_REQUEST)
-
-        collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not collection_name and response:
-            return response
-
-        obj = self.get_dir_object(path, dir_name, collection_name)
-        if not obj:
-            return Response(data = {'code': 404, 'code_text': '目录不存在'}, status=status.HTTP_404_NOT_FOUND)
-
-        bfm = BucketFileManagement(collection_name=collection_name)
-        if not bfm.dir_is_empty(obj):
-            return Response(data={'code': 400, 'code_text': '无法删除非空目录'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not obj.do_delete():
-            return Response(data={'code': 500, 'code_text': '删除数据库元数据错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        hManager = HarborManager()
+        try:
+            ok = hManager.rmdir(bucket_name=bucket_name, dirpath=dirpath, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1625,7 +1522,7 @@ class SecurityViewSet(CustomGenericViewSet):
                 }
         '''
     queryset = []
-    permission_classes = [permissions.IsAppSuperUser, permissions.IsSuperAndStaffUser]
+    permission_classes = [ permissions.IsSuperOrAppSuperUser]
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
@@ -1802,42 +1699,22 @@ class MoveViewSet(CustomGenericViewSet):
     def create_detail_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
-        path, filename = PathParser(filepath=objpath).get_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': '参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+        move_to = request.query_params.get('move_to', None)
+        rename = request.query_params.get('rename', None)
 
+        hManager = HarborManager()
         try:
-            params = self.validate_params(request)
-        except ValidationError as e:
-            if isinstance(e.detail, list) and len(e.detail) > 0:
-                msg = e.detail[0]
-            else:
-                msg = e.default_detail
-            return Response(data={'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
+            obj, bucket = hManager.move_rename(bucket_name=bucket_name, obj_path=objpath, rename=rename, move=move_to, user=request.user)
+        except HarborError as e:
+            return Response(data={'code':e.code, 'code_text': e.msg}, status=e.code)
 
-        move_to = params.get('move_to')
-        rename = params.get('rename')
-        if move_to is None and rename is None:
-            return Response(data={'code': 400, 'code_text': '请至少提交一个要执行操作的参数'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        table_name = bucket.get_bucket_table_name()
-        try:
-            obj = self.get_obj_or_404(table_name, path, filename)
-        except Http404:
-            return Response(data={'code': 404, 'code_text': '指定对象不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        if obj is None:
-            return Response(data={'code': 404, 'code_text': '对象父目录不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        return self.move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
+        context = self.get_serializer_context()
+        context.update({'bucket_name': bucket.name, 'bucket': bucket})
+        return Response(data={'code': 201, 'code_text': '移动对象操作成功',
+                              'bucket_name': bucket.name,
+                              'dir_path': obj.get_parent_path(),
+                              'obj': serializers.ObjInfoSerializer(obj, context=context).data},
+                        status=status.HTTP_201_CREATED)
 
     def move_rename_obj(self, bucket, obj, move_to, rename):
         '''

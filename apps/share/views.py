@@ -16,9 +16,14 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject
 from utils.jwt_token import JWTokenTool
 from . import serializers
+from api.harbor import HarborError, HarborManager
 
 
 # Create your views here.
+class InvalidError(Exception):
+    def __init__(self, code:int, msg:str='invalid'):
+        self.code = code
+        self.msg = msg
 
 class ObsViewSet(viewsets.GenericViewSet):
     '''
@@ -85,32 +90,55 @@ class ObsViewSet(viewsets.GenericViewSet):
     )
 
     def retrieve(self, request, *args, **kwargs):
+
         objpath = kwargs.get(self.lookup_field, '')
-
         pp = PathParser(filepath=objpath)
-        bucket_name, path, filename = pp.get_bucket_path_and_filename()
-        if not bucket_name or not filename:
-            return Response(data={'code': 400, 'code_text': 'objpath参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+        bucket_name, obj_path = pp.get_bucket_and_dirpath()
 
-        bucket = Bucket.get_bucket_by_name(bucket_name)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储通不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
+        # 存储桶验证和获取桶对象
+        hManager = HarborManager()
+        try:
+            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-        collection_name = bucket.get_bucket_table_name()
-        fileobj = self.get_file_obj_or_404(collection_name, path, filename)
+        if fileobj is None:
+            return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         # 是否有文件对象的访问权限
         if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
-        # 下载整个文件对象
-        obj_key = fileobj.get_obj_key(bucket.id)
-        response, offset = self.get_file_download_response(request, obj_key, filename, filesize=fileobj.si)
+        filesize = fileobj.si
+        filename = fileobj.name
+        # 是否是断点续传部分读取
+        ranges = request.headers.get('range')
+        if ranges:
+            try:
+                offset, end = self.get_offset_and_end(ranges, filesize=filesize)
+            except InvalidError as e:
+                return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-        # 增加一次下载次数
-        if offset == 0:
+            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
+            response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
+            response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
+            response['Content-Length'] = end - offset + 1
+            filename = urlquote(filename)  # 中文文件名需要
+            response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
+            response['Content-Type'] = 'application/octet-stream'  # 注意格式
+            response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        else:
+            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj)
+            response = FileResponse(generator)
+            response['Content-Length'] = filesize
+
+            # 增加一次下载次数
             fileobj.download_cound_increase()
+
+        filename = urlquote(filename)  # 中文文件名需要
+        response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
         return response
 
     def get_serializer(self, *args, **kwargs):
@@ -134,49 +162,34 @@ class ObsViewSet(viewsets.GenericViewSet):
             return serializers.SharedPostSerializer
         return serializers.SharedPostSerializer
 
-    def get_file_download_response(self, request, file_id, filename, filesize):
+    def get_offset_and_end(self, hRange:str, filesize:int):
         '''
-        获取文件下载返回对象, 对象起始下载偏移量
-        :param file_id: 文件Id, type: str
-        :filename: 文件名， type: str
-        :return:
-            success：Response, offset
-        '''
-        offset = 0
-        ho = HarborObject(file_id, obj_size=filesize)
+        获取读取开始偏移量和结束偏移量
 
-        # 是否是断点续传部分读取
-        ranges = request.headers.get('range')
-        if ranges:
-            start, end = self.parse_header_ranges(ranges)
-            # 无法解析header ranges,返回整个对象
-            if start is None and end is None:
-                return Response({'code': 416, 'code_text': 'Header Ranges is invalid'},
-                                status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE), offset
-            # 读最后end个字节
-            if (start is None) and (end is not None):
-                offset = max(filesize - end, 0)
+        :param hRange: range Header
+        :param filesize: 对象大小
+        :return:
+            (offset:int, end:int)
+
+        :raise InvalidError
+        '''
+        start, end = self.parse_header_ranges(hRange)
+        # 无法解析header ranges,返回整个对象
+        if start is None and end is None:
+            InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
+
+        # 读最后end个字节
+        if (start is None) and isinstance(end, int):
+            offset = max(filesize - end, 0)
+            end = filesize - 1
+        else:
+            offset = start
+            if end is None:
                 end = filesize - 1
             else:
-                offset = start
-                if end is None:
-                    end = filesize - 1
-                else:
-                    end = min(end, filesize - 1)
+                end = min(end, filesize - 1)
 
-            response = FileResponse(ho.read_obj_generator(offset=offset, end=end), status=status.HTTP_206_PARTIAL_CONTENT)
-            response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
-            response['Content-Length'] = end - offset + 1
-        else:
-            response = FileResponse(ho.read_obj_generator(offset=offset))
-            response['Content-Length'] = filesize
-
-        filename = urlquote(filename)  # 中文文件名需要
-        response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
-        response['Content-Type'] = 'application/octet-stream'  # 注意格式
-        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
-
-        return response, offset
+        return offset, end
 
     def parse_header_ranges(self, ranges):
         '''

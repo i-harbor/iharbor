@@ -451,7 +451,10 @@
                 {{/if}}
                 <span class="glyphicon glyphicon-edit ftp-enable-btn"></span>
             </td>
-            <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">{{ $data['ftp_password'] }}</td>
+            <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                <span class="ftp-password-value">{{ $data['ftp_password'] }}</span>
+            </td>
         </tr>
     `);
 
@@ -501,7 +504,7 @@
                                     <span class=" ftp-enable-btn"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
                                     <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
-                                        <span class="glyphicon glyphicon-eye-open"></span>
+                                        <span class="glyphicon glyphicon-info-sign"></span>
                                         <span class="ftp-password-value">{{ $value.ftp_password }}</span>
                                     </td>
                                 </tr>

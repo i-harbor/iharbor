@@ -26,6 +26,17 @@ class IsAppSuperUser(BasePermission):
         return request.user.is_app_superuser()
 
 
+class IsSuperOrAppSuperUser(BasePermission):
+    '''
+    Does the user have administrator privileges.
+    '''
+    def has_permission(self, request, view):
+        u = request.user
+        if not u.id:
+            return False
+        return bool(u.is_superuser or u.is_app_superuser())
+
+
 class IsOwnObject(BasePermission):
     '''
     对象是否属于自己

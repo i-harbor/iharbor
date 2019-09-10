@@ -128,7 +128,10 @@ class HarborManager():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
         table_name = bucket.get_bucket_table_name()
-        obj = self._get_obj_or_dir(table_name, path, name)
+        ok, obj = self._get_obj_or_dir(table_name, path, name)
+        if not ok:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='指定对象或目录不存在')
 
@@ -142,18 +145,21 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            obj，bfm: 对象或目录
-            None, bfm: 目录或对象不存在，父目录路径错误，不存在
+            ok, obj，bfm: 对象或目录
+
+            False, None, bfm    # 父目录路径错误，不存在
+            True, obj, bfm   # 目录或对象存在
+            True, None, bfm  # 目录或对象不存在
         '''
         bfm = BucketFileManagement(path=path, collection_name=table_name)
         ok, obj = bfm.get_dir_or_obj_exists(name=name)
         if not ok:
-            return None, bfm
+            return False, None, bfm    # 父目录路径错误不存在
 
         if obj:
-            return obj, bfm
+            return True, obj, bfm   # 目录或对象存在
 
-        return None, bfm
+        return True, None, bfm  # 目录或对象不存在
 
     def _get_obj_or_dir(self, table_name, path, name):
         '''
@@ -163,12 +169,13 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            obj: 对象或目录
-            None: 目录或对象不存在，父目录路径错误，不存在
+            ok, obj: 对象或目录
+            ok == False: 父目录路径错误，不存在
+            None: 目录或对象不存在
         '''
-        obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
+        ok, obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
 
-        return obj
+        return ok, obj
 
     def mkdir(self, bucket_name:str, path:str, user=None):
         '''
@@ -237,17 +244,18 @@ class HarborManager():
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
 
-        dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
-        if not dir:
+        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
+        if not ok:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
 
-        # 目录已存在
-        if dir.is_dir():
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"{dir_name}"目录已存在', existing=True)
+        if dir:
+            # 目录已存在
+            if dir.is_dir():
+                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"{dir_name}"目录已存在', existing=True)
 
-        # 同名对象已存在
-        if dir.is_file():
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
+            # 同名对象已存在
+            if dir.is_file():
+                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
         data['bucket_name'] = bucket_name
@@ -280,7 +288,10 @@ class HarborManager():
 
         table_name = bucket.get_bucket_table_name()
 
-        dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
+        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
+        if not ok:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+
         if not dir or dir.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
 
@@ -292,7 +303,7 @@ class HarborManager():
 
         return True
 
-    def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None):
+    def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None, paginator=None):
         '''
         获取目录下的文件列表信息
 
@@ -301,9 +312,10 @@ class HarborManager():
         :param offset: 目录下文件列表偏移量
         :param limit: 获取文件信息数量
         :param user: 用户，默认为None，如果给定用户只获取属于此用户的目录下的文件列表信息（只查找此用户的存储桶）
+        :param paginator: 分页器，默认为None
         :return:
-                list[object, object,]: success
-                raise HarborError:  failed
+                success:    (list[object, object,], bucket) # list和bucket实例
+                failed:      raise HarborError
 
         :raise HarborError
         '''
@@ -317,7 +329,8 @@ class HarborManager():
         if not ok:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
 
-        paginator = BucketFileLimitOffsetPagination()
+        if paginator is None:
+            paginator = BucketFileLimitOffsetPagination()
         if limit <= 0 :
             limit = paginator.default_limit
         else:
@@ -326,12 +339,15 @@ class HarborManager():
         if offset < 0:
             offset = 0
 
+        paginator.offset = offset
+        paginator.limit = limit
+
         try:
             l = paginator.pagenate_to_list(files, offset=offset, limit=limit)
         except Exception as e:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
 
-        return l
+        return (l, bucket)
 
     def move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None, user=None):
         '''
@@ -343,7 +359,7 @@ class HarborManager():
         :param move: 移动到move路径下，默认为None不移动
         :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
         :return:
-            success: object
+            success: (object, bucket)     # 移动后的对象实例
             failed : raise HarborError
 
         :raise HarborError
@@ -357,14 +373,13 @@ class HarborManager():
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='请至少提交一个要执行操作的参数')
 
         # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name=bucket_name, user=user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+        try:
+            bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        except HarborError as e:
+            raise e
 
-        table_name = bucket.get_bucket_table_name()
-        obj = self._get_obj_or_dir(table_name, path, filename)
-        if (not obj) or (not obj.is_file()):
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
+        if obj is None:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
 
         return self._move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
 
@@ -377,7 +392,7 @@ class HarborManager():
         :param move_to: 移动目标路径
         :param rename: 重命名的新名称
         :return:
-            success: object
+            success: (object, bucket)
             failed : raise HarborError
 
         :raise HarborError
@@ -413,7 +428,7 @@ class HarborManager():
         if not obj.do_save():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')
 
-        return obj
+        return obj, bucket
 
     def _validate_move_rename_params(self, move_to, rename):
         '''
@@ -728,13 +743,12 @@ class HarborManager():
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
 
         # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name=bucket_name, user=user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+        try:
+            bucket, fileobj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        except HarborError as e:
+            raise e
 
-        table_name = bucket.get_bucket_table_name()
-        fileobj = self._get_obj_or_dir(table_name=table_name, path=path, name=filename)
-        if not fileobj or fileobj.isdir():
+        if fileobj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
 
         obj_key = fileobj.get_obj_key(bucket.id)
@@ -763,27 +777,21 @@ class HarborManager():
         :param size: 读取数据字节长度, 最大20Mb
         :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
         :return:
-            success: （chunk:bytes, size:int）  #  数据块，对象总大小
+            success: （chunk:bytes, obj）  #  数据块，对象元数据实例
             failed:   raise HarborError         # 读取失败，抛出HarborError
 
         :raise HarborError
         '''
-        pp = PathParser(filepath=obj_path)
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
-
         if offset < 0 or size < 0 or size > 20 * 1024 ** 2:  # 20Mb
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
 
         # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name=bucket_name, user=user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+        try:
+            bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        except HarborError as e:
+            raise e
 
-        table_name = bucket.get_bucket_table_name()
-        obj = self._get_obj_or_dir(table_name=table_name, path=path, name=filename)
-        if not obj or obj.isdir():
+        if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
 
         # 自定义读取文件对象
@@ -796,7 +804,11 @@ class HarborManager():
         if not ok:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块读取失败')
 
-        return (chunk, obj.si)
+        # 如果从0读文件就增加一次下载次数
+        if offset == 0:
+            obj.download_cound_increase()
+
+        return (chunk, obj)
 
     def get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2, user=None):
         '''
@@ -808,20 +820,66 @@ class HarborManager():
         :param end: 读结束偏移量(包含)；type: int；默认None表示对象结尾；
         :param per_size: 每次读取数据块长度；type: int， 默认10Mb
         :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
-        :return: generator
+        :return: (generator, object)
                 for data in generator:
-
+                    do something
         :raise HarborError
         '''
-        pp = PathParser(filepath=obj_path)
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
-
         if per_size < 0 or per_size > 20 * 1024 ** 2:  # 20Mb
             per_size = 10 * 1024 ** 2   # 10Mb
 
-        if offset < 0 or end < 0:
+        if offset < 0 or (end is not None and end < 0):
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+
+        # 存储桶验证和获取桶对象
+        try:
+            bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        except HarborError as e:
+            raise e
+
+        if obj is None:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+
+        # 增加一次下载次数
+        obj.download_cound_increase()
+        generator = self._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end, per_size=per_size)
+        return  generator, obj
+
+    def _get_obj_generator(self, bucket, obj, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
+        '''
+        获取一个读取对象的生成器函数
+
+        :param bucket: 存储桶实例
+        :param obj: 对象实例
+        :param offset: 读起始偏移量；type: int
+        :param end: 读结束偏移量(包含)；type: int；默认None表示对象结尾；
+        :param per_size: 每次读取数据块长度；type: int， 默认10Mb
+        :return: generator
+                for data in generator:
+                    do something
+        :raise HarborError
+        '''
+        # 读取文件对象生成器
+        obj_key = obj.get_obj_key(bucket.id)
+        rados = HarborObject(obj_key, obj_size=obj.si)
+        return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
+
+    def get_bucket_and_obj_or_dir(self,bucket_name:str, path:str, user=None):
+        '''
+        获取存储桶和对象或目录实例
+
+        :param bucket_name: 桶名
+        :param path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :return:
+                success: （bucket, object） # obj == None表示对象或目录不存在
+                failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
+
+        :raise HarborError
+        '''
+        pp = PathParser(filepath=path)
+        dir_path, filename = pp.get_path_and_filename()
+        if not bucket_name or not filename:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
 
         # 存储桶验证和获取桶对象
@@ -830,14 +888,57 @@ class HarborManager():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
         table_name = bucket.get_bucket_table_name()
-        obj = self._get_obj_or_dir(table_name=table_name, path=path, name=filename)
-        if not obj or obj.isdir():
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+        ok, obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
+        if not ok:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
 
-        # 读取文件对象生成器
-        obj_key = obj.get_obj_key(bucket.id)
-        rados = HarborObject(obj_key, obj_size=obj.si)
-        return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
+        if not obj:
+            return bucket, None
+
+        return bucket, obj
+
+    def get_bucket_and_obj(self, bucket_name: str, obj_path: str, user=None):
+        '''
+        获取存储桶和对象实例
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :return:
+                success: （bucket, obj）  # obj == None表示对象不存在
+                failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
+
+        :raise HarborError
+        '''
+        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_path, user=user)
+        if obj and obj.is_file():
+            return bucket, obj
+
+        return bucket, None
+
+    def share_object(self, bucket_name:str, obj_path:str, share:bool=False, days:int=0, user=None):
+        '''
+        设置对象共享或私有权限
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :param share: 共享(True)或私有(False)
+        :param days: 共享天数，0表示永久共享, <0表示不共享
+        :return:
+            success: True
+            failed: False
+
+        :raise HarborError
+        '''
+        bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        if obj is None:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
+
+        if obj.set_shared(sh=share, days=days):
+            return True
+
+        return False
 
 
 class FtpHarborManager():
@@ -938,7 +1039,7 @@ class FtpHarborManager():
         :param offset: 读起始偏移量
         :param size: 读取数据字节长度, 最大20Mb
         :return:
-            success: （chunk:bytes, size:int）  #  数据块，对象总大小
+            success: （chunk:bytes, object）  #  数据块，对象元数据实例
             failed:   raise HarborError         # 读取失败，抛出HarborError
 
         :raise HarborError
@@ -954,9 +1055,9 @@ class FtpHarborManager():
         :param offset: 读起始偏移量；type: int
         :param end: 读结束偏移量(包含)；type: int；默认None表示对象结尾；
         :param per_size: 每次读取数据块长度；type: int， 默认10Mb
-        :return: generator
+        :return: (generator, object)
                 for data in generator:
-
+                    do something
         :raise HarborError
         '''
         return self.__hbManager.get_obj_generator(bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
@@ -984,8 +1085,8 @@ class FtpHarborManager():
         :param offset: 目录下文件列表偏移量
         :param limit: 获取文件信息数量
         :return:
-                list[object, object,]: success
-                raise HarborError:  failed
+                success:    (list[object, object,], bucket) # list和bucket实例
+                failed:      raise HarborError
 
         :raise HarborError
         '''
