@@ -482,7 +482,7 @@ class HarborManager():
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
         :param offset: 写入对象偏移量
-        :param chunk: 要写入的数据，bytes
+        :param file: 要写入的数据，已打开的类文件句柄
         :param reset: 为True时，先重置对象大小为0后再写入数据；
         :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
         :return:
@@ -682,7 +682,7 @@ class HarborManager():
         if not self._update_obj_metadata(obj, size=new_size):
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
 
-        # 存储文件块
+        # 存储文件
         try:
             ok, msg = rados.write_file(offset=offset, file=file)
         except Exception as e:
@@ -989,7 +989,7 @@ class FtpHarborManager():
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
         :param offset: 写入对象偏移量
-        :param file: 要写入的数据，类文件
+        :param file: 要写入的数据，已打开的类文件句柄（文件描述符）
         :param reset: 为True时，先重置对象大小为0后再写入数据；
         :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
         :return:

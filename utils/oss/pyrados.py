@@ -227,7 +227,7 @@ class RadosAPI():
 
         return self._cluster
 
-    def write(self, obj_id, offset, data: bytes):
+    def _io_write(self,ioctx, obj_id, offset, data: bytes):
         '''
         向对象写入数据
 
@@ -240,22 +240,94 @@ class RadosAPI():
         '''
         tasks = write_part_tasks(obj_id, offset=offset, bytes_len=len(data))
 
+        for obj_key, off, start, end in tasks:
+            try:
+                r = ioctx.write(obj_key, data[start:end], offset=off)
+            except rados.Error as e:
+                msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
+                raise RadosError(msg, errno=e.errno)
+            if r != 0:
+                raise RadosError('Failed to write bytes to rados object')
+
+        return True
+
+    def write(self, obj_id, offset, data: bytes):
+        '''
+        向对象写入数据
+
+        :param obj_id: 对象id
+        :param offset: 数据写入偏移量
+        :param data: 数据，bytes
+        :return:
+            success: True
+        :raises: class:`RadosError`
+        '''
         cluster = self.get_cluster()
         try:
             with cluster.open_ioctx(self._pool_name) as ioctx:
-                for obj_key, off, start, end in tasks:
-                    try:
-                        r = ioctx.write(obj_key, data[start:end], offset=off)
-                    except rados.Error as e:
-                        msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
-                        raise RadosError(msg, errno=e.errno)
-                    if r != 0:
-                        raise RadosError('Failed to write bytes to rados object')
+                self._io_write(ioctx=ioctx, obj_id=obj_id, offset=offset, data=data)
         except rados.Error as e:
             msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
             raise RadosError(msg, errno=e.errno)
-        except Exception as e:
-            raise RadosError(str(e))
+
+        return True
+
+    def _io_write_file(self, ioctx, obj_id, offset, file, per_size=20 * 1024 ** 2):
+        '''
+        向对象写入一个类文件数据
+
+        :param obj_id: 对象id
+        :param offset: 文件数据写入对象偏移量
+        :param file: 类文件
+        :param per_size: 每次从文件读取数据的大小,默认20MB
+        :return:
+            success: True
+        :raises: class:`RadosError`
+        '''
+        try:
+            size = get_size(file)
+        except AttributeError:
+            raise RadosError('input is not a file')
+
+        file_offset = 0  # 文件已写入的偏移量
+        while True:
+            # 文件是否已完全写入
+            if file_offset >= size:
+                return True
+
+            file.seek(file_offset)
+            chunk = file.read(per_size)
+            if chunk:
+                try:
+                    self._io_write(ioctx=ioctx, obj_id=obj_id, offset=offset + file_offset, data=chunk)
+                except RadosError:
+                    # 写入失败再尝试一次
+                    self._io_write(ioctx=ioctx, obj_id=obj_id, offset=offset + file_offset, data=chunk)
+
+                file_offset += len(chunk)  # 更新已写入大小
+            else:
+                raise RadosError('read error when write a file to rados')
+
+    def write_file(self, obj_id, offset, file, per_size=1024*20): #20 * 1024 ** 2):
+        '''
+        向对象写入一个类文件数据
+
+        :param obj_id: 对象id
+        :param offset: 文件数据写入对象偏移量
+        :param file: 类文件
+        :param per_size: 每次从文件读取数据的大小,默认20MB
+        :return:
+            success: True
+        :raises: class:`RadosError`
+        '''
+        cluster = self.get_cluster()
+        try:
+            with cluster.open_ioctx(self._pool_name) as ioctx:
+                self._io_write_file(ioctx=ioctx, obj_id=obj_id, offset=offset, file=file, per_size=per_size)
+
+        except rados.Error as e:
+            msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
+            raise RadosError(msg, errno=e.errno)
 
         return True
 
@@ -642,29 +714,12 @@ class HarborObject():
                  (False msg) 错误
         '''
         try:
-            size = get_size(file)
-        except AttributeError:
-            return False, 'input is not a file'
+            rados = self.get_rados_api()
+            rados.write_file(obj_id=self._obj_id, offset=offset, file=file)
+        except RadosError as e:
+            return False, str(e)
 
-        file_offset = 0  # 文件已写入的偏移量
-        while True:
-            # 文件是否已完全写入
-            if file_offset == size:
-                return True, 'write success'
-
-            file.seek(file_offset)
-            chunk = file.read(per_size)
-            if chunk:
-                ok, msg = self.write(offset=offset + file_offset, data_block=chunk)
-                if not ok:
-                    # 写入失败再尝试一次
-                    ok, msg = self.write(offset=offset + file_offset, data_block=chunk)
-                    if not ok:
-                        return False, msg
-
-                file_offset += len(chunk)  # 更新已写入大小
-            else:
-                return False, 'read error'
+        return True, 'success to write file'
 
     def delete(self, obj_size=None):
         '''
