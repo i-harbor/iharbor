@@ -322,6 +322,7 @@ class BucketFileBase(models.Model):
     sst = models.DateTimeField(blank=True, null=True, verbose_name='共享起始时间') # share_start_time, 该文件的共享起始时间
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
+    md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
 
     class Meta:
         abstract = True

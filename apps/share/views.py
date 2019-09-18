@@ -123,10 +123,6 @@ class ObsViewSet(viewsets.GenericViewSet):
             response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
             response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
             response['Content-Length'] = end - offset + 1
-            filename = urlquote(filename)  # 中文文件名需要
-            response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
-            response['Content-Type'] = 'application/octet-stream'  # 注意格式
-            response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
         else:
             generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj)
             response = FileResponse(generator)
