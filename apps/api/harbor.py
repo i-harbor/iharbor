@@ -83,6 +83,10 @@ class HarborManager():
 
         :raise HarborError  # 桶或路径不存在，发生错误
         '''
+        # path为空或根目录时
+        if not path_name or path_name == '/':
+            return True
+
         obj = self.get_object(bucket_name, path_name)
         if obj.is_dir():
             return True
@@ -100,6 +104,10 @@ class HarborManager():
 
         :raise HarborError  # 桶或路径不存在，发生错误
         '''
+        # path为空或根目录时
+        if not path_name or path_name == '/':
+            return False
+
         obj = self.get_object(bucket_name, path_name)
         if obj.is_file():
             return True
