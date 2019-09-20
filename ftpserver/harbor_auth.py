@@ -25,7 +25,13 @@ class HarborAuthorizer(DummyAuthorizer):
         # raise AuthenticationFailed
         # if not (user_name == 'root' and password == 'root'):
         #     raise AuthenticationFailed
-        if not authenticate(username=user_name, password=password):
+        # if not authenticate(username=user_name, password=password):
+        #     raise AuthenticationFailed
+        if not Bucket.objects.filter(name=user_name):
+            raise AuthenticationFailed('Have no this bucket.')
+        if not Bucket.objects.get(name=user_name).ftp_enable:
+            raise AuthenticationFailed('Bucket is not enable for ftp.')
+        if not Bucket.objects.get(name=user_name).ftp_password == password:
             raise AuthenticationFailed
 
     def get_home_dir(self, username):
@@ -35,21 +41,21 @@ class HarborAuthorizer(DummyAuthorizer):
         the provided username no longer exists.
         """
         # return self.user_table[username]['home']
-        user = UserProfile.objects.get(username=username)
-        auth = AuthKey.objects.filter(user=user)
-        if not auth:
-            auth = [AuthKey.objects.create(user=user)]
-        bucket = Bucket.objects.filter(user=user)
-        if not bucket:
-            raise AuthenticationFailed('There is not a bucket')
-        # access_key = '40a95de4472411e99b7bc8000a00c8d3'
-        # secret_key = 'a2d3b4be966f4ed3381b535306b5e59b7983e40e'
-        # bucket = 'liyun'
-        access_key = auth[0].id
-        secret_key = auth[0].secret_key
-        bucket = bucket[0].name
-        print(access_key, secret_key, bucket)
-        return access_key + '-' + secret_key + '-' + bucket
+        # user = UserProfile.objects.get(username=username)
+        # auth = AuthKey.objects.filter(user=user)
+        # if not auth:
+        #     auth = [AuthKey.objects.create(user=user)]
+        # bucket = Bucket.objects.filter(user=user)
+        # if not bucket:
+        #     raise AuthenticationFailed('There is not a bucket')
+        # # access_key = '40a95de4472411e99b7bc8000a00c8d3'
+        # # secret_key = 'a2d3b4be966f4ed3381b535306b5e59b7983e40e'
+        # # bucket = 'liyun'
+        # access_key = auth[0].id
+        # secret_key = auth[0].secret_key
+        # bucket = bucket[0].name
+        # print(access_key, secret_key, bucket)
+        return username
 
     def get_msg_login(self, username):
         """Return the user's login message."""

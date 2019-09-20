@@ -1,61 +1,35 @@
 from pyftpdlib.filesystems import AbstractedFS, FilesystemError
-from pyharbor import pyharbor
+import django
 import sys
 import os
+
+# 将项目路径添加到系统搜寻路径当中，查找方式为从当前脚本开始，找到要调用的django项目的路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 设置项目的配置文件 不做修改的话就是 settings 文件
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
+django.setup()  # 加载项目配置
+
+from api.harbor import FtpHarborManager
 
 
 class HarborFileSystem(AbstractedFS):
     def __init__(self, *args, **kwargs):
         super(HarborFileSystem, self).__init__(*args, **kwargs)
-        ak, sk, root = self._root.split('-')
+        self.bucket_name = self._root
         self._root = '/'
-        pyharbor.set_global_settings({
-            'SCHEME': 'http',
-            'ACCESS_KEY': ak,
-            'SECRET_KEY': sk,
-        })
-        self.bucket_name = root
-        self.client = pyharbor.get_client()
+        self.client = FtpHarborManager()
 
     def realpath(self, path):
         return path
 
     def isdir(self, path):
-        assert isinstance(path, str), path
-        print(sys._getframe().f_code.co_name)
-        print('输入了', end='')
         print(path)
-        print('输出了', end='')
-        ftp_path = self.fs2ftp(path)
-        if ftp_path == "/":  # root
-            print(True)
-            return True
-        if self.client.list_dir(bucket_name=self.bucket_name, dir_name=ftp_path, per_page=100):
-            print(True)
-            return True
-        else:
-            print(False)
-            return False
-        #print(self.client.bucket(self.bucket_name).dir('').get_obj_info('/'))
-        #return self.client.isdir(ftp_path, self.bucket_name)
+        print(self.bucket_name)
+        return self.client.ftp_is_dir(self.bucket_name, path)
 
     def isfile(self, path):
-        """Return True if path is a file."""
-        assert isinstance(path, str), path
-        print(sys._getframe().f_code.co_name)
-        print('输入了', end='')
         print(path)
-        print('输出了', end='')
-        ftp_path = self.fs2ftp(path)
-        if ftp_path == "/":  # root
-            print(False)
-            return False
-        if self.client.list_dir(bucket_name=self.bucket_name, dir_name=ftp_path, per_page=100):
-            print(False)
-            return False
-        else:
-            print(True)
-            return True
+        return self.client.ftp_is_file(self.bucket_name, path)
 
     def islink(self, fs_path):
         return False
@@ -73,30 +47,32 @@ class HarborFileSystem(AbstractedFS):
             raise FilesystemError('Not a dir.')
 
     def listdir(self, path):
-        assert isinstance(path, str), path
-        ftp_path = self.fs2ftp(path)
-        dir_list = []
-        page = self.client.list_dir(bucket_name=self.bucket_name, dir_name=ftp_path, per_page=100)
-
-        for obj in page.get_list():
-            if obj['fod'] == True:
-                dir_list.append((obj['name'], obj['upt'], obj['si']))
-            else:
-                dir_list.append((obj['name'] + '/', '', 0))
-        while page.has_next():
-            page = page.next_page()
-            for obj in page.get_list():
-                if obj['fod'] == True:
-                    dir_list.append((obj['name'], obj['upt'], obj['si']))
-                else:
-                    dir_list.append((obj['name'] + '/', '', 0))
-
-        print(sys._getframe().f_code.co_name)
-        print('输入了', end='')
-        print(path)
-        print('输出了', end='')
-        print(dir_list)
-        return dir_list
+        files = self.client.ftp_list_dir(self.bucket_name, path)
+        print(files)
+        # assert isinstance(path, str), path
+        # ftp_path = self.fs2ftp(path)
+        # dir_list = []
+        # page = self.client.list_dir(bucket_name=self.bucket_name, dir_name=ftp_path, per_page=100)
+        #
+        # for obj in page.get_list():
+        #     if obj['fod'] == True:
+        #         dir_list.append((obj['name'], obj['upt'], obj['si']))
+        #     else:
+        #         dir_list.append((obj['name'] + '/', '', 0))
+        # while page.has_next():
+        #     page = page.next_page()
+        #     for obj in page.get_list():
+        #         if obj['fod'] == True:
+        #             dir_list.append((obj['name'], obj['upt'], obj['si']))
+        #         else:
+        #             dir_list.append((obj['name'] + '/', '', 0))
+        #
+        # print(sys._getframe().f_code.co_name)
+        # print('输入了', end='')
+        # print(path)
+        # print('输出了', end='')
+        # print(dir_list)
+        # return dir_list
 
     def format_list(self, basedir, listing, ignore_err=True):
         assert isinstance(basedir, str), basedir
