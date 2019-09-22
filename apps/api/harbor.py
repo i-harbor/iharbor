@@ -1151,3 +1151,18 @@ class FtpHarborManager():
         :raise HarborError  # 桶或路径不存在，发生错误
         '''
         return self.__hbManager.is_file(bucket_name=bucket_name, path_name=path_name)
+
+    def ftp_get_obj(self, buckest_name:str, path_name:str):
+        '''
+        获取对象或目录实例
+
+        :param bucket_name: 桶名
+        :param path_name: 文件路径
+        :param user: 用户，默认为None，如果给定用户只获取属于此用户的对象（只查找此用户的存储桶）
+        :return:
+            success: 对象实例
+
+        :raise HarborError
+        '''
+        return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
+
