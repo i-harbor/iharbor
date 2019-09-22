@@ -121,8 +121,7 @@ class HarborFileSystem(AbstractedFS):
                 else:
                     filename = listing[0][0]
                     mtimestr = listing[0][1]
-                    mtimestr = str(mtimestr.year) + str(mtimestr.month) + str(mtimestr.day) + str(mtimestr.hour) + str(
-                        mtimestr.minute) + str(mtimestr.second)
+                    mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = listing[0][2]
                     perm = 'el'
                     type = "file"
@@ -141,8 +140,7 @@ class HarborFileSystem(AbstractedFS):
                     print('---------------', data)
                     filename = data.name
                     mtimestr = data.upt
-                    mtimestr = str(mtimestr.year) + str(mtimestr.month) + str(mtimestr.day) + str(mtimestr.hour) + str(
-                        mtimestr.minute) + str(mtimestr.second)
+                    mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = data.si
                     perm = 'el'
                     type = "file"
@@ -166,8 +164,7 @@ class HarborFileSystem(AbstractedFS):
                 else:
                     perm = 'el'
                     type = "file"
-                    mtimestr = str(mtimestr.year) + str(mtimestr.month) + str(mtimestr.day) + str(mtimestr.hour) + str(mtimestr.minute) + str(mtimestr.second)
-
+                    mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                 line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                     type, size, perm, mtimestr, '', filename)
 
