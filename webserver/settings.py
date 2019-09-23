@@ -211,7 +211,9 @@ REST_FRAMEWORK = {
 
     # 分页
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 100
+    'PAGE_SIZE': 100,
+
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
 JWT_AUTH = {
@@ -229,9 +231,9 @@ JWT_AUTH = {
 # Ceph rados settings
 CEPH_RADOS = {
     'CLUSTER_NAME': 'ceph',
-    'USER_NAME': 'client.admin',
+    'USER_NAME': 'client.obs',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    # 'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
+    'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.obs.keyring',
     'POOL_NAME': 'obs',
 }
 

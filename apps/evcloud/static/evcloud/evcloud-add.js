@@ -79,6 +79,48 @@
         )
     })
 
+    $('#api').change(function () {
+        // Swal.fire({
+        //
+        //   type: 'success',
+        //   title: 'Your work has been saved',
+        //   showConfirmButton: false,
+        //   timer: 5000
+        // })
+        api_id = this.value
+        $('#image').empty()
+        $.ajax({
+            url: "/evcloud/list/",
+            type: "POST",
+            data: {
+                "vm_id": '',
+                "vm_operate": '7',
+                "api": api_id,
+                "csrfmiddlewaretoken": $('[name="csrfmiddlewaretoken"]').val(),
+            },
+            datatype: "json",
+            async: false,
+            success: function (data) {
+                for(var i in data) {
+                    // console.log(data[i])
+                    var select = '<option value="' + data[i].id + '_' + data[i].name + ' ' + data[i].version + '">' + data[i].name + ' ' + data[i].version + '</option>'
+                    // console.log(select)
+                    $('#image').append(select)
+                }
+                // console.log(data)
+                // Swal.close()
+            },
+            error: function () {
+                swal({
+                        type: 'error',
+                        title: '暂停服务',
+                        text: '当前服务不可用',
+                    })
+            },
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+        })
+    })
+
 })();
 
 

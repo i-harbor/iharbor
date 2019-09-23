@@ -101,7 +101,7 @@ class BucketFileManagement():
     ROOT_DIR_ID = 0 # 根目录ID
 
     def __init__(self, path='', collection_name='', *args, **kwargs):
-        self._path = path if path else ''
+        self._path = self._hand_path(path)
         self._collection_name = collection_name # bucket's database table name
         self.cur_dir_id = None
         self._bucket_file_class = self.creat_obj_model_class()
@@ -141,7 +141,7 @@ class BucketFileManagement():
 
         path = dir_path if dir_path else self._path
         # path为空，根目录为存储桶
-        if path == '':
+        if path == '' or path == '/':
             return (True, self.ROOT_DIR_ID)
 
         path = self._hand_path(path)

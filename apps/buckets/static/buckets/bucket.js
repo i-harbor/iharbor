@@ -140,6 +140,24 @@
         return get_metadata_base_api() + path + '/';
     }
 
+    //
+    // bucket ftp base api
+    //
+    function get_ftp_base_api() {
+        return "/api/v1/ftp/";
+    }
+
+    //
+    //构建bucket ftp api
+    function build_ftp_patch_url(params={bucket_name:'', enable: '', password: ''}) {
+
+        let name = params.bucket_name;
+        delete params.bucket_name;
+        let param_str = encode_params(params);
+        let api = get_ftp_base_api() + name +  '/?' + param_str;
+        return build_url_with_domain_name(api);
+    }
+
     /**
      * 拼接数组为url字符串
      * @param {Array} arr - 待拼接的数组
@@ -424,6 +442,19 @@
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
             <td>{{ $data['access_permission'] }}</td>
+            <td class="ftp-enable">
+                {{if $data['ftp_enable']}}
+                    <span class="glyphicon glyphicon-ok">开启</span>
+                {{/if}}
+                {{if !$data['ftp_enable']}}
+                    <span class="glyphicon glyphicon-remove">关闭</span>
+                {{/if}}
+                <span class="glyphicon glyphicon-edit ftp-enable-btn"></span>
+            </td>
+            <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                <span class="ftp-password-value">{{ $data['ftp_password'] }}</span>
+            </td>
         </tr>
     `);
 
@@ -452,6 +483,8 @@
                             <th>存储桶名称</th>
                             <th>创建时间</th>
                             <th>访问权限</th>
+                            <th>FTP状态</th>
+                            <th>FTP密码(双击修改)</th>
                         </tr>
                         {{if buckets}}
                             {{ each buckets }}
@@ -461,6 +494,19 @@
                                     </td>
                                     <td>{{ $value.created_time }}</td>
                                     <td>{{ $value.access_permission }}</td>
+                                    <td class="ftp-enable">
+                                    {{if $value.ftp_enable}}
+                                        <span class="glyphicon glyphicon-ok">开启</span>
+                                    {{/if}}
+                                    {{if !$value.ftp_enable}}
+                                        <span class="glyphicon glyphicon-remove">关闭</span>
+                                    {{/if}}
+                                    <span class=" ftp-enable-btn"><span class="glyphicon glyphicon-edit"></span></span>
+                                     </td>
+                                    <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
+                                        <span class="glyphicon glyphicon-info-sign"></span>
+                                        <span class="ftp-password-value">{{ $value.ftp_password }}</span>
+                                    </td>
                                 </tr>
                             {{/each}}
                         {{/if}}
@@ -547,6 +593,131 @@
         get_buckets_and_render();
     });
 
+
+    //
+    // FTP密码双击修改事件
+    //
+    $("#content-display-div").on("dblclick", '.ftp-password-value', function (e) {
+        e.preventDefault();
+        let remarks = $(this);
+        let old_html = remarks.text();
+        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
+
+        //如果已经双击过，正在编辑中
+        if(remarks.attr('data-in-edit') === 'true'){
+            return;
+        }
+        // 标记正在编辑中
+        remarks.attr('data-in-edit', 'true');
+        //创建新的input元素，初始内容为原备注信息
+        var newobj = document.createElement('input');
+        newobj.type = 'text';
+        newobj.value = old_html;
+        //设置该标签的子节点为空
+        remarks.empty();
+        remarks.append(newobj);
+        newobj.setSelectionRange(0, old_html.length);
+        //设置获得光标
+        newobj.focus();
+        //为新增元素添加光标离开事件
+        newobj.onblur = function () {
+            remarks.attr('data-in-edit', '');
+            remarks.empty();
+            let input_text = this.value;
+            // 如果输入内容修改了
+            if (input_text && (input_text !== old_html)){
+                if (input_text.length < 6){
+                    show_warning_dialog('密码长度不得小于6个字符', 'warning');
+                    remarks.append(old_html);
+                    return;
+                }
+                // 请求修改ftp密码
+                data = {};
+                data.bucket_name = remarks.parent().attr('data-bucket-name');
+                data.password = input_text;
+                let url = build_ftp_patch_url(data);
+                if(ftp_enable_password_ajax(url)){
+                    show_warning_dialog("修改密码成功", "success");
+                }else{
+                    // 修改失败，显示原内容
+                    input_text = old_html;
+                    show_warning_dialog('修改密码失败', 'error');
+                }
+            }
+            remarks.append(input_text);
+        };
+    });
+
+    //
+    //  同步请求使能ftp或修改FTP密码
+    //@ return:
+    //      success: true
+    //      failed : false
+    function ftp_enable_password_ajax(url) {
+        let ret = false;
+
+        $.ajax({
+            url: url,
+            type: "PATCH",
+            content_type: "application/json",
+            async: false,
+            success: function (res) {
+                if(res.code === 200)
+                    ret = true;
+            },
+            headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
+        });
+
+        return ret;
+    }
+
+    //
+    // FTP开启或关闭点击修改事件
+    //
+    $("#content-display-div").on("click", '.ftp-enable-btn', function (e) {
+        e.preventDefault();
+
+        data = {};
+        data.bucket_name = $(this).parent().next().attr('data-bucket-name');
+        let status_node = $(this).prev();
+        (async function() {
+            const {value: result} = await Swal({
+                title: '开启或关闭FTP',
+                input: 'radio',
+                inputOptions: {
+                    true: '开启',
+                    false: '关闭',
+                },
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    return !value && 'You need to choose something!'
+                }
+            });
+
+            let enable = false;
+            if (result === 'true'){
+                enable = true;
+            }else if (result === 'false'){
+                enable = false;
+            }else{
+                return;
+            }
+            data.enable = enable;
+            let url = build_ftp_patch_url(data);
+            if(ftp_enable_password_ajax(url)){
+                if (enable){
+                    status_node.removeClass().addClass("glyphicon glyphicon-ok");
+                    status_node.html("开启");
+                }else{
+                    status_node.removeClass().addClass("glyphicon glyphicon-remove");
+                    status_node.html("关闭");
+                }
+                show_warning_dialog("配置存储桶FTP成功", "success");
+            }else{
+                show_warning_dialog('配置存储桶FTP失败', 'error');
+            }
+        })();
+    });
 
     //
     //存储桶文件列表视图渲染模板

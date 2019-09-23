@@ -6,7 +6,7 @@ from .models import (Bucket, BucketLimitConfig, ApiUsageDescription)
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'get_collection_name', 'created_time', 'user', 'objs_count',
-                    'size', 'soft_delete', 'modified_time')
+                    'size', 'soft_delete', 'ftp_enable', 'ftp_password', 'modified_time')
     list_display_links = ('id', 'name')
 
     list_filter = ('user', 'created_time', 'soft_delete')

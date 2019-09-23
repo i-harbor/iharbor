@@ -1,5 +1,7 @@
 import uuid
 import logging
+import binascii
+import os
 from datetime import timedelta, datetime
 
 from django.db import models
@@ -10,6 +12,7 @@ from ckeditor.fields import RichTextField
 
 # from utils.log.decorators import log_used_time
 from utils.time import to_localtime_string_naive_by_utc
+from utils.storagers import PathParser
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
@@ -21,6 +24,9 @@ User = get_user_model()
 
 def get_uuid1_hex_string():
     return uuid.uuid1().hex
+
+def rand_hex_string(len=10):
+    return binascii.hexlify(os.urandom(len//2)).decode()
 
 class Bucket(models.Model):
     '''
@@ -47,6 +53,8 @@ class Bucket(models.Model):
     objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
+    ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
+    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
 
     class Meta:
         ordering = ['-created_time']
@@ -77,6 +85,11 @@ class Bucket(models.Model):
 
         return None
 
+    def save(self, *args, **kwargs):
+        if not self.ftp_password or len(self.ftp_password) < 6:
+            self.ftp_password = rand_hex_string()
+        super().save(**kwargs)
+
     def do_soft_delete(self):
         '''
         软删除
@@ -97,9 +110,9 @@ class Bucket(models.Model):
     def is_soft_deleted(self):
         return self.soft_delete
 
-    def check_user_own_bucket(self, request):
+    def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
-        return request.user.id == self.user.id
+        return user.id == self.user.id
 
     def get_bucket_table_name(self):
         '''
@@ -215,6 +228,17 @@ class Bucket(models.Model):
         time_str =  to_localtime_string_naive_by_utc(self.stats_time)
         return {'stats': stats, 'stats_time': time_str}
 
+    def is_ftp_enable(self):
+        '''是否开启了ftp'''
+        return self.ftp_enable
+
+    def check_ftp_password(self, password):
+        '''检查ftp密码是否一致'''
+        if self.ftp_password == password:
+            return True
+
+        return False
+
 
 class BucketLimitConfig(models.Model):
     '''
@@ -298,6 +322,7 @@ class BucketFileBase(models.Model):
     sst = models.DateTimeField(blank=True, null=True, verbose_name='共享起始时间') # share_start_time, 该文件的共享起始时间
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
+    md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
 
     class Meta:
         abstract = True
@@ -455,6 +480,11 @@ class BucketFileBase(models.Model):
             return False
 
         return True
+
+    def get_parent_path(self):
+        '''获取父路经字符串'''
+        path, _ = PathParser(filepath=self.na).get_path_and_filename()
+        return path
 
 class ModelSaveError(Exception):
     pass
