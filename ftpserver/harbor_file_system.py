@@ -241,16 +241,19 @@ class Uploader(object):
         self.client = client
         self.closed = False
         #self.buffer = FifoBuffer()
-        # self.file = bytes()
+        self.file = bytes()
         self.id = 0
 
     def write(self, data):
-        print(len(data), '---------------')
-        try:
-            self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, data)
-        except HarborError as error:
-            raise FilesystemError(error.msg)
-        self.id += len(data)
+        self.file += data
+        if len(self.file) >= 16777216:
+            try:
+                self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
+                print(len(self.file), '---------')
+            except HarborError as error:
+                raise FilesystemError(error.msg)
+            self.id += len(self.file)
+            self.file = bytes()
         return len(data)
 
     def close(self):
@@ -277,7 +280,7 @@ class DownLoader(object):
         #     raise FilesystemError(error.msg)
 
     def read(self, size=None):
-
+        print(size, '--------------')
         try:
             data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
             self.id += size
