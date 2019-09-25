@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
+from django.db import connections
 from rest_framework import status
 
 from buckets.models import Bucket
@@ -8,6 +9,13 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject, get_size
 from.paginations import BucketFileLimitOffsetPagination
 
+def ftp_close_old_connections(func):
+    def wrapper(*args, **kwargs):
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
+        return func(*args, **kwargs)
+
+    return wrapper
 
 class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
@@ -965,15 +973,15 @@ class FtpHarborManager():
         '''
         bucket = self.__hbManager.get_bucket(bucket_name)
         if not bucket:
-            return False, '存储桶不存在'
+            return False, 'Have no this bucket.'
 
         if not bucket.is_ftp_enable():
-            return False, '存储桶未开启ftp访问权限'
+            return False, 'Bucket is not enable for ftp.'
 
         if bucket.check_ftp_password(password):
             return True, bucket
 
-        return False, '密码有误'
+        return False, 'Wrong password'
 
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
         '''
@@ -1165,4 +1173,6 @@ class FtpHarborManager():
         :raise HarborError
         '''
         return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
+
+
 
