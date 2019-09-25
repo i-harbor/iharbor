@@ -67,13 +67,9 @@ class HarborFileSystem(AbstractedFS):
     def format_list(self, basedir, listing, ignore_err=True):
         print('function: format_list', basedir, listing)
         assert isinstance(basedir, str), basedir
-        months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-                      7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-        print('format_list')
-        print('输入了', end='')
-        print(basedir, end='')
-        print(listing)
-        print('输出了')
+        # months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+        #               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+
         path = self.fs2ftp(basedir)
         for filename, mtimestr, size in listing:
             ftp_path = os.path.join(path, filename)
@@ -82,10 +78,7 @@ class HarborFileSystem(AbstractedFS):
                 mtimestr = 'Jan 01 00:00'
                 filename = filename[:-1]
             else:
-                month = mtimestr.split(' ')[0].split('-')[1]
-                day = mtimestr.split(' ')[0].split('-')[2]
-                time = mtimestr.split(' ')[1][:-3]
-                mtimestr = '%s %s %5s' % (months_map[int(month)], day, time)
+                mtimestr = mtimestr.strftime('%b %d %X')[:-3]
                 perm = "-r-xr-xr-x"
             line = "%s %3s %-8s %-8s %8s %12s %s\r\n" % (
                 perm, 1, 'root', 'root', size, mtimestr, filename)
