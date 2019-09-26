@@ -250,7 +250,12 @@ class Uploader(object):
         return len(data)
 
     def close(self):
-
+        if self.file:
+            try:
+                self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
+                print(len(self.file), '---------')
+            except HarborError as error:
+                raise FilesystemError(error.msg)
         self.closed = True
 
 
