@@ -30,7 +30,7 @@ def main():
     #handler.passive_ports = range(60000, 65535)
  
     # Instantiate FTP server class and listen on 0.0.0.0:2121
-    address = ('0.0.0.0', 2121)
+    address = ('0.0.0.0', 21)
     server = FTPServer(address, handler)
  
     # set a limit for connections
