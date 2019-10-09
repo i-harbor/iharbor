@@ -1,8 +1,7 @@
-#!/usr/bin/env python36
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-import sys
+import os,sys,time
 import logging
 import traceback
 import django
@@ -52,13 +51,16 @@ def auth(username, raw_password):
 if __name__ == '__main__':
     username = os.environ.get('username', None)
     password = os.environ.get('password', None)
+    time_string = time.strftime( '%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
 
     if username is None or password is None:
-        logging.error(f'username={username}, password={password}.')
+        logging.error(f'time: {time_string},error!username={username}, password={password}.')
         return_auth_failed()
 
-    logging.warning(f'username={username}, password={password}.')
+    #logging.warning(f'username={username}, password={password}.')
     if not auth(username=username, raw_password=password):
+        logging.warning(f'time: {time_string},auth failed.username={username}')
         return_auth_failed() # 认证未通过
     else:
+        logging.warning(f'time: {time_string},auth OK!username={username}')
         return_auth_passed()
