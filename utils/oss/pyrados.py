@@ -666,7 +666,7 @@ class HarborObject():
 
         return True, data
 
-    def write(self, data_block, offset=0, chunk_size=20 * 1024 ** 2):
+    def write(self, data_block, offset=0, chunk_size=None):
         '''
         分片写入一个数据块，默认分片大小20MB
         :param data_block: 要写入的数据块; type: bytes
@@ -678,10 +678,13 @@ class HarborObject():
         if offset < 0 or not isinstance(data_block, bytes):
             return False, 'offset must be >=0 and data input must be bytes'
 
-        if offset < 0 or chunk_size < 0:
+        block_size = len(data_block)
+        if chunk_size is None:  # 未明确指定分片写入，则一次输入
+            chunk_size = block_size
+
+        if offset < 0 or chunk_size <= 0:
             return False, "offset or chunk_size don't less than 0"
 
-        block_size = len(data_block)
         start = 0
         end = start + chunk_size
 
