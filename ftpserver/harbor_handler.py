@@ -1,11 +1,13 @@
 from pyftpdlib.handlers import DTPHandler, FileProducer, FTPHandler
 
 class HarborDTPHandler(DTPHandler):
-    ac_in_buffer_size = 8 * 1024 * 1024 * 5
+    # ac_in_buffer_size = 8 * 1024 * 1024 * 5
     # ac_out_buffer_size = 8 * 1024 * 1024 * 5
+    ac_in_buffer_size = 256 * 1024
+    ac_out_buffer_size = 256 * 1024
 
 class HarborFileProducer(FileProducer):
-    buffer_size = 8 * 1024 * 1024 * 2
+    buffer_size = 32 * 1024 * 1024
 
 class HarborFTPHandler(FTPHandler):
     def ftp_RETR(self, file):
