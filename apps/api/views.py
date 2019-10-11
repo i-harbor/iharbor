@@ -32,7 +32,7 @@ from . import serializers
 from . import paginations
 from . import permissions
 from . import throttles
-from .harbor import HarborError, HarborManager
+from .harbor import HarborError, HarborManager, FtpHarborManager
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参

@@ -428,6 +428,8 @@ class RadosAPI():
         except Exception as e:
             raise RadosError(str(e))
 
+
+
     def get_cluster_stats(self):
         '''
         获取ceph集群总容量和已使用容量
@@ -773,6 +775,22 @@ class HarborObject():
                 yield data_block
             else:
                 break
+
+    def write_obj_generator(self):
+        '''
+        写入对象生成器
+
+        :return:
+            generator
+
+        :usage:
+            ok = next(generator)
+            ok = generator.send((offset, bytes))    # ok = True写入成功， ok=False写入失败
+        '''
+        ok = True
+        while True:
+            offset, data = yield ok
+            ok, _ = self.write(offset=offset, data_block=data)
 
     def get_cluster_stats(self):
         '''
