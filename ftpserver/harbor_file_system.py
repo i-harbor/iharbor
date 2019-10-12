@@ -234,30 +234,57 @@ class Uploader(object):
         self.ftp_path = ftp_path
         self.client = client
         self.closed = False
-        #self.buffer = FifoBuffer()
-        self.file = bytes()
+        self.file = BytesIO()
+        # self.file_list = []
         self.id = 0
+        # self.count = 0
+        try:
+            self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:])
+            next(self.write_generator)
+        except HarborError as error:
+            raise FilesystemError(error.msg)
 
     def write(self, data):
-        print(len(data), '--------')
-        # self.file += data
-        # if len(self.file) >= 1024 * 1024 * 32:
+        self.file.write(data)
+        if self.file.tell() >= 1024 ** 2 * 64:
+            try:
+                self.write_generator.send((self.id, self.file.getvalue()))
+                # pass
+            except HarborError as error:
+                raise FilesystemError(error.msg)
+            self.id += self.file.tell()
+            self.file = BytesIO()
+        return len(data)
+
+        # self.file = b''.join((self.file, data))
+        # if len(self.file) >= 1024 * 1024 * 4:
         #     try:
-        #         time.sleep(0)
-        #         # self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
-        #         # print(len(self.file), '---------')
+        #         self.write_generator.send((self.id, self.file))
+        #         pass
         #     except HarborError as error:
         #         raise FilesystemError(error.msg)
         #     self.id += len(self.file)
         #     self.file = bytes()
+        # return len(data)
 
-        return len(data)
+        # self.file_list.append(data)  # 利用列表，效果不佳
+        # if len(self.file_list) >= 30:
+        #     self.file_list = b''.join(self.file_list)
+        #     try:
+        #         self.write_generator.send((self.id, self.file_list))
+        #     except HarborError as error:
+        #         raise FilesystemError(error.msg)
+        #     self.file_list = []
+        #     self.id = self.count
+        # self.count += len(data)
+        # return len(data)
 
     def close(self):
-        if self.file:
+        if self.file.tell():
             try:
-                self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
-                # print(len(self.file), '---------')
+                self.write_generator.send((self.id, self.file.getvalue()))
+                # self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
+                # print(self.id + len(self.file.getvalue()), '---------')
             except HarborError as error:
                 raise FilesystemError(error.msg)
         self.closed = True
