@@ -42,11 +42,9 @@
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </button>
-                    <a class="navbar-brand" href="https://www.cstcloud.cn">
-                        中国科技云
-                    </a>
+                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">
                     <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">
-                        EVHarbor
+                        地球大数据科学工程对象云存储
                     </a>
                 </div>
                 <!-- Collect the nav links, forms, and other content for toggling -->
@@ -59,7 +57,7 @@
     {#                            <li><a href="https://github.com/evharbor" target="view_window">Github</a></li>#}
     {#                            <li role="separator" class="divider"></li>#}
                                 <li><a href="{% url 'apidocs' %}" target="view_window" >API文档</a></li>
-                                <li><a href="{% url 'docs:docs' %}">文档</a></li>
+                                <li><a href="{% url 'docs:docs' %}">帮助文档</a></li>
                             </ul>
                         </li>
                         <li>
@@ -94,7 +92,7 @@
     </div>
     <footer class="page-footer container-fluid">
         <div class="text-center">
-            <p>1996-{% now "Y" %} <a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 版权所有 京ICP备09112257号-94</p>
+            <p>1996-{% now "Y" %} <a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 版权所有 京ICP备09112257号-94.  Powered by 中国科技云 iHarbor</p>
             <p>Copyright © 1996-{% now "Y" %} Computer Network Information Center, Chinese Academy of Sciences. All Rights Reserved.</p>
         </div>
     </footer>

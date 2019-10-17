@@ -918,6 +918,9 @@ class HarborManager():
         def generator():
             ok = True
             rados = HarborObject(obj_key, obj_size=obj.si)
+            if created is False:  # 对象已存在，不是新建的,重置对象大小
+                self._pre_reset_upload(obj=obj, rados=rados)
+
             while True:
                 offset, data = yield ok
                 try:
