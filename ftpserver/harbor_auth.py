@@ -13,10 +13,10 @@ django.setup()  # 加载项目配置
 from django.contrib.auth import authenticate
 from users.models import AuthKey, UserProfile
 from buckets.models import Bucket
-
+from api.harbor import FtpHarborManager, ftp_close_old_connections
 
 class HarborAuthorizer(DummyAuthorizer):
-
+    @ftp_close_old_connections
     def validate_authentication(self, user_name, password, handler):
         # for login_user_name, login_password, login_permission in HarborFtpCfg().login_users:
         #     if user_name == login_user_name and password == login_password:
@@ -27,12 +27,15 @@ class HarborAuthorizer(DummyAuthorizer):
         #     raise AuthenticationFailed
         # if not authenticate(username=user_name, password=password):
         #     raise AuthenticationFailed
-        if not Bucket.objects.filter(name=user_name):
-            raise AuthenticationFailed('Have no this bucket.')
-        if not Bucket.objects.get(name=user_name).ftp_enable:
-            raise AuthenticationFailed('Bucket is not enable for ftp.')
-        if not Bucket.objects.get(name=user_name).ftp_password == password:
-            raise AuthenticationFailed
+        # if not Bucket.objects.filter(name=user_name):
+        #     raise AuthenticationFailed('Have no this bucket.')
+        # if not Bucket.objects.get(name=user_name).ftp_enable:
+        #     raise AuthenticationFailed('Bucket is not enable for ftp.')
+        # if not Bucket.objects.get(name=user_name).ftp_password == password:
+        #     raise AuthenticationFailed
+        flag, msg = FtpHarborManager().ftp_authenticate(user_name, password)
+        if not flag:
+            raise AuthenticationFailed(msg)
 
     def get_home_dir(self, username):
         """Return the user's home directory.

@@ -404,7 +404,15 @@
             });
 
             if (result) {
-                selected_buckets_permission_set(result === 'true');
+                //获取选中的存储桶的id
+                var arr = [];
+                let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
+                bucket_list_checked.each(function (i) {
+                    arr.push($(this).val());
+                });
+                if (arr.length > 0) {
+                    selected_buckets_permission_set(id = 0, ids = arr, result === 'true');
+                }
             }
         })();
     });
@@ -412,25 +420,21 @@
     //
     // 存储桶私有或公有访问权限设置
     //
-    function selected_buckets_permission_set(publiced=false){
-        //获取选中的存储桶的id
-        var arr = [];
-        let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
-        bucket_list_checked.each(function (i) {
-            arr.push($(this).val());
+    function selected_buckets_permission_set(id, ids=[],publiced=false){
+        let ret = false;
+        $.ajax({
+            url: build_buckets_permission_url({id: id, public: publiced, ids:ids}),
+            type: 'patch',
+            async: false,
+            success: function (data) {
+                show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
+                ret = true;
+            },
+            error: function (err) {
+                show_auto_close_warning_dialog('设置存储桶访问权限失败,' + err.status + ':' + err.statusText, 'error');
+            },
         });
-        if (arr.length > 0) {
-            $.ajax({
-                url: build_buckets_permission_url({id: 0, public: publiced, ids:arr}),
-                type: 'patch',
-                success: function (data) {
-                    show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
-                },
-                error: function (err) {
-                    show_auto_close_warning_dialog('设置存储桶访问权限失败,' + err.status + ':' + err.statusText, 'error');
-                },
-            })
-        }
+        return ret;
     }
 
     //
@@ -441,7 +445,10 @@
             <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
-            <td>{{ $data['access_permission'] }}</td>
+            <td class="access-perms-enable">
+                <span>{{ $data['access_permission'] }}</span>
+                <span class="btn-public-bucket"><span class="glyphicon glyphicon-edit"></span>
+            </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
                     <span class="glyphicon glyphicon-ok">开启</span>
@@ -469,8 +476,8 @@
                         <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
                         </button>
                         <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
-                        <!--<button class="btn btn-warning disabled">清空存储桶</button>-->
-                        <button class="btn btn-success" id="btn-public-bucket">公开</button>
+                        <!--<button class="btn btn-success" id="btn-public-bucket">公开</button>-->
+                        <!--<span class="text-danger">警告：试服务测试阶段,请自行做好数据备份</span>-->
                     </div>
                 </div>
             </div>
@@ -493,7 +500,10 @@
                                     <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.created_time }}</td>
-                                    <td>{{ $value.access_permission }}</td>
+                                    <td class="access-perms-enable">
+                                        <span>{{ $value.access_permission }}</span>
+                                        <span class="btn-public-bucket"><span class="glyphicon glyphicon-edit"></span>
+                                    </td>
                                     <td class="ftp-enable">
                                     {{if $value.ftp_enable}}
                                         <span class="glyphicon glyphicon-ok">开启</span>
@@ -718,6 +728,46 @@
             }
         })();
     });
+
+
+    //
+    //存储通访问权限修改点击事件
+    //
+    $("#content-display-div").on("click", '.btn-public-bucket', function (e) {
+        e.preventDefault();
+
+        let status_node = $(this).prev();
+        let bucket_item = $(this).parents("#bucket-list-item");
+        let td = bucket_item.children('td:first-child');
+        let check = td.children(':checkbox:first-child');
+        let b_id = check.val();
+        (async function() {
+            const {value: result} = await Swal({
+                title: '选择权限',
+                input: 'radio',
+                inputOptions: {
+                    'true': '公开',
+                    'false': '私有',
+                },
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    return !value && 'You need to choose something!'
+                }
+            });
+
+            if (result) {
+                let pub = (result === 'true');
+                if(selected_buckets_permission_set(b_id, [], pub)) {
+                    if (pub) {
+                        status_node.html('公有');
+                    } else {
+                        status_node.html('私有');
+                    }
+                }
+            }
+        })();
+    });
+
 
     //
     //存储桶文件列表视图渲染模板

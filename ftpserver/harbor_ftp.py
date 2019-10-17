@@ -4,6 +4,7 @@ from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
 from harbor_file_system import HarborFileSystem
 from harbor_auth import HarborAuthorizer
+from harbor_handler import HarborDTPHandler, HarborFTPHandler
  
 def main():
     # Instantiate a dummy authorizer for managing 'virtual' users
@@ -14,8 +15,10 @@ def main():
     # authorizer.add_anonymous('/root/ftp/')
  
     # Instantiate FTP handler class
-    handler = FTPHandler
+    handler = HarborFTPHandler
+
     handler.abstracted_fs = HarborFileSystem
+    handler.dtp_handler = HarborDTPHandler
     handler.authorizer = authorizer
  
     # Define a customized banner (string returned when client connects)
@@ -27,7 +30,7 @@ def main():
     #handler.passive_ports = range(60000, 65535)
  
     # Instantiate FTP server class and listen on 0.0.0.0:2121
-    address = ('0.0.0.0', 2121)
+    address = ('0.0.0.0', 21)
     server = FTPServer(address, handler)
  
     # set a limit for connections

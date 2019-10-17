@@ -46,7 +46,7 @@ class Bucket(models.Model):
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    collection_name = models.CharField(max_length=50, default='', verbose_name='存储桶对应的表名')
+    collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
@@ -122,6 +122,7 @@ class Bucket(models.Model):
         if not self.collection_name:
             name = f'bucket_{self.id}'
             self.collection_name = name
+            self.save()
 
         return self.collection_name
 

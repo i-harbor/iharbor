@@ -4,6 +4,7 @@ import django
 import sys
 import os
 import datetime
+import time
 
 # 将项目路径添加到系统搜寻路径当中，查找方式为从当前脚本开始，找到要调用的django项目的路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,34 +23,34 @@ class HarborFileSystem(AbstractedFS):
         self.client = FtpHarborManager()
 
     def realpath(self, path):
-        print('function: realpath', 'path: ' + path)
+        # print('function: realpath', 'path: ' + path)
         return path
 
     def isdir(self, path):
-        print('function: isdir', 'path: ' + path)
-        print('isdir return', self.client.ftp_is_dir(self.bucket_name, path[1:]))
+        # print('function: isdir', 'path: ' + path)
+        # print('isdir return', self.client.ftp_is_dir(self.bucket_name, path[1:]))
         return self.client.ftp_is_dir(self.bucket_name, path[1:])
 
     def isfile(self, path):
-        print('function: isfile', 'path: ' + path)
-        print('isfile return', self.client.ftp_is_file(self.bucket_name, path[1:]))
+        # print('function: isfile', 'path: ' + path)
+        # print('isfile return', self.client.ftp_is_file(self.bucket_name, path[1:]))
         return self.client.ftp_is_file(self.bucket_name, path[1:])
 
     def islink(self, fs_path):
-        print('function: islink', 'fs_path: ' + fs_path)
-        print('islink return', False)
+        # print('function: islink', 'fs_path: ' + fs_path)
+        # print('islink return', False)
         return False
 
     def chdir(self, path):
-        print('function: chdir', 'path: ' + path)
+        # print('function: chdir', 'path: ' + path)
         if self.isdir(path):
             self._cwd = self.fs2ftp(path)
-            print('赋值_cwd:', self._cwd)
+            # print('赋值_cwd:', self._cwd)
         else:
             raise FilesystemError('Not a dir.')
 
     def listdir(self, path):
-        print('functioin: listdir', 'path:' + path)
+        # print('functioin: listdir', 'path:' + path)
         dir_list = []
         try:
             files = self.client.ftp_list_dir(self.bucket_name, path[1:])
@@ -60,20 +61,16 @@ class HarborFileSystem(AbstractedFS):
                     dir_list.append((file.name + '/', '', 0))
         except HarborError as error:
             raise FilesystemError(error.msg)
-        print('listdir return', dir_list)
+        # print('listdir return', dir_list)
         return dir_list
 
 
     def format_list(self, basedir, listing, ignore_err=True):
-        print('function: format_list', basedir, listing)
+        # print('function: format_list', basedir, listing)
         assert isinstance(basedir, str), basedir
-        months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-                      7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-        print('format_list')
-        print('输入了', end='')
-        print(basedir, end='')
-        print(listing)
-        print('输出了')
+        # months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+        #               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+
         path = self.fs2ftp(basedir)
         for filename, mtimestr, size in listing:
             ftp_path = os.path.join(path, filename)
@@ -82,24 +79,21 @@ class HarborFileSystem(AbstractedFS):
                 mtimestr = 'Jan 01 00:00'
                 filename = filename[:-1]
             else:
-                month = mtimestr.split(' ')[0].split('-')[1]
-                day = mtimestr.split(' ')[0].split('-')[2]
-                time = mtimestr.split(' ')[1][:-3]
-                mtimestr = '%s %s %5s' % (months_map[int(month)], day, time)
+                mtimestr = mtimestr.strftime('%b %d %X')[:-3]
                 perm = "-r-xr-xr-x"
             line = "%s %3s %-8s %-8s %8s %12s %s\r\n" % (
                 perm, 1, 'root', 'root', size, mtimestr, filename)
 
             if self.cmd_channel is not None:
-                print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                 yield line.encode("utf8", self.cmd_channel.unicode_errors)
             else:
-                print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                 yield line.encode("utf8")
 
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         assert isinstance(basedir, str), basedir
-        print('function: format_mlsx', basedir, listing, perms, facts)
+        # print('function: format_mlsx', basedir, listing, perms, facts)
 
         ftp_path = self.fs2ftp(basedir)
         if len(listing) == 1:
@@ -113,10 +107,10 @@ class HarborFileSystem(AbstractedFS):
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                         type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
-                        print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                        # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
-                        print(line.encode("utf8"))
+                        # print(line.encode("utf8"))
                         yield line.encode("utf8")
                 else:
                     filename = listing[0][0]
@@ -128,16 +122,16 @@ class HarborFileSystem(AbstractedFS):
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                         type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
-                        print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                        # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
-                        print(line.encode("utf8"))
+                        # print(line.encode("utf8"))
                         yield line.encode("utf8")
             else:
                 ftp_path = os.path.join(ftp_path, listing[0])
                 try:
                     data = self.client.ftp_get_obj(self.bucket_name, ftp_path[1:])
-                    print('---------------', data)
+                    # print('---------------', data)
                     filename = data.name
                     mtimestr = data.upt
                     mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
@@ -147,10 +141,10 @@ class HarborFileSystem(AbstractedFS):
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                         type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
-                        print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                        # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
-                        print(line.encode("utf8"))
+                        # print(line.encode("utf8"))
                         yield line.encode("utf8")
                 except HarborError as error:
                     raise FilesystemError(error.msg)
@@ -169,16 +163,16 @@ class HarborFileSystem(AbstractedFS):
                     type, size, perm, mtimestr, '', filename)
 
                 if self.cmd_channel is not None:
-                    print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                    # print(line.encode("utf8", self.cmd_channel.unicode_errors))
                     yield line.encode("utf8", self.cmd_channel.unicode_errors)
                 else:
-                    print(line.encode("utf8"))
+                    # print(line.encode("utf8"))
                     yield line.encode("utf8")
 
     def open(self, filename, mode):
         """Open a file returning its handler."""
         assert isinstance(filename, str), filename
-        print('function: open', filename, mode)
+        # print('function: open', filename, mode)
         ftp_path = self.fs2ftp(filename)
         if mode.startswith('r') or mode.startswith('R'):
             return DownLoader(self.bucket_name, ftp_path, self.client)
@@ -187,7 +181,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def mkdir(self, path):
-        print('function:mkdir', 'path: '+ path)
+        # print('function:mkdir', 'path: '+ path)
 
         ftp_path = self.fs2ftp(path)
         try:
@@ -197,7 +191,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def rename(self, src, dst):
-        print('function: rename', 'src: ' + src, 'dst ' + dst)
+        # print('function: rename', 'src: ' + src, 'dst ' + dst)
         new_name = os.path.basename(dst)
         try:
             self.client.ftp_rename(self.bucket_name, src[1:], new_name)
@@ -206,7 +200,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def lexists(self, path):
-        print('function: lexists', 'path: ' + path)
+        # print('function: lexists', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
 
         if self.isdir(ftp_path[1:]) or self.isfile(ftp_path[1:]):
@@ -216,7 +210,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def rmdir(self, path):
-        print('function: rmdir', 'path: ' + path)
+        # print('function: rmdir', 'path: ' + path)
 
         ftp_path = self.fs2ftp(path)
         try:
@@ -225,7 +219,7 @@ class HarborFileSystem(AbstractedFS):
             raise FilesystemError(error.msg)
 
     def remove(self, path):
-        print('function: remove', 'path: ' + path)
+        # print('function: remove', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_delete_object(self.bucket_name, ftp_path[1:])
@@ -240,21 +234,59 @@ class Uploader(object):
         self.ftp_path = ftp_path
         self.client = client
         self.closed = False
-        #self.buffer = FifoBuffer()
-        # self.file = bytes()
+        self.file = BytesIO()
+        # self.file_list = []
         self.id = 0
-
-    def write(self, data):
-        print(len(data), '---------------')
+        # self.count = 0
         try:
-            self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, data)
+            self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:])
+            next(self.write_generator)
         except HarborError as error:
             raise FilesystemError(error.msg)
-        self.id += len(data)
+
+    def write(self, data):
+        self.file.write(data)
+        if self.file.tell() >= 1024 ** 2 * 64:
+            try:
+                self.write_generator.send((self.id, self.file.getvalue()))
+                # pass
+            except HarborError as error:
+                raise FilesystemError(error.msg)
+            self.id += self.file.tell()
+            self.file = BytesIO()
         return len(data)
 
-    def close(self):
+        # self.file = b''.join((self.file, data))
+        # if len(self.file) >= 1024 * 1024 * 4:
+        #     try:
+        #         self.write_generator.send((self.id, self.file))
+        #         pass
+        #     except HarborError as error:
+        #         raise FilesystemError(error.msg)
+        #     self.id += len(self.file)
+        #     self.file = bytes()
+        # return len(data)
 
+        # self.file_list.append(data)  # 利用列表，效果不佳
+        # if len(self.file_list) >= 30:
+        #     self.file_list = b''.join(self.file_list)
+        #     try:
+        #         self.write_generator.send((self.id, self.file_list))
+        #     except HarborError as error:
+        #         raise FilesystemError(error.msg)
+        #     self.file_list = []
+        #     self.id = self.count
+        # self.count += len(data)
+        # return len(data)
+
+    def close(self):
+        if self.file.tell():
+            try:
+                self.write_generator.send((self.id, self.file.getvalue()))
+                # self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
+                # print(self.id + len(self.file.getvalue()), '---------')
+            except HarborError as error:
+                raise FilesystemError(error.msg)
         self.closed = True
 
 
@@ -267,24 +299,23 @@ class DownLoader(object):
         self.client = client
         self.closed = False
         self.id = 0
-        # self.file = bytes()
-        # try:
-        #     obj_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:])
-        #     for obj in obj_generator:
-        #         self.file += obj
-        #     self.file = BytesIO(self.file)
-        # except HarborError as error:
-        #     raise FilesystemError(error.msg)
-
-    def read(self, size=None):
-
         try:
-            data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
-            self.id += size
-            
+            self.obj_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:], per_size= 4 * 1024 ** 2)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
+    def read(self, size=None):
+        # print(size, '--------------')
+        # try:
+        #     data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
+        #     self.id += size
+        #
+        # except HarborError as error:
+        #     raise FilesystemError(error.msg)
+        try:
+            data = next(self.obj_generator)
+        except StopIteration as error:
+            return
         return data
 
     def close(self):

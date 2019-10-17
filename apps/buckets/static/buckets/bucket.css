@@ -43,3 +43,11 @@
 .ftp-password:hover .ftp-password-value{
 	display: inline-block;
 }
+
+.btn-public-bucket {
+	display: none;
+}
+
+.access-perms-enable:hover .btn-public-bucket{
+	display: inline-block;
+}

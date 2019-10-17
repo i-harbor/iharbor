@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
+from django.db import connections
 from rest_framework import status
 
 from buckets.models import Bucket
@@ -8,6 +9,13 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject, get_size
 from.paginations import BucketFileLimitOffsetPagination
 
+def ftp_close_old_connections(func):
+    def wrapper(*args, **kwargs):
+        for conn in connections.all():
+            conn.close_if_unusable_or_obsolete()
+        return func(*args, **kwargs)
+
+    return wrapper
 
 class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
@@ -872,6 +880,56 @@ class HarborManager():
         rados = HarborObject(obj_key, obj_size=obj.si)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
+    def get_write_generator(self, bucket_name:str, obj_path:str, user=None):
+        '''
+        获取一个写入对象的生成器函数
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                generator           # success
+                :raise HarborError  # failed
+
+        :usage:
+            ok = next(generator)
+            ok = generator.send((offset, bytes))  # ok = True写入成功， ok=False写入失败
+
+        :raise HarborError
+        '''
+        # 对象路径分析
+        pp = PathParser(filepath=obj_path)
+        path, filename = pp.get_path_and_filename()
+        if not bucket_name or not filename:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+
+        if len(filename) > 255:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称长度最大为255字符')
+
+        # 存储桶验证和获取桶对象
+        bucket = self.get_bucket(bucket_name, user=user)
+        if not bucket:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        collection_name = bucket.get_bucket_table_name()
+        obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+        obj_key = obj.get_obj_key(bucket.id)
+
+        def generator():
+            ok = True
+            rados = HarborObject(obj_key, obj_size=obj.si)
+            if created is False:  # 对象已存在，不是新建的,重置对象大小
+                self._pre_reset_upload(obj=obj, rados=rados)
+
+            while True:
+                offset, data = yield ok
+                try:
+                    ok = self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data)
+                except HarborError:
+                    ok = False
+
+        return generator()
+
     def get_bucket_and_obj_or_dir(self,bucket_name:str, path:str, user=None):
         '''
         获取存储桶和对象或目录实例
@@ -965,15 +1023,15 @@ class FtpHarborManager():
         '''
         bucket = self.__hbManager.get_bucket(bucket_name)
         if not bucket:
-            return False, '存储桶不存在'
+            return False, 'Have no this bucket.'
 
         if not bucket.is_ftp_enable():
-            return False, '存储桶未开启ftp访问权限'
+            return False, 'Bucket is not enable for ftp.'
 
         if bucket.check_ftp_password(password):
             return True, bucket
 
-        return False, '密码有误'
+        return False, 'Wrong password'
 
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
         '''
@@ -1165,4 +1223,23 @@ class FtpHarborManager():
         :raise HarborError
         '''
         return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
+
+    def ftp_get_write_generator(self, bucket_name: str, obj_path: str):
+        '''
+        获取一个写入对象的生成器函数
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                generator           # success
+                :raise HarborError  # failed
+
+        :usage:
+            ok = next(generator)
+            ok = generator.send((offset, bytes))  # ok = True写入成功， ok=False写入失败
+
+        :raise HarborError
+        '''
+        return  self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path)
 
