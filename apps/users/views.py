@@ -98,6 +98,9 @@ def change_password(request):
     '''
     修改密码函数视图
     '''
+    from users.management.commands.email_notice import Command
+    Command().handle(all=True, msg='test email', title='', username=None)
+
     if request.method == 'POST':
         form = PasswordChangeForm(request.POST, user=request.user)
         if form.is_valid():
@@ -280,12 +283,12 @@ def send_active_url_email(request, to_email, user):
 
     message = f'''
         亲爱的用户：
-            欢迎使用EVHarbor,您已使用本邮箱成功注册账号，请访问下面激活连接以激活账户,如非本人操作请忽略此邮件。
+            欢迎使用iHarbor,您已使用本邮箱成功注册账号，请访问下面激活连接以激活账户,如非本人操作请忽略此邮件。
             激活连接：{active_link}
         '''
-    return send_one_email(subject='EVHarbor账户激活', receiver=to_email, message=message, log_message=active_link)
+    return send_one_email(subject='iHarbor账户激活', receiver=to_email, message=message, log_message=active_link)
 
-def send_one_email(receiver, message, subject='EVHarbor', log_message=''):
+def send_one_email(receiver, message, subject='iHarbor', log_message=''):
     '''
     发送一封邮件
 
@@ -340,10 +343,10 @@ def send_forget_password_email(request, to_email, user):
 
     message = f'''
         亲爱的用户：
-            欢迎使用EVHarbor,您正在为以本邮箱注册的账号找回密码，请访问下面连接以完成账户密码修改,如非本人操作请忽略此邮件。
+            欢迎使用iHarbor,您正在为以本邮箱注册的账号找回密码，请访问下面连接以完成账户密码修改,如非本人操作请忽略此邮件。
             连接：{link}
         '''
-    return send_one_email(subject='EVHarbor账户找回密码', receiver=to_email, message=message, log_message=link)
+    return send_one_email(subject='iHarbor账户找回密码', receiver=to_email, message=message, log_message=link)
 
 
 def get_find_password_link(request, user):

@@ -428,8 +428,6 @@ class RadosAPI():
         except Exception as e:
             raise RadosError(str(e))
 
-
-
     def get_cluster_stats(self):
         '''
         获取ceph集群总容量和已使用容量
@@ -454,21 +452,46 @@ class RadosAPI():
 
     def mgr_command(self, prefix, format='json', **kwargs):
         '''
-        :return: io status string
+        执行ceph的mgr命令
+
+        :prefix: 命令， 例如'iostat'
+        :return:
+            (string outbuf, string outs)
         :raises: class:`RadosError`
         '''
         cluster = self.get_cluster()
         kwargs['prefix'] = prefix
         kwargs['format'] = format
         try:
-            ret, buf, err = cluster.mgr_command(json.dumps(kwargs), '', timeout=5)
+            ret, buf, outs = cluster.mgr_command(json.dumps(kwargs), '', timeout=5)
         except rados.Error as e:
             raise RadosError(str(e), errno=e.errno)
         else:
             if ret != 0:
-                raise RadosError(err)
+                raise RadosError(outs)
             else:
-                return err
+                return buf, outs
+
+    def mon_command(self, prefix, format='json', **kwargs):
+        '''
+        执行ceph的mon命令
+
+        :return:
+            (string outbuf, string outs)
+        :raises: class:`RadosError`
+        '''
+        cluster = self.get_cluster()
+        kwargs['prefix'] = prefix
+        kwargs['format'] = format
+        try:
+            ret, buf, outs = cluster.mon_command(json.dumps(kwargs), '', timeout=5)
+        except rados.Error as e:
+            raise RadosError(str(e), errno=e.errno)
+        else:
+            if ret != 0:
+                raise RadosError(outs)
+            else:
+                return buf, outs
 
     def get_ceph_io_status(self):
         '''
@@ -483,7 +506,7 @@ class RadosAPI():
         :raises: class:`RadosError`
         '''
         try:
-            s = self.mgr_command(prefix='iostat')
+            b, s = self.mgr_command(prefix='iostat')
         except RadosError as e:
             raise e
         return self.parse_io_str(io_str=s)
@@ -595,7 +618,7 @@ class HarborObjectBase():
 
 class HarborObject():
     '''
-    EVHarbor对象操作接口封装，
+    iHarbor对象操作接口封装，
     '''
 
     def __init__(self, obj_id, obj_size=0, cluster_name=None, pool_name=None, user_name=None, conf_file='',
@@ -627,6 +650,11 @@ class HarborObject():
 
     def get_rados_api(self):
         '''
+        获取RadosAPI对象
+
+        :return:
+            RadosAPI()  # success
+
         :raises: class:`RadosError`
         '''
         if not self._rados:
@@ -649,7 +677,6 @@ class HarborObject():
             正常时：(True, bytes) bytes是读取的数据
             错误时：(False, error_msg) error_msg是错误描述
         '''
-
         if offset < 0 or size < 0:
             return False, 'offset or size param is invalid'
 
