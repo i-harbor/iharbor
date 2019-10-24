@@ -1285,6 +1285,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         dir_path = kwargs.get(self.lookup_field, '')
 
         paginator = self.paginator
+        paginator.request = request
         try:
             offset = paginator.get_offset(request)
             limit = paginator.get_limit(request)
