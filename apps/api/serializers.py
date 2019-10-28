@@ -109,7 +109,7 @@ class BucketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Bucket
-        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password')
+        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password', 'ftp_ro_password')
         # depth = 1
 
     def get_user(selfself, obj):

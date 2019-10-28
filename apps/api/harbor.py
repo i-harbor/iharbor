@@ -918,6 +918,9 @@ class HarborManager():
         def generator():
             ok = True
             rados = HarborObject(obj_key, obj_size=obj.si)
+            if created is False:  # 对象已存在，不是新建的,重置对象大小
+                self._pre_reset_upload(obj=obj, rados=rados)
+
             while True:
                 offset, data = yield ok
                 try:
@@ -1014,21 +1017,24 @@ class FtpHarborManager():
     def ftp_authenticate(self, bucket_name:str, password:str):
         '''
         Bucket桶ftp访问认证
-        :return:
-            False, msg:str
-            True, Bucket()
+        :return:    (ok:bool, permission:bool, msg:str)
+            ok:         True，认证成功；False, 认证失败
+            permission: True, 可读可写权限；False, 只读权限
+            msg:        认证结果字符串
         '''
         bucket = self.__hbManager.get_bucket(bucket_name)
         if not bucket:
-            return False, 'Have no this bucket.'
+            return False, False, 'Have no this bucket.'
 
         if not bucket.is_ftp_enable():
-            return False, 'Bucket is not enable for ftp.'
+            return False, False, 'Bucket is not enable for ftp.'
 
         if bucket.check_ftp_password(password):
-            return True, bucket
+            return True, True, 'authenticate successfully'
+        if bucket.check_ftp_ro_password(password):
+            return True, False, 'authenticate successfully'
 
-        return False, 'Wrong password'
+        return False, False, 'Wrong password'
 
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
         '''

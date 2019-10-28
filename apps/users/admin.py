@@ -30,7 +30,7 @@ class UserProfileAdmin(UserAdmin):
             'fields': ('username', 'password1', 'password2', 'company', 'first_name', 'last_name', 'telephone'),
         }),
     )
-
+    ordering = None # 使用Model中的ordering
     def fullname(self, obj):
         return obj.get_full_name()
     fullname.short_description = '姓名'

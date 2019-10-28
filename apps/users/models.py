@@ -106,7 +106,7 @@ class Email(models.Model):
         verbose_name = '邮件'
         verbose_name_plural = verbose_name
 
-    def send_email(self, subject='EVHarbor', receiver=None, message=None):
+    def send_email(self, subject='iHarbor', receiver=None, message=None):
         '''
         发送用户激活邮件
 
