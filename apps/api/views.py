@@ -2615,6 +2615,7 @@ class FtpViewSet(CustomGenericViewSet):
             "data": {               # 请求时提交的数据
                 "enable": xxx,      # 此项提交时才存在
                 "password": xxx     # 此项提交时才存在
+                "ro_password": xxx     # 此项提交时才存在
             }
         }
         Http Code: 状态码400：参数有误时，返回数据：
@@ -2656,7 +2657,13 @@ class FtpViewSet(CustomGenericViewSet):
                     name='password',
                     required=False,
                     location='query',
-                    schema=coreschema.String(description='存储桶ftp新的访问密码')
+                    schema=coreschema.String(description='存储桶ftp新的读写访问密码')
+                ),
+                coreapi.Field(
+                    name='ro_password',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='存储桶ftp新的只读访问密码')
                 ),
             ],
         }
@@ -2680,6 +2687,7 @@ class FtpViewSet(CustomGenericViewSet):
 
         enable = params.get('enable')
         password = params.get('password')
+        ro_password = params.get('ro_password')
 
         # 存储桶验证和获取桶对象
         bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
@@ -2693,8 +2701,16 @@ class FtpViewSet(CustomGenericViewSet):
             data['enable'] = enable
 
         if password is not None:
-            bucket.ftp_password = password
+            ok, msg = bucket.set_ftp_password(password)
+            if not ok:
+                return Response(data={'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
             data['password'] = password
+
+        if ro_password is not None:
+            ok, msg = bucket.set_ftp_ro_password(ro_password)
+            if not ok:
+                return Response(data={'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
+            data['ro_password'] = ro_password
 
         try:
             bucket.save()
@@ -2716,12 +2732,13 @@ class FtpViewSet(CustomGenericViewSet):
                 'password': xxx   # None(未提交此参数) 或 string
             }
         '''
-        validated_data = {'enable': None, 'password': None}
+        validated_data = {'enable': None, 'password': None, 'ro_password': None}
         enable = request.query_params.get('enable', None)
         password = request.query_params.get('password', None)
+        ro_password = request.query_params.get('ro_password', None)
 
-        if not enable and not password:
-            raise ValidationError('参数enable或password必须提交一个')
+        if not enable and not password and not ro_password:
+            raise ValidationError('参数enable,password或ro_password必须提交一个')
 
         if enable is not None:
             if isinstance(enable, str):
@@ -2741,6 +2758,13 @@ class FtpViewSet(CustomGenericViewSet):
                 raise ValidationError('密码长度必须为6-20个字符')
 
             validated_data['password'] = password
+
+        if ro_password is not None:
+            ro_password = ro_password.strip()
+            if not (6 <= len(ro_password) <= 20):
+                raise ValidationError('密码长度必须为6-20个字符')
+
+            validated_data['ro_password'] = ro_password
 
         return validated_data
 

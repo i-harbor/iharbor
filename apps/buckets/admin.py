@@ -28,8 +28,10 @@ class BucketLimitConfigAdmin(admin.ModelAdmin):
 
 
 @admin.register(ApiUsageDescription)
-class VMUsageDescAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'modified_time')
+class UsageDescAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'desc_for', 'modified_time')
     list_display_links = ('id', 'title')
     search_fields = ('title', 'content')  # 搜索字段
 
+    def get_desc_for(self, obj):
+        return obj.get_desc_for_display()
