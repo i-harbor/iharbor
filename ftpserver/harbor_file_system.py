@@ -29,12 +29,12 @@ class HarborFileSystem(AbstractedFS):
     def isdir(self, path):
         # print('function: isdir', 'path: ' + path)
         # print('isdir return', self.client.ftp_is_dir(self.bucket_name, path[1:]))
-        return self.client.ftp_is_dir(self.bucket_name, path[1:])
+        return self.client.ftp_is_dir(self.bucket_name, path.lstrip('/'))
 
     def isfile(self, path):
         # print('function: isfile', 'path: ' + path)
         # print('isfile return', self.client.ftp_is_file(self.bucket_name, path[1:]))
-        return self.client.ftp_is_file(self.bucket_name, path[1:])
+        return self.client.ftp_is_file(self.bucket_name, path.lstrip('/'))
 
     def islink(self, fs_path):
         # print('function: islink', 'fs_path: ' + fs_path)
@@ -86,10 +86,10 @@ class HarborFileSystem(AbstractedFS):
 
             if self.cmd_channel is not None:
                 # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("utf8", self.cmd_channel.unicode_errors)
+                yield line.encode("gbk", self.cmd_channel.unicode_errors)
             else:
                 # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("utf8")
+                yield line.encode("gbk")
 
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         assert isinstance(basedir, str), basedir
@@ -203,7 +203,7 @@ class HarborFileSystem(AbstractedFS):
         # print('function: lexists', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
 
-        if self.isdir(ftp_path[1:]) or self.isfile(ftp_path[1:]):
+        if self.isdir(ftp_path) or self.isfile(ftp_path):
             return True
         else:
             return False
