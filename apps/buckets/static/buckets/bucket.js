@@ -462,9 +462,9 @@
                 <span class="glyphicon glyphicon-info-sign"></span>
                 <span class="ftp-password-value">{{ $data['ftp_password'] }}</span>
             </td>
-            <td class="ftp-ro-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+            <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
                 <span class="glyphicon glyphicon-info-sign"></span>
-                <span class="ftp-ro-password-value">{{ $data['ftp_ro_password'] }}</span>
+                <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
             </td>
         </tr>
     `);
@@ -522,9 +522,9 @@
                                         <span class="glyphicon glyphicon-info-sign"></span>
                                         <span class="ftp-password-value">{{ $value.ftp_password }}</span>
                                     </td>
-                                    <td class="ftp-ro-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
+                                    <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="glyphicon glyphicon-info-sign"></span>
-                                        <span class="ftp-ro-password-value">{{ $value.ftp_ro_password }}</span>
+                                        <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
                                     </td>
                                 </tr>
                             {{/each}}
