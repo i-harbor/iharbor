@@ -462,6 +462,10 @@
                 <span class="glyphicon glyphicon-info-sign"></span>
                 <span class="ftp-password-value">{{ $data['ftp_password'] }}</span>
             </td>
+            <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+                <span class="glyphicon glyphicon-info-sign"></span>
+                <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
+            </td>
         </tr>
     `);
 
@@ -491,7 +495,8 @@
                             <th>创建时间</th>
                             <th>访问权限</th>
                             <th>FTP状态</th>
-                            <th>FTP密码(双击修改)</th>
+                            <th>FTP读写密码(双击修改)</th>
+                            <th>FTP只读密码(双击修改)</th>
                         </tr>
                         {{if buckets}}
                             {{ each buckets }}
@@ -516,6 +521,10 @@
                                     <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="glyphicon glyphicon-info-sign"></span>
                                         <span class="ftp-password-value">{{ $value.ftp_password }}</span>
+                                    </td>
+                                    <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
+                                        <span class="glyphicon glyphicon-info-sign"></span>
+                                        <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
                                     </td>
                                 </tr>
                             {{/each}}
@@ -607,9 +616,9 @@
     //
     // FTP密码双击修改事件
     //
-    $("#content-display-div").on("dblclick", '.ftp-password-value', function (e) {
+    $("#content-display-div").on("dblclick", '.ftp-password', function (e) {
         e.preventDefault();
-        let remarks = $(this);
+        let remarks = $(this).children('.ftp-password-value');
         let old_html = remarks.text();
         old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
 
@@ -646,12 +655,68 @@
                 data.bucket_name = remarks.parent().attr('data-bucket-name');
                 data.password = input_text;
                 let url = build_ftp_patch_url(data);
-                if(ftp_enable_password_ajax(url)){
+                let ret = ftp_enable_password_ajax(url);
+                if(ret.ok){
                     show_warning_dialog("修改密码成功", "success");
                 }else{
                     // 修改失败，显示原内容
                     input_text = old_html;
-                    show_warning_dialog('修改密码失败', 'error');
+                    show_warning_dialog('修改密码失败,' + ret.msg, 'error');
+                }
+            }
+            remarks.append(input_text);
+        };
+    });
+
+     //
+    // FTP只读密码双击修改事件
+    //
+    $("#content-display-div").on("dblclick", '.ftp-ro-password', function (e) {
+        e.preventDefault();
+        let remarks = $(this).children('.ftp-ro-password-value');
+        let old_html = remarks.text();
+        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
+
+        //如果已经双击过，正在编辑中
+        if(remarks.attr('data-in-edit') === 'true'){
+            return;
+        }
+        // 标记正在编辑中
+        remarks.attr('data-in-edit', 'true');
+        //创建新的input元素，初始内容为原备注信息
+        var newobj = document.createElement('input');
+        newobj.type = 'text';
+        newobj.value = old_html;
+        //设置该标签的子节点为空
+        remarks.empty();
+        remarks.append(newobj);
+        newobj.setSelectionRange(0, old_html.length);
+        //设置获得光标
+        newobj.focus();
+        //为新增元素添加光标离开事件
+        newobj.onblur = function () {
+            remarks.attr('data-in-edit', '');
+            remarks.empty();
+            let input_text = this.value;
+            // 如果输入内容修改了
+            if (input_text && (input_text !== old_html)){
+                if (input_text.length < 6){
+                    show_warning_dialog('密码长度不得小于6个字符', 'warning');
+                    remarks.append(old_html);
+                    return;
+                }
+                // 请求修改ftp密码
+                data = {};
+                data.bucket_name = remarks.parent().attr('data-bucket-name');
+                data.ro_password = input_text;
+                let url = build_ftp_patch_url(data);
+                let ret = ftp_enable_password_ajax(url);
+                if(ret.ok){
+                    show_warning_dialog("修改密码成功", "success");
+                }else{
+                    // 修改失败，显示原内容
+                    input_text = old_html;
+                    show_warning_dialog('修改密码失败,' + ret.msg, 'error');
                 }
             }
             remarks.append(input_text);
@@ -664,16 +729,30 @@
     //      success: true
     //      failed : false
     function ftp_enable_password_ajax(url) {
-        let ret = false;
+        let ret = {ok:false, msg:''};
 
         $.ajax({
             url: url,
             type: "PATCH",
             content_type: "application/json",
+            timeout: 5000,
             async: false,
             success: function (res) {
-                if(res.code === 200)
-                    ret = true;
+                if(res.code === 200){
+                    ret.ok = true;
+                }
+            },
+            error: function(xhr){
+                if (xhr.responseJSON.hasOwnProperty('code_text')){
+                    ret.msg = xhr.responseJSON.code_text;
+                }else{
+                    ret.msg = '请求失败';
+                }
+            },
+            complete : function(xhr,status){
+                if (status === 'timeout') {// 判断超时后 执行
+                    alert("请求超时");
+                }
             },
             headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
         });
@@ -714,7 +793,8 @@
             }
             data.enable = enable;
             let url = build_ftp_patch_url(data);
-            if(ftp_enable_password_ajax(url)){
+            let ret = ftp_enable_password_ajax(url);
+            if(ret.ok){
                 if (enable){
                     status_node.removeClass().addClass("glyphicon glyphicon-ok");
                     status_node.html("开启");
@@ -724,7 +804,7 @@
                 }
                 show_warning_dialog("配置存储桶FTP成功", "success");
             }else{
-                show_warning_dialog('配置存储桶FTP失败', 'error');
+                show_warning_dialog('配置存储桶FTP失败,' + ret.msg, 'error');
             }
         })();
     });

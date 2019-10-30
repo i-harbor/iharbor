@@ -51,3 +51,10 @@
 .access-perms-enable:hover .btn-public-bucket{
 	display: inline-block;
 }
+
+.mouse-hover:hover .mouse-hover-show{
+    display: inline-block;
+}
+.mouse-hover-show{
+    display: none;
+}

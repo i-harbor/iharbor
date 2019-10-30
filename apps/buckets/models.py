@@ -55,6 +55,7 @@ class Bucket(models.Model):
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
+    ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
 
     class Meta:
         ordering = ['-created_time']
@@ -88,6 +89,8 @@ class Bucket(models.Model):
     def save(self, *args, **kwargs):
         if not self.ftp_password or len(self.ftp_password) < 6:
             self.ftp_password = rand_hex_string()
+        if not self.ftp_ro_password or len(self.ftp_ro_password) < 6:
+            self.ftp_ro_password = rand_hex_string()
         super().save(**kwargs)
 
     def do_soft_delete(self):
@@ -235,10 +238,49 @@ class Bucket(models.Model):
 
     def check_ftp_password(self, password):
         '''检查ftp密码是否一致'''
-        if self.ftp_password == password:
+        if password and (self.ftp_password == password):
             return True
 
         return False
+
+    def check_ftp_ro_password(self, password):
+        '''检查ftp只读密码是否一致'''
+        if password and (self.ftp_ro_password == password):
+            return True
+
+        return False
+
+    def set_ftp_password(self, password):
+        '''
+        设置ftp可读写密码，更改不会自动提交到数据库
+
+        :param password: 要设置的密码
+        :return:
+            (True, str)    # 设置成功
+            (False, str)   # 设置失败
+        '''
+        if not (6 <= len(password) <= 20):
+            return False, '密码长度必须为6-20个字符'
+        if self.ftp_ro_password == password:
+            return False, '可读写密码不得和只读密码一致'
+        self.ftp_password = password
+        return True, '修改成功'
+
+    def set_ftp_ro_password(self, password):
+        '''
+        设置ftp只读密码，更改不会自动提交到数据库
+
+        :param password: 要设置的密码
+        :return:
+            (True, str)    # 设置成功
+            (False, str)   # 设置失败
+        '''
+        if not (6 <= len(password) <= 20):
+            return False, '密码长度必须为6-20个字符'
+        if self.ftp_password == password:
+            return False, '只读密码不得和可读写密码一致'
+        self.ftp_ro_password = password
+        return True, '修改成功'
 
 
 class BucketLimitConfig(models.Model):
@@ -266,22 +308,31 @@ class BucketLimitConfig(models.Model):
 
 class ApiUsageDescription(models.Model):
     '''
-    EVHarbor API使用说明
+    iHarbor 使用说明
     '''
+    DESC_API = 0
+    DESC_FTP = 1
+    DESC_FOR_CHOICES = (
+        (DESC_API, 'API说明'),
+        (DESC_FTP, 'FTP说明')
+    )
+
+
     title = models.CharField(verbose_name='标题', default='EVHarbor API使用说明', max_length=255)
+    desc_for = models.SmallIntegerField(verbose_name='关于什么的说明', choices=DESC_FOR_CHOICES, default=DESC_API)
     content = RichTextField(verbose_name='说明内容', default='')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
 
     class Meta:
-        verbose_name = 'API使用说明'
+        verbose_name = '使用说明'
         verbose_name_plural = verbose_name
 
     def __str__(self):
-        return f'<ApiUsageDescription>{self.title}'
+        return f'<UsageDescription>{self.title}'
 
     def __repr__(self):
-        return f'<ApiUsageDescription>{self.title}'
+        return f'<UsageDescription>{self.title}'
 
 
 class BucketFileBase(models.Model):

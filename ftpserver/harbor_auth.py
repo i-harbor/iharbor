@@ -33,9 +33,11 @@ class HarborAuthorizer(DummyAuthorizer):
         #     raise AuthenticationFailed('Bucket is not enable for ftp.')
         # if not Bucket.objects.get(name=user_name).ftp_password == password:
         #     raise AuthenticationFailed
-        flag, msg = FtpHarborManager().ftp_authenticate(user_name, password)
+        flag, perm, msg = FtpHarborManager().ftp_authenticate(user_name, password)
         if not flag:
             raise AuthenticationFailed(msg)
+        perms = 'elradfmwM' if perm else 'elr'
+        self.user_table[user_name] = {'perm': perms}
 
     def get_home_dir(self, username):
         """Return the user's home directory.
@@ -71,10 +73,10 @@ class HarborAuthorizer(DummyAuthorizer):
         Expected perm argument is one of the following letters:
         "elradfmwMT".
         """
-        return True
+        return perm in self.user_table[username]['perm']
 
     def get_perms(self, username):
         """Return current user permissions."""
-        return 'elradfmwM'
+        return self.user_table[username]['perm']
 
 
