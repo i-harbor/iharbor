@@ -224,7 +224,7 @@ JWT_AUTH = {
     # 好比每个jwt有效期为1天，但是想N天内免密码登录，就可以通过此参数设置第一次登录以后N天内，可以通过刷新获取新的有效期为1天的jwt
     # N天后就不允许刷新了，只能重新用户名和密码登录认证
     'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
-    'JWT_GET_USER_SECRET_KEY': 'utils.jwt_token.jwt_get_user_secret_key',
+    # 'JWT_GET_USER_SECRET_KEY': 'utils.jwt_token.jwt_get_user_secret_key',
     'JWT_AUTH_HEADER_PREFIX': 'JWT',
 }
 

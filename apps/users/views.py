@@ -98,9 +98,6 @@ def change_password(request):
     '''
     修改密码函数视图
     '''
-    from users.management.commands.email_notice import Command
-    Command().handle(all=True, msg='test email', title='', username=None)
-
     if request.method == 'POST':
         form = PasswordChangeForm(request.POST, user=request.user)
         if form.is_valid():
