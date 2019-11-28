@@ -80,7 +80,7 @@ class Bucket(models.Model):
         :param bucket_name: 存储通名称
         :return: Bucket对象; None(不存在)
         '''
-        query_set = Bucket.objects.filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
+        query_set = Bucket.objects.select_related('user').filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
         if query_set.exists():
             return query_set.first()
 
@@ -115,6 +115,8 @@ class Bucket(models.Model):
 
     def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
+        if not user.id:
+            return False
         return user.id == self.user.id
 
     def get_bucket_table_name(self):
