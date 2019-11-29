@@ -98,7 +98,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         # 存储桶验证和获取桶对象
         hManager = HarborManager()
         try:
-            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=request.user)
+            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
