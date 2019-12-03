@@ -16,8 +16,22 @@ from buckets.models import Bucket
 from api.harbor import FtpHarborManager, ftp_close_old_connections
 
 class HarborAuthorizer(DummyAuthorizer):
+    '''
+    继承DummyAuthorizer
+    主要修改pyftpdlib的认证模块的一些函数
+    修改pyftpdlib的认证函数
+    修改pyftpdlib的获得根目录的函数
+    修改pyftpdlib的成功登陆提示函数
+    修改pyftpdlib的判断是否有权限函数
+    修改pyftpdlib的获得权限函数
+    '''
     @ftp_close_old_connections
     def validate_authentication(self, user_name, password, handler):
+        '''
+        @ftp_close_old_connections装饰器是防止连接django后台数据库的连接超时，保证服务的一直开启
+        使用api里harbor提供的api，进行认证
+        认证完对本次登录的权限问题进行处理
+        '''
         # for login_user_name, login_password, login_permission in HarborFtpCfg().login_users:
         #     if user_name == login_user_name and password == login_password:
         #         pass

@@ -1,7 +1,7 @@
 import os
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
-from pyftpdlib.servers import FTPServer
+from pyftpdlib.servers import FTPServer, ThreadedFTPServer, MultiprocessFTPServer
 from harbor_file_system import HarborFileSystem
 from harbor_auth import HarborAuthorizer
 from harbor_handler import HarborDTPHandler, HarborFTPHandler
@@ -31,7 +31,9 @@ def main():
  
     # Instantiate FTP server class and listen on 0.0.0.0:2121
     address = ('0.0.0.0', 21)
-    server = FTPServer(address, handler)
+    # server = FTPServer(address, handler)
+    server = ThreadedFTPServer(address, handler)
+    # server = MultiprocessFTPServer(address, handler)
  
     # set a limit for connections
     server.max_cons = 256
