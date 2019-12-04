@@ -32,8 +32,8 @@ def main():
     # Instantiate FTP server class and listen on 0.0.0.0:2121
     address = ('0.0.0.0', 21)
     # server = FTPServer(address, handler)
-    server = ThreadedFTPServer(address, handler)
-    # server = MultiprocessFTPServer(address, handler)
+    # server = ThreadedFTPServer(address, handler)
+    server = MultiprocessFTPServer(address, handler)
  
     # set a limit for connections
     server.max_cons = 256

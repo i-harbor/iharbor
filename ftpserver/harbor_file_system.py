@@ -301,7 +301,7 @@ class DownLoader(object):
         self.id = 0
         try:
             self.obj_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:], per_size= 4 * 1024 ** 2)
-            print(self.obj_generator, ob)
+            # print(self.obj_generator, ob)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
@@ -315,7 +315,7 @@ class DownLoader(object):
         #     raise FilesystemError(error.msg)
         try:
             data = next(self.obj_generator)
-            print(data)
+            # print(data)
         # except StopIteration as error:
         except Exception as error:
             return b''
