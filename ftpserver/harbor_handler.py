@@ -3,15 +3,24 @@ from pyftpdlib.handlers import DTPHandler, FileProducer, FTPHandler
 
 
 class HarborDTPHandler(DTPHandler):
+    '''
+    继承DTPHandler，修改上传数据块的大小
+    '''
     # ac_in_buffer_size = 8 * 1024 * 1024 * 5
     # ac_out_buffer_size = 8 * 1024 * 1024 * 5
     ac_in_buffer_size = 256 * 1024
     ac_out_buffer_size = 256 * 1024
 
 class HarborFileProducer(FileProducer):
+    '''
+    继承FileProducer，修改下载数据块的大小
+    '''
     buffer_size = 32 * 1024 * 1024
 
 class HarborFTPHandler(FTPHandler):
+    '''
+    继承FTPHandler，主要为了处理编码问题。
+    '''
     def ftp_RETR(self, file):
         """Retrieve the specified file (transfer from the server to the
         client).  On success return the file path else None.
@@ -54,6 +63,16 @@ class HarborFTPHandler(FTPHandler):
             raise
     
     def decode(self, bytes):
+        '''
+        这里主要为了解码。
+            客户端传送过来的内容需要解码的。解码主要是文件信息，比如文件名，不是指文件内容
+        chardet库的使用
+            客户端传送过来的数据并不知道是什么编码类型，所以解码也无从下手
+            chardet可以帮助识别bytes是什么编码类型，于是可以对症下药，对其进行解码
+        问题来源：
+            windows默认编码是gbk，而linux以及harbor_ftp服务端默认编码是utf8
+            此步主要为了兼容windows的网络映射功能
+        '''
         # print(chardet.detect(bytes)['encoding'])
         if chardet.detect(bytes)['encoding'] not in ('utf-8', 'ascii'):
             return bytes.decode('gbk', self.unicode_errors)
