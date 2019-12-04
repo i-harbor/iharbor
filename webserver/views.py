@@ -63,7 +63,10 @@ def create_kjy_auth_user(request, token):
         return user
 
     # 创建用户
-    first_name, last_name = get_first_and_last_name(truename)
+    try:
+        first_name, last_name = get_first_and_last_name(truename)
+    except Exception:
+        first_name, last_name = '', ''
     user = User(username=email, email=email, first_name=first_name, last_name=last_name)
     try:
         user.save()
@@ -85,7 +88,11 @@ def get_first_and_last_name(name:str):
 
     # 如果是英文名
     if name.replace(' ','').encode('UTF-8').isalpha():
-        first_name, last_name = name.rsplit(' ', maxsplit=1)
+        names = name.rsplit(' ', maxsplit=1)
+        if len(names) == 2:
+            first_name, last_name = names
+        else:
+            first_name, last_name = name, ''
     elif len(name) == 4:
         first_name, last_name = name[2:], name[:2]
     else:
