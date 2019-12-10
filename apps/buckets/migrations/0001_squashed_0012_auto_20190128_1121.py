@@ -61,8 +61,8 @@ class Migration(migrations.Migration):
                 ('modified_time', models.DateTimeField(auto_now=True, verbose_name='修改时间')),
             ],
             options={
-                'verbose_name': 'API使用说明',
-                'verbose_name_plural': 'API使用说明',
+                'verbose_name': '使用说明',
+                'verbose_name_plural': '使用说明',
             },
         ),
     ]

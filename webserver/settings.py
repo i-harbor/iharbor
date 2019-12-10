@@ -274,7 +274,7 @@ LOGGING = {
         },
         # output to console settings
         'console': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'filters': ['require_debug_true'],# working with debug mode
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
@@ -310,6 +310,11 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        # 'django.db.backends': {
+        #     'handlers': ['console'],
+        #     'propagate': True,
+        #     'level':'DEBUG',
+        # },
     },
 }
 

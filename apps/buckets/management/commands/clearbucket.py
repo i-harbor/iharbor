@@ -167,7 +167,7 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.ERROR(f'deleted bucket table error:{bucket.name}'))
 
             self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
-        except ProgrammingError as e:
+        except (ProgrammingError, Exception) as e:
             if e.args[0] == 1146: # table not exists
                 bucket.delete()
                 self.stdout.write(self.style.WARNING(f"only deleted bucket({bucket.name}),{e}"))

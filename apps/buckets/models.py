@@ -2,6 +2,7 @@ import uuid
 import logging
 import binascii
 import os
+import hashlib
 from datetime import timedelta, datetime
 
 from django.db import models
@@ -27,6 +28,13 @@ def get_uuid1_hex_string():
 
 def rand_hex_string(len=10):
     return binascii.hexlify(os.urandom(len//2)).decode()
+
+def get_str_hexMD5(s:str):
+    '''
+    求字符串MD5
+    '''
+    return hashlib.md5(s.encode(encoding='utf-8')).hexdigest()
+
 
 class Bucket(models.Model):
     '''
@@ -363,6 +371,7 @@ class BucketFileBase(models.Model):
     )
     id = models.BigAutoField(auto_created=True, primary_key=True)
     na = models.TextField(verbose_name='全路径文件名或目录名')
+    na_md5 = models.CharField(max_length=32, null=True, default=None, verbose_name='全路径MD5值')
     name = models.CharField(verbose_name='文件名或目录名', max_length=255)
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
@@ -382,7 +391,7 @@ class BucketFileBase(models.Model):
         abstract = True
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-id']
-        # indexes = [models.Index(fields=['fod'])]
+        indexes = [models.Index(fields=('na_md5',), name='na_md5_idx')]
         index_together = ['fod', 'did']
         unique_together = ('did', 'name')
         verbose_name = '对象模型抽象基类'
@@ -521,6 +530,12 @@ class BucketFileBase(models.Model):
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.na_md5:
+            na = self.na if self.na else ''
+            self.na_md5 = get_str_hexMD5(na)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def do_save(self, **kwargs):
         '''
