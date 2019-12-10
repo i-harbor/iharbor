@@ -217,10 +217,10 @@ class ObjInfoSerializer(serializers.Serializer):
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.IntegerField()  # 父节点ID
     si = serializers.IntegerField()  # 文件大小,字节数
-    # ult = serializers.DateTimeField(default=datetime.utcnow)  # 文件的上传时间，或目录的创建时间
-    ult = serializers.SerializerMethodField()  # 自定义字段序列化方法
-    # upt = serializers.DateTimeField()  # 文件的最近修改时间，目录，则upt为空
-    upt = serializers.SerializerMethodField()  # 自定义字段序列化方法
+    ult = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的上传时间，或目录的创建时间
+    # ult = serializers.SerializerMethodField()  # 自定义字段序列化方法
+    upt = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的最近修改时间，目录，则upt为空
+    # upt = serializers.SerializerMethodField()  # 自定义字段序列化方法
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
     # arc = serializers.ListField(child = serializers.CharField(required=True))  # archive，该文件的归档地址，目录时arc为空
@@ -257,20 +257,20 @@ class ObjInfoSerializer(serializers.Serializer):
     def get_sds(self, obj):
         return obj.get_sds_display()
 
-    def get_ult(self, obj):
-        if not obj.ult:
-            return ''
-        return to_localtime_string_naive_by_utc(obj.ult)
-
-    def get_upt(self, obj):
-        if not obj.upt:
-            return ''
-        return to_localtime_string_naive_by_utc(obj.upt)
-
-    def get_set(self, obj):
-        if not obj.set:
-            return ''
-        return to_localtime_string_naive_by_utc(obj.set)
+    # def get_ult(self, obj):
+    #     if not obj.ult:
+    #         return ''
+    #     return to_localtime_string_naive_by_utc(obj.ult)
+    #
+    # def get_upt(self, obj):
+    #     if not obj.upt:
+    #         return ''
+    #     return to_localtime_string_naive_by_utc(obj.upt)
+    #
+    # def get_set(self, obj):
+    #     if not obj.set:
+    #         return ''
+    #     return to_localtime_string_naive_by_utc(obj.set)
 
     def get_download_url(self, obj):
         # 目录

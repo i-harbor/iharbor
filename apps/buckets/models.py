@@ -195,7 +195,7 @@ class Bucket(models.Model):
         return True
 
     def __update_stats(self):
-        from buckets.utils import get_bfmanager
+        from .utils import get_bfmanager
 
         table_name = self.get_bucket_table_name()
         bfm = get_bfmanager(table_name=table_name)
