@@ -279,7 +279,7 @@ class ObjInfoSerializer(serializers.Serializer):
         request = self.context.get('request', None)
         bucket_name = self._context.get('bucket_name', '')
         filepath = '/'.join((bucket_name, obj.na))
-        download_url = reverse('obs:obs-detail', kwargs={'objpath': filepath})
+        download_url = reverse('share:obs-detail', kwargs={'objpath': filepath})
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url

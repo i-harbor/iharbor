@@ -42,9 +42,11 @@ class Bucket(models.Model):
     '''
     PUBLIC = 1
     PRIVATE = 2
+    PUBLIC_READWRITE = 3
     ACCESS_PERMISSION_CHOICES = (
         (PUBLIC, '公有'),
         (PRIVATE, '私有'),
+        (PUBLIC_READWRITE, '公有（可读写）'),
     )
     SOFT_DELETE_CHOICES = (
         (True, '删除'),
@@ -139,22 +141,22 @@ class Bucket(models.Model):
 
         return self.collection_name
 
-    def set_permission(self, public=False):
+    def set_permission(self, public:int=2):
         '''
         设置存储桶公有或私有访问权限
 
-        :param public: 公有(True)或私有(False)
+        :param public:
         :return: True(success); False(error)
         '''
-        if public == True and self.access_permission != self.PUBLIC:
-            self.access_permission = self.PUBLIC
-        elif  public == False and self.access_permission != self.PRIVATE:
-            self.access_permission = self.PRIVATE
-        else:
+        if public not in [self.PUBLIC, self.PRIVATE, self.PUBLIC_READWRITE]:
+            return False
+
+        if self.access_permission == public:
             return True
 
+        self.access_permission = public
         try:
-            self.save()
+            self.save(update_fields=['access_permission'])
         except:
             return  False
 
@@ -166,7 +168,7 @@ class Bucket(models.Model):
 
         :return: True(是公共); False(私有权限)
         '''
-        if self.access_permission == self.PUBLIC:
+        if self.access_permission in [self.PUBLIC, self.PUBLIC_READWRITE]:
             return True
         return False
 
@@ -369,6 +371,16 @@ class BucketFileBase(models.Model):
         (True, '删除'),
         (False, '正常'),
     )
+
+    SHARE_ACCESS_NO = 0
+    SHARE_ACCESS_READONLY = 1
+    SHARE_ACCESS_READWRITE = 2
+    SHARE_ACCESS_CHOICES = (
+            (SHARE_ACCESS_NO, '禁止访问'),
+            (SHARE_ACCESS_READONLY, '只读'),
+            (SHARE_ACCESS_READWRITE, '可读可写'),
+    )
+
     id = models.BigAutoField(auto_created=True, primary_key=True)
     na = models.TextField(verbose_name='全路径文件名或目录名')
     na_md5 = models.CharField(max_length=32, null=True, default=None, verbose_name='全路径MD5值')
@@ -386,6 +398,7 @@ class BucketFileBase(models.Model):
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
     md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
+    # srd = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_NO)
 
     class Meta:
         abstract = True
@@ -531,10 +544,19 @@ class BucketFileBase(models.Model):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None
 
+    def reset_na_md5(self):
+        '''
+        na更改时，计算并重设新的na_md5
+        :return: None
+
+        :备注：不会自动更新的数据库
+        '''
+        na = self.na if self.na else ''
+        self.na_md5 = get_str_hexMD5(na)
+
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.na_md5:
-            na = self.na if self.na else ''
-            self.na_md5 = get_str_hexMD5(na)
+            self.reset_na_md5()
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def do_save(self, **kwargs):

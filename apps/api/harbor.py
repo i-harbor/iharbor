@@ -153,6 +153,26 @@ class HarborManager():
 
         return obj
 
+    def get_metadata_obj(self, table_name:str, path:str):
+        '''
+        直接获取目录或对象元数据对象，不检查父节点是否存在
+
+        :param table_name: 数据库表名
+        :param path: 目录或对象的全路径
+        :return:
+            obj     #
+            None    #
+        :raises: HarborError
+        '''
+        bfm = BucketFileManagement(collection_name=table_name)
+        try:
+            obj = bfm.get_obj(path=path)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+        if obj:
+            return obj
+        return None
+
     def _get_obj_or_dir_and_bfm(self, table_name, path, name):
         '''
         获取文件对象或目录,和BucketFileManagement对象
@@ -441,6 +461,7 @@ class HarborManager():
             obj.na = bfm.build_dir_full_name(new_obj_name)
             obj.name = new_obj_name
 
+        obj.reset_na_md5()
         if not obj.do_save():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')
 

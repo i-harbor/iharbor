@@ -13,7 +13,6 @@ from django.core import exceptions
 from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.authtoken.models import Token
@@ -26,6 +25,7 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
+from utils.view import CustomAutoSchema, CustomGenericViewSet
 from .models import User, Bucket
 from buckets.models import ModelSaveError
 from . import serializers
@@ -37,61 +37,6 @@ from .harbor import HarborError, HarborManager, FtpHarborManager
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
-
-
-class CustomAutoSchema(AutoSchema):
-    '''
-    自定义Schema
-    '''
-    def get_manual_fields(self, path, method):
-        '''
-        重写方法，为每个方法自定义参数字段, action或method做key
-        '''
-        extra_fields = []
-        action = None
-        try:
-            action = self.view.action
-        except AttributeError:
-            pass
-
-        if action and type(self._manual_fields) is dict and action in self._manual_fields:
-            extra_fields = self._manual_fields[action]
-            return extra_fields
-
-        if type(self._manual_fields) is dict and method in self._manual_fields:
-            extra_fields = self._manual_fields[method]
-
-        return extra_fields
-
-
-class CustomGenericViewSet(viewsets.GenericViewSet):
-    '''
-    自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
-    '''
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
-    def perform_authentication(self, request):
-        super(CustomGenericViewSet, self).perform_authentication(request)
-
-        # 用户最后活跃日期
-        user = request.user
-        if user.id and user.id > 0:
-            try:
-                date = timezone.now().date()
-                if user.last_active < date:
-                    user.last_active = date
-                    user.save(update_fields=['last_active'])
-            except:
-                pass
 
 
 def get_user_own_bucket(bucket_name, request):
@@ -125,6 +70,22 @@ def get_bucket_collection_name_or_response(bucket_name, request):
 
     collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
+
+
+def str_to_int_or_default(val, default):
+    '''
+    字符串转int，转换失败返回设置的默认值
+
+    :param val: 待转化的字符串
+    :param default: 转换失败返回的值
+    :return:
+        int     # success
+        default # failed
+    '''
+    try:
+        return int(val)
+    except Exception:
+        return default
 
 
 class UserViewSet(mixins.ListModelMixin,
@@ -382,7 +343,7 @@ class BucketViewSet(CustomGenericViewSet):
             }
 
     partial_update:
-    存储桶公有或私有权限设置
+    存储桶访问权限设置
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
@@ -421,7 +382,7 @@ class BucketViewSet(CustomGenericViewSet):
                     name='public',
                     required=True,
                     location='query',
-                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
+                    schema=coreschema.Integer(description='设置访问权限, 1(公有)，2(私有)，3（公有可读可写）'),
                 ),
                 coreapi.Field(
                     name='ids',
@@ -512,12 +473,8 @@ class BucketViewSet(CustomGenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
-        public = request.query_params.get('public', '').lower()
-        if public == 'true':
-            public = True
-        elif public == 'false':
-            public = False
-        else:
+        public = str_to_int_or_default(request.query_params.get('public', ''), 0)
+        if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': 'public参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)

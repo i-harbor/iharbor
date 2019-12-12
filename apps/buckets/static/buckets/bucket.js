@@ -394,8 +394,8 @@
                 title: '选择权限',
                 input: 'radio',
                 inputOptions: {
-                    'true': '公开',
-                    'false': '私有',
+                    '1': '公开',
+                    '2': '私有',
                 },
                 showCancelButton: true,
                 inputValidator: (value) => {
@@ -411,7 +411,7 @@
                     arr.push($(this).val());
                 });
                 if (arr.length > 0) {
-                    selected_buckets_permission_set(id = 0, ids = arr, result === 'true');
+                    selected_buckets_permission_set(id = 0, ids = arr, publiced=result);
                 }
             }
         })();
@@ -420,7 +420,7 @@
     //
     // 存储桶私有或公有访问权限设置
     //
-    function selected_buckets_permission_set(id, ids=[],publiced=false){
+    function selected_buckets_permission_set(id, ids=[],publiced){
         let ret = false;
         $.ajax({
             url: build_buckets_permission_url({id: id, public: publiced, ids:ids}),
@@ -826,8 +826,8 @@
                 title: '选择权限',
                 input: 'radio',
                 inputOptions: {
-                    'true': '公开',
-                    'false': '私有',
+                    '1': '公开',
+                    '2': '私有',
                 },
                 showCancelButton: true,
                 inputValidator: (value) => {
@@ -836,9 +836,9 @@
             });
 
             if (result) {
-                let pub = (result === 'true');
+                let pub = result;
                 if(selected_buckets_permission_set(b_id, [], pub)) {
-                    if (pub) {
+                    if (pub === "1") {
                         status_node.html('公有');
                     } else {
                         status_node.html('私有');
@@ -864,7 +864,7 @@
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
                             {{ each breadcrumbs }}
-                                <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path={{$value[1]}}>{{ $value[0] }}</a></li>
+                                <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                             {{/each}}
                         </ol>
                     </div>

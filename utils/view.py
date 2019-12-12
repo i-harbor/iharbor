@@ -1,0 +1,58 @@
+from django.utils import timezone
+from rest_framework.schemas import AutoSchema
+from rest_framework import viewsets
+
+
+class CustomAutoSchema(AutoSchema):
+    '''
+    自定义Schema
+    '''
+    def get_manual_fields(self, path, method):
+        '''
+        重写方法，为每个方法自定义参数字段, action或method做key
+        '''
+        extra_fields = []
+        action = None
+        try:
+            action = self.view.action
+        except AttributeError:
+            pass
+
+        if action and type(self._manual_fields) is dict and action in self._manual_fields:
+            extra_fields = self._manual_fields[action]
+            return extra_fields
+
+        if type(self._manual_fields) is dict and method in self._manual_fields:
+            extra_fields = self._manual_fields[method]
+
+        return extra_fields
+
+
+class CustomGenericViewSet(viewsets.GenericViewSet):
+    '''
+    自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
+    '''
+    def get_serializer(self, *args, **kwargs):
+        """
+        Return the serializer instance that should be used for validating and
+        deserializing input, and for serializing output.
+        """
+        serializer_class = self.get_serializer_class()
+        context = self.get_serializer_context()
+        context.update(kwargs.get('context', {}))
+        kwargs['context'] = context
+        return serializer_class(*args, **kwargs)
+
+    def perform_authentication(self, request):
+        super(CustomGenericViewSet, self).perform_authentication(request)
+
+        # 用户最后活跃日期
+        user = request.user
+        if user.id and user.id > 0:
+            try:
+                date = timezone.now().date()
+                if user.last_active < date:
+                    user.last_active = date
+                    user.save(update_fields=['last_active'])
+            except:
+                pass
