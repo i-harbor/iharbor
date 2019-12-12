@@ -86,7 +86,9 @@ def main():
     # set a limit for connections
     server.max_cons = 1024
     server.max_cons_per_ip = 50
- 
+
+    # set passive port 
+    handler.passive_ports = range(2000, 3001)
     # start ftp server
     server.serve_forever()
  

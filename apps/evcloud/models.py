@@ -23,7 +23,7 @@ class APIAuth(models.Model):
     pwd = models.CharField(max_length=50, verbose_name='密码')
     group_id = models.IntegerField()
     vlan_id = models.IntegerField()
-    pool_id = models.IntegerField()
+    center_id = models.IntegerField()
     description = models.CharField(max_length=50, default='', verbose_name='描述')
     limit = models.IntegerField(verbose_name='虚拟机限制')
     flag = models.BooleanField(verbose_name='是否当前使用')

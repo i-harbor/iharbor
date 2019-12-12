@@ -17,8 +17,8 @@ class VMConfigAdmin(admin.ModelAdmin):
 
 @admin.register(APIAuth)
 class APIAuthAdmin(admin.ModelAdmin):
-    list_display = ('id', 'url', 'name', 'pwd', 'group_id', 'vlan_id', 'pool_id', 'description', 'limit', 'flag')
-    list_display_links = ('id', 'url', 'name', 'pwd', 'group_id', 'vlan_id', 'pool_id', 'description', 'limit', 'flag')
+    list_display = ('id', 'url', 'name', 'pwd', 'group_id', 'vlan_id', 'center_id', 'description', 'limit', 'flag')
+    list_display_links = ('id', 'url', 'name', 'pwd', 'group_id', 'vlan_id', 'center_id', 'description', 'limit', 'flag')
     list_filter = ('url', 'name', 'pwd', 'flag')
 
 @admin.register(EvcloudVM)
