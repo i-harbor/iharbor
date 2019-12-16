@@ -172,3 +172,64 @@ function encode_params(obj) {
 
     return params.join('&');
 }
+
+function sizeFormat(val, unit) {
+    let value = val;
+    let mb = 1 << 20;
+    if (unit === "B") {
+        if (val > mb) {
+            value = val / mb;
+            return sizeFormat(value, 'MB');
+        }
+    }
+    switch (unit) {
+        case "B":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'KB');
+            } else {
+                value = val.toFixed(2) + 'B';
+            }
+            break;
+        case "KB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'MB');
+            } else {
+                value = val.toFixed(2) + 'KB';
+            }
+            break;
+        case "MB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'GB');
+            } else {
+                value = val.toFixed(2) + 'MB';
+            }
+            break;
+        case "GB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'TB');
+            } else {
+                value = val.toFixed(2) + 'GB';
+            }
+            break;
+        case "TB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'PB');
+            } else {
+                value = val.toFixed(2) + 'TB';
+            }
+            break;
+        case "PB":
+            value = val.toFixed(2) + 'PB';
+            break;
+        default:
+            value = val.toFixed(2) + 'B';
+    }
+
+    return value
+}
+

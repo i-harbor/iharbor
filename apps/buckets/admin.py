@@ -9,7 +9,7 @@ class BucketAdmin(admin.ModelAdmin):
                     'size', 'soft_delete', 'ftp_enable', 'ftp_password', 'modified_time')
     list_display_links = ('id', 'name')
 
-    list_filter = ('user', 'created_time', 'soft_delete')
+    list_filter = ('created_time', 'soft_delete')
     search_fields = ('name', 'user__username')  # 搜索字段
 
     def get_collection_name(self, obj):

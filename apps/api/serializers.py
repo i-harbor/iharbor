@@ -285,10 +285,6 @@ class ObjInfoSerializer(serializers.Serializer):
         return download_url
 
     def get_access_permission(self, obj):
-        # 目录
-        if not obj.fod:
-            return ''
-
         # 桶公有权限，对象都为公有权限
         bucket = self._context.get('bucket')
         if bucket and bucket.is_public_permission():

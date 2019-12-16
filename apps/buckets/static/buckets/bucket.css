@@ -28,27 +28,19 @@
 	word-wrap:break-word;
 }
 
-.ftp-enable-btn {
-	display: none;
-}
+/*.ftp-enable-btn {*/
+	/*display: none;*/
+/*}*/
 
-.ftp-enable:hover .ftp-enable-btn{
-	display: inline-block;
-}
+/*.ftp-enable:hover .ftp-enable-btn{*/
+	/*display: inline-block;*/
+/*}*/
 
 .ftp-password-value {
 	display: none;
 }
 
 .ftp-password:hover .ftp-password-value{
-	display: inline-block;
-}
-
-.btn-public-bucket {
-	display: none;
-}
-
-.access-perms-enable:hover .btn-public-bucket{
 	display: inline-block;
 }
 
