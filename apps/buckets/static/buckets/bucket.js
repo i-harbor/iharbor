@@ -173,27 +173,6 @@
         return newArr.join('/');
     }
 
-    /**
-     * 拼接params对象为url参数字符串
-     * @param {Object} obj - 待拼接的对象
-     * @returns {string} - 拼接成的请求字符串
-     */
-    function encode_params(obj) {
-        const params = [];
-
-        Object.keys(obj).forEach((key) => {
-            let value = obj[key];
-            // 如果值为undefined我们将其置空
-            if (typeof value === 'undefined') {
-                value = ''
-            }
-            // 对于需要编码的文本我们要进行编码
-            params.push([key, encodeURIComponent(value)].join('='))
-        });
-
-        return params.join('&');
-    }
-
     //
     //所有ajax的请求的全局设置
     //

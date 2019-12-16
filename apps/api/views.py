@@ -10,6 +10,7 @@ from django.db.models import Q as dQ
 from django.db.models import Case, Value, When, F
 from django.core.validators import validate_email
 from django.core import exceptions
+from django.urls import reverse as django_reverse
 from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -484,9 +485,14 @@ class BucketViewSet(CustomGenericViewSet):
         buckets = Bucket.objects.filter(id__in=ids)
         if not buckets.exists():
             return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
+
+        share_urls = []
         for bucket in buckets:
             # 只设置用户自己的buckets
             if bucket.user.id == request.user.id:
+                url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
+                url = request.build_absolute_uri(url)
+                share_urls.append(url)
                 if not bucket.set_permission(public=public):
                     return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -494,6 +500,7 @@ class BucketViewSet(CustomGenericViewSet):
             'code': 200,
             'code_text': '存储桶权限设置成功',
             'public': public,
+            'share': share_urls
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
@@ -1197,6 +1204,16 @@ class DirectoryViewSet(CustomGenericViewSet):
                 'code': 404,
                 'code_text': '文件不存在
             }
+
+    partial_update:
+        设置目录访问权限
+
+        >>Http Code: 状态码200;
+        {
+          "code": 200,
+          "code_text": "设置目录权限成功",
+          "share": "http://xxx/share/s/xx/xx" # 分享链接
+        }
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
@@ -1227,6 +1244,20 @@ class DirectoryViewSet(CustomGenericViewSet):
             'list': BASE_METHOD_FIELDS,
             'create_detail': BASE_METHOD_FIELDS,
             'destroy': BASE_METHOD_FIELDS,
+            'partial_update': BASE_METHOD_FIELDS + [
+                coreapi.Field(
+                    name='share',
+                    required=True,
+                    location='query',
+                    schema=coreschema.Integer(description='用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)'),
+                ),
+                coreapi.Field(
+                    name='days',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='对象公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0'),
+                ),
+            ],
         }
     )
 
@@ -1295,13 +1326,35 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def partial_update(self, request, *args, **kwargs):
+        bucket_name = kwargs.get('bucket_name', '')
+        dirpath = kwargs.get(self.lookup_field, '')
+        days = str_to_int_or_default(request.query_params.get('days', 0), 0)
+        share = str_to_int_or_default(request.query_params.get('share', ''), -1)
+        if share not in [0, 1, 2]:
+            return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hManager = HarborManager()
+        try:
+            ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        if not ok:
+            return Response(data={'code': 400, 'code_text': '设置目录权限失败'}, status=status.HTTP_400_BAD_REQUEST)
+
+        share_base = f'{bucket_name}/{dirpath}'
+        share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
+        share_url = request.build_absolute_uri(share_url)
+        return Response(data={'code': 200, 'code_text': '设置目录权限成功', 'share': share_url}, status=status.HTTP_200_OK)
+
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create_detail']:
+        if self.action in ['create_detail', 'partial_update']:
             return Serializer
         return serializers.ObjInfoSerializer
 

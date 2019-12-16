@@ -347,6 +347,11 @@ class ApiUsageDescription(models.Model):
         return f'<UsageDescription>{self.title}'
 
 
+SHARE_ACCESS_NO = 0
+SHARE_ACCESS_READONLY = 1
+SHARE_ACCESS_READWRITE = 2
+
+
 class BucketFileBase(models.Model):
     '''
     存储桶bucket文件信息模型基类
@@ -372,13 +377,13 @@ class BucketFileBase(models.Model):
         (False, '正常'),
     )
 
-    SHARE_ACCESS_NO = 0
-    SHARE_ACCESS_READONLY = 1
-    SHARE_ACCESS_READWRITE = 2
+    SHARE_ACCESS_NO = SHARE_ACCESS_NO
+    SHARE_ACCESS_READONLY = SHARE_ACCESS_READONLY
+    SHARE_ACCESS_READWRITE = SHARE_ACCESS_READWRITE
     SHARE_ACCESS_CHOICES = (
-            (SHARE_ACCESS_NO, '禁止访问'),
-            (SHARE_ACCESS_READONLY, '只读'),
-            (SHARE_ACCESS_READWRITE, '可读可写'),
+        (SHARE_ACCESS_NO, '禁止访问'),
+        (SHARE_ACCESS_READONLY, '只读'),
+        (SHARE_ACCESS_READWRITE, '可读可写'),
     )
 
     id = models.BigAutoField(auto_created=True, primary_key=True)
@@ -398,7 +403,7 @@ class BucketFileBase(models.Model):
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
     md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
-    # srd = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_NO)
+    srd = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_READONLY)
 
     class Meta:
         abstract = True
@@ -428,16 +433,21 @@ class BucketFileBase(models.Model):
             return False
         return True
 
-    def set_shared(self, sh=False, days=0):
+    def set_shared(self, sh=False, rw=SHARE_ACCESS_READONLY, days=0):
         '''
         设置对象共享或私有权限
 
         :param sh: 共享(True)或私有(False)
+        :param rw: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
         '''
+        if rw not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
+            return False
+
         if sh == True:
             self.sh = True          # 共享
+            self.srw = rw
             now = timezone.now()
             self.sst = now          # 共享时间
             if days == 0:
@@ -449,6 +459,7 @@ class BucketFileBase(models.Model):
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
+            self.srw = self.SHARE_ACCESS_NO
 
         try:
             self.save()
@@ -474,6 +485,17 @@ class BucketFileBase(models.Model):
             return False
 
         return True
+
+    def can_shared_write(self):
+        '''
+        是否分享并可写
+
+        :return:
+            True(是), False(否)
+        '''
+        if self.is_shared_and_in_shared_time() and (self.srd == self.SHARE_ACCESS_READWRITE):
+            return True
+        return False
 
     def has_shared_limit(self):
         '''

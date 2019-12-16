@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'evcloud',
     'docs',
     'vpn',
+    'share',
 ]
 
 MIDDLEWARE = [

@@ -1,7 +1,9 @@
 import re
 from collections import OrderedDict
 
-from django.http import FileResponse, Http404
+from django.shortcuts import render
+from django.views import View
+from django.http import FileResponse, Http404, JsonResponse
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
@@ -9,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.serializers import Serializer
 
 from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
@@ -154,9 +157,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create']:
-            return serializers.SharedPostSerializer
-        return serializers.SharedPostSerializer
+        return Serializer
 
     def get_offset_and_end(self, hRange:str, filesize:int):
         '''
@@ -430,7 +431,7 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        return serializers.Serializer
+        return Serializer
 
     def get_offset_and_end(self, hRange:str, filesize:int):
         '''
@@ -645,55 +646,6 @@ class ShareDirViewSet(CustomGenericViewSet):
         """
         return serializers.ShareObjInfoSerializer
 
-    def get_offset_and_end(self, hRange:str, filesize:int):
-        '''
-        获取读取开始偏移量和结束偏移量
-
-        :param hRange: range Header
-        :param filesize: 对象大小
-        :return:
-            (offset:int, end:int)
-
-        :raise InvalidError
-        '''
-        start, end = self.parse_header_ranges(hRange)
-        # 无法解析header ranges,返回整个对象
-        if start is None and end is None:
-            InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
-
-        # 读最后end个字节
-        if (start is None) and isinstance(end, int):
-            offset = max(filesize - end, 0)
-            end = filesize - 1
-        else:
-            offset = start
-            if end is None:
-                end = filesize - 1
-            else:
-                end = min(end, filesize - 1)
-
-        return offset, end
-
-    def parse_header_ranges(self, ranges):
-        '''
-        parse Range header string
-
-        :param ranges: 'bytes={start}-{end}'  下载第M－N字节范围的内容
-        :return: (M, N)
-            start: int or None
-            end: int or None
-        '''
-        m = re.match(r'bytes=(\d*)-(\d*)', ranges)
-        if not m:
-            return None, None
-        items = m.groups()
-
-        start = int(items[0]) if items[0] else None
-        end = int(items[1]) if items[1] else None
-        if isinstance(start, int) and isinstance(end, int) and start > end:
-            return None, None
-        return start, end
-
     def has_access_permission(self, bucket, base_dir_obj):
         '''
         是否有访问对象的权限
@@ -719,3 +671,63 @@ class ShareDirViewSet(CustomGenericViewSet):
         return False
 
 
+class ShareView(View):
+    '''
+    list分享目录视图
+    '''
+    lookup_field = 'share_base'
+
+    def get(self, request, *args, **kwargs):
+        '''获取分享目录网页'''
+        share_base = kwargs.get(self.lookup_field, '')
+
+        pp = PathParser(filepath=share_base)
+        bucket_name, dir_base = pp.get_bucket_and_dirpath()
+        if not bucket_name:
+            return render(request, 'info.html', context={'code': 400, 'code_text': '分享路径无效'})
+
+        # 存储桶验证和获取桶对象
+        hManager = HarborManager()
+        try:
+            bucket = hManager.get_bucket(bucket_name=bucket_name)
+            if not bucket:
+                return render(request, 'info.html', context={'code': 404, 'code_text': '存储桶不存在'})
+
+            if dir_base:
+                base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
+                if not base_obj:
+                    return render(request, 'info.html', context={'code': 404, 'code_text': '分享根目录不存在'})
+            else:
+                base_obj = None
+
+            # 是否有文件对象的访问权限
+            if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
+                return render(request, 'info.html', context={'code': 403, 'code_text': '您没有访问权限'})
+        except HarborError as e:
+            return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
+
+        return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username})
+
+    def has_access_permission(self, bucket, base_dir_obj):
+        '''
+        是否有访问对象的权限
+
+        :param bucket: 存储桶对象
+        :param base_dir_obj: 分享根目录对象, None为分享的存储桶
+        :return: True(可访问)；False（不可访问）
+        '''
+        obj = base_dir_obj
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+        if not obj:
+            return False
+
+        if obj.is_file():
+            return False
+
+        # 检查目录读写权限，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False
