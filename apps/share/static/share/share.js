@@ -291,9 +291,13 @@
                     show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
                 }
             },
-            error: function (error) {
+            error: function (xhr, errtype, error) {
                 swal.close();
-                show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                if (errtype === 'timeout'){
+                    show_warning_dialog('请求超时', 'error');
+                }else{
+                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                }
             }
         });
     }

@@ -423,16 +423,16 @@
                         </tr>
                         {{if buckets}}
                             {{ each buckets }}
-                                <tr class="mouse-hover" id="bucket-list-item">
+                                <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
                                     <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.created_time }}</td>
                                     <td>
                                         <span>{{ $value.access_permission }}</span>
-                                        <span class="btn-share-bucket mouse-hover-show"><span class="glyphicon glyphicon-share"></span></span>
+                                        <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
                                     </td>
-                                    <td class="ftp-enable">
+                                    <td class="ftp-enable mouse-hover">
                                     {{if $value.ftp_enable}}
                                         <span class="glyphicon glyphicon-ok">开启</span>
                                     {{/if}}
@@ -1167,7 +1167,7 @@
     //
     $("#content-display-div").on("click", '#bucket-files-obj-share', function (e) {
         e.preventDefault();
-        
+
         let obj = {
             bucket_name: $(this).attr("bucket_name"),
             dir_path: $(this).attr("dir_path"),
@@ -1368,9 +1368,13 @@
                     show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
                 }
             },
-            error: function (error) {
+            error: function (xhr, errtype, error) {
                 swal.close();
-                show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                if (errtype === 'timeout'){
+                    show_warning_dialog('请求超时', 'error');
+                }else{
+                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                }
             }
         });
     }

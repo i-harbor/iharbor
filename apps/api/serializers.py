@@ -233,44 +233,12 @@ class ObjInfoSerializer(serializers.Serializer):
     download_url = serializers.SerializerMethodField()
     access_permission = serializers.SerializerMethodField() # 公共读权限
 
-    # def get_na(self, obj):
-    #     # 文件
-    #     if obj.fod:
-    #         pp = PathParser(obj.na)
-    #         _, name = pp.get_path_and_filename()
-    #         return name
-    #
-    #     return obj.na
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0
 
-    # def get_dir_name(self, obj):
-    #     # 文件
-    #     if obj.fod:
-    #         return ''
-    #
-    #     pp = PathParser(obj.na)
-    #     _, name = pp.get_path_and_filename()
-    #     return name
-
     def get_sds(self, obj):
         return obj.get_sds_display()
-
-    # def get_ult(self, obj):
-    #     if not obj.ult:
-    #         return ''
-    #     return to_localtime_string_naive_by_utc(obj.ult)
-    #
-    # def get_upt(self, obj):
-    #     if not obj.upt:
-    #         return ''
-    #     return to_localtime_string_naive_by_utc(obj.upt)
-    #
-    # def get_set(self, obj):
-    #     if not obj.set:
-    #         return ''
-    #     return to_localtime_string_naive_by_utc(obj.set)
 
     def get_download_url(self, obj):
         # 目录
@@ -287,11 +255,16 @@ class ObjInfoSerializer(serializers.Serializer):
     def get_access_permission(self, obj):
         # 桶公有权限，对象都为公有权限
         bucket = self._context.get('bucket')
-        if bucket and bucket.is_public_permission():
-            return '公有'
+        if bucket:
+            if bucket.has_public_write_perms():
+                return '公有（读写）'
+            elif bucket.is_public_permission():
+                return '公有'
 
         try:
             if obj.is_shared_and_in_shared_time():
+                if obj.is_dir() and obj.is_read_write_perms():
+                    return '公有（读写）'
                 return '公有'
         except Exception as e:
             pass

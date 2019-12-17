@@ -164,11 +164,21 @@ class Bucket(models.Model):
 
     def is_public_permission(self):
         '''
-        存储桶是否是公共访问权限
+        存储桶是否是公共读访问权限
 
         :return: True(是公共); False(私有权限)
         '''
         if self.access_permission in [self.PUBLIC, self.PUBLIC_READWRITE]:
+            return True
+        return False
+
+    def has_public_write_perms(self):
+        '''
+        存储桶是否是公共读写访问权限
+
+        :return: True(公共可读可写); False(不可写)
+        '''
+        if self.access_permission == self.PUBLIC_READWRITE:
             return True
         return False
 
@@ -476,6 +486,10 @@ class BucketFileBase(models.Model):
         if not self.sh:
             return False
 
+        # 是否可读
+        if not self.is_read_perms():
+            return False
+
         # 是否有分享时间限制
         if not self.has_shared_limit():
             return True
@@ -494,6 +508,28 @@ class BucketFileBase(models.Model):
             True(是), False(否)
         '''
         if self.is_shared_and_in_shared_time() and (self.srd == self.SHARE_ACCESS_READWRITE):
+            return True
+        return False
+
+    def is_read_write_perms(self):
+        '''
+        是否可读可写权限
+
+        :return:
+            True(是), False(否)
+        '''
+        if self.srd == self.SHARE_ACCESS_READWRITE:
+            return True
+        return False
+
+    def is_read_perms(self):
+        '''
+        是否有读权限
+
+        :return:
+            True(有), False(没有)
+        '''
+        if self.srd in [self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
             return True
         return False
 
