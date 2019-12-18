@@ -8,7 +8,7 @@ from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
 
-from .models import BucketFileBase
+from .models import BucketFileBase, get_str_hexMD5
 
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -148,19 +148,15 @@ class BucketFileManagement():
         if not path:
             return (False, None) # path参数有误
 
-        model_class = self.get_obj_model_class()
         try:
-            dir = model_class.objects.get(Q(fod=False) & Q(na=path))  # 查找目录记录
-        except model_class.DoesNotExist as e:
-            return (False, None)  # path参数有误,未找到对应目录信息
-        except MultipleObjectsReturned as e:
-            logger.error(f'数据库表{self.get_collection_name()}中存在多个相同的目录：{path}')
-            # dir = model_class.objects.filter(Q(na=path) & Q(fod=False)).first()
-            return (False, None)  # path参数有误,未找到对应目录信息
-        if dir:
-            self.cur_dir_id = dir.id
-        return (True, self.cur_dir_id)
+            obj = self.get_obj(path=path)
+        except Exception:
+            obj = None
+        if obj and obj.is_dir():
+            self.cur_dir_id = obj.id
+            return (True, self.cur_dir_id)
 
+        return (False, None)  # path参数有误,未找到对应目录信息
 
     def get_cur_dir_files(self, cur_dir_id=None):
         '''
@@ -335,6 +331,27 @@ class BucketFileManagement():
         data = self.get_obj_model_class().objects.filter(fod=True).aggregate(space=Sum('si'), count=Count('fod'))
         return data
 
+    def get_obj(self, path:str):
+        '''
+        获取目录或对象
 
+        :param path: 目录或对象路径
+        :return:
+            obj     # success
+            None    # 不存在或存在多个
 
+        :raises: Exception
+        '''
+        na_md5 = get_str_hexMD5(path)
+        model_class = self.get_obj_model_class()
+        try:
+            obj = model_class.objects.get(Q(na_md5=na_md5) | Q(na_md5__isnull=True), Q(fod=False) & Q(na=path))
+        except model_class.DoesNotExist as e:
+            return None
+        except MultipleObjectsReturned as e:
+            msg = f'数据库表{self.get_collection_name()}中存在多个相同的目录：{path}'
+            logger.error(msg)
+            raise Exception(msg)
+
+        return obj
 

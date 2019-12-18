@@ -151,3 +151,85 @@ function get_domain_url() {
     origin = origin.rightStrip('/');
     return origin + '/';
 }
+
+/**
+ * 拼接params对象为url参数字符串
+ * @param {Object} obj - 待拼接的对象
+ * @returns {string} - 拼接成的请求字符串
+ */
+function encode_params(obj) {
+    const params = [];
+
+    Object.keys(obj).forEach((key) => {
+        let value = obj[key];
+        // 如果值为undefined我们将其置空
+        if (typeof value === "undefined") {
+            value = ''
+        }
+        // 对于需要编码的文本我们要进行编码
+        params.push([key, encodeURIComponent(value)].join('='))
+    });
+
+    return params.join('&');
+}
+
+function sizeFormat(val, unit) {
+    let value = val;
+    let mb = 1 << 20;
+    if (unit === "B") {
+        if (val > mb) {
+            value = val / mb;
+            return sizeFormat(value, 'MB');
+        }
+    }
+    switch (unit) {
+        case "B":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'KB');
+            } else {
+                value = val.toFixed(2) + 'B';
+            }
+            break;
+        case "KB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'MB');
+            } else {
+                value = val.toFixed(2) + 'KB';
+            }
+            break;
+        case "MB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'GB');
+            } else {
+                value = val.toFixed(2) + 'MB';
+            }
+            break;
+        case "GB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'TB');
+            } else {
+                value = val.toFixed(2) + 'GB';
+            }
+            break;
+        case "TB":
+            if (val > 1024) {
+                val = val / 1024;
+                value = sizeFormat(val, 'PB');
+            } else {
+                value = val.toFixed(2) + 'TB';
+            }
+            break;
+        case "PB":
+            value = val.toFixed(2) + 'PB';
+            break;
+        default:
+            value = val.toFixed(2) + 'B';
+    }
+
+    return value
+}
+

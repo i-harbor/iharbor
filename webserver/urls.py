@@ -24,7 +24,7 @@ from .views import kjy_login_callback
 urlpatterns = [
     path('api/', include('api.urls', namespace='api')),
     path('evcloud/', include('evcloud.urls', namespace='evcloud')),
-    path('obs/', include('share.urls', namespace='obs')),
+    path('share/', include('share.urls', namespace='share')),
     path('', include('buckets.urls', namespace='buckets')),
     path('users/', include('users.urls', namespace='users')),
     path('vpn/', include('vpn.urls', namespace='vpn')),

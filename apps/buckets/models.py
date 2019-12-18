@@ -2,6 +2,7 @@ import uuid
 import logging
 import binascii
 import os
+import hashlib
 from datetime import timedelta, datetime
 
 from django.db import models
@@ -28,15 +29,24 @@ def get_uuid1_hex_string():
 def rand_hex_string(len=10):
     return binascii.hexlify(os.urandom(len//2)).decode()
 
+def get_str_hexMD5(s:str):
+    '''
+    求字符串MD5
+    '''
+    return hashlib.md5(s.encode(encoding='utf-8')).hexdigest()
+
+
 class Bucket(models.Model):
     '''
     存储桶bucket类，bucket名称必须唯一（不包括软删除记录）
     '''
     PUBLIC = 1
     PRIVATE = 2
+    PUBLIC_READWRITE = 3
     ACCESS_PERMISSION_CHOICES = (
         (PUBLIC, '公有'),
         (PRIVATE, '私有'),
+        (PUBLIC_READWRITE, '公有（可读写）'),
     )
     SOFT_DELETE_CHOICES = (
         (True, '删除'),
@@ -131,22 +141,22 @@ class Bucket(models.Model):
 
         return self.collection_name
 
-    def set_permission(self, public=False):
+    def set_permission(self, public:int=2):
         '''
         设置存储桶公有或私有访问权限
 
-        :param public: 公有(True)或私有(False)
+        :param public:
         :return: True(success); False(error)
         '''
-        if public == True and self.access_permission != self.PUBLIC:
-            self.access_permission = self.PUBLIC
-        elif  public == False and self.access_permission != self.PRIVATE:
-            self.access_permission = self.PRIVATE
-        else:
+        if public not in [self.PUBLIC, self.PRIVATE, self.PUBLIC_READWRITE]:
+            return False
+
+        if self.access_permission == public:
             return True
 
+        self.access_permission = public
         try:
-            self.save()
+            self.save(update_fields=['access_permission'])
         except:
             return  False
 
@@ -154,11 +164,21 @@ class Bucket(models.Model):
 
     def is_public_permission(self):
         '''
-        存储桶是否是公共访问权限
+        存储桶是否是公共读访问权限
 
         :return: True(是公共); False(私有权限)
         '''
-        if self.access_permission == self.PUBLIC:
+        if self.access_permission in [self.PUBLIC, self.PUBLIC_READWRITE]:
+            return True
+        return False
+
+    def has_public_write_perms(self):
+        '''
+        存储桶是否是公共读写访问权限
+
+        :return: True(公共可读可写); False(不可写)
+        '''
+        if self.access_permission == self.PUBLIC_READWRITE:
             return True
         return False
 
@@ -195,7 +215,7 @@ class Bucket(models.Model):
         return True
 
     def __update_stats(self):
-        from buckets.utils import get_bfmanager
+        from .utils import get_bfmanager
 
         table_name = self.get_bucket_table_name()
         bfm = get_bfmanager(table_name=table_name)
@@ -337,6 +357,11 @@ class ApiUsageDescription(models.Model):
         return f'<UsageDescription>{self.title}'
 
 
+SHARE_ACCESS_NO = 0
+SHARE_ACCESS_READONLY = 1
+SHARE_ACCESS_READWRITE = 2
+
+
 class BucketFileBase(models.Model):
     '''
     存储桶bucket文件信息模型基类
@@ -361,8 +386,19 @@ class BucketFileBase(models.Model):
         (True, '删除'),
         (False, '正常'),
     )
+
+    SHARE_ACCESS_NO = SHARE_ACCESS_NO
+    SHARE_ACCESS_READONLY = SHARE_ACCESS_READONLY
+    SHARE_ACCESS_READWRITE = SHARE_ACCESS_READWRITE
+    SHARE_ACCESS_CHOICES = (
+        (SHARE_ACCESS_NO, '禁止访问'),
+        (SHARE_ACCESS_READONLY, '只读'),
+        (SHARE_ACCESS_READWRITE, '可读可写'),
+    )
+
     id = models.BigAutoField(auto_created=True, primary_key=True)
     na = models.TextField(verbose_name='全路径文件名或目录名')
+    na_md5 = models.CharField(max_length=32, null=True, default=None, verbose_name='全路径MD5值')
     name = models.CharField(verbose_name='文件名或目录名', max_length=255)
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
@@ -377,12 +413,13 @@ class BucketFileBase(models.Model):
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
     md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
+    srd = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_READONLY)
 
     class Meta:
         abstract = True
         app_label = 'metadata' # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-id']
-        # indexes = [models.Index(fields=['fod'])]
+        indexes = [models.Index(fields=('na_md5',), name='na_md5_idx')]
         index_together = ['fod', 'did']
         unique_together = ('did', 'name')
         verbose_name = '对象模型抽象基类'
@@ -406,16 +443,21 @@ class BucketFileBase(models.Model):
             return False
         return True
 
-    def set_shared(self, sh=False, days=0):
+    def set_shared(self, sh=False, rw=SHARE_ACCESS_READONLY, days=0):
         '''
         设置对象共享或私有权限
 
         :param sh: 共享(True)或私有(False)
+        :param rw: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
         '''
+        if rw not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
+            return False
+
         if sh == True:
             self.sh = True          # 共享
+            self.srw = rw
             now = timezone.now()
             self.sst = now          # 共享时间
             if days == 0:
@@ -427,6 +469,7 @@ class BucketFileBase(models.Model):
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.sh = False         # 私有
+            self.srw = self.SHARE_ACCESS_NO
 
         try:
             self.save()
@@ -443,6 +486,10 @@ class BucketFileBase(models.Model):
         if not self.sh:
             return False
 
+        # 是否可读
+        if not self.is_read_perms():
+            return False
+
         # 是否有分享时间限制
         if not self.has_shared_limit():
             return True
@@ -452,6 +499,39 @@ class BucketFileBase(models.Model):
             return False
 
         return True
+
+    def can_shared_write(self):
+        '''
+        是否分享并可写
+
+        :return:
+            True(是), False(否)
+        '''
+        if self.is_shared_and_in_shared_time() and (self.srd == self.SHARE_ACCESS_READWRITE):
+            return True
+        return False
+
+    def is_read_write_perms(self):
+        '''
+        是否可读可写权限
+
+        :return:
+            True(是), False(否)
+        '''
+        if self.srd == self.SHARE_ACCESS_READWRITE:
+            return True
+        return False
+
+    def is_read_perms(self):
+        '''
+        是否有读权限
+
+        :return:
+            True(有), False(没有)
+        '''
+        if self.srd in [self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
+            return True
+        return False
 
     def has_shared_limit(self):
         '''
@@ -521,6 +601,21 @@ class BucketFileBase(models.Model):
         if isinstance(bucket_id, str) or isinstance(bucket_id, int):
             return f'{str(bucket_id)}_{str(self.id)}'
         return None
+
+    def reset_na_md5(self):
+        '''
+        na更改时，计算并重设新的na_md5
+        :return: None
+
+        :备注：不会自动更新的数据库
+        '''
+        na = self.na if self.na else ''
+        self.na_md5 = get_str_hexMD5(na)
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if not self.na_md5:
+            self.reset_na_md5()
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def do_save(self, **kwargs):
         '''

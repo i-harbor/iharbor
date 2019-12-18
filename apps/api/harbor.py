@@ -153,6 +153,26 @@ class HarborManager():
 
         return obj
 
+    def get_metadata_obj(self, table_name:str, path:str):
+        '''
+        直接获取目录或对象元数据对象，不检查父节点是否存在
+
+        :param table_name: 数据库表名
+        :param path: 目录或对象的全路径
+        :return:
+            obj     #
+            None    #
+        :raises: HarborError
+        '''
+        bfm = BucketFileManagement(collection_name=table_name)
+        try:
+            obj = bfm.get_obj(path=path)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+        if obj:
+            return obj
+        return None
+
     def _get_obj_or_dir_and_bfm(self, table_name, path, name):
         '''
         获取文件对象或目录,和BucketFileManagement对象
@@ -441,6 +461,7 @@ class HarborManager():
             obj.na = bfm.build_dir_full_name(new_obj_name)
             obj.name = new_obj_name
 
+        obj.reset_na_md5()
         if not obj.do_save():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')
 
@@ -982,7 +1003,7 @@ class HarborManager():
 
         return bucket, None
 
-    def share_object(self, bucket_name:str, obj_path:str, share:bool=False, days:int=0, user=None):
+    def share_object(self, bucket_name:str, obj_path:str, share:bool=False, rw=1, days:int=0, user=None):
         '''
         设置对象共享或私有权限
 
@@ -990,6 +1011,7 @@ class HarborManager():
         :param obj_path: 对象全路径
         :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
         :param share: 共享(True)或私有(False)
+        :param rw: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return:
             success: True
@@ -1001,7 +1023,32 @@ class HarborManager():
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
 
-        if obj.set_shared(sh=share, days=days):
+        if obj.set_shared(sh=share, rw=rw, days=days):
+            return True
+
+        return False
+
+    def share_dir(self, bucket_name:str, path:str, share:int, days:int=0, user=None):
+        '''
+        设置目录共享或私有权限
+
+        :param bucket_name: 桶名
+        :param path: 目录全路径
+        :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :param share: 读写权限；0（禁止访问），1（只读），2（可读可写）
+        :param days: 共享天数，0表示永久共享, <0表示不共享
+        :return:
+            success: True
+            failed: False
+
+        :raise HarborError
+        '''
+        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=user)
+        if not obj or obj.is_file():
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
+
+        sh = False if share == 0 else True
+        if obj.set_shared(sh=sh, rw=share, days=days):
             return True
 
         return False

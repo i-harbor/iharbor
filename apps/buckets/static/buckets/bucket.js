@@ -99,9 +99,11 @@
     //
     // 存储桶权限设置url
     //@param id:存储桶id, type:int
-    //@param public: true(公开)；false（私有）
-    function build_buckets_permission_url(params={id: 0, public: false, ids:[]}){
-        let api = build_buckets_detail_api(params.id) + '?' + $.param({public: params.public, ids: params.ids}, true);
+    //@param public: 1(公有)，2(私有)，3（公有可读可写）
+    function build_buckets_permission_url(params={id: 0, public: 2, ids:[]}){
+        let bid = params.id;
+        delete params.id;
+        let api = build_buckets_detail_api(bid) + '?' + $.param(params, true);
         return build_url_with_domain_name(api);
     }
 
@@ -173,27 +175,6 @@
         return newArr.join('/');
     }
 
-    /**
-     * 拼接params对象为url参数字符串
-     * @param {Object} obj - 待拼接的对象
-     * @returns {string} - 拼接成的请求字符串
-     */
-    function encode_params(obj) {
-        const params = [];
-
-        Object.keys(obj).forEach((key) => {
-            let value = obj[key];
-            // 如果值为undefined我们将其置空
-            if (typeof value === 'undefined') {
-                value = ''
-            }
-            // 对于需要编码的文本我们要进行编码
-            params.push([key, encodeURIComponent(value)].join('='))
-        });
-
-        return params.join('&');
-    }
-
     //
     //所有ajax的请求的全局设置
     //
@@ -232,6 +213,7 @@
 
     //art-template渲染模板注册过滤器
     template.defaults.imports.get_breadcrumb = get_breadcrumb;
+    template.defaults.imports.sizeFormat = sizeFormat;
 
     //
     // 创建存储桶按钮点击事件
@@ -379,75 +361,17 @@
         }
     }
 
-
-    //
-    // 存储桶私有或公有访问权限设置按钮事件
-    //
-    $("#content-display-div").on('click', '#btn-public-bucket', function () {
-        if(!is_exists_checked()){
-            show_warning_dialog('请先选择存储桶');
-            return;
-        }
-
-        (async function() {
-            const {value: result} = await Swal({
-                title: '选择权限',
-                input: 'radio',
-                inputOptions: {
-                    'true': '公开',
-                    'false': '私有',
-                },
-                showCancelButton: true,
-                inputValidator: (value) => {
-                    return !value && 'You need to choose something!'
-                }
-            });
-
-            if (result) {
-                //获取选中的存储桶的id
-                var arr = [];
-                let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
-                bucket_list_checked.each(function (i) {
-                    arr.push($(this).val());
-                });
-                if (arr.length > 0) {
-                    selected_buckets_permission_set(id = 0, ids = arr, result === 'true');
-                }
-            }
-        })();
-    });
-
-    //
-    // 存储桶私有或公有访问权限设置
-    //
-    function selected_buckets_permission_set(id, ids=[],publiced=false){
-        let ret = false;
-        $.ajax({
-            url: build_buckets_permission_url({id: id, public: publiced, ids:ids}),
-            type: 'patch',
-            async: false,
-            success: function (data) {
-                show_auto_close_warning_dialog('成功设置存储桶访问权限', 'success', 'center');
-                ret = true;
-            },
-            error: function (err) {
-                show_auto_close_warning_dialog('设置存储桶访问权限失败,' + err.status + ':' + err.statusText, 'error');
-            },
-        });
-        return ret;
-    }
-
     //
     // 单个存储桶列表项渲染模板
     //
     let render_bucket_item = template.compile(`
-        <tr class="active" id="bucket-list-item">
+        <tr class="mouse-hover" id="bucket-list-item">
             <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
             <td class="access-perms-enable">
                 <span>{{ $data['access_permission'] }}</span>
-                <span class="btn-public-bucket"><span class="glyphicon glyphicon-edit"></span>
+                <span class="btn-share-bucket mouse-hover-show"><span class="glyphicon glyphicon-share"></span></span>
             </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
@@ -456,7 +380,7 @@
                 {{if !$data['ftp_enable']}}
                     <span class="glyphicon glyphicon-remove">关闭</span>
                 {{/if}}
-                <span class="glyphicon glyphicon-edit ftp-enable-btn"></span>
+                <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
             </td>
             <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
                 <span class="glyphicon glyphicon-info-sign"></span>
@@ -481,7 +405,6 @@
                         </button>
                         <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
                         <!--<button class="btn btn-success" id="btn-public-bucket">公开</button>-->
-                        <!--<span class="text-danger">警告：试服务测试阶段,请自行做好数据备份</span>-->
                     </div>
                 </div>
             </div>
@@ -500,23 +423,23 @@
                         </tr>
                         {{if buckets}}
                             {{ each buckets }}
-                                <tr class="active" id="bucket-list-item">
+                                <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
                                     <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.created_time }}</td>
-                                    <td class="access-perms-enable">
+                                    <td>
                                         <span>{{ $value.access_permission }}</span>
-                                        <span class="btn-public-bucket"><span class="glyphicon glyphicon-edit"></span>
+                                        <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
                                     </td>
-                                    <td class="ftp-enable">
+                                    <td class="ftp-enable mouse-hover">
                                     {{if $value.ftp_enable}}
                                         <span class="glyphicon glyphicon-ok">开启</span>
                                     {{/if}}
                                     {{if !$value.ftp_enable}}
                                         <span class="glyphicon glyphicon-remove">关闭</span>
                                     {{/if}}
-                                    <span class=" ftp-enable-btn"><span class="glyphicon glyphicon-edit"></span></span>
+                                    <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
                                     <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="glyphicon glyphicon-info-sign"></span>
@@ -809,11 +732,8 @@
         })();
     });
 
-
-    //
-    //存储通访问权限修改点击事件
-    //
-    $("#content-display-div").on("click", '.btn-public-bucket', function (e) {
+    // 分享存储桶
+    $("#content-display-div").on("click", '.btn-share-bucket', function (e) {
         e.preventDefault();
 
         let status_node = $(this).prev();
@@ -821,31 +741,52 @@
         let td = bucket_item.children('td:first-child');
         let check = td.children(':checkbox:first-child');
         let b_id = check.val();
-        (async function() {
-            const {value: result} = await Swal({
-                title: '选择权限',
-                input: 'radio',
-                inputOptions: {
-                    'true': '公开',
-                    'false': '私有',
-                },
-                showCancelButton: true,
-                inputValidator: (value) => {
-                    return !value && 'You need to choose something!'
-                }
-            });
+        let op = '1';
 
-            if (result) {
-                let pub = (result === 'true');
-                if(selected_buckets_permission_set(b_id, [], pub)) {
-                    if (pub) {
-                        status_node.html('公有');
-                    } else {
-                        status_node.html('私有');
-                    }
-                }
+        Swal.fire({
+            title: '选择权限',
+            input: 'radio',
+            inputOptions: {
+                '1': '公开',
+                '2': '私有',
+            },
+            showCancelButton: true,
+            inputValidator: (value) => {
+                return !value && 'You need to choose something!'
+            },
+            inputAttributes: {
+                autocapitalize: 'off'
+            },
+            confirmButtonText: '分享',
+            showLoaderOnConfirm: true,
+            preConfirm: (value) => {
+                op = value;
+                return $.ajax({
+                    url: build_buckets_permission_url({id: b_id, public: value}),
+                    type: 'patch',
+                    async: true,
+                    success: function (data, status_text, xhr) {
+                        if (op === "1") {
+                            status_node.html('公有');
+                        } else {
+                            status_node.html('私有');
+                        }
+                        return data;
+                    },
+                    error: function (xhr, msg, err) {
+                        Swal.showValidationMessage('Request failed:' + xhr.statusText);
+                    },
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.value && (op === "1")) {
+                Swal.fire({
+                    title: "分享链接",
+                    text: result.value.share[0]
+                });
             }
-        })();
+        })
     });
 
 
@@ -864,7 +805,7 @@
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
                             {{ each breadcrumbs }}
-                                <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path={{$value[1]}}>{{ $value[0] }}</a></li>
+                                <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                             {{/each}}
                         </ol>
                     </div>
@@ -907,8 +848,7 @@
                                         <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $value.ult }}</td>
-                                    <td>{{ $value.si }}</td>
-                                    <td>{{ $value.access_permission}}</td>
+                                    <td>{{ $imports.sizeFormat($value.si, "B") }}</td>
                                 {{/if}}
                                 {{ if !$value.fod }}
                                     <td>
@@ -917,8 +857,8 @@
                                     </td>
                                     <td>{{ $value.ult }}</td>
                                     <td>--</td>
-                                    <td>--</td>
                                 {{/if}}
+                                <td id="id-access-perms">{{ $value.access_permission}}</td>
                                 <td>
                                     <li class="dropdown btn">
                                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
@@ -928,6 +868,7 @@
                                             {{ if !$value.fod }}
                                                 <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">打开</a></li>
                                                 <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">删除</a></li>
+                                                <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">分享公开</a></li>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
@@ -1155,6 +1096,73 @@
     });
 
     //
+    // 目录文件夹分享公开点击事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-item-dir-share', function (e) {
+        e.preventDefault();
+
+        let status_node = $(this).parents("tr.bucket-files-table-item").find("td#id-access-perms");
+        let bucket_name = get_bucket_name_and_cur_path().bucket_name;
+        let dir_path = $(this).attr('dir_path');
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: dir_path
+        });
+        let share = 1;
+        Swal.fire({
+            title: '请选择公开时间',
+            input: 'select',
+            inputOptions: {
+                '0': '永久公开',
+                '1': '1天',
+                '7': '7天',
+                '30': '30天',
+                '-1': '私有'
+            },
+            showCancelButton: true,
+            inputAttributes: {
+                autocapitalize: 'off'
+            },
+            confirmButtonText: '分享',
+            showLoaderOnConfirm: true,
+            inputValidator: (value) => {
+                return !value && '请选择一个选项';
+            },
+            preConfirm: (value) => {
+                if (value === '-1'){
+                    share = 0;
+                }
+                url = url + '?' + $.param({share: share, days: value}, true);
+
+                return $.ajax({
+                    url: url,
+                    type: 'patch',
+                    async: true,
+                    success: function (data, status_text, xhr) {
+                        if (share === 1) {
+                            status_node.html('公有');
+                        } else {
+                            status_node.html('私有');
+                        }
+                        return data;
+                    },
+                    error: function (xhr, msg, err) {
+                        Swal.showValidationMessage('Request failed:' + xhr.statusText);
+                    },
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.value && (share === 1)) {
+                Swal.fire({
+                    title: "分享链接",
+                    text: result.value.share
+                });
+            }
+        })
+    });
+
+    //
     // 文件对象分享公开点击事件处理
     //
     $("#content-display-div").on("click", '#bucket-files-obj-share', function (e) {
@@ -1360,9 +1368,13 @@
                     show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
                 }
             },
-            error: function (error) {
+            error: function (xhr, errtype, error) {
                 swal.close();
-                show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                if (errtype === 'timeout'){
+                    show_warning_dialog('请求超时', 'error');
+                }else{
+                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                }
             }
         });
     }
@@ -1535,18 +1547,6 @@
                 uploadFileChunk(url, file, offset, overwrite, false);
             },
             error: function (err) {
-                // if ( (offset===0) && (err.status === 400) && err.responseJSON.hasOwnProperty('exists')){
-                //     if(err.responseJSON.exists === true)
-                //     {
-                //         show_confirm_dialog({
-                //             title:"已存在同名文件,是否覆盖上传？",
-                //             text:"注意，覆盖后数据无法恢复",
-                //             ok_todo: function (){
-                //                 uploadFileChunk(url, file, offset, true);//覆盖上传
-                //             }
-                //         })
-                //     }
-                // }else
                 if (err.responseJSON && err.responseJSON.hasOwnProperty('code_text'))
                     show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text + '请重新上传');
                 else
@@ -1756,7 +1756,7 @@
             </td>
             <td>{{ dir.ult }}</td>
             <td>--</td>
-            <td>--</td>
+            <td id="id-access-perms">{{ dir.access_permission}}</td>
             <td>
                 <li class="dropdown btn">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
@@ -1764,6 +1764,7 @@
                     <ul class="dropdown-menu">
                          <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">打开</a></li>
                          <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">删除</a></li>
+                         <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">分享公开</a></li>
                     </ul>
                 </li>
             </td>

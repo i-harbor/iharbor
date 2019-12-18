@@ -1,6 +1,9 @@
 import re
+from collections import OrderedDict
 
-from django.http import FileResponse, Http404
+from django.shortcuts import render
+from django.views import View
+from django.http import FileResponse, Http404, JsonResponse
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
@@ -8,13 +11,13 @@ from rest_framework.response import Response
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.serializers import Serializer
 
 from buckets.utils import BucketFileManagement
-from buckets.models import Bucket
-from api.views import CustomAutoSchema
+from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
-from utils.oss import HarborObject
 from utils.jwt_token import JWTokenTool
+from utils.view import CustomGenericViewSet, CustomAutoSchema
 from . import serializers
 from api.harbor import HarborError, HarborManager
 
@@ -154,9 +157,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create']:
-            return serializers.SharedPostSerializer
-        return serializers.SharedPostSerializer
+        return Serializer
 
     def get_offset_and_end(self, hRange:str, filesize:int):
         '''
@@ -296,3 +297,437 @@ class ObsViewSet(viewsets.GenericViewSet):
             request.user, request.auth = user, token
         except AuthenticationFailed:
             pass
+
+
+class ShareDownloadViewSet(CustomGenericViewSet):
+    '''
+    分享下载视图集
+
+    retrieve:
+    下载分享的目录下载的文件对象
+
+        * 支持断点续传，通过HTTP头 Range和Content-Range
+
+        >>Http Code: 状态码200：
+                返回FileResponse对象,bytes数据流；
+
+        >>Http Code: 状态码206 Partial Content：
+                返回FileResponse对象,bytes数据流；
+
+        >>Http Code: 状态码416 Requested Range Not Satisfiable:
+            {
+                'code': 416,
+                'code_text': 'Header Ranges is invalid'
+            }
+
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'xxxx参数有误'
+            }
+        >>Http Code: 状态码403
+            {
+                'code': 403,
+                'code_text': '您没有访问权限'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
+
+    '''
+    queryset = []
+    permission_classes = []
+    lookup_field = 'share_base'
+    lookup_value_regex = '.+'
+
+    # api docs
+    schema = CustomAutoSchema(
+        manual_fields={
+            'retrieve': [
+                coreapi.Field(
+                    name='share_base',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
+                ),
+                coreapi.Field(
+                    name='subpath',
+                    required=True,
+                    location='query',
+                    schema=coreschema.String(description='分享根目录下的对象相对路径')
+                ),
+            ],
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        share_base = kwargs.get(self.lookup_field, '')
+        subpath = request.query_params.get('subpath', '')
+
+        if not subpath:
+            return Response(data={'code': 400, 'code_text': 'subpath参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pp = PathParser(filepath=share_base)
+        bucket_name, dir_base = pp.get_bucket_and_dirpath()
+        if not bucket_name:
+            return Response(data={'code': 400, 'code_text': '分享路径无效'}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj_path = f'{dir_base}/{subpath}' if dir_base else subpath
+        # 存储桶验证和获取桶对象
+        hManager = HarborManager()
+        try:
+            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        if fileobj is None:
+            return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 是否有文件对象的访问权限
+        if not self.has_access_permission(bucket=bucket, base_dir=dir_base):
+            return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+
+        filesize = fileobj.si
+        filename = fileobj.name
+        # 是否是断点续传部分读取
+        ranges = request.headers.get('range')
+        if ranges:
+            try:
+                offset, end = self.get_offset_and_end(ranges, filesize=filesize)
+            except InvalidError as e:
+                return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
+            response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
+            response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
+            response['Content-Length'] = end - offset + 1
+        else:
+            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj)
+            response = FileResponse(generator)
+            response['Content-Length'] = filesize
+
+            # 增加一次下载次数
+            fileobj.download_cound_increase()
+
+        filename = urlquote(filename)  # 中文文件名需要
+        response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        return response
+
+    def get_serializer(self, *args, **kwargs):
+        """
+        Return the serializer instance that should be used for validating and
+        deserializing input, and for serializing output.
+        """
+        serializer_class = self.get_serializer_class()
+        context = self.get_serializer_context()
+        context.update(kwargs.get('context', {}))
+        kwargs['context'] = context
+        return serializer_class(*args, **kwargs)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        return Serializer
+
+    def get_offset_and_end(self, hRange:str, filesize:int):
+        '''
+        获取读取开始偏移量和结束偏移量
+
+        :param hRange: range Header
+        :param filesize: 对象大小
+        :return:
+            (offset:int, end:int)
+
+        :raise InvalidError
+        '''
+        start, end = self.parse_header_ranges(hRange)
+        # 无法解析header ranges,返回整个对象
+        if start is None and end is None:
+            InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
+
+        # 读最后end个字节
+        if (start is None) and isinstance(end, int):
+            offset = max(filesize - end, 0)
+            end = filesize - 1
+        else:
+            offset = start
+            if end is None:
+                end = filesize - 1
+            else:
+                end = min(end, filesize - 1)
+
+        return offset, end
+
+    def parse_header_ranges(self, ranges):
+        '''
+        parse Range header string
+
+        :param ranges: 'bytes={start}-{end}'  下载第M－N字节范围的内容
+        :return: (M, N)
+            start: int or None
+            end: int or None
+        '''
+        m = re.match(r'bytes=(\d*)-(\d*)', ranges)
+        if not m:
+            return None, None
+        items = m.groups()
+
+        start = int(items[0]) if items[0] else None
+        end = int(items[1]) if items[1] else None
+        if isinstance(start, int) and isinstance(end, int) and start > end:
+            return None, None
+        return start, end
+
+    def has_access_permission(self, bucket, base_dir:str):
+        '''
+        是否有访问对象的权限
+
+        :param bucket: 存储桶对象
+        :param base_dir: 分享根目录
+        :return: True(可访问)；False（不可访问）
+        '''
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+
+        # 分享根目录是存储通
+        if not base_dir:
+            return False
+
+        bf = BucketFileManagement(collection_name=bucket.get_bucket_table_name())
+        try:
+            obj = bf.get_obj(path=base_dir)
+        except Exception:
+            return False
+
+        if (not obj) or (obj and obj.is_file()):
+            return False
+
+        # 检查目录读写权限，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False
+
+
+class ShareDirViewSet(CustomGenericViewSet):
+    '''
+    list分享目录视图集
+
+    retrieve:
+    获取分享目录下的子目录和文件对象列表
+
+        * 支持断点续传，通过HTTP头 Range和Content-Range
+
+        >>Http Code: 状态码200：
+
+
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'xxxx参数有误'
+            }
+        >>Http Code: 状态码403
+            {
+                'code': 403,
+                'code_text': '您没有访问权限'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
+
+    '''
+    queryset = []
+    permission_classes = []
+    pagination_class = BucketFileLimitOffsetPagination
+    lookup_field = 'share_base'
+    lookup_value_regex = '.+'
+
+    # api docs
+    schema = CustomAutoSchema(
+        manual_fields={
+            'retrieve': [
+                coreapi.Field(
+                    name='share_base',
+                    required=True,
+                    location='path',
+                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
+                ),
+                coreapi.Field(
+                    name='subpath',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='子目录路径，list此子目录')
+                ),
+            ],
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        share_base = kwargs.get(self.lookup_field, '')
+        subpath = request.query_params.get('subpath', '')
+
+        # if not subpath:
+        #     return Response(data={'code': 400, 'code_text': 'subpath参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pp = PathParser(filepath=share_base)
+        bucket_name, dir_base = pp.get_bucket_and_dirpath()
+        if not bucket_name:
+            return Response(data={'code': 400, 'code_text': '分享路径无效'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 存储桶验证和获取桶对象
+        hManager = HarborManager()
+        try:
+            bucket = hManager.get_bucket(bucket_name=bucket_name)
+            if not bucket:
+                return Response(data={'code': 404, 'code_text': '存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+            if dir_base:
+                base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
+                if not base_obj:
+                    return Response(data={'code': 404, 'code_text': '分享根目录不存在'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                base_obj = None
+
+            # 是否有文件对象的访问权限
+            if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
+                return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+
+            if subpath: # 是否list子目录
+                if dir_base:
+                    sub_path = f'{dir_base}/{subpath}'
+                else:
+                    sub_path = subpath
+                sub_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=sub_path)
+                if not sub_obj or (sub_obj and sub_obj.is_file()):
+                    return Response(data={'code': 404, 'msg': '子目录不存在'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                sub_obj = None
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        if sub_obj:
+            list_dir_id = sub_obj.id
+        elif base_obj:
+            list_dir_id = base_obj.id
+        else:
+            list_dir_id = BucketFileManagement.ROOT_DIR_ID
+
+        collection_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(collection_name=collection_name)
+        ok, files = bfm.get_cur_dir_files(cur_dir_id=list_dir_id)
+        if not ok:
+            return Response(data={'code': 404, 'msg': '未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
+
+        data_dict = OrderedDict([
+            ('code', 200),
+            ('bucket_name', bucket_name),
+            ('subpath', subpath),
+            ('share_base', share_base),
+        ])
+        page = self.paginate_queryset(files)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'share_base': share_base, 'subpath': subpath})
+            data_dict['files'] = serializer.data
+            return self.get_paginated_response(data_dict)
+        else:
+            serializer = self.get_serializer(files, many=True, context={'share_base': share_base, 'subpath': subpath})
+            data_dict['files'] = serializer.data
+        return Response(data_dict)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        return serializers.ShareObjInfoSerializer
+
+    def has_access_permission(self, bucket, base_dir_obj):
+        '''
+        是否有访问对象的权限
+
+        :param bucket: 存储桶对象
+        :param base_dir_obj: 分享根目录对象, None为分享的存储桶
+        :return: True(可访问)；False（不可访问）
+        '''
+        obj = base_dir_obj
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+        if not obj:
+            return False
+
+        if obj.is_file():
+            return False
+
+        # 检查目录读写权限，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False
+
+
+class ShareView(View):
+    '''
+    list分享目录视图
+    '''
+    lookup_field = 'share_base'
+
+    def get(self, request, *args, **kwargs):
+        '''获取分享目录网页'''
+        share_base = kwargs.get(self.lookup_field, '')
+
+        pp = PathParser(filepath=share_base)
+        bucket_name, dir_base = pp.get_bucket_and_dirpath()
+        if not bucket_name:
+            return render(request, 'info.html', context={'code': 400, 'code_text': '分享路径无效'})
+
+        # 存储桶验证和获取桶对象
+        hManager = HarborManager()
+        try:
+            bucket = hManager.get_bucket(bucket_name=bucket_name)
+            if not bucket:
+                return render(request, 'info.html', context={'code': 404, 'code_text': '存储桶不存在'})
+
+            if dir_base:
+                base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
+                if not base_obj:
+                    return render(request, 'info.html', context={'code': 404, 'code_text': '分享根目录不存在'})
+            else:
+                base_obj = None
+
+            # 是否有文件对象的访问权限
+            if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
+                return render(request, 'info.html', context={'code': 403, 'code_text': '您没有访问权限'})
+        except HarborError as e:
+            return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
+
+        return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username})
+
+    def has_access_permission(self, bucket, base_dir_obj):
+        '''
+        是否有访问对象的权限
+
+        :param bucket: 存储桶对象
+        :param base_dir_obj: 分享根目录对象, None为分享的存储桶
+        :return: True(可访问)；False（不可访问）
+        '''
+        obj = base_dir_obj
+        # 存储桶是否是公有权限
+        if bucket.is_public_permission():
+            return True
+        if not obj:
+            return False
+
+        if obj.is_file():
+            return False
+
+        # 检查目录读写权限，并且在有效共享事件内
+        if obj.is_shared_and_in_shared_time():
+            return True
+
+        return False

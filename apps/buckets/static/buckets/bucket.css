@@ -12,15 +12,6 @@
 
 .sidebar {
 	min-height: 100%;
-	/*overflow: auto;*/
-	/*font-size: 12px;*/
-	/*font-weight: 200;*/
-	/*background-color: rgba(165, 189, 194, 0.36);*/
-	/*position: fixed;*/
-	/*top: 60px;*/
-	/*width: 225px;*/
-	/*height: 100%;*/
-	/*color: rgba(33, 38, 39, 0.92);*/
 }
 
 .text-auto-break {
@@ -28,27 +19,11 @@
 	word-wrap:break-word;
 }
 
-.ftp-enable-btn {
-	display: none;
-}
-
-.ftp-enable:hover .ftp-enable-btn{
-	display: inline-block;
-}
-
 .ftp-password-value {
 	display: none;
 }
 
 .ftp-password:hover .ftp-password-value{
-	display: inline-block;
-}
-
-.btn-public-bucket {
-	display: none;
-}
-
-.access-perms-enable:hover .btn-public-bucket{
 	display: inline-block;
 }
 

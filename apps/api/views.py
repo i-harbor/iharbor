@@ -10,10 +10,10 @@ from django.db.models import Q as dQ
 from django.db.models import Case, Value, When, F
 from django.core.validators import validate_email
 from django.core import exceptions
+from django.urls import reverse as django_reverse
 from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.schemas import AutoSchema
 from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.authtoken.models import Token
@@ -26,6 +26,7 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
+from utils.view import CustomAutoSchema, CustomGenericViewSet
 from .models import User, Bucket
 from buckets.models import ModelSaveError
 from . import serializers
@@ -37,61 +38,6 @@ from .harbor import HarborError, HarborManager, FtpHarborManager
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
-
-
-class CustomAutoSchema(AutoSchema):
-    '''
-    自定义Schema
-    '''
-    def get_manual_fields(self, path, method):
-        '''
-        重写方法，为每个方法自定义参数字段, action或method做key
-        '''
-        extra_fields = []
-        action = None
-        try:
-            action = self.view.action
-        except AttributeError:
-            pass
-
-        if action and type(self._manual_fields) is dict and action in self._manual_fields:
-            extra_fields = self._manual_fields[action]
-            return extra_fields
-
-        if type(self._manual_fields) is dict and method in self._manual_fields:
-            extra_fields = self._manual_fields[method]
-
-        return extra_fields
-
-
-class CustomGenericViewSet(viewsets.GenericViewSet):
-    '''
-    自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
-    '''
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for validating and
-        deserializing input, and for serializing output.
-        """
-        serializer_class = self.get_serializer_class()
-        context = self.get_serializer_context()
-        context.update(kwargs.get('context', {}))
-        kwargs['context'] = context
-        return serializer_class(*args, **kwargs)
-
-    def perform_authentication(self, request):
-        super(CustomGenericViewSet, self).perform_authentication(request)
-
-        # 用户最后活跃日期
-        user = request.user
-        if user.id and user.id > 0:
-            try:
-                date = timezone.now().date()
-                if user.last_active < date:
-                    user.last_active = date
-                    user.save(update_fields=['last_active'])
-            except:
-                pass
 
 
 def get_user_own_bucket(bucket_name, request):
@@ -125,6 +71,22 @@ def get_bucket_collection_name_or_response(bucket_name, request):
 
     collection_name = bucket.get_bucket_table_name()
     return (collection_name, None)
+
+
+def str_to_int_or_default(val, default):
+    '''
+    字符串转int，转换失败返回设置的默认值
+
+    :param val: 待转化的字符串
+    :param default: 转换失败返回的值
+    :return:
+        int     # success
+        default # failed
+    '''
+    try:
+        return int(val)
+    except Exception:
+        return default
 
 
 class UserViewSet(mixins.ListModelMixin,
@@ -382,7 +344,7 @@ class BucketViewSet(CustomGenericViewSet):
             }
 
     partial_update:
-    存储桶公有或私有权限设置
+    存储桶访问权限设置
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
@@ -421,7 +383,7 @@ class BucketViewSet(CustomGenericViewSet):
                     name='public',
                     required=True,
                     location='query',
-                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
+                    schema=coreschema.Integer(description='设置访问权限, 1(公有)，2(私有)，3（公有可读可写）'),
                 ),
                 coreapi.Field(
                     name='ids',
@@ -512,12 +474,8 @@ class BucketViewSet(CustomGenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def partial_update(self, request, *args, **kwargs):
-        public = request.query_params.get('public', '').lower()
-        if public == 'true':
-            public = True
-        elif public == 'false':
-            public = False
-        else:
+        public = str_to_int_or_default(request.query_params.get('public', ''), 0)
+        if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': 'public参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
@@ -527,9 +485,14 @@ class BucketViewSet(CustomGenericViewSet):
         buckets = Bucket.objects.filter(id__in=ids)
         if not buckets.exists():
             return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
+
+        share_urls = []
         for bucket in buckets:
             # 只设置用户自己的buckets
             if bucket.user.id == request.user.id:
+                url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
+                url = request.build_absolute_uri(url)
+                share_urls.append(url)
                 if not bucket.set_permission(public=public):
                     return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -537,6 +500,7 @@ class BucketViewSet(CustomGenericViewSet):
             'code': 200,
             'code_text': '存储桶权限设置成功',
             'public': public,
+            'share': share_urls
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
@@ -895,17 +859,6 @@ class ObjViewSet(CustomGenericViewSet):
             return serializers.ObjPutSerializer
         return Serializer
 
-    def get_file_obj_or_404(self, collection_name, path, filename):
-        """
-        获取文件对象
-        """
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
-        if ok and obj and obj.is_file():
-            return obj
-
-        raise Http404
-
     def do_bucket_limit_validate(self, bfm:BucketFileManagement):
         '''
         存储桶的限制验证
@@ -916,82 +869,6 @@ class ObjViewSet(CustomGenericViewSet):
             return False
 
         return True
-
-    @log_used_time(debug_logger, mark_text='select obj info')
-    def get_obj_and_check_limit_or_create_or_404(self, collection_name, path, filename):
-        '''
-        获取文件对象, 验证集合文档数量上限，不存在并且验证通过则创建，其他错误(如对象父路径不存在)会抛404错误
-
-        :param collection_name: 桶对应的数据库表名
-        :param path: 文件对象所在的父路径
-        :param filename: 文件对象名称
-        :return: (obj, created); obj: 对象; created: 指示对象是否是新创建的，True(是)
-                (obj, False) # 对象存在
-                (obj, True)  # 对象不存在，创建一个新对象
-                (None, None) # 集合文档数量已达上限，不允许再创建新的对象
-                (dir, None)  # 已存在同名的目录
-        '''
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-
-        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
-        # 父路经不存在或有错误
-        if not ok:
-            raise Http404
-
-        # 文件对象已存在
-        if obj and obj.is_file():
-            return obj, False
-
-        # 已存在同名的目录
-        if obj and obj.is_dir():
-            return obj, None
-
-        ok, did = bfm.get_cur_dir_id()
-        if not ok:
-            raise Http404 # 目录路径不存在
-
-        # 验证集合文档上限
-        # if not self.do_bucket_limit_validate(bfm):
-        #     return None, None
-
-        # 创建文件对象
-        BucketFileClass = bfm.get_obj_model_class()
-        full_filename = bfm.build_dir_full_name(filename)
-        bfinfo = BucketFileClass(na=full_filename,  # 全路径文件名
-                                 name=filename, #  文件名
-                                fod=True,  # 文件
-                                si=0)  # 文件大小
-        # 有父节点
-        if did:
-            bfinfo.did = did
-
-        try:
-            bfinfo.save()
-            obj = bfinfo
-        except:
-            logger.error(f'新建对象元数据保存数据库错误：{bfinfo.na}')
-            raise Http404
-        return obj, True
-
-    def get_obj_info_response(self, request, fileobj, bucket_name, path):
-        '''
-        文件对象信息Response
-        :param request:
-        :param fileobj: 文件对象
-        :param bucket_name: 存储桶
-        :param path: 文件对象所在目录路径
-        :return: Response
-        '''
-        serializer = serializers.ObjInfoSerializer(fileobj, context={'request': request,
-                                                                           'bucket_name': bucket_name,
-                                                                           'dir_path': path})
-        return Response(data={
-            'code': 200,
-            'bucket_name': bucket_name,
-            'dir_path': path,
-            'obj': serializer.data,
-            # 'breadcrumb': PathParser(path).get_path_breadcrumb()
-        })
 
     def custom_read_param_validate_or_response(self, request):
         '''
@@ -1078,107 +955,6 @@ class ObjViewSet(CustomGenericViewSet):
         response['evob_obj_size'] = obj_size
         return response
 
-    def pre_reset_upload(self, obj, rados):
-        '''
-        覆盖上传前的一些操作
-
-        :param obj: 文件对象元数据
-        :param rados: rados接口类对象
-        :return:
-                正常：True
-                错误：Response
-        '''
-        # 先更新元数据，后删除rados数据（如果删除失败，恢复元数据）
-        # 更新文件上传时间
-        old_ult = obj.ult
-        old_size = obj.si
-
-        obj.ult = timezone.now()
-        obj.si = 0
-        if not obj.do_save(update_fields=['ult', 'si']):
-            logger.error('修改对象元数据失败')
-            return Response({'code': 500, 'code_text': '修改对象元数据失败'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        ok, _ = rados.delete()
-        if not ok:
-            # 恢复元数据
-            obj.ult = old_ult
-            obj.si = old_size
-            obj.do_save(update_fields=['ult', 'si'])
-            logger.error('rados文件对象删除失败')
-            return Response({'code': 500, 'code_text': 'rados文件对象删除失败'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return True
-
-    @log_used_time(debug_logger, mark_text='save_one_chunk')
-    def save_one_chunk(self, obj, rados, chunk_offset, chunk):
-        '''
-        保存一个上传的分片
-
-        :param obj: 对象元数据
-        :param rados: rados接口
-        :param chunk_offset: 分片偏移量
-        :param chunk: 分片数据
-        :return:
-            成功：True
-            失败：Response
-        '''
-        # 先更新元数据，后写rados数据
-        try:
-            # 更新文件修改时间和对象大小
-            new_size = chunk_offset + chunk.size # 分片数据写入后 对象偏移量大小
-            if not self.update_obj_metadata(obj, size=new_size):
-                raise ModelSaveError()
-
-            # 存储文件块
-            try:
-                ok, msg = rados.write_file(offset=chunk_offset, file=chunk)
-            except Exception as e:
-                raise RadosWriteError(str(e))
-            if not ok:
-                raise RadosWriteError(msg)
-        except RadosWriteError as e:
-            # 手动回滚对象元数据
-            model = obj._meta.model
-            try:
-                model.objects.filter(id=obj.id).update(si=obj.si, upt=obj.upt)
-            except:
-                pass
-            error = '文件块rados写入失败:' + str(e)
-            logger.error(error)
-            return Response({'code': 500, 'code_text': error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except ModelSaveError:
-            logger.error('修改对象元数据失败')
-            return Response({'code': 500, 'code_text': '修改对象元数据失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return True
-
-    def update_obj_metadata(self, obj, size):
-        '''
-        更新对象元数据
-        :param obj: 对象
-        :param size: 对象大小
-        :return:
-            success: True
-            failed: False
-        '''
-        model = obj._meta.model
-
-        # 更新文件修改时间和对象大小
-        old_size = obj.si if obj.si else 0
-        new_size = max(size, old_size)  # 更新文件大小（只增不减）
-        try:
-            # r = model.objects.filter(id=obj.id, si=obj.si).update(si=new_size, upt=timezone.now())  # 乐观锁方式
-            r = model.objects.filter(id=obj.id).update(si=Case(When(si__lt=new_size, then=Value(new_size)),
-                                                               default=F('si')), upt=timezone.now())
-        except Exception as e:
-            return False
-        if r > 0:  # 更新行数
-            return True
-
-        return False
-
     @log_used_time(debug_logger, mark_text='get request.data during upload file')
     def get_data(self, request):
         return request.data
@@ -1240,6 +1016,16 @@ class DirectoryViewSet(CustomGenericViewSet):
                 'code': 404,
                 'code_text': '文件不存在
             }
+
+    partial_update:
+        设置目录访问权限
+
+        >>Http Code: 状态码200;
+        {
+          "code": 200,
+          "code_text": "设置目录权限成功",
+          "share": "http://xxx/share/s/xx/xx" # 分享链接
+        }
     '''
     queryset = []
     permission_classes = [IsAuthenticated]
@@ -1270,6 +1056,20 @@ class DirectoryViewSet(CustomGenericViewSet):
             'list': BASE_METHOD_FIELDS,
             'create_detail': BASE_METHOD_FIELDS,
             'destroy': BASE_METHOD_FIELDS,
+            'partial_update': BASE_METHOD_FIELDS + [
+                coreapi.Field(
+                    name='share',
+                    required=True,
+                    location='query',
+                    schema=coreschema.Integer(description='用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)'),
+                ),
+                coreapi.Field(
+                    name='days',
+                    required=False,
+                    location='query',
+                    schema=coreschema.String(description='对象公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0'),
+                ),
+            ],
         }
     )
 
@@ -1338,79 +1138,37 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def partial_update(self, request, *args, **kwargs):
+        bucket_name = kwargs.get('bucket_name', '')
+        dirpath = kwargs.get(self.lookup_field, '')
+        days = str_to_int_or_default(request.query_params.get('days', 0), 0)
+        share = str_to_int_or_default(request.query_params.get('share', ''), -1)
+        if share not in [0, 1, 2]:
+            return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hManager = HarborManager()
+        try:
+            ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        if not ok:
+            return Response(data={'code': 400, 'code_text': '设置目录权限失败'}, status=status.HTTP_400_BAD_REQUEST)
+
+        share_base = f'{bucket_name}/{dirpath}'
+        share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
+        share_url = request.build_absolute_uri(share_url)
+        return Response(data={'code': 200, 'code_text': '设置目录权限成功', 'share': share_url}, status=status.HTTP_200_OK)
+
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['create_detail']:
+        if self.action in ['create_detail', 'partial_update']:
             return Serializer
         return serializers.ObjInfoSerializer
-
-    def get_dir_object(self, path, dir_name, collection_name):
-        """
-        Returns the object the view is displaying.
-        """
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=dir_name)
-        if ok and obj:
-            return obj
-        return None
-
-    def post_detail_params_validate_or_response(self, request, kwargs):
-        '''
-        post_detail参数验证
-
-        :param request:
-        :param kwargs:
-        :return:
-                success: ({data}, None)
-                failure: (None, Response())
-        '''
-        data = {}
-
-        bucket_name = kwargs.get('bucket_name', '')
-        dirpath = kwargs.get(self.lookup_field, '')
-        dir_path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
-
-        if not bucket_name or not dir_name:
-            return None, Response({'code': 400, 'code_text': '目录路径参数无效，要同时包含有效的存储桶和目录名称'},
-                                  status=status.HTTP_400_BAD_REQUEST)
-
-        if '/' in dir_name:
-            return None, Response({'code': 400, 'code_text': 'dir_name不能包含‘/’'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if len(dir_name) > 255:
-            return None, Response({'code': 400, 'code_text': 'dir_name长度最大为255字符'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        _collection_name, response = get_bucket_collection_name_or_response(bucket_name, request)
-        if not _collection_name and response:
-            return None, response
-
-        data['collection_name'] = _collection_name
-
-        bfm = BucketFileManagement(path=dir_path, collection_name=_collection_name)
-        ok, dir = bfm.get_dir_or_obj_exists(name=dir_name)
-        if not ok:
-            return None, Response({'code': 400, 'code_text': '目录路径参数无效，父节点目录不存在'},
-                                  status=status.HTTP_400_BAD_REQUEST)
-        # 目录已存在
-        if dir and dir.is_dir():
-            return None, Response({'code': 400, 'code_text': f'"{dir_name}"目录已存在', 'existing': True},
-                                  status=status.HTTP_400_BAD_REQUEST)
-
-        # 同名对象已存在
-        if dir and dir.is_file():
-            return None, Response({'code': 400, 'code_text': f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称'},
-                                  status=status.HTTP_400_BAD_REQUEST)
-
-        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
-        data['bucket_name'] = bucket_name
-        data['dir_path'] = dir_path
-        data['dir_name'] = dir_name
-        return data, None
 
     @log_used_time(debug_logger, 'paginate in dir')
     def paginate_queryset(self, queryset):
@@ -1716,131 +1474,6 @@ class MoveViewSet(CustomGenericViewSet):
                               'dir_path': obj.get_parent_path(),
                               'obj': serializers.ObjInfoSerializer(obj, context=context).data},
                         status=status.HTTP_201_CREATED)
-
-    def move_rename_obj(self, bucket, obj, move_to, rename):
-        '''
-        移动重命名对象
-
-        :param bucket: 对象所在桶
-        :param obj: 文件对象
-        :param move_to: 移动目标路径
-        :param rename: 重命名的新名称
-        :return:
-            Response()
-        '''
-        table_name = bucket.get_bucket_table_name()
-        new_obj_name = rename if rename else obj.name # 移动后对象的名称，对象名称不变或重命名
-
-        # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
-        if move_to is None: # 仅仅重命名对象，不移动
-            bfm = BucketFileManagement( collection_name=table_name)
-            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
-        else: # 需要移动对象
-            bfm = BucketFileManagement(path=move_to, collection_name=table_name)
-            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
-
-        if not ok:
-            return Response(data={'code': 404, 'code_text': '无法完成对象的移动操作，指定的目标路径未找到'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        if target_obj:
-            return Response(data={'code': 400, 'code_text': '无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # 仅仅重命名对象，不移动
-        if move_to is None:
-            path, _ = PathParser(filepath=obj.na).get_path_and_filename()
-            obj.na = path + '/' + new_obj_name if path else  new_obj_name
-            obj.name = new_obj_name
-        else: # 移动对象或重命名
-            _, did = bfm.get_cur_dir_id()
-            obj.did = did
-            obj.na = bfm.build_dir_full_name(new_obj_name)
-            obj.name = new_obj_name
-            path = move_to
-
-        if not obj.do_save():
-            return Response(data={'code': 500, 'code_text': '移动对象操作失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        context = self.get_serializer_context()
-        context.update({'bucket_name': bucket.name, 'bucket': bucket})
-        return Response(data={'code': 201, 'code_text': '移动对象操作成功',
-                              'bucket_name': bucket.name,
-                              'dir_path': path,
-                              'obj': serializers.ObjInfoSerializer(obj, context=context).data}, status=status.HTTP_201_CREATED)
-
-    def validate_params(self, request):
-        '''
-        校验请求参数
-        :param request:
-        :return:
-            {
-                'move_to': xxx, # None(未提交此参数) 或 string
-                'rename': xxx   # None(未提交此参数) 或 string
-            }
-        '''
-        validated_data = {'move_to': None, 'rename': None}
-        move_to = request.query_params.get('move_to')
-        rename = request.query_params.get('rename')
-
-        # 移动对象参数
-        if move_to is not None:
-            validated_data['move_to'] = move_to.strip('/')
-
-        # 重命名对象参数
-        if rename is not None:
-            if '/' in rename:
-                raise ValidationError('对象名称不能含“/”')
-
-            if len(rename) > 255:
-                raise ValidationError('对象名称不能大于255个字符长度')
-
-            validated_data['rename'] = rename
-
-        return validated_data
-
-    def get_obj_or_dir_404(self, table_name, path, name):
-        '''
-        获取文件对象或目录
-
-        :param table_name: 数据库表名
-        :param path: 父目录路经
-        :param name: 对象名称或目录名称
-        :return:
-            None: 父目录路径错误，不存在
-            obj: 对象或目录
-            raise Http404: 目录或对象不存在
-        '''
-        bfm = BucketFileManagement(path=path, collection_name=table_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=name)
-        if not ok:
-            return None
-
-        if obj:
-            return obj
-
-        raise Http404
-
-    def get_obj_or_404(self, table_name, path, name):
-        '''
-        获取文件对象
-
-        :param table_name: 数据库表名
-        :param path: 父目录路经
-        :param name: 对象名称
-        :return:
-            None: 父目录路径错误，不存在
-            obj: 对象
-            raise Http404: 对象不存在
-        '''
-        obj = self.get_obj_or_dir_404(table_name=table_name, path=path, name=name)
-        if not obj:
-            return None
-
-        if obj.is_file():
-            return obj
-        else:
-            raise Http404
 
     def get_serializer_class(self):
         """
