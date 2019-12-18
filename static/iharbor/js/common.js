@@ -174,6 +174,8 @@ function encode_params(obj) {
 }
 
 function sizeFormat(val, unit) {
+    if (isNaN(val))
+        return val;
     let value = val;
     let mb = 1 << 20;
     if (unit === "B") {

@@ -933,7 +933,7 @@
                 <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.name }}</a>
             </td>
             <td>{{ obj.ult }}</td>
-            <td>{{ obj.si }}</td>
+            <td>{{ $imports.sizeFormat(obj.si, "B") }}</td>
             <td>{{ obj.access_permission }}</td>
             <td>
                 <li class="dropdown btn">
