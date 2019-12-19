@@ -406,14 +406,13 @@ class BucketFileBase(models.Model):
     ult = models.DateTimeField(default=timezone.now) # 文件的上传时间，或目录的创建时间
     upt = models.DateTimeField(blank=True, null=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
     dlc = models.IntegerField(default=0, verbose_name='下载次数')  # 该文件的下载次数，目录时dlc为0
-    sh = models.BooleanField(default=False, verbose_name='是否可共享') # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
     shp = models.CharField(default='', max_length=10, verbose_name='共享密码') # 该文件的共享密码，目录时为空
     stl = models.BooleanField(default=True, verbose_name='是否有共享时间限制') # True: 文件有共享时间限制; False: 则文件无共享时间限制
     sst = models.DateTimeField(blank=True, null=True, verbose_name='共享起始时间') # share_start_time, 该文件的共享起始时间
     set = models.DateTimeField(blank=True, null=True, verbose_name='共享终止时间') # share_end_time,该文件的共享终止时间
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
     md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
-    srd = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_READONLY)
+    share = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_NO)
 
     class Meta:
         abstract = True
@@ -443,33 +442,30 @@ class BucketFileBase(models.Model):
             return False
         return True
 
-    def set_shared(self, sh=False, rw=SHARE_ACCESS_READONLY, days=0):
+    def set_shared(self, share=SHARE_ACCESS_NO, days=0):
         '''
         设置对象共享或私有权限
 
-        :param sh: 共享(True)或私有(False)
-        :param rw: 读写权限；0（禁止访问），1（只读），2（可读可写）
+        :param share: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return: True(success); False(error)
         '''
-        if rw not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
+        if share not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
             return False
 
-        if sh == True:
-            self.sh = True          # 共享
-            self.srw = rw
+        if share != self.SHARE_ACCESS_NO:
+            self.share = share
             now = timezone.now()
             self.sst = now          # 共享时间
             if days == 0:
                 self.stl = False    # 永久共享,没有共享时间限制
             elif days < 0:
-                self.sh = False     # 私有
+                self.share = self.SHARE_ACCESS_NO     # 私有
             else:
                 self.stl = True     # 有共享时间限制
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
-            self.sh = False         # 私有
-            self.srw = self.SHARE_ACCESS_NO
+            self.share = self.SHARE_ACCESS_NO
 
         try:
             self.save()
@@ -482,10 +478,6 @@ class BucketFileBase(models.Model):
         对象是否是分享的, 并且在有效分享时间内，即是否可公共访问
         :return: True(是), False(否)
         '''
-        # 对象是否是分享的
-        if not self.sh:
-            return False
-
         # 是否可读
         if not self.is_read_perms():
             return False
@@ -507,7 +499,7 @@ class BucketFileBase(models.Model):
         :return:
             True(是), False(否)
         '''
-        if self.is_shared_and_in_shared_time() and (self.srd == self.SHARE_ACCESS_READWRITE):
+        if self.is_shared_and_in_shared_time() and self.is_read_write_perms():
             return True
         return False
 
@@ -518,7 +510,7 @@ class BucketFileBase(models.Model):
         :return:
             True(是), False(否)
         '''
-        if self.srd == self.SHARE_ACCESS_READWRITE:
+        if self.share == self.SHARE_ACCESS_READWRITE:
             return True
         return False
 
@@ -529,7 +521,7 @@ class BucketFileBase(models.Model):
         :return:
             True(有), False(没有)
         '''
-        if self.srd in [self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
+        if self.share in [self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
             return True
         return False
 

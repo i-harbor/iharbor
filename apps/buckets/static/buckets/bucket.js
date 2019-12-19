@@ -375,10 +375,10 @@
             </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
-                    <span class="glyphicon glyphicon-ok">开启</span>
+                    开启
                 {{/if}}
                 {{if !$data['ftp_enable']}}
-                    <span class="glyphicon glyphicon-remove">关闭</span>
+                    关闭
                 {{/if}}
                 <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
             </td>
@@ -434,10 +434,10 @@
                                     </td>
                                     <td class="ftp-enable mouse-hover">
                                     {{if $value.ftp_enable}}
-                                        <span class="glyphicon glyphicon-ok">开启</span>
+                                        开启
                                     {{/if}}
                                     {{if !$value.ftp_enable}}
-                                        <span class="glyphicon glyphicon-remove">关闭</span>
+                                        关闭
                                     {{/if}}
                                     <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
@@ -1193,10 +1193,15 @@
                 }
             });
 
+            let share = 1;
+            if (key === '-1'){
+                share = 0
+            }
+
             if (key) {
                 let share_url = build_obj_share_url({
                     detail_url: detail_url,
-                    share: true,
+                    share: share,
                     days: key
                 });
                 set_obj_shared(share_url);

@@ -1003,15 +1003,14 @@ class HarborManager():
 
         return bucket, None
 
-    def share_object(self, bucket_name:str, obj_path:str, share:bool=False, rw=1, days:int=0, user=None):
+    def share_object(self, bucket_name:str, obj_path:str, share:int, days:int=0, user=None):
         '''
         设置对象共享或私有权限
 
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
         :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
-        :param share: 共享(True)或私有(False)
-        :param rw: 读写权限；0（禁止访问），1（只读），2（可读可写）
+        :param share: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :return:
             success: True
@@ -1023,7 +1022,7 @@ class HarborManager():
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
 
-        if obj.set_shared(sh=share, rw=rw, days=days):
+        if obj.set_shared(share=share, days=days):
             return True
 
         return False
@@ -1047,8 +1046,7 @@ class HarborManager():
         if not obj or obj.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
 
-        sh = False if share == 0 else True
-        if obj.set_shared(sh=sh, rw=share, days=days):
+        if obj.set_shared(share=share, days=days):
             return True
 
         return False
