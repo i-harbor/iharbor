@@ -703,7 +703,7 @@ class ObjViewSet(CustomGenericViewSet):
                     name='share',
                     required=False,
                     location='query',
-                    schema=coreschema.Boolean(description='是否分享，用于设置对象公有或私有, true(公开)，false(私有)'),
+                    schema=coreschema.Integer(description='分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）'),
                 ),
                 coreapi.Field(
                     name='days',
@@ -721,11 +721,11 @@ class ObjViewSet(CustomGenericViewSet):
 
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
-    def update(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.upload_chunk_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+    # def update(self, request, *args, **kwargs):
+    #     if request.version == 'v1':
+    #         return self.upload_chunk_v1(request, *args, **kwargs)
+    #
+    #     return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
     @log_used_time(debug_logger, mark_text='upload chunks')
     def upload_chunk_v1(self, request, *args, **kwargs):
@@ -825,11 +825,17 @@ class ObjViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
 
-        validated_param, valid_response = self.shared_param_validate_or_response(request)
-        if not validated_param and valid_response:
-            return valid_response
-        share = validated_param.get('share')
-        days = validated_param.get('days')
+        days = str_to_int_or_default(request.query_params.get('days', 0), None)
+        if days is None:
+            return Response(data={'code': 400, 'code_text': 'days参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        share = request.query_params.get('share', None)
+        if share is None:
+            return Response(data={'code': 400, 'code_text': '缺少share参数'}, status=status.HTTP_400_BAD_REQUEST)
+
+        share = str_to_int_or_default(share, -1)
+        if share not in [0, 1, 2]:
+            return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -905,39 +911,6 @@ class ObjViewSet(CustomGenericViewSet):
                                 status=status.HTTP_400_BAD_REQUEST)
             return None, response
         return validated_data, None
-
-    def shared_param_validate_or_response(self, request):
-        '''
-        文件对象共享或私有权限参数验证
-        :param request:
-        :return:
-            (None, response) -> 参数有误
-            ({data}, None) -> 参数验证通过
-
-        '''
-        days = request.query_params.get('days', 0)
-        share = request.query_params.get('share', '').lower()
-
-        validated_data = {}
-        if share == 'true':
-            share = True
-        elif share == 'false':
-            share = False
-        else:
-            response = Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-            return (None, response)
-
-        try:
-            days = int(days)
-            # if days < 0:
-            #     raise Exception()
-        except:
-            response = Response(data={'code': 400, 'code_text': 'days参数有误'}, status=status.HTTP_400_BAD_REQUEST)
-            return (None, response)
-
-        validated_data['share'] = share
-        validated_data['days'] = days
-        return (validated_data, None)
 
     def wrap_chunk_response(self, chunk:bytes, obj_size:int):
         '''
