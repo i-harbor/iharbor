@@ -339,6 +339,48 @@ class HarborManager():
 
         return True
 
+    def list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000, user=None, paginator=None):
+        '''
+        获取目录下的文件列表信息生成器
+
+        :param bucket_name: 桶名
+        :param path: 目录路径
+        :param per_num: 每次获取文件信息数量
+        :param user: 用户，默认为None，如果给定用户只获取属于此用户的目录下的文件列表信息（只查找此用户的存储桶）
+        :param paginator: 分页器，默认为None
+        :return:
+                generator           # success
+                :raise HarborError  # failed
+
+        :raise HarborError
+        '''
+        bucket = self.get_bucket(bucket_name, user)
+        if not bucket:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        collection_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+        ok, files = bfm.get_cur_dir_files()
+        if not ok:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
+
+        def generator(per_num, paginator=None):
+            offset = 0
+            limit = per_num
+            if paginator is None:
+                paginator = BucketFileLimitOffsetPagination()
+
+            while True:
+                try:
+                    ret = paginator.pagenate_to_list(files, offset=offset, limit=limit)
+                except Exception as e:
+                    raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+
+                yield ret
+                offset = offset + len(ret)
+
+        return generator(per_num=per_num, paginator=paginator)
+
     def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None, paginator=None):
         '''
         获取目录下的文件列表信息
@@ -1205,6 +1247,21 @@ class FtpHarborManager():
         :raise HarborError
         '''
         return self.__hbManager.list_dir(bucket_name, path, offset=offset, limit=limit)
+
+    def ftp_list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000):
+        '''
+        获取目录下的文件列表信息生成器
+
+        :param bucket_name: 桶名
+        :param path: 目录路径
+        :param per_num: 每次获取文件信息数量
+        :return:
+                generator           # success
+                :raise HarborError  # failed
+
+        :raise HarborError
+        '''
+        return self.__hbManager.list_dir_generator(bucket_name=bucket_name, path=path, per_num=per_num)
 
     def ftp_mkdir(self, bucket_name:str, path:str):
         '''
