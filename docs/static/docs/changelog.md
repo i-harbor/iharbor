@@ -1,3 +1,8 @@
+## v0.3.2 
+* ftp兼容filezilla客户端  
+* 增加ftp list_dir生成器接口  
+* 域名修改科技云通行证登录配置修改，logo修改   
+
 ## v0.3.1
 * 对象和目录model删除sh字段，重命名srd字段为share   
 * 对象分享API参数修改   

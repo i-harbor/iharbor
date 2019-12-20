@@ -430,16 +430,16 @@
                                     <td>{{ $value.created_time }}</td>
                                     <td>
                                         <span>{{ $value.access_permission }}</span>
-                                        <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
+                                        <span class="btn-share-bucket"><span class="glyphicon glyphicon-edit"></span></span>
                                     </td>
-                                    <td class="ftp-enable mouse-hover">
+                                    <td class="ftp-enable">
                                     {{if $value.ftp_enable}}
                                         开启
                                     {{/if}}
                                     {{if !$value.ftp_enable}}
                                         关闭
                                     {{/if}}
-                                    <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
+                                    <span class=" ftp-enable-btn"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
                                     <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="glyphicon glyphicon-info-sign"></span>
