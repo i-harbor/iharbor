@@ -1,4 +1,6 @@
 import os
+import logging
+
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer, ThreadedFTPServer, MultiprocessFTPServer
@@ -20,6 +22,9 @@ def main():
     handler.abstracted_fs = HarborFileSystem
     handler.dtp_handler = HarborDTPHandler
     handler.authorizer = authorizer
+
+    # log
+    logging.basicConfig(filename='/var/log/nginx/ftp.log', level=logging.INFO)
  
     # Define a customized banner (string returned when client connects)
     handler.banner = "pyftpdlib based ftpd ready."
@@ -36,8 +41,8 @@ def main():
     server = MultiprocessFTPServer(address, handler)
  
     # set a limit for connections
-    server.max_cons = 256
-    server.max_cons_per_ip = 5
+    server.max_cons = 1024
+    server.max_cons_per_ip = 50
  
     # start ftp server
     server.serve_forever()

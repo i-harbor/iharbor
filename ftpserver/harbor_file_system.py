@@ -29,12 +29,18 @@ class HarborFileSystem(AbstractedFS):
     def isdir(self, path):
         # print('function: isdir', 'path: ' + path)
         # print('isdir return', self.client.ftp_is_dir(self.bucket_name, path[1:]))
-        return self.client.ftp_is_dir(self.bucket_name, path.lstrip('/'))
+        try:
+            return self.client.ftp_is_dir(self.bucket_name, path.lstrip('/'))
+        except HarborError as error:
+            return False
 
     def isfile(self, path):
         # print('function: isfile', 'path: ' + path)
         # print('isfile return', self.client.ftp_is_file(self.bucket_name, path[1:]))
-        return self.client.ftp_is_file(self.bucket_name, path.lstrip('/'))
+        try:
+            return self.client.ftp_is_file(self.bucket_name, path.lstrip('/'))
+        except HarborError as error:
+            return False
 
     def islink(self, fs_path):
         # print('function: islink', 'fs_path: ' + fs_path)

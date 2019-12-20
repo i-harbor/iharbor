@@ -389,8 +389,8 @@ THIRD_PARTY_APP_AUTH = {
     'SCIENCE_CLOUD': {
         # 'client_id': 000,
         # 'client_secret': 'xxx',
-        'client_home_url': 'http://obs.casearth.cn',
-        'client_callback_url': 'http://obs.casearth.cn/callback/', # 认证回调地址
+        'client_home_url': 'http://obs.cstcloud.cn',
+        'client_callback_url': 'http://obs.cstcloud.cn/callback/', # 认证回调地址
         'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
         'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'

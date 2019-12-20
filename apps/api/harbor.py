@@ -339,6 +339,30 @@ class HarborManager():
 
         return True
 
+    def _list_dir_queryset(self, bucket_name:str, path:str, user=None):
+        '''
+        获取目录下的文件列表信息
+
+        :param bucket_name: 桶名
+        :param path: 目录路径
+        :param user: 用户，默认为None，如果给定用户只获取属于此用户的目录下的文件列表信息（只查找此用户的存储桶）
+        :return:
+                success:    (QuerySet(), bucket) # django QuerySet实例和bucket实例
+                failed:      raise HarborError
+
+        :raise HarborError
+        '''
+        bucket = self.get_bucket(bucket_name, user)
+        if not bucket:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        collection_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path=path, collection_name=collection_name)
+        ok, qs = bfm.get_cur_dir_files()
+        if not ok:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
+        return qs, bucket
+
     def list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000, user=None, paginator=None):
         '''
         获取目录下的文件列表信息生成器
@@ -351,20 +375,15 @@ class HarborManager():
         :return:
                 generator           # success
                 :raise HarborError  # failed
+        :usage:
+            for objs in generator:
+                print(objs)         # objs type list, raise HarborError when error
 
         :raise HarborError
         '''
-        bucket = self.get_bucket(bucket_name, user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+        qs, _ = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
 
-        collection_name = bucket.get_bucket_table_name()
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, files = bfm.get_cur_dir_files()
-        if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
-
-        def generator(per_num, paginator=None):
+        def generator(queryset, per_num, paginator=None):
             offset = 0
             limit = per_num
             if paginator is None:
@@ -372,14 +391,17 @@ class HarborManager():
 
             while True:
                 try:
-                    ret = paginator.pagenate_to_list(files, offset=offset, limit=limit)
+                    ret = paginator.pagenate_to_list(queryset, offset=offset, limit=limit)
                 except Exception as e:
                     raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
 
                 yield ret
-                offset = offset + len(ret)
+                l = len(ret)
+                if l < per_num:
+                    return
+                offset = offset + l
 
-        return generator(per_num=per_num, paginator=paginator)
+        return generator(queryset=qs, per_num=per_num, paginator=paginator)
 
     def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None, paginator=None):
         '''
@@ -397,15 +419,7 @@ class HarborManager():
 
         :raise HarborError
         '''
-        bucket = self.get_bucket(bucket_name, user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
-
-        collection_name = bucket.get_bucket_table_name()
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, files = bfm.get_cur_dir_files()
-        if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
+        files, bucket = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
 
         if paginator is None:
             paginator = BucketFileLimitOffsetPagination()
@@ -1258,6 +1272,9 @@ class FtpHarborManager():
         :return:
                 generator           # success
                 :raise HarborError  # failed
+        :usage:
+            for objs in generator:
+                print(objs)         # objs type list, raise HarborError when error
 
         :raise HarborError
         '''
