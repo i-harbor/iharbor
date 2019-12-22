@@ -48,17 +48,12 @@ class Bucket(models.Model):
         (PRIVATE, '私有'),
         (PUBLIC_READWRITE, '公有（可读写）'),
     )
-    SOFT_DELETE_CHOICES = (
-        (True, '删除'),
-        (False, '正常'),
-    )
 
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
-    soft_delete = models.BooleanField(choices=SOFT_DELETE_CHOICES, default=False, verbose_name='软删除') #True->删除状态
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
     objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
@@ -81,7 +76,7 @@ class Bucket(models.Model):
     @classmethod
     def get_user_valid_bucket_count(cls, user):
         '''获取用户有效的存储桶数量'''
-        return cls.objects.filter(models.Q(user=user) & models.Q(soft_delete=False)).count()
+        return cls.objects.filter(user=user).count()
 
     @classmethod
     def get_bucket_by_name(cls, bucket_name):
@@ -90,7 +85,7 @@ class Bucket(models.Model):
         :param bucket_name: 存储通名称
         :return: Bucket对象; None(不存在)
         '''
-        query_set = Bucket.objects.select_related('user').filter(models.Q(name=bucket_name) & models.Q(soft_delete=False))
+        query_set = Bucket.objects.select_related('user').filter(name=bucket_name)
         if query_set.exists():
             return query_set.first()
 
@@ -103,25 +98,40 @@ class Bucket(models.Model):
             self.ftp_ro_password = rand_hex_string()
         super().save(**kwargs)
 
-    def do_soft_delete(self):
+    def delete_and_archive(self):
         '''
-        软删除
+        删除bucket,并归档
+
         :return:
-            success: True
-            failed: False
+            True    # success
+            False   # failed
         '''
-        bucket_name = '_' + get_uuid1_hex_string()
-        self.name = bucket_name # 桶名具有唯一性约束，所以改为一个无效的桶名
-        self.soft_delete = True
         try:
-            self.save()
-        except :
+            a = Archive()
+            a.original_id = self.id
+            a.name = self.name
+            a.user_id = self.user_id
+            a.created_time = self.created_time
+            a.table_name = self.get_bucket_table_name()
+            a.access_permission = self.access_permission
+            a.modified_time = self.modified_time
+            a.objs_count = self.objs_count
+            a.size = self.size
+            a.stats_time = self.stats_time
+            a.ftp_enable = self.ftp_enable
+            a.ftp_password = self.ftp_password
+            a.ftp_ro_password = self.ftp_ro_password
+            a.save()
+        except Exception as e:
+            return False
+
+        try:
+            self.delete()
+        except Exception:
+            a.delete()
             return False
 
         return True
-
-    def is_soft_deleted(self):
-        return self.soft_delete
 
     def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
@@ -303,6 +313,44 @@ class Bucket(models.Model):
             return False, '只读密码不得和可读写密码一致'
         self.ftp_ro_password = password
         return True, '修改成功'
+
+
+class Archive(models.Model):
+    '''
+    存储桶bucket删除归档类
+    '''
+    PUBLIC = 1
+    PRIVATE = 2
+    PUBLIC_READWRITE = 3
+    ACCESS_PERMISSION_CHOICES = (
+        (PUBLIC, '公有'),
+        (PRIVATE, '私有'),
+        (PUBLIC_READWRITE, '公有（可读写）'),
+    )
+
+    id = models.BigAutoField(primary_key=True)
+    original_id = models.BigIntegerField(verbose_name='bucket id')
+    archive_time = models.DateTimeField(auto_now_add=True, verbose_name='删除归档时间')
+    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
+    user = models.ForeignKey(to=User, null=True, on_delete=models.SET_NULL, verbose_name='所属用户')
+    created_time = models.DateTimeField(verbose_name='创建时间')
+    table_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
+    access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
+    modified_time = models.DateTimeField(verbose_name='修改时间')
+    objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
+    size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
+    stats_time = models.DateTimeField(verbose_name='统计时间')
+    ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
+    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
+    ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
+
+    class Meta:
+        ordering = ['-id']
+        verbose_name = '存储桶归档'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return self.name if isinstance(self.name, str) else str(self.name)
 
 
 class BucketLimitConfig(models.Model):

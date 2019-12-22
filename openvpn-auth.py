@@ -25,7 +25,9 @@ except Exception as e:
     logging.error(msg)
     return_auth_failed()
 
-from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 def auth(username, raw_password):
     '''
@@ -37,7 +39,7 @@ def auth(username, raw_password):
     '''
     # 验证用户
     try:
-        user = authenticate(username=username, password=raw_password)
+        user = User.objects.filter(username=username).first()
     except Exception as e:
         msg = traceback.format_exc()
         logging.error(msg)
@@ -46,7 +48,11 @@ def auth(username, raw_password):
     if not user:
         return False
 
-    return True
+    vpn = user.vpn_auth
+    if vpn.check_password(raw_password):
+        return True
+
+    return False
 
 if __name__ == '__main__':
     username = os.environ.get('username', None)

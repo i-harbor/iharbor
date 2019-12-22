@@ -18,7 +18,7 @@ class BucketView(View):
 
     def get_content(self, request):
         content = {}
-        content['buckets'] = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all()
+        content['buckets'] = Bucket.objects.filter(user=request.user).all()
         return content
 
 class UsageView(View):

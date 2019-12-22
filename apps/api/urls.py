@@ -29,6 +29,7 @@ router.register(r'(?P<version>(v1|v2))/usercount', views.UserCountViewSet, base_
 router.register(r'(?P<version>(v1|v2))/availability', views.AvailabilityViewSet, base_name='availability')
 router.register(r'(?P<version>(v1|v2))/test', views.TestViewSet, base_name='test')
 router.register(r'(?P<version>(v1|v2))/ftp', views.FtpViewSet, base_name='ftp')
+router.register(r'(?P<version>(v1|v2))/vpn', views.VPNViewSet, base_name='vpn')
 
 
 dlp_router = DetailListPostRouter()
