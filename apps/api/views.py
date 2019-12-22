@@ -27,6 +27,7 @@ from utils.oss import HarborObject, RadosWriteError, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
 from utils.view import CustomAutoSchema, CustomGenericViewSet
+from vpn.models import VPNAuth
 from .models import User, Bucket
 from buckets.models import ModelSaveError
 from . import serializers
@@ -2324,7 +2325,7 @@ class FtpViewSet(CustomGenericViewSet):
 
         return Response({
             'code': 200,
-            'code_text': '系统可用',
+            'code_text': 'ftp配置成功',
             'data': data     # 请求提交的参数
         })
 
@@ -2379,4 +2380,102 @@ class FtpViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
+        return Serializer
+
+
+class VPNViewSet(CustomGenericViewSet):
+    '''
+    VPN相关API
+    '''
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    # api docs
+    BASE_METHOD_FIELDS = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1, v2）')
+        ),
+    ]
+    schema = CustomAutoSchema(
+        manual_fields={
+            'partial_update': BASE_METHOD_FIELDS + [
+                coreapi.Field(
+                    name='password',
+                    required=True,
+                    location='body',
+                    schema=coreschema.String(description='存储桶ftp新的读写访问密码')
+                )
+            ],
+        }
+    )
+
+    def list(self, request, *args, **kwargs):
+        '''
+        获取VPN口令信息
+
+            Http Code: 状态码200，返回数据：
+            {
+                "code": 200,
+                "code_text": "获取成功",
+                "vpn": {
+                    "id": 2,
+                    "password": "2523c77e7b",
+                    "created_time": "2019-12-22 11:44:43",
+                    "modified_time": "2019-12-22 11:44:43",
+                    "user": {
+                        "id": 3,
+                        "username": "869588058@qq.com"
+                    }
+                }
+            }
+        '''
+        if request.version == 'v1':
+            return self.list_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def list_v1(self, request, *args, **kwargs):
+        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
+        return Response(data={'code': 200, 'code_text': '获取成功', 'vpn': serializers.VPNSerializer(vpn).data})
+
+    def create(self, request, *args, **kwargs):
+        '''
+        修改vpn口令
+        '''
+        if request.version == 'v1':
+            return self.create_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def create_v1(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid(raise_exception=False):
+            code_text = 'password有误'
+            try:
+                for key, err_list in serializer.errors.items():
+                    code_text = f'{key},{err_list[0]}'
+                    break
+            except:
+                pass
+            return Response(data={'code': 400, 'code_text': code_text}, status=status.HTTP_400_BAD_REQUEST)
+
+        password = serializer.validated_data['password']
+        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
+        if vpn.reset_password(password):
+            return Response(data={'code': 201, 'code_text': '修改成功', 'vpn': serializers.VPNSerializer(vpn).data}, status=status.HTTP_201_CREATED)
+
+        return Response(data={'code': 400, 'code_text': '修改失败'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def get_serializer_class(self):
+        """
+        Return the class to use for the serializer.
+        Defaults to using `self.serializer_class`.
+        Custom serializer_class
+        """
+        if self.action == 'create':
+            return serializers.VPNPostSerializer
         return Serializer
