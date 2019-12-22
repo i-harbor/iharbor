@@ -63,10 +63,10 @@ class VPNAuth(models.Model):
         self.password = password
         try:
             self.save()
-        except:
+        except Exception as e:
             return False
 
-        return
+        return True
 
     def check_password(self, password):
         return self.password == password

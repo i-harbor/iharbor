@@ -10,28 +10,28 @@
 {% block content %}
     <div class="container-fluid">
         <div class="row">
-        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
+{#        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>#}
         <div class="row">
             <div class="col-md-offset-1 col-md-10">
                 <div>
-                    <p>我的VPN</p>
+                    <p class="panel-title">我的VPN</p>
                 </div>
                 <table class="table table-hover">
                     <thead>
                         <tr class="bg-info">
-                            <th>ID</th>
                             <th>用户名</th>
-                            <th>VPN口令(双击修改)</th>
+                            <th>VPN口令</th>
                             <th>创建时间</th>
                             <th>修改时间</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>{{ vpn.id }}</td>
                             <td>{{ vpn.user.username }}</td>
-                            <td class="vpn-password" title="双击修改" data-vpn-id="{{ vpn.id }}">
-                                <span class="vpn-password-value">{{ vpn.password }}</span>
+                            <td class="vpn-password">
+                                <input class="vpn-password-value" readonly type="password" value="{{ vpn.password }}" style="border: 0px;outline:none;">
+                                <span class="glyphicon glyphicon-edit vpn-password-edit"></span>
+                                {#                                <span class="vpn-password-value">{{ vpn.password }}</span>#}
                             </td>
                             <td>{{ vpn.created_time|date:'Y-m-d H:i:s' }}</td>
                             <td>{{ vpn.modified_time|date:'Y-m-d H:i:s' }}</td>

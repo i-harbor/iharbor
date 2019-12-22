@@ -1,5 +1,5 @@
 {% extends "form.html" %}
-
+{% load static %}
 {% block form_extend %}
     <a class="btn text-warning" href="{% url 'users:forget' %}">忘记密码</a>
     <a class="btn btn-success pull-right" href="{% url 'users:register' %}">注册</a>
@@ -9,11 +9,24 @@
         <div class="third-part">
             <div class="text-center">第三方帐号登录:</div>
             <div>
-                <h3 class="text-center"><a href="{{ kjy_url }}" class="text-info">中国科技云通行证</a></h3>
+                <h3 class="text-center"><a id="id-passport" href="{{ kjy_url }}" class="text-info">中国科技云通行证</a></h3>
             </div>
         </div>
     {% endif %}
 {% endblock %}
 
+{% block script %}
+    <script type="text/javascript" src="{% static 'passport/passport.js' %}"></script>
+    {% verbatim %}
+    <script>
+        var passport = new Passport({umtUrl:'http://passport.escience.cn'});
+        passport.checkLogin(function(is_login){
+            if(is_login){
+                document.getElementById("id-passport").click();
+            }
+        });
+    </script>
+    {% endverbatim %}
+{% endblock %}
 
 
