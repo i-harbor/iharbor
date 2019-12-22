@@ -66,5 +66,8 @@ class VPNAuth(models.Model):
         except:
             return False
 
-        return True
+        return
+
+    def check_password(self, password):
+        return self.password == password
 
