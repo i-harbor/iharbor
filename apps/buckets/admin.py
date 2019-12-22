@@ -1,21 +1,31 @@
 from django.contrib import admin
 
-from .models import (Bucket, BucketLimitConfig, ApiUsageDescription)
+from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive)
 # Register your models here.
 
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'get_collection_name', 'created_time', 'user', 'objs_count',
-                    'size', 'soft_delete', 'ftp_enable', 'ftp_password', 'modified_time')
+                    'size', 'ftp_enable', 'ftp_password', 'modified_time')
     list_display_links = ('id', 'name')
 
-    list_filter = ('created_time', 'soft_delete')
+    list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
 
     def get_collection_name(self, obj):
         return obj.get_bucket_table_name()
 
     get_collection_name.short_description = '桶的表名'
+
+
+@admin.register(Archive)
+class BucketArchiveAdmin(admin.ModelAdmin):
+    list_display = ('id', 'original_id', 'name', 'table_name', 'archive_time', 'created_time', 'user', 'objs_count',
+                    'size', 'ftp_enable', 'ftp_password', 'modified_time')
+    list_display_links = ('id', 'name')
+
+    list_filter = ('created_time',)
+    search_fields = ('name', 'user__username')  # 搜索字段
 
 
 @admin.register(BucketLimitConfig)

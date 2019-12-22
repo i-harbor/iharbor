@@ -73,7 +73,7 @@ class Command(BaseCommand):
         # 全部已删除的桶
         if all_deleted:
             self.stdout.write(self.style.NOTICE('Will clear all buckets that have been softly deleted '))
-            return Bucket.objects.filter(soft_delete=True).all()
+            return []
 
         # 全部的桶
         if all is not None:
@@ -131,8 +131,8 @@ class Command(BaseCommand):
             if not timezone.is_naive(modified_time):
                 modified_time = timezone.make_naive(modified_time)
 
-        if bucket.is_soft_deleted() and  modified_time < self._clear_datetime:
-            by_filters = False
+        # if bucket.is_soft_deleted() and  modified_time < self._clear_datetime:
+        #     by_filters = False
 
         ho = HarborObject(obj_id='')
 

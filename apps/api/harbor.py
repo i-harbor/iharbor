@@ -243,7 +243,7 @@ class HarborManager():
             bfinfo.did = did
         try:
             bfinfo.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
-        except:
+        except Exception as e:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='创建失败，数据库错误')
 
         return True, bfinfo

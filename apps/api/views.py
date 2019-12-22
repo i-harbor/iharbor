@@ -363,7 +363,7 @@ class BucketViewSet(CustomGenericViewSet):
         }
 
     '''
-    queryset = Bucket.objects.filter(soft_delete=False).all()
+    queryset = Bucket.objects.all()
     permission_classes = [IsAuthenticated, permissions.IsOwnBucket]
     pagination_class = paginations.BucketsLimitOffsetPagination
 
@@ -396,7 +396,7 @@ class BucketViewSet(CustomGenericViewSet):
     )
 
     def list(self, request, *args, **kwargs):
-        self.queryset = Bucket.objects.filter(dQ(user=request.user) & dQ(soft_delete=False)).all() # user's own
+        self.queryset = Bucket.objects.filter(user=request.user).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -467,9 +467,8 @@ class BucketViewSet(CustomGenericViewSet):
         for bucket in buckets:
             # 只删除用户自己的buckets
             if bucket.user.id == request.user.id:
-                if not bucket.do_soft_delete():  # 软删除
-                    if not bucket.do_soft_delete():
-                        return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                if not bucket.delete_and_archive():  # 删除归档
+                    return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1781,7 +1780,7 @@ class UserStatsViewSet(CustomGenericViewSet):
         all_count = 0
         all_space = 0
         li = []
-        buckets = Bucket.objects.filter(dQ(user=user) & dQ(soft_delete=False))
+        buckets = Bucket.objects.filter(user=user)
         for b in buckets:
             s = b.get_stats()
             s['bucket_name'] = b.name
