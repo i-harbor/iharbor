@@ -19,15 +19,13 @@
 	word-wrap:break-word;
 }
 
-.ftp-password-value {
-	display: none;
-}
-
-.ftp-password:hover .ftp-password-value{
-	display: inline-block;
-}
-
 .mouse-hover:hover .mouse-hover-show{
+    display: inline-block;
+}
+.mouse-hover:hover .mouse-hover-no-show{
+    display: none;
+}
+.mouse-hover-no-show{
     display: inline-block;
 }
 .mouse-hover-show{

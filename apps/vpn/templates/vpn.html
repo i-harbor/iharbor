@@ -5,7 +5,9 @@
     VPN
 {%endblock%}
 
-{% block head_extends %}{% endblock %}
+{% block head_extends %}
+    <link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+{% endblock %}
 
 {% block content %}
     <div class="container-fluid">
@@ -20,7 +22,7 @@
                     <thead>
                         <tr class="bg-info">
                             <th>用户名</th>
-                            <th>VPN口令</th>
+                            <th>VPN口令(双击修改)</th>
                             <th>创建时间</th>
                             <th>修改时间</th>
                         </tr>
@@ -28,10 +30,9 @@
                     <tbody>
                         <tr>
                             <td>{{ vpn.user.username }}</td>
-                            <td class="vpn-password">
-                                <input class="vpn-password-value" readonly type="password" value="{{ vpn.password }}" style="border: 0px;outline:none;">
-                                <span class="glyphicon glyphicon-edit vpn-password-edit"></span>
-                                {#                                <span class="vpn-password-value">{{ vpn.password }}</span>#}
+                            <td class="vpn-password mouse-hover">
+                                <span class="vpn-password-value mouse-hover-show">{{ vpn.password }}</span>
+                                <span class="mouse-hover-no-show">******</span>
                             </td>
                             <td>{{ vpn.created_time|date:'Y-m-d H:i:s' }}</td>
                             <td>{{ vpn.modified_time|date:'Y-m-d H:i:s' }}</td>

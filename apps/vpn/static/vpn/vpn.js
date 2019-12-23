@@ -27,42 +27,53 @@
         }
     };
 
-
-     var OLD_VPN_PASSWORD;
-    $("#content-display-div").on("click", '.vpn-password-edit', function (e) {
+    $("#content-display-div").on("dblclick", '.vpn-password', function (e) {
         e.preventDefault();
+        let remarks = $(this).children('.vpn-password-value');
+        let old_html = remarks.text();
+        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
 
-        let input = $(this).prev();
-        OLD_VPN_PASSWORD = input.val();
-        input.removeAttr("readonly");
-        input.after(`<span class="glyphicon glyphicon-floppy-saved vpn-password-save"></span>`);
-        $(this).remove();
-    });
-
-    $("#content-display-div").on("click", '.vpn-password-save', function (e) {
-        e.preventDefault();
-
-        let input = $(this).prev();
-        password = input.val();
-        if (password.length < 6){
-            show_warning_dialog('密码长度不得小于6个字符', 'warning');
+        //如果已经双击过，正在编辑中
+        if(remarks.attr('data-in-edit') === 'true'){
             return;
         }
-        if (password !== OLD_VPN_PASSWORD){
-            // 请求修改ftp密码
-            let url = build_url_with_domain_name('api/v1/vpn/');
-            let ret = vpn_password_ajax(url, password);
-            if(ret.ok){
-                show_warning_dialog("修改密码成功", "success");
-            }else{
-                // 修改失败，显示原内容
-                input.val(OLD_VPN_PASSWORD);
-                show_warning_dialog('修改密码失败,' + ret.msg, 'error');
+        // 标记正在编辑中
+        remarks.attr('data-in-edit', 'true');
+        //创建新的input元素，初始内容为原备注信息
+        var newobj = document.createElement('input');
+        newobj.type = 'text';
+        newobj.value = old_html;
+        //设置该标签的子节点为空
+        remarks.empty();
+        remarks.append(newobj);
+        newobj.setSelectionRange(0, old_html.length);
+        //设置获得光标
+        newobj.focus();
+        //为新增元素添加光标离开事件
+        newobj.onblur = function () {
+            remarks.attr('data-in-edit', '');
+            remarks.empty();
+            let input_text = this.value;
+            // 如果输入内容修改了
+            if (input_text && (input_text !== old_html)){
+                if (input_text.length < 6){
+                    show_warning_dialog('密码长度不得小于6个字符', 'warning');
+                    remarks.append(old_html);
+                    return;
+                }
+                // 请求修改ftp密码
+                let url = build_url_with_domain_name('api/v1/vpn/');
+                let ret = vpn_password_ajax(url, input_text);
+                if(ret.ok){
+                    show_warning_dialog("修改密码成功", "success");
+                }else{
+                    // 修改失败，显示原内容
+                    input_text = old_html;
+                    show_warning_dialog('修改密码失败,' + ret.msg, 'error');
+                }
             }
-        }
-        input.attr("readonly", "readonly");
-        input.after(`<span class="glyphicon glyphicon-edit vpn-password-edit"></span>`);
-        $(this).remove();
+            remarks.append(input_text);
+        };
     });
 
     function vpn_password_ajax(url, password) {
@@ -94,15 +105,5 @@
 
         return ret;
     }
-
-    //内容星号显示或隐藏
-    $("#content-display-div").on("mouseover", '.vpn-password', function (e) {
-        e.preventDefault();
-        $(this).children('.vpn-password-value').attr("type", "text");
-    });
-    $("#content-display-div").on("mouseout", '.vpn-password', function (e) {
-        e.preventDefault();
-        $(this).children('.vpn-password-value').attr("type", "password");
-    });
 
 })();
