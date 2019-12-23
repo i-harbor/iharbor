@@ -1,10 +1,10 @@
-from django.conf.urls import url
+from django.urls import path
 
 from . import views
 
 app_name = "vpn"
 
 urlpatterns = [
-    url(r'', views.vpn, name='home'),
-    url(r'^usage/$', views.usage, name='usage'),
+    path('', views.vpn, name='home'),
+    path('usage/', views.usage, name='usage'),
 ]

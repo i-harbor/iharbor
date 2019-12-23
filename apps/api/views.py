@@ -1,13 +1,9 @@
-import random
 from collections import OrderedDict
 import logging
 from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
 from django.utils.http import urlquote
-from django.utils import timezone
-from django.db.models import Q as dQ
-from django.db.models import Case, Value, When, F
 from django.core.validators import validate_email
 from django.core import exceptions
 from django.urls import reverse as django_reverse
@@ -23,18 +19,17 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import PathParser
-from utils.oss import HarborObject, RadosWriteError, RadosError
+from utils.oss import HarborObject, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
 from utils.view import CustomAutoSchema, CustomGenericViewSet
 from vpn.models import VPNAuth
 from .models import User, Bucket
-from buckets.models import ModelSaveError
 from . import serializers
 from . import paginations
 from . import permissions
 from . import throttles
-from .harbor import HarborError, HarborManager, FtpHarborManager
+from .harbor import HarborError, HarborManager
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
