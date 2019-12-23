@@ -1,4 +1,4 @@
-from django.conf.urls import url, include
+from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
@@ -43,11 +43,11 @@ detail_router.register(r'(?P<version>(v1|v2))/move/(?P<bucket_name>[a-z0-9-]{3,6
 
 
 urlpatterns = [
-    url(r'^', include(router.urls)), # The API URLs are now determined automatically by the router.
-    url(r'^', include(detail_router.urls)),
-    url(r'^', include(dlp_router.urls)),
-    url(r'^(?P<version>(v1|v2))/jwt-token/', obtain_jwt_token),
-    url(r'^(?P<version>(v1|v2))/jwt-token-refresh/', refresh_jwt_token),
-    url(r'^(?P<version>(v1|v2))/auth-token/', obtain_auth_token),
+    path('', include(router.urls)), # The API URLs are now determined automatically by the router.
+    path('', include(detail_router.urls)),
+    path('', include(dlp_router.urls)),
+    re_path(r'^(?P<version>(v1|v2))/jwt-token/', obtain_jwt_token),
+    re_path(r'^(?P<version>(v1|v2))/jwt-token-refresh/', refresh_jwt_token),
+    re_path(r'^(?P<version>(v1|v2))/auth-token/', obtain_auth_token),
 ]
 

@@ -675,5 +675,3 @@ class BucketFileBase(models.Model):
         path, _ = PathParser(filepath=self.na).get_path_and_filename()
         return path
 
-class ModelSaveError(Exception):
-    pass
