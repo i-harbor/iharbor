@@ -331,7 +331,7 @@ class Archive(models.Model):
     id = models.BigAutoField(primary_key=True)
     original_id = models.BigIntegerField(verbose_name='bucket id')
     archive_time = models.DateTimeField(auto_now_add=True, verbose_name='删除归档时间')
-    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
+    name = models.CharField(max_length=63, db_index=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, null=True, on_delete=models.SET_NULL, verbose_name='所属用户')
     created_time = models.DateTimeField(verbose_name='创建时间')
     table_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
@@ -351,6 +351,18 @@ class Archive(models.Model):
 
     def __str__(self):
         return self.name if isinstance(self.name, str) else str(self.name)
+
+    def get_bucket_table_name(self):
+        '''
+        获得bucket对应的数据库表名
+        :return: 表名
+        '''
+        if not self.table_name:
+            name = f'bucket_{self.original_id}'
+            self.table_name = name
+            self.save(update_fields=['table_name'])
+
+        return self.table_name
 
 
 class BucketLimitConfig(models.Model):
@@ -421,8 +433,6 @@ class BucketFileBase(models.Model):
     @ si : size,文件大小,字节数，若该doc代表文件，则si为该文件的大小，若该doc代表目录，则si为空；
     @ ult: upload_time，若该doc代表文件，则ult为该文件的上传时间，若该doc代表目录，则ult为该目录的创建时间
     @ upt: update_time，若该doc代表文件，则upt为该文件的最近修改时间，若该doc代表目录，则upt为空;
-    @ sh : shared，若该doc代表文件，则sh用于判断文件是否允许共享，若sh为True，则文件可共享，若sh为False，则文件不能共享，
-                且shp，stl，sst，set等字段为空；若该doc代表目录，则sh为空；
     @ shp: share_password，若该doc代表文件，且允许共享，则shp为该文件的共享密码，若该doc代表目录，则shp为空;
     @ stl: share_time_limit，若该doc代表文件，且允许共享，则stl用于判断该文件是否有共享时间限制，若stl为True，则文件有
                 共享时间限制，若stl为False，则文件无共享时间限制，且sst，set等字段为空；若该doc代表目录，则stl为空;
