@@ -10,10 +10,6 @@
 	background-color: #97dffd;
 }
 
-.sidebar {
-	min-height: 100%;
-}
-
 .text-auto-break {
 	word-break:break-all;
 	word-wrap:break-word;

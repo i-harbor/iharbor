@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="{% static 'bootstrap-3.3.7/css/bootstrap.min.css' %}">
+	{% block page-head %}{% endblock %}
+    <style>
+        html{
+            height: 100%;
+        }
+        body{
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .page-header{
+            flex: 0 0 auto;
+        }
+        .page-content {
+            flex: 1 0 auto;
+        }
+        .page-footer{
+            background: #ececec;
+            flex: 0 0 auto;
+            height:60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        {% block page-header %}{% endblock %}
+    </div>
+    <div class="page-content">
+        {% block page-content %}{% endblock %}
+    </div>
+    <footer class="page-footer">
+        <div class="text-center">
+            <p>1996-{% now "Y" %} <a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 版权所有 京ICP备09112257号-94.  Powered by 中国科技云 iHarbor</p>
+            <p>Copyright © 1996-{% now "Y" %} Computer Network Information Center, Chinese Academy of Sciences. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+</body>
+    <script type="text/javascript" src="{% static 'jquery2.2.4/dist/jquery-2.2.4.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'bootstrap-3.3.7/js/bootstrap.min.js' %}"></script>
+	{% block page-script %}{% endblock %}
+</html>
