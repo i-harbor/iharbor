@@ -12,7 +12,7 @@ from .models import BucketFileBase, get_str_hexMD5
 
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
-
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 def create_table_for_model_class(model):
     '''
@@ -132,9 +132,11 @@ class BucketFileManagement():
     def get_cur_dir_id(self, dir_path=None):
         '''
         获得当前目录节点id
-        @ return: (ok, id)，ok指示是否有错误(路径参数错误)
+        :return: (ok, id)，ok指示是否有错误(路径参数错误)
             正常返回：(True, id)，顶级目录时id=ROOT_DIR_ID
             未找到记录返回(False, None)，即参数有误
+
+        :raises: Exception
         '''
         if self.cur_dir_id:
             return (True, self.cur_dir_id)
@@ -150,8 +152,9 @@ class BucketFileManagement():
 
         try:
             obj = self.get_obj(path=path)
-        except Exception:
-            obj = None
+        except Exception as e:
+            logger.error(f'查询table={self.get_collection_name()},path={path}时错误，{str(e)}')
+            raise Exception(f'查询目录id错误，{str(e)}')
         if obj and obj.is_dir():
             self.cur_dir_id = obj.id
             return (True, self.cur_dir_id)
@@ -164,6 +167,8 @@ class BucketFileManagement():
 
         :param cur_dir_id: 目录id;
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
+
+        :raises: Exception
         '''
         dir_id = None
         if cur_dir_id is not None:
@@ -192,18 +197,18 @@ class BucketFileManagement():
     def get_file_exists(self, file_name):
         '''
         通过文件名获取当前目录下的文件信息
+
         :param file_name: 文件名
         :return: 如果存在返回文件记录对象，否则None
+
+        :raises: Exception
         '''
         file_name = file_name.strip('/')
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return None
+        ok, obj = self.get_dir_or_obj_exists(name=file_name)
+        if obj and obj.is_file():
+            return obj
 
-        bfis = self.get_obj_model_class().objects.filter(Q(did=did)  & Q(name=file_name)& Q(fod=True))
-        bfi = bfis.first()
-
-        return bfi
+        return None
 
     def get_dir_exists(self, dir_name):
         '''
@@ -212,16 +217,14 @@ class BucketFileManagement():
         :return:
             第一个返回值：表示是否有错误发生，(可能错误：当前目录参数有误，对应目录不存在)
             第二个返回值：如果存在返回文件记录对象，否则None
+
+        :raises: Exception
         '''
-        # 先检测当前目录存在
-        ok, did = self.get_cur_dir_id()
-        if not ok:
-            return False, None
+        ok, obj = self.get_dir_or_obj_exists(name=dir_name)
+        if obj and obj.is_dir():
+            return ok, obj
 
-        model_class = self.get_obj_model_class()
-        dir = model_class.objects.filter(Q(did=did) & Q(name=dir_name) & Q(fod=False)).first()  # 查找目录记录
-
-        return True, dir
+        return ok, None
 
     def get_dir_or_obj_exists(self, name, cur_dir_id=None):
         '''
@@ -231,6 +234,8 @@ class BucketFileManagement():
         :return:
             第一个返回值：表示是否有错误发生，(可能错误：当前目录参数有误，对应目录不存在)
             第二个返回值：如果存在返回文件记录对象，否则None
+
+        :raises: Exception
         '''
         if cur_dir_id is None:
             ok, did = self.get_cur_dir_id()
@@ -240,7 +245,18 @@ class BucketFileManagement():
             did = cur_dir_id
 
         model_class = self.get_obj_model_class()
-        dir_or_obj = model_class.objects.filter(Q(did=did) & Q(name=name)).first()  # 查找目录或对象记录
+        try:
+            dir_or_obj = model_class.objects.filter(Q(did=did) & Q(name=name)).get()  # 查找目录或对象记录
+        except model_class.DoesNotExist as e:
+            return True, None
+        except MultipleObjectsReturned as e:
+            msg = f'数据库表{self.get_collection_name()}中存在多个相同的路径：{self._path}/{name}'
+            logger.error(msg)
+            raise Exception(msg)
+        except Exception as e:
+            msg = f'select table={self.get_collection_name()}，path={self._path}/{name},err={str(e)}'
+            debug_logger.error(msg)
+            raise e
 
         return True, dir_or_obj
 
@@ -293,6 +309,8 @@ class BucketFileManagement():
         '''
         当前目录是否为空目录
         :return:True(空); False(非空); None(有错误或目录不存在)
+
+        :raises: Exception
         '''
         ok, did = self.get_cur_dir_id()
         # 有错误发生

@@ -1532,43 +1532,20 @@ class MetadataViewSet(CustomGenericViewSet):
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': '存储桶不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        table_name = bucket.get_bucket_table_name()
+        hManager = HarborManager()
         try:
-            obj = self.get_obj_or_dir_404(table_name, path, name)
-        except Http404:
-            return Response(data={'code': 404, 'code_text': '指定对象或目录不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
+            bucket, obj = hManager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not obj:
+            return Response(data={'code': 404, 'code_text': '对象或目录不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
         return Response(data={'code': 200, 'code_text': '获取元数据成功', 'bucket_name': bucket_name,
                               'dir_path': path, 'obj': serializer.data})
-
-    def get_obj_or_dir_404(self, table_name, path, name):
-        '''
-        获取文件对象或目录
-
-        :param table_name: 数据库表名
-        :param path: 父目录路经
-        :param name: 对象名称或目录名称
-        :return:
-            obj: 对象或目录
-            raise Http404: 目录或对象不存在，父目录路径错误，不存在
-        '''
-        bfm = BucketFileManagement(path=path, collection_name=table_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=name)
-        if not ok:
-            raise Http404
-
-        if obj:
-            return obj
-
-        raise Http404
 
     def get_serializer_class(self):
         """
