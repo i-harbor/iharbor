@@ -39,10 +39,6 @@ def log_op_info(logger=None, mark_text=''):
     '''
     def _decorator(func):
         def swwaper(*args, **kwargs):
-            # 不是debug模式，或者logger无效，不打印日志
-            if not settings.DEBUG or not isinstance(logger, logging.Logger):
-                return func(*args, **kwargs)
-
             try:
                 ret = func(*args, **kwargs)
             except Exception as e:
