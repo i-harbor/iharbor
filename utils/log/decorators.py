@@ -42,10 +42,10 @@ def log_op_info(logger=None, mark_text=''):
             try:
                 ret = func(*args, **kwargs)
             except Exception as e:
-                logger.info(f'{mark_text},kwargs={kwargs};err={str(e)}')
+                logger.debug(f'{mark_text},kwargs={kwargs};err={str(e)}')
                 raise e
 
-            logger.info(f'{mark_text},kwargs={kwargs};成功return')
+            logger.debug(f'{mark_text},kwargs={kwargs};成功return')
             return ret
 
         return swwaper

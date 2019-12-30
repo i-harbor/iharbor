@@ -107,7 +107,6 @@ class HarborManager():
 
         return False
 
-    @log_op_info(logger=debug_logger, mark_text='is_file')
     def is_file(self, bucket_name:str, path_name:str):
         '''
         是否时一个文件
@@ -129,7 +128,6 @@ class HarborManager():
 
         return False
 
-    @log_op_info(logger=debug_logger, mark_text='get_object')
     def get_object(self, bucket_name:str, path_name:str, user=None):
         '''
         获取对象或目录实例
@@ -176,24 +174,24 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            ok, obj，bfm: 对象或目录
+            obj，bfm: 对象或目录
 
-            False, None, bfm    # 父目录路径错误，不存在
-            True, obj, bfm   # 目录或对象存在
-            True, None, bfm  # 目录或对象不存在
+            obj, bfm   # 目录或对象存在
+            None, bfm  # 目录或对象不存在
+            raise Exception    # 父目录路径错误，不存在
 
-        :raises: Exception
+        :raises: HarborError
         '''
         bfm = BucketFileManagement(path=path, collection_name=table_name)
         try:
             obj = bfm.get_dir_or_obj_exists(name=name)
         except Exception as e:
-            raise e
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
 
         if obj:
-            return True, obj, bfm   # 目录或对象存在
+            return obj, bfm   # 目录或对象存在
 
-        return True, None, bfm  # 目录或对象不存在
+        return None, bfm  # 目录或对象不存在
 
     def _get_obj_or_dir(self, table_name, path, name):
         '''
@@ -203,15 +201,13 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            ok, obj: 对象或目录
-            ok == False: 父目录路径错误，不存在
-            None: 目录或对象不存在
+            raise Exception    # 父目录路径错误，不存在
+            obj or None: 目录或对象不存在
 
-        :raises: Exception
+        :raises: HarborError
         '''
-        ok, obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
-
-        return ok, obj
+        obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
+        return obj
 
     @log_op_info(logger=debug_logger, mark_text='mkdir')
     def mkdir(self, bucket_name:str, path:str, user=None):
@@ -281,9 +277,10 @@ class HarborManager():
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
 
-        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+        try:
+            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
+        except HarborError as e:
+            raise e
 
         if dir:
             # 目录已存在
@@ -325,9 +322,10 @@ class HarborManager():
 
         table_name = bucket.get_bucket_table_name()
 
-        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+        try:
+            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
+        except HarborError as e:
+            raise e
 
         if not dir or dir.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
@@ -442,7 +440,6 @@ class HarborManager():
 
         return (l, bucket)
 
-    @log_op_info(logger=debug_logger, mark_text='move_rename object')
     def move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None, user=None):
         '''
         移动或重命名对象
@@ -587,7 +584,6 @@ class HarborManager():
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=file,
                                     reset=reset, user=user)
 
-    @log_op_info(logger=debug_logger, mark_text='write_to_object')
     def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, reset:bool=False, user=None):
         '''
         向对象写入一个数据
@@ -821,7 +817,6 @@ class HarborManager():
 
         return False
 
-    @log_op_info(logger=debug_logger, mark_text='delete_object')
     def delete_object(self, bucket_name:str, obj_path:str, user=None):
         '''
         删除一个对象
@@ -1036,11 +1031,11 @@ class HarborManager():
 
         table_name = bucket.get_bucket_table_name()
         try:
-            ok, obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
+            obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
+        except HarborError as e:
+            raise e
         except Exception as e:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=f'查询目录或对象错误，{str(e)}')
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
 
         if not obj:
             return bucket, None
