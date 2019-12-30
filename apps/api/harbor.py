@@ -1292,7 +1292,7 @@ class FtpHarborManager():
             raise HarborError: failed
         :raise HarborError
         '''
-        return self.__hbManager.mkdir(bucket_name, path)
+        return self.__hbManager.mkdir(bucket_name=bucket_name, path=path)
 
     def ftp_rmdir(self, bucket_name:str, path:str):
         '''

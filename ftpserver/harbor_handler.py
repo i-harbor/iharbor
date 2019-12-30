@@ -167,7 +167,7 @@ class HarborFTPHandler(FTPHandler):
         """Log a message, including additional identifying session data."""
         prefix = self.log_prefix % self.__dict__
         # print(self.__dict__)
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         logfun("[%s] %s %s" % (time, prefix, msg))
 
     def logline(self, msg, logfun=logger.debug):
@@ -176,13 +176,13 @@ class HarborFTPHandler(FTPHandler):
         """
         if self._log_debug:
             prefix = self.log_prefix % self.__dict__
-            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
             logfun("[%s] %s %s" % (time, prefix, msg))
 
-    def logerror(self, msg):
+    def logerror(self, msg, logfun=logger.error):
         """Log an error including additional indentifying session data."""
         prefix = self.log_prefix % self.__dict__
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         logfun("[%s] %s %s" % (time, prefix, msg))
 
 
