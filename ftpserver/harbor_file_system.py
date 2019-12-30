@@ -32,6 +32,7 @@ class HarborFileSystem(AbstractedFS):
         try:
             return self.client.ftp_is_dir(self.bucket_name, path.lstrip('/'))
         except HarborError as error:
+            print(error)
             return False
 
     def isfile(self, path):
@@ -40,6 +41,7 @@ class HarborFileSystem(AbstractedFS):
         try:
             return self.client.ftp_is_file(self.bucket_name, path.lstrip('/'))
         except HarborError as error:
+            print(error)
             return False
 
     def islink(self, fs_path):
@@ -206,7 +208,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def lexists(self, path):
-        # print('function: lexists', 'path: ' + path)
+        print('function: lexists', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
 
         if self.isdir(ftp_path) or self.isfile(ftp_path):

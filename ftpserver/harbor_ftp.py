@@ -24,7 +24,8 @@ def main():
     handler.authorizer = authorizer
 
     # log
-    logging.basicConfig(filename='/var/log/nginx/ftp.log', level=logging.INFO)
+    logging.basicConfig(filename='/var/log/harbor/ftp.log', level=logging.INFO)
+    # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
  
     # Define a customized banner (string returned when client connects)
     handler.banner = "pyftpdlib based ftpd ready."

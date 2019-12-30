@@ -50,7 +50,7 @@ class HarborAuthorizer(DummyAuthorizer):
         flag, perm, msg = FtpHarborManager().ftp_authenticate(user_name, password)
         if not flag:
             raise AuthenticationFailed(msg)
-        perms = 'elradfmwM' if perm else 'elr'
+        perms = 'elradfmwMT' if perm else 'elr'
         self.user_table[user_name] = {'perm': perms}
 
     def get_home_dir(self, username):
