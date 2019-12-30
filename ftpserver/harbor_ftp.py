@@ -1,5 +1,37 @@
 import os
 import logging
+# import concurrent_log_handler
+
+# logging.handlers = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
+#                                                                             maxBytes=300,
+#                                                                             backupCount=10,
+#                                                                             use_gzip=True,)
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'default': {
+#             'format': '%(remote_ip)s:%(remote_port)s-[%(username)s]'
+#         },
+#     },
+#     'handlers': {
+#         'file': {
+#             'level': 'DEBUG',
+#             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+#             'formatter': 'default',
+#             'filename': '/var/log/harbor/ftp.log',
+#             'maxBytes': 300,
+#             'backupCount': 10,
+#             'use_gzip': True,
+#             'delay': True
+#         }
+#     },
+#     'pyftpdlib': {
+#         'handlers': ['file'],
+#         'level': 'DEBUG',
+#     },
+# }
+# logging.basicConfig.dictConfig(LOGGING)
 
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
@@ -7,8 +39,10 @@ from pyftpdlib.servers import FTPServer, ThreadedFTPServer, MultiprocessFTPServe
 from harbor_file_system import HarborFileSystem
 from harbor_auth import HarborAuthorizer
 from harbor_handler import HarborDTPHandler, HarborFTPHandler
- 
+
+
 def main():
+    
     # Instantiate a dummy authorizer for managing 'virtual' users
     authorizer = HarborAuthorizer()
     # authorizer = DummyAuthorizer()
@@ -24,9 +58,15 @@ def main():
     handler.authorizer = authorizer
 
     # log
+    # logging.handlers = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
+    #                                                                         maxBytes=300,
+    #                                                                         backupCount=10,
+    #                                                                         use_gzip=True,)
+    # logging.basicConfig(level=logging.INFO)
     logging.basicConfig(filename='/var/log/harbor/ftp.log', level=logging.INFO)
     # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
- 
+    
+
     # Define a customized banner (string returned when client connects)
     handler.banner = "pyftpdlib based ftpd ready."
  

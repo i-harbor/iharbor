@@ -55,7 +55,8 @@ class HarborFTPHandler(FTPHandler):
                 except ValueError:
                     why = "Invalid REST parameter"
                 except (EnvironmentError, FilesystemError) as err:
-                    why = _strerror(err)
+                    # why = _strerror(err)
+                    why = str(err)
                 if not ok:
                     fd.close()
                     self.respond('554 %s' % why)

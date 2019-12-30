@@ -194,8 +194,8 @@ class HarborFileSystem(AbstractedFS):
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_mkdir(self.bucket_name, ftp_path[1:])
-        except HarborError as error:
-            raise FilesystemError(error.msg)
+        except (HarborError, Exception) as error:
+            raise FilesystemError(str(error))
 
 
     def rename(self, src, dst):
@@ -205,6 +205,8 @@ class HarborFileSystem(AbstractedFS):
             self.client.ftp_rename(self.bucket_name, src[1:], new_name)
         except HarborError as error:
             raise FilesystemError('rename dir is not supported')
+        except Exception as error:
+            raise FilesystemError(str(error))
 
 
     def lexists(self, path):
@@ -223,16 +225,16 @@ class HarborFileSystem(AbstractedFS):
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_rmdir(self.bucket_name, ftp_path[1:])
-        except HarborError as error:
-            raise FilesystemError(error.msg)
+        except (HarborError, Exception) as error:
+            raise FilesystemError(str(error))
 
     def remove(self, path):
         # print('function: remove', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_delete_object(self.bucket_name, ftp_path[1:])
-        except HarborError as error:
-            raise FilesystemError(error.msg)
+        except (HarborError, Exception) as error:
+            raise FilesystemError(str(error.msg))
 
 
 class Uploader(object):
