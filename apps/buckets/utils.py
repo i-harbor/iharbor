@@ -153,7 +153,6 @@ class BucketFileManagement():
         try:
             obj = self.get_obj(path=path)
         except Exception as e:
-            logger.error(f'查询table={self.get_collection_name()},path={path}时错误，{str(e)}')
             raise Exception(f'查询目录id错误，{str(e)}')
         if obj and obj.is_dir():
             self.cur_dir_id = obj.id
@@ -204,7 +203,7 @@ class BucketFileManagement():
         :raises: Exception
         '''
         file_name = file_name.strip('/')
-        ok, obj = self.get_dir_or_obj_exists(name=file_name)
+        obj = self.get_dir_or_obj_exists(name=file_name)
         if obj and obj.is_file():
             return obj
 
@@ -215,16 +214,16 @@ class BucketFileManagement():
         通过目录名获取当前目录下的目录信息
         :param dir_name: 目录名称（不含父路径）
         :return:
-            第一个返回值：表示是否有错误发生，(可能错误：当前目录参数有误，对应目录不存在)
-            第二个返回值：如果存在返回文件记录对象，否则None
+            目录对象 or None
+            raises: Exception   # 发生错误，或当前目录参数有误，对应目录不存在
 
         :raises: Exception
         '''
-        ok, obj = self.get_dir_or_obj_exists(name=dir_name)
+        obj = self.get_dir_or_obj_exists(name=dir_name)
         if obj and obj.is_dir():
-            return ok, obj
+            return obj
 
-        return ok, None
+        return None
 
     def get_dir_or_obj_exists(self, name, cur_dir_id=None):
         '''
@@ -232,15 +231,15 @@ class BucketFileManagement():
         :param name: 目录名或对象名称
         :param cur_dir_id: 如果给定ID,基于此ID的目录查找；默认基于当前路径查找,
         :return:
-            第一个返回值：表示是否有错误发生，(可能错误：当前目录参数有误，对应目录不存在)
-            第二个返回值：如果存在返回文件记录对象，否则None
+            文件目录对象 or None
+            raises: Exception   # 发生错误，或当前目录参数有误，对应目录不存在
 
         :raises: Exception
         '''
         if cur_dir_id is None:
             ok, did = self.get_cur_dir_id()
             if not ok:
-                return False, None
+                raise Exception(f'父路径（{self._path}）不存在，或路径有误')
         else:
             did = cur_dir_id
 
@@ -248,7 +247,7 @@ class BucketFileManagement():
         try:
             dir_or_obj = model_class.objects.filter(Q(did=did) & Q(name=name)).get()  # 查找目录或对象记录
         except model_class.DoesNotExist as e:
-            return True, None
+            return None
         except MultipleObjectsReturned as e:
             msg = f'数据库表{self.get_collection_name()}中存在多个相同的路径：{self._path}/{name}'
             logger.error(msg)
@@ -256,9 +255,9 @@ class BucketFileManagement():
         except Exception as e:
             msg = f'select table={self.get_collection_name()}，path={self._path}/{name},err={str(e)}'
             debug_logger.error(msg)
-            raise e
+            raise Exception(msg)
 
-        return True, dir_or_obj
+        return dir_or_obj
 
     def build_dir_full_name(self, dir_name):
         '''
@@ -368,6 +367,10 @@ class BucketFileManagement():
             return None
         except MultipleObjectsReturned as e:
             msg = f'数据库表{self.get_collection_name()}中存在多个相同的目录：{path}'
+            logger.error(msg)
+            raise Exception(msg)
+        except Exception as e:
+            msg = f'select {self.get_collection_name()},path={path},err={str(e)}'
             logger.error(msg)
             raise Exception(msg)
 
