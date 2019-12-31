@@ -2,7 +2,7 @@ import logging
 
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
-from django.db import connections
+from django.db import close_old_connections
 from rest_framework import status
 
 from buckets.models import Bucket
@@ -16,8 +16,7 @@ debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting�
 
 def ftp_close_old_connections(func):
     def wrapper(*args, **kwargs):
-        for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
+        close_old_connections()
         return func(*args, **kwargs)
 
     return wrapper
@@ -1117,6 +1116,7 @@ class FtpHarborManager():
     def __init__(self):
         self.__hbManager = HarborManager()
 
+    @ftp_close_old_connections
     def ftp_authenticate(self, bucket_name:str, password:str):
         '''
         Bucket桶ftp访问认证
@@ -1139,6 +1139,7 @@ class FtpHarborManager():
 
         return False, False, 'Wrong password'
 
+    @ftp_close_old_connections
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
         '''
         向对象写入一个数据块
@@ -1154,6 +1155,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.write_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, chunk=chunk)
 
+    @ftp_close_old_connections
     def ftp_write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
         '''
         向对象写入一个文件
@@ -1171,6 +1173,7 @@ class FtpHarborManager():
         return self.__hbManager.write_file(bucket_name=bucket_name, obj_path=obj_path, offset=offset,
                                            file=file, reset=reset, user=user)
 
+    @ftp_close_old_connections
     def ftp_move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None):
         '''
         移动或重命名对象
@@ -1187,6 +1190,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename, move=move)
 
+    @ftp_close_old_connections
     def ftp_rename(self, bucket_name:str, obj_path:str, rename):
         '''
         重命名对象
@@ -1202,6 +1206,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename)
 
+    @ftp_close_old_connections
     def ftp_read_chunk(self, bucket_name:str, obj_path:str, offset:int, size:int):
         '''
         从对象读取一个数据块
@@ -1218,6 +1223,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.read_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, size=size)
 
+    @ftp_close_old_connections
     def ftp_get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
         '''
         获取一个读取对象的生成器函数
@@ -1234,6 +1240,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.get_obj_generator(bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
 
+    @ftp_close_old_connections
     def ftp_delete_object(self, bucket_name:str, obj_path:str):
         '''
         删除一个对象
@@ -1248,6 +1255,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.delete_object(bucket_name=bucket_name, obj_path=obj_path)
 
+    @ftp_close_old_connections
     def ftp_list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000):
         '''
         获取目录下的文件列表信息
@@ -1264,6 +1272,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.list_dir(bucket_name, path, offset=offset, limit=limit)
 
+    @ftp_close_old_connections
     def ftp_list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000):
         '''
         获取目录下的文件列表信息生成器
@@ -1282,6 +1291,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.list_dir_generator(bucket_name=bucket_name, path=path, per_num=per_num)
 
+    @ftp_close_old_connections
     def ftp_mkdir(self, bucket_name:str, path:str):
         '''
         创建一个目录
@@ -1294,6 +1304,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.mkdir(bucket_name=bucket_name, path=path)
 
+    @ftp_close_old_connections
     def ftp_rmdir(self, bucket_name:str, path:str):
         '''
         删除一个空目录
@@ -1307,6 +1318,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.rmdir(bucket_name, path)
 
+    @ftp_close_old_connections
     def ftp_is_dir(self, bucket_name:str, path_name:str):
         '''
         是否时一个目录
@@ -1321,6 +1333,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.is_dir(bucket_name=bucket_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_is_file(self, bucket_name:str, path_name:str):
         '''
         是否时一个文件
@@ -1334,6 +1347,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.is_file(bucket_name=bucket_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_get_obj(self, buckest_name:str, path_name:str):
         '''
         获取对象或目录实例
@@ -1348,6 +1362,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_get_write_generator(self, bucket_name: str, obj_path: str):
         '''
         获取一个写入对象的生成器函数
