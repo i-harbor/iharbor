@@ -24,7 +24,7 @@ def ftp_close_old_connections(func):
 
 class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
-        self.code = code    # 错误码
+        self.code = code if code else 500   # 错误码
         self.msg = msg      # 错误描述
         self.data = kwargs  # 一些希望传递的数据
 

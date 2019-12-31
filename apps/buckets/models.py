@@ -485,6 +485,10 @@ class BucketFileBase(models.Model):
     def __str__(self):
         return self.na if isinstance(self.na, str) else str(self.na)
 
+    @property
+    def obj_size(self):
+        return self.si
+
     def do_soft_delete(self):
         '''
         软删除

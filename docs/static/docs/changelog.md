@@ -1,3 +1,8 @@
+## v0.3.4
+* clearbucket命令修改，增加selectobject命令，桶归档桶名去除唯一索引   
+* 对象rados存储信息API obj-rados   
+* 日志库concurrent_log_handler和日志相关修改   
+
 ## v0.3.3
 * 去除桶软删除，增加存储通归档表   
 * 增加vpn口令密码   

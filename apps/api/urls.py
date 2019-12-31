@@ -30,6 +30,7 @@ router.register(r'(?P<version>(v1|v2))/availability', views.AvailabilityViewSet,
 router.register(r'(?P<version>(v1|v2))/test', views.TestViewSet, base_name='test')
 router.register(r'(?P<version>(v1|v2))/ftp', views.FtpViewSet, base_name='ftp')
 router.register(r'(?P<version>(v1|v2))/vpn', views.VPNViewSet, base_name='vpn')
+router.register(r'(?P<version>(v1|v2))/obj-rados/(?P<bucket_name>[a-z0-9-]{3,64})', views.ObjKeyViewSet, base_name='obj-rados')
 
 
 dlp_router = DetailListPostRouter()

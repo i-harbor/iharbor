@@ -615,15 +615,17 @@ class HarborObjectBase():
     def reset_obj_id_and_size(self, obj_id, obj_size):
         raise NotImplementedError('`reset_obj_id_and_size()` must be implemented.')
 
+    def get_rados_key_info(self):
+        raise NotImplementedError('`reset_obj_id_and_size()` must be implemented.')
+
 
 class HarborObject():
     '''
     iHarbor对象操作接口封装，
     '''
-
     def __init__(self, obj_id, obj_size=0, cluster_name=None, pool_name=None, user_name=None, conf_file='',
                  keyring_file='', *args, **kwargs):
-        self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', '')
+        self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', 'ceph')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
         self._keyring_file = keyring_file if os.path.exists(keyring_file) else settings.CEPH_RADOS.get(
@@ -852,4 +854,13 @@ class HarborObject():
             return False, str(e)
 
         return True, status
+
+    def get_rados_key_info(self):
+        '''
+        获取对象在ceph rados中的存储信息
+
+        :return:
+               str   # format = iharbor:{cluster_name}/{pool_name}/{rados-key}
+        '''
+        return f'iharbor:{self._cluster_name}/{self._pool_name}/{self._obj_id}'
 
