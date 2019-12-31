@@ -269,9 +269,11 @@ LOGGING = {
         # logging file settings
         'file': {
             'level': 'WARNING',
-            'class': 'logging.handlers.WatchedFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGGING_FILES_DIR, 'webserver.log'),
-            'formatter': 'verbose'
+            'formatter': 'verbose',
+            'maxBytes': 1024*1024*200,  # 200MB
+            'backupCount': 10           # 最多10个文件
         },
         # output to console settings
         'console': {
@@ -283,10 +285,12 @@ LOGGING = {
         # debug logging file settings
         'debug': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],# working with debug mode
-            'class': 'logging.handlers.WatchedFileHandler',
+            'filters': ['require_debug_false'],# working with debug mode
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGGING_FILES_DIR, 'debug.log'),
-            'formatter': 'dubug_formatter'
+            'formatter': 'dubug_formatter',
+            'maxBytes': 1024*1024*200,  # 200MB
+            'backupCount': 10           # 最多10个文件
         },
         # 邮件通知
         # 'mail_admins': {

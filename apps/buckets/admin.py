@@ -11,6 +11,7 @@ class BucketAdmin(admin.ModelAdmin):
 
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
+    readonly_fields = ('collection_name', )
 
     def get_collection_name(self, obj):
         return obj.get_bucket_table_name()
@@ -26,6 +27,7 @@ class BucketArchiveAdmin(admin.ModelAdmin):
 
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
+    readonly_fields = ('table_name',)
 
 
 @admin.register(BucketLimitConfig)

@@ -29,5 +29,26 @@ def log_used_time(logger=None, mark_text=''):
     return _decorator
 
 
+def log_op_info(logger=None, mark_text=''):
+    '''
+    执行操作信息日志装饰器
+
+    :param logger: 日志输出接口
+    :param mark_text: 描述文字
+    :return:
+    '''
+    def _decorator(func):
+        def swwaper(*args, **kwargs):
+            try:
+                ret = func(*args, **kwargs)
+            except Exception as e:
+                logger.debug(f'{mark_text},kwargs={kwargs};err={str(e)}')
+                raise e
+
+            logger.debug(f'{mark_text},kwargs={kwargs};成功return')
+            return ret
+
+        return swwaper
+    return _decorator
 
 

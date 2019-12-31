@@ -1,103 +1,70 @@
+{% extends 'html.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<link rel="stylesheet" type="text/css" href="{% static 'bootstrap-3.3.7/css/bootstrap.min.css' %}">
+
+{% block page-head %}
 	{% block head %}{% endblock %}
 	<title>{% block title %}{% endblock %}</title>
-    <style>
-        html, body{
-            height: 100%;
-        }
+{% endblock %}
 
-        .page-content {
-            min-height: 100%;
-            height: auto;
-            padding-top: 60px;
-            margin-bottom: -60px;
-            padding-bottom: 60px;
-        }
+{% block page-header %}
+    <nav class="navbar navbar-default navbar-fixed-top">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+                        data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+    {#                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">#}
+    {#                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">地球大数据科学工程对象云存储</a>#}
+                <img class="navbar-brand" src="{% static 'images/icon/logo.png' %}">
+                <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">中国科技云对象存储服务</a>
+            </div>
+            <div class="collapse navbar-collapse navbar-right" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                           aria-expanded="false">帮助 <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="{% url 'apidocs' %}" target="view_window" >API文档</a></li>
+                            <li><a href="{% url 'docs:docs' %}">帮助文档</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <ul class="nav navbar-nav">
+                            {% if user.is_authenticated %}
+                                <li class="dropdown">
+                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                       aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a href="{% url 'users:logout' %}">登出</a></li>
+                                        <li><a href="{% url 'users:change_password' %}">修改密码</a></li>
+                                        <li><a href="{% url 'users:security' %}">安全凭证</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        {% if user.is_superuser %}
+                                            <li><a href="{% url 'admin:index' %}">后台管理</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </li>
+                            {% else %}
+                                <li><a href="{% url 'users:login' %}">登录</a></li>
+                                <li><a href="{% url 'users:register' %}">注册</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+{% endblock %}
 
-        .page-footer{
-            height: 60px;
-            opacity: 0.8;
-            background-color: #ececec;
-        }
-        .page-content-display{
-            margin-bottom: 47%;
-        }
-    </style>
-</head>
-<body>
-    <div  class="page-content container-fluid">
-        <nav class="navbar navbar-default navbar-fixed-top">
-            <div class="container-fluid">
-                <!-- Brand and toggle get grouped for better mobile display -->
-                <div class="navbar-header">
-                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
-                            data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
-                        <span class="sr-only">Toggle navigation</span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </button>
-{#                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">#}
-{#                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">地球大数据科学工程对象云存储</a>#}
-                    <img class="navbar-brand" src="{% static 'images/icon/logo.png' %}">
-                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">中国科技云对象存储服务</a>
-                </div>
-                <!-- Collect the nav links, forms, and other content for toggling -->
-                <div class="collapse navbar-collapse navbar-right" id="bs-example-navbar-collapse-1">
-                    <ul class="nav navbar-nav">
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                               aria-expanded="false">帮助 <span class="caret"></span></a>
-                            <ul class="dropdown-menu">
-                                <li><a href="{% url 'apidocs' %}" target="view_window" >API文档</a></li>
-                                <li><a href="{% url 'docs:docs' %}">帮助文档</a></li>
-                            </ul>
-                        </li>
-                        <li>
-                            <ul class="nav navbar-nav">
-                                {% if user.is_authenticated %}
-                                    <li class="dropdown">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                           aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
-                                        <ul class="dropdown-menu">
-                                            <li><a href="{% url 'users:logout' %}">登出</a></li>
-                                            <li><a href="{% url 'users:change_password' %}">修改密码</a></li>
-                                            <li><a href="{% url 'users:security' %}">安全凭证</a></li>
-                                            <li role="separator" class="divider"></li>
-                                            {% if user.is_superuser %}
-                                                <li><a href="{% url 'admin:index' %}">后台管理</a></li>
-                                            {% endif %}
-                                        </ul>
-                                    </li>
-                                {% else %}
-                                    <li><a href="{% url 'users:login' %}">登录</a></li>
-                                    <li><a href="{% url 'users:register' %}">注册</a></li>
-                                {% endif %}
-                            </ul>
-                        </li>
-                    </ul>
-                </div><!-- /.navbar-collapse -->
-            </div><!-- /.container-fluid -->
-        </nav>
-        <div class="page-content-display">
-            {% block boby %}{% endblock %}
-        </div>
-    </div>
-    <footer class="page-footer container-fluid">
-        <div class="text-center">
-            <p>1996-{% now "Y" %} <a href="http://www.cnic.cas.cn/">中国科学院计算机网络信息中心</a> 版权所有 京ICP备09112257号-94.  Powered by 中国科技云 iHarbor</p>
-            <p>Copyright © 1996-{% now "Y" %} Computer Network Information Center, Chinese Academy of Sciences. All Rights Reserved.</p>
-        </div>
-    </footer>
-</body>
-    <script type="text/javascript" src="{% static 'jquery2.2.4/dist/jquery-2.2.4.min.js' %}"></script>
-    {# 加载 Bootstrap 的所有 JavaScript 插件。你也可以根据需要只加载单个插件 #}
-    <script type="text/javascript" src="{% static 'bootstrap-3.3.7/js/bootstrap.min.js' %}"></script>
+{% block page-content %}
+    {% block boby %}{% endblock %}
+{% endblock %}
+
+{% block page-script %}
     <script type="text/javascript" src="{% static 'iharbor/js/common.js' %}"></script>
 	{% block script %}{% endblock %}
-</html>
+{% endblock %}

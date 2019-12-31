@@ -1,6 +1,8 @@
+import logging
+
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
-from django.db import connections
+from django.db import close_old_connections
 from rest_framework import status
 
 from buckets.models import Bucket
@@ -8,18 +10,20 @@ from buckets.utils import BucketFileManagement
 from utils.storagers import PathParser
 from utils.oss import HarborObject, get_size
 from.paginations import BucketFileLimitOffsetPagination
+from utils.log.decorators import log_op_info
+
+debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 def ftp_close_old_connections(func):
     def wrapper(*args, **kwargs):
-        for conn in connections.all():
-            conn.close_if_unusable_or_obsolete()
+        close_old_connections()
         return func(*args, **kwargs)
 
     return wrapper
 
 class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
-        self.code = code    # 错误码
+        self.code = code if code else 500   # 错误码
         self.msg = msg      # 错误描述
         self.data = kwargs  # 一些希望传递的数据
 
@@ -79,6 +83,7 @@ class HarborManager():
 
         return None
 
+    @log_op_info(logger=debug_logger, mark_text='is_dir')
     def is_dir(self, bucket_name:str, path_name:str):
         '''
         是否时一个目录
@@ -130,24 +135,11 @@ class HarborManager():
         :param path_name: 文件路径
         :param user: 用户，默认为None，如果给定用户只获取属于此用户的对象（只查找此用户的存储桶）
         :return:
-            success: 对象实例
+            obj or dir    # 对象或目录实例
 
         :raise HarborError
         '''
-        path, name = PathParser(filepath=path_name).get_path_and_filename()
-        if not bucket_name or not name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg="path参数有误")
-
-        # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name, user=user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
-
-        table_name = bucket.get_bucket_table_name()
-        ok, obj = self._get_obj_or_dir(table_name, path, name)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
-
+        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=user)
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='指定对象或目录不存在')
 
@@ -181,21 +173,24 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            ok, obj，bfm: 对象或目录
+            obj，bfm: 对象或目录
 
-            False, None, bfm    # 父目录路径错误，不存在
-            True, obj, bfm   # 目录或对象存在
-            True, None, bfm  # 目录或对象不存在
+            obj, bfm   # 目录或对象存在
+            None, bfm  # 目录或对象不存在
+            raise Exception    # 父目录路径错误，不存在
+
+        :raises: HarborError
         '''
         bfm = BucketFileManagement(path=path, collection_name=table_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=name)
-        if not ok:
-            return False, None, bfm    # 父目录路径错误不存在
+        try:
+            obj = bfm.get_dir_or_obj_exists(name=name)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
 
         if obj:
-            return True, obj, bfm   # 目录或对象存在
+            return obj, bfm   # 目录或对象存在
 
-        return True, None, bfm  # 目录或对象不存在
+        return None, bfm  # 目录或对象不存在
 
     def _get_obj_or_dir(self, table_name, path, name):
         '''
@@ -205,14 +200,15 @@ class HarborManager():
         :param path: 父目录路经
         :param name: 对象名称或目录名称
         :return:
-            ok, obj: 对象或目录
-            ok == False: 父目录路径错误，不存在
-            None: 目录或对象不存在
+            raise Exception    # 父目录路径错误，不存在
+            obj or None: 目录或对象不存在
+
+        :raises: HarborError
         '''
-        ok, obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
+        obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
+        return obj
 
-        return ok, obj
-
+    @log_op_info(logger=debug_logger, mark_text='mkdir')
     def mkdir(self, bucket_name:str, path:str, user=None):
         '''
         创建一个目录
@@ -280,9 +276,10 @@ class HarborManager():
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
 
-        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+        try:
+            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
+        except HarborError as e:
+            raise e
 
         if dir:
             # 目录已存在
@@ -299,6 +296,7 @@ class HarborManager():
         data['dir_name'] = dir_name
         return data
 
+    @log_op_info(logger=debug_logger, mark_text='rmdir')
     def rmdir(self, bucket_name:str, dirpath:str, user=None):
         '''
         删除一个空目录
@@ -311,7 +309,6 @@ class HarborManager():
 
         :raise HarborError()
         '''
-
         path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
         if not bucket_name or not dir_name:
@@ -324,9 +321,10 @@ class HarborManager():
 
         table_name = bucket.get_bucket_table_name()
 
-        ok, dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+        try:
+            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
+        except HarborError as e:
+            raise e
 
         if not dir or dir.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
@@ -493,15 +491,15 @@ class HarborManager():
         new_obj_name = rename if rename else obj.name # 移动后对象的名称，对象名称不变或重命名
 
         # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
-        if move_to is None: # 仅仅重命名对象，不移动
-            bfm = BucketFileManagement( collection_name=table_name)
-            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
-        else: # 需要移动对象
-            bfm = BucketFileManagement(path=move_to, collection_name=table_name)
-            ok, target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
-
-        if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='无法完成对象的移动操作，指定的目标路径未找到')
+        try:
+            if move_to is None: # 仅仅重命名对象，不移动
+                bfm = BucketFileManagement( collection_name=table_name)
+                target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
+            else: # 需要移动对象
+                bfm = BucketFileManagement(path=move_to, collection_name=table_name)
+                target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
 
         if target_obj:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录')
@@ -650,10 +648,10 @@ class HarborManager():
         '''
         bfm = BucketFileManagement(path=path, collection_name=table_name)
 
-        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
-        # 父路经不存在或有错误
-        if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象路经不存在')
+        try:
+            obj = bfm.get_dir_or_obj_exists(name=filename)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=f'查询对象错误，{str(e)}')
 
         # 文件对象已存在
         if obj and obj.is_file():
@@ -1031,9 +1029,12 @@ class HarborManager():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
         table_name = bucket.get_bucket_table_name()
-        ok, obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
-        if not ok:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，父节点目录不存在')
+        try:
+            obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
+        except HarborError as e:
+            raise e
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=f'查询目录或对象错误，{str(e)}')
 
         if not obj:
             return bucket, None
@@ -1115,6 +1116,7 @@ class FtpHarborManager():
     def __init__(self):
         self.__hbManager = HarborManager()
 
+    @ftp_close_old_connections
     def ftp_authenticate(self, bucket_name:str, password:str):
         '''
         Bucket桶ftp访问认证
@@ -1137,6 +1139,7 @@ class FtpHarborManager():
 
         return False, False, 'Wrong password'
 
+    @ftp_close_old_connections
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
         '''
         向对象写入一个数据块
@@ -1152,6 +1155,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.write_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, chunk=chunk)
 
+    @ftp_close_old_connections
     def ftp_write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
         '''
         向对象写入一个文件
@@ -1169,6 +1173,7 @@ class FtpHarborManager():
         return self.__hbManager.write_file(bucket_name=bucket_name, obj_path=obj_path, offset=offset,
                                            file=file, reset=reset, user=user)
 
+    @ftp_close_old_connections
     def ftp_move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None):
         '''
         移动或重命名对象
@@ -1185,6 +1190,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename, move=move)
 
+    @ftp_close_old_connections
     def ftp_rename(self, bucket_name:str, obj_path:str, rename):
         '''
         重命名对象
@@ -1200,6 +1206,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename)
 
+    @ftp_close_old_connections
     def ftp_read_chunk(self, bucket_name:str, obj_path:str, offset:int, size:int):
         '''
         从对象读取一个数据块
@@ -1216,6 +1223,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.read_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, size=size)
 
+    @ftp_close_old_connections
     def ftp_get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
         '''
         获取一个读取对象的生成器函数
@@ -1232,6 +1240,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.get_obj_generator(bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
 
+    @ftp_close_old_connections
     def ftp_delete_object(self, bucket_name:str, obj_path:str):
         '''
         删除一个对象
@@ -1246,6 +1255,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.delete_object(bucket_name=bucket_name, obj_path=obj_path)
 
+    @ftp_close_old_connections
     def ftp_list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000):
         '''
         获取目录下的文件列表信息
@@ -1262,6 +1272,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.list_dir(bucket_name, path, offset=offset, limit=limit)
 
+    @ftp_close_old_connections
     def ftp_list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000):
         '''
         获取目录下的文件列表信息生成器
@@ -1280,6 +1291,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.list_dir_generator(bucket_name=bucket_name, path=path, per_num=per_num)
 
+    @ftp_close_old_connections
     def ftp_mkdir(self, bucket_name:str, path:str):
         '''
         创建一个目录
@@ -1290,8 +1302,9 @@ class FtpHarborManager():
             raise HarborError: failed
         :raise HarborError
         '''
-        return self.__hbManager.mkdir(bucket_name, path)
+        return self.__hbManager.mkdir(bucket_name=bucket_name, path=path)
 
+    @ftp_close_old_connections
     def ftp_rmdir(self, bucket_name:str, path:str):
         '''
         删除一个空目录
@@ -1305,6 +1318,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.rmdir(bucket_name, path)
 
+    @ftp_close_old_connections
     def ftp_is_dir(self, bucket_name:str, path_name:str):
         '''
         是否时一个目录
@@ -1319,6 +1333,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.is_dir(bucket_name=bucket_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_is_file(self, bucket_name:str, path_name:str):
         '''
         是否时一个文件
@@ -1332,6 +1347,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.is_file(bucket_name=bucket_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_get_obj(self, buckest_name:str, path_name:str):
         '''
         获取对象或目录实例
@@ -1346,6 +1362,7 @@ class FtpHarborManager():
         '''
         return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
 
+    @ftp_close_old_connections
     def ftp_get_write_generator(self, bucket_name: str, obj_path: str):
         '''
         获取一个写入对象的生成器函数

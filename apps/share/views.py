@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from django.shortcuts import render
 from django.views import View
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
@@ -207,17 +207,6 @@ class ObsViewSet(viewsets.GenericViewSet):
         if isinstance(start, int) and isinstance(end, int) and start > end:
             return None, None
         return start, end
-
-    def get_file_obj_or_404(self, collection_name, path, filename):
-        """
-        获取文件对象
-        """
-        bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=filename)
-        if ok and obj and obj.is_file():
-            return obj
-
-        raise Http404
 
     def has_access_permission(self, request, bucket, obj):
         '''

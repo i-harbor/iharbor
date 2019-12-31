@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.db.utils import ProgrammingError
 
 from buckets.utils import BucketFileManagement, delete_table_for_model_class
-from buckets.models import Bucket
+from buckets.models import Archive
 from utils.oss import HarborObject
 
 
@@ -17,24 +17,21 @@ class Command(BaseCommand):
     '''
     pool_sem = threading.Semaphore(1000)  # 定义最多同时启用多少个线程
 
-    help = 'Really delete objects and directories that have been softly deleted from a bucket'
+    help = 'Really delete objects and directories that have been deleted from a bucket'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--bucket-name', default=None, dest='bucketname',
-            help='Name of bucket will be clearing,',
+            help='Name of bucket have been deleted will be clearing,',
         )
-        parser.add_argument(
-            '--all', default=None, nargs='?', dest='all', const=True, # 当命令行有此参数时取值const, 否则取值default
-            help='All buckets will be clearing',
-        )
+
         parser.add_argument(
             '--daysago', default='30', dest='daysago', type=int,
-            help='Clear objects and directories that have been softly deleted more than days ago.',
+            help='Clear objects and directories that have been deleted more than days ago.',
         )
         parser.add_argument(
             '--all-deleted', default=None, nargs='?', dest='all_deleted', const=True, # 当命令行有此参数时取值const, 否则取值default
-            help='All buckets that have been softly deleted will be clearing.',
+            help='All buckets that have been deleted will be clearing.',
         )
 
     def handle(self, *args, **options):
@@ -62,35 +59,28 @@ class Command(BaseCommand):
         :return:
         '''
         bucketname = options['bucketname']
-        all = options['all']
         all_deleted = options['all_deleted']
 
         # 指定名字的桶
         if bucketname:
             self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
-            return Bucket.objects.filter(name=bucketname).all()
+            return Archive.objects.filter(name=bucketname, archive_time__lt=self._clear_datetime).all()
 
-        # 全部已删除的桶
+        # 全部已删除归档的桶
         if all_deleted:
             self.stdout.write(self.style.NOTICE('Will clear all buckets that have been softly deleted '))
-            return []
-
-        # 全部的桶
-        if all is not None:
-            self.stdout.write(self.style.NOTICE(
-                'Will clear objs or dirs that have been softly deleted before {0} from all buckets.'.format(self._clear_datetime)))
-            return Bucket.objects.all()
+            return Archive.objects.filter(archive_time__lt=self._clear_datetime).all()
 
         # 未给出参数
         if not bucketname:
             bucketname = input('Please input a bucket name:')
 
         self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
-        return Bucket.objects.filter(name=bucketname).all()
+        return Archive.objects.filter(name=bucketname).all()
 
-    def get_objs_and_dirs(self, modelclass, num=1000, by_filters=True):
+    def get_objs_and_dirs(self, modelclass, num=1000):
         '''
-        获取满足要被删除条件的对象和目录,默认最多返回1000条
+        获取对象和目录,默认最多返回1000条
 
         :param modelclass: 对象和目录的模型类
         :param num: 获取数量
@@ -98,48 +88,56 @@ class Command(BaseCommand):
         :return:
         '''
         try:
-            if not by_filters:
-                objs = modelclass.objects.all()[:num]
-            else:
-                objs = modelclass.objects.filter(Q(sds=True) & Q(upt__lt=self._clear_datetime))[:num]
+            objs = modelclass.objects.all()[:num]
         except Exception as e:
             self.stdout.write(self.style.ERROR('Error when clearing bucket table named {0},'.format(
                 modelclass.Meta.db_table) + str(e)))
             return None
         return objs
 
+    def is_meet_delete_time(self, bucket):
+        '''
+        归档的桶是否满足删除时间要求，即是否可以清理
+
+        :param bucket: Archive()
+        :return:
+            True    # 满足
+            False   # 不满足
+        '''
+        archive_time = bucket.archive_time.replace(tzinfo=None)
+
+        if timezone.is_aware(self._clear_datetime):
+            if not timezone.is_aware(archive_time):
+                archive_time = timezone.make_aware(archive_time)
+        else:
+            if not timezone.is_naive(archive_time):
+                archive_time = timezone.make_naive(archive_time)
+
+        if archive_time < self._clear_datetime:
+            return True
+
+        return False
+
     def clear_one_bucket(self, bucket):
         '''
         清除一个bucket中满足删除条件的对象和目录
 
-        :param bucket: Bucket obj
+        :param bucket: Archive()
         :return:
         '''
         self.stdout.write('Now clearing bucket named {0}'.format(bucket.name))
+        table_name = bucket.get_bucket_table_name()
+        modelclass = BucketFileManagement(collection_name=table_name).get_obj_model_class()
 
-        collection_name = bucket.get_bucket_table_name()
-        modelclass = BucketFileManagement(collection_name=collection_name).get_obj_model_class()
-
-        # 如果bucket是已删除的, 并且满足删除条件
-        by_filters = True
-        modified_time = bucket.modified_time.replace(tzinfo=None)
-
-        if timezone.is_aware(self._clear_datetime):
-            if not timezone.is_aware(modified_time):
-                modified_time = timezone.make_aware(modified_time)
-        else:
-            if not timezone.is_naive(modified_time):
-                modified_time = timezone.make_naive(modified_time)
-
-        # if bucket.is_soft_deleted() and  modified_time < self._clear_datetime:
-        #     by_filters = False
+        # 已删除归档的桶不满足删除时间条件，直接返回不清理
+        if not self.is_meet_delete_time(bucket):
+            return
 
         ho = HarborObject(obj_id='')
-
         try:
             while True:
-                objs = self.get_objs_and_dirs(modelclass=modelclass, by_filters=by_filters)
-                if objs is None or objs.count() <= 0:
+                objs = self.get_objs_and_dirs(modelclass=modelclass)
+                if objs is None or len(objs) <= 0:
                     break
 
                 for obj in objs:
@@ -158,13 +156,12 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"Success deleted {objs.count()} objects from bucket {bucket.name}."))
 
             # 如果bucket对应表已空，删除bucket和表
-            if by_filters == False:
-                if modelclass.objects.count() == 0:
-                    if delete_table_for_model_class(modelclass):
-                        bucket.delete()
-                        self.stdout.write(self.style.WARNING(f"deleted bucket and it's table:{bucket.name}"))
-                    else:
-                        self.stdout.write(self.style.ERROR(f'deleted bucket table error:{bucket.name}'))
+            if modelclass.objects.count() == 0:
+                if delete_table_for_model_class(modelclass):
+                    bucket.delete()
+                    self.stdout.write(self.style.WARNING(f"deleted bucket and it's table:{bucket.name}"))
+                else:
+                    self.stdout.write(self.style.ERROR(f'deleted bucket table error:{bucket.name}'))
 
             self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
         except (ProgrammingError, Exception) as e:

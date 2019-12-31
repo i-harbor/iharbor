@@ -560,6 +560,8 @@ class ObjViewSet(CustomGenericViewSet):
     通过文件对象绝对路径分片上传文件对象
 
         说明：
+        * 请求类型ContentType = multipart/form-data；不是json，请求体中分片chunk当成是一个文件或类文件处理；
+
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
@@ -1532,43 +1534,20 @@ class MetadataViewSet(CustomGenericViewSet):
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': '存储桶不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
-
-        table_name = bucket.get_bucket_table_name()
+        hManager = HarborManager()
         try:
-            obj = self.get_obj_or_dir_404(table_name, path, name)
-        except Http404:
-            return Response(data={'code': 404, 'code_text': '指定对象或目录不存在'},
-                            status=status.HTTP_404_NOT_FOUND)
+            bucket, obj = hManager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not obj:
+            return Response(data={'code': 404, 'code_text': '对象或目录不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
         return Response(data={'code': 200, 'code_text': '获取元数据成功', 'bucket_name': bucket_name,
                               'dir_path': path, 'obj': serializer.data})
-
-    def get_obj_or_dir_404(self, table_name, path, name):
-        '''
-        获取文件对象或目录
-
-        :param table_name: 数据库表名
-        :param path: 父目录路经
-        :param name: 对象名称或目录名称
-        :return:
-            obj: 对象或目录
-            raise Http404: 目录或对象不存在，父目录路径错误，不存在
-        '''
-        bfm = BucketFileManagement(path=path, collection_name=table_name)
-        ok, obj = bfm.get_dir_or_obj_exists(name=name)
-        if not ok:
-            raise Http404
-
-        if obj:
-            return obj
-
-        raise Http404
 
     def get_serializer_class(self):
         """
@@ -2474,3 +2453,90 @@ class VPNViewSet(CustomGenericViewSet):
         if self.action == 'create':
             return serializers.VPNPostSerializer
         return Serializer
+
+
+class ObjKeyViewSet(CustomGenericViewSet):
+    '''
+    对象CEPH RADOS KEY视图集
+
+    retrieve:
+        获取对象对应的ceph rados key信息
+
+    	>>Http Code: 状态码200：
+            {
+                "code": 200,
+                "code_text": "请求成功",
+                "info": {
+                    "rados": "iharbor:ceph/obs/217_12", # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
+                    "size": 1185,                       # 对象大小Byte
+                    "filename": "client.ovpn"           # 对象名称
+                }
+            }
+
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+                'code': 400,
+                'code_text': 'xxxx参数有误'
+            }
+        >>Http Code: 状态码404：找不到资源;
+        >>Http Code: 状态码500：服务器内部错误;
+
+    '''
+    queryset = {}
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'objpath'
+    lookup_value_regex = '.+'
+
+    # api docs
+    VERSION_METHOD_FEILD = [
+        coreapi.Field(
+            name='version',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='API版本（v1）')
+        ),
+    ]
+
+    OBJ_PATH_METHOD_FEILD = [
+        coreapi.Field(
+            name='objpath',
+            required=True,
+            location='path',
+            schema=coreschema.String(description='文件对象绝对路径，类型String'),
+        ),
+    ]
+
+    schema = CustomAutoSchema(
+        manual_fields={
+            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+        }
+    )
+
+    def retrieve(self, request, *args, **kwargs):
+        if request.version == 'v1':
+            return self.retrieve_v1(request, *args, **kwargs)
+
+        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+
+    def retrieve_v1(self, request, *args, **kwargs):
+        objpath = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name','')
+
+        hManager = HarborManager()
+        try:
+            bucket, obj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=objpath, user = request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        if not obj:
+            return Response(data={'code': 404, 'code_text': '对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+        obj_key = obj.get_obj_key(bucket.id)
+        rados_key = HarborObject(obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+        info = {
+            'rados': rados_key,
+            'size': obj.obj_size,
+            'filename': obj.name
+        }
+        return Response(data={'code': 200, 'code_text': '请求成功', 'info': info}, status=status.HTTP_200_OK)
+

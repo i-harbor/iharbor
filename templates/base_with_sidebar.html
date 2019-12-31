@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block boby %}
-    <div class="container col-xs-2">
+    <div class="col-xs-2">
         <ul class="nav nav-tabs nav-stacked">
             <li role="presentation" class="active menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
@@ -35,8 +35,6 @@
                 </li>
                 <ul class="bg-info nav nav-pills nav-stacked collapse in" id="vpn-nav-list-group">
                     <li><a href="{% url 'vpn:home' %}">VPN口令管理</a></li>
-                </ul>
-                <ul class="bg-info nav nav-pills nav-stacked collapse in" id="vpn-nav-list-group">
                     <li><a href="{% url 'vpn:usage' %}">VPN安装配置说明</a></li>
                 </ul>
             </li>
