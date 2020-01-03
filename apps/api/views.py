@@ -2,12 +2,12 @@ from collections import OrderedDict
 import logging
 from io import BytesIO
 
-from django.http import StreamingHttpResponse, FileResponse, Http404, QueryDict
+from django.http import StreamingHttpResponse, FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.core.validators import validate_email
 from django.core import exceptions
 from django.urls import reverse as django_reverse
-from rest_framework import viewsets, status, mixins
+from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.serializers import Serializer, ValidationError
@@ -24,7 +24,7 @@ from utils.storagers import PathParser
 from utils.oss import HarborObject, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool
-from utils.view import CustomAutoSchema, CustomGenericViewSet
+from utils.view import CustomGenericViewSet
 from vpn.models import VPNAuth
 from .models import User, Bucket
 from . import serializers
@@ -54,21 +54,6 @@ def get_user_own_bucket(bucket_name, request):
     if not bucket.check_user_own_bucket(request.user):
         return None
     return bucket
-
-def get_bucket_collection_name_or_response(bucket_name, request):
-    '''
-    获取存储通对应集合名称，或者Response对象
-    :param bucket_name: 存储通名称
-    :return: (collection_name, response)
-            collection_name=None时，存储通不存在，response有效；
-            collection_name!=''时，存储通存在，response=None；
-    '''
-    bucket = get_user_own_bucket(bucket_name, request)
-    if not isinstance(bucket, Bucket):
-        return None, Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
-
-    collection_name = bucket.get_bucket_table_name()
-    return (collection_name, None)
 
 
 def str_to_int_or_default(val, default):
@@ -758,13 +743,6 @@ class ObjViewSet(CustomGenericViewSet):
         }
     )
     def create_detail(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.upload_chunk_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def upload_chunk_v1(self, request, *args, **kwargs):
-
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
         reset = request.query_params.get('reset', '').lower()
@@ -1123,10 +1101,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
+        return self.list_v1(request, *args, **kwargs)
 
     @swagger_auto_schema(
         operation_summary='获取一个目录下的文件和文件夹信息',
@@ -1598,12 +1573,6 @@ class MoveViewSet(CustomGenericViewSet):
         }
     )
     def create_detail(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.create_detail_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def create_detail_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
         move_to = request.query_params.get('move_to', None)
@@ -1691,13 +1660,8 @@ class MetadataViewSet(CustomGenericViewSet):
             status.HTTP_200_OK: ''
         }
     )
+
     def retrieve(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.retrieve_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def retrieve_v1(self, request, *args, **kwargs):
         path_name = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
         path, name = PathParser(filepath=path_name).get_path_and_filename()
@@ -1767,14 +1731,7 @@ class CephStatsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         try:
             stats = HarborObject(obj_id='').get_cluster_stats()
         except RadosError as e:
@@ -1786,6 +1743,7 @@ class CephStatsViewSet(CustomGenericViewSet):
             'code_text': 'successful',
             'stats': stats
         })
+
 
 class UserStatsViewSet(CustomGenericViewSet):
     '''
@@ -1863,14 +1821,7 @@ class UserStatsViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         user = request.user
         data = self.get_user_stats(user)
         data['code'] = 200
@@ -1878,12 +1829,6 @@ class UserStatsViewSet(CustomGenericViewSet):
         return Response(data)
 
     def retrieve(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.retrieve_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def retrieve_v1(self, request, *args, **kwargs):
         username = kwargs.get(self.lookup_field)
         try:
             user = User.objects.get(username=username)
@@ -1955,14 +1900,7 @@ class CephComponentsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         return Response({
             'code': 200,
             'mon': {},
@@ -1999,12 +1937,6 @@ class CephErrorViewSet(CustomGenericViewSet):
     pagination_class = None
 
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         return Response({
             'code': 200,
             'errors': {
@@ -2042,14 +1974,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         ok, data = HarborObject(obj_id='').get_ceph_io_status()
         if not ok:
             return Response(data={'code': 500, 'code_text': 'Get io status error:' + data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2081,14 +2006,7 @@ class UserCountViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         count = User.objects.filter(is_active=True).count()
         return Response({
             'code': 200,
@@ -2116,12 +2034,6 @@ class AvailabilityViewSet(CustomGenericViewSet):
     pagination_class = None
 
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         return Response({
             'code': 200,
             'availability': '100%'
@@ -2159,14 +2071,7 @@ class VisitStatsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         stats = User.active_user_stats()
         stats.update({
             'visitors': 100,
@@ -2206,14 +2111,7 @@ class TestViewSet(CustomGenericViewSet):
     throttle_classes = (throttles.TestRateThrottle,)
     pagination_class = None
 
-
     def list(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         return Response({
             'code': 200,
             'code_text': '系统可用',
@@ -2284,12 +2182,6 @@ class FtpViewSet(CustomGenericViewSet):
         }
     )
     def partial_update(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.patch_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def patch_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get(self.lookup_field, '')
         if not bucket_name:
             return Response(data={'code': 400, 'code_text': '桶名称有误'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2426,12 +2318,6 @@ class VPNViewSet(CustomGenericViewSet):
                 }
             }
         '''
-        if request.version == 'v1':
-            return self.list_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def list_v1(self, request, *args, **kwargs):
         vpn, created = VPNAuth.objects.get_or_create(user=request.user)
         return Response(data={'code': 200, 'code_text': '获取成功', 'vpn': serializers.VPNSerializer(vpn).data})
 
@@ -2456,12 +2342,6 @@ class VPNViewSet(CustomGenericViewSet):
         '''
         修改vpn口令
         '''
-        if request.version == 'v1':
-            return self.create_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def create_v1(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
             code_text = 'password有误'
@@ -2537,12 +2417,6 @@ class ObjKeyViewSet(CustomGenericViewSet):
         ]
     )
     def retrieve(self, request, *args, **kwargs):
-        if request.version == 'v1':
-            return self.retrieve_v1(request, *args, **kwargs)
-
-        return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    def retrieve_v1(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name','')
 
