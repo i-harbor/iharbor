@@ -10,9 +10,11 @@ from django.urls import reverse as django_reverse
 from rest_framework import viewsets, status, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.compat import coreapi, coreschema
 from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.authtoken.models import Token
+from rest_framework import parsers
+from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg import openapi
 
 from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
 from users.views import send_active_url_email
@@ -90,9 +92,11 @@ class UserViewSet(mixins.ListModelMixin,
     '''
     用户类视图
     list:
-    获取用户列表,需要超级用户权限
+        获取用户列表
 
-        http code 200 返回内容:
+        获取用户列表,需要超级用户权限
+
+        >> http code 200 返回内容:
             {
               "count": 2,  # 总数
               "next": null, # 下一页url
@@ -117,7 +121,9 @@ class UserViewSet(mixins.ListModelMixin,
             }
 
     retrieve:
-    获取一个用户详细信息，需要超级用户权限，或当前用户信息
+    获取一个用户详细信息
+
+        需要超级用户权限，或当前用户信息
 
         http code 200 返回内容:
             {
@@ -158,6 +164,7 @@ class UserViewSet(mixins.ListModelMixin,
 
     partial_update:
     修改用户信息
+
     1、超级职员用户拥有所有权限；
     2、用户拥有修改自己信息的权限；
     3、超级用户只有修改普通用户信息的权限
@@ -177,6 +184,12 @@ class UserViewSet(mixins.ListModelMixin,
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
+    @swagger_auto_schema(
+        operation_summary='注册一个用户',
+        responses={
+            status.HTTP_200_OK: ''
+        }
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -287,34 +300,30 @@ class BucketViewSet(CustomGenericViewSet):
     '''
     存储桶视图
 
-    list:
-    获取存储桶列表
-
-        >>Http Code: 状态码200：无异常时，返回所有的存储桶信息；
-            {
-                'code': 200,
-                'buckets': [], // bucket对象列表
-            }
-
-    retrieve:
-    获取一个存储桶详细信息
-
-        >>Http Code: 状态码200：无异常时，返回存储桶的详细信息；
-            {
-                'code': 200,
-                'bucket': {}, // bucket对象
-            }
-
     create:
     创建一个新的存储桶
+    存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符
 
-        >>Http Code: 状态码201；
-            创建成功时：
+        >>Http Code: 状态码201；创建成功时：
             {
-                'code': 201,
-                'code_text': '创建成功',
-                'data': serializer.data, //请求时提交数据
-                'bucket': {}             //bucket对象信息
+              "code": 201,
+              "code_text": "创建成功",
+              "data": {                 //请求时提交数据
+                "name": "333"
+              },
+              "bucket": {               //bucket对象信息
+                "id": 225,
+                "name": "333",
+                "user": {
+                  "id": 3,
+                  "username": "869588058@qq.com"
+                },
+                "created_time": "2020-01-02 14:02:34",
+                "access_permission": "私有",
+                "ftp_enable": false,
+                "ftp_password": "696674124f",
+                "ftp_ro_password": "9563d3cc29"
+              }
             }
         >>Http Code: 状态码400,参数有误：
             {
@@ -359,40 +368,47 @@ class BucketViewSet(CustomGenericViewSet):
         }
 
     '''
-    queryset = Bucket.objects.all()
+    queryset = Bucket.objects.select_related('user').all()
     permission_classes = [IsAuthenticated, permissions.IsOwnBucket]
     pagination_class = paginations.BucketsLimitOffsetPagination
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'destroy': [
-                coreapi.Field(
-                    name='ids',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Array(description='存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id'),
-                ),
-            ],
-            'partial_update': [
-                coreapi.Field(
-                    name='public',
-                    required=True,
-                    location='query',
-                    schema=coreschema.Integer(description='设置访问权限, 1(公有)，2(私有)，3（公有可读可写）'),
-                ),
-                coreapi.Field(
-                    name='ids',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Array(description='存储桶id列表或数组，设置多个存储桶时，通过此参数传递其他存储桶id'),
-                ),
-            ]
+
+    @swagger_auto_schema(
+        operation_summary= '获取存储桶列表',
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "count": 18,
+                  "next": null,
+                  "page": {
+                    "current": 1,
+                    "final": 1
+                  },
+                  "previous": null,
+                  "buckets": [
+                    {
+                      "id": 222,
+                      "name": "hhf",
+                      "user": {
+                        "id": 3,
+                        "username": "869588058@qq.com"
+                      },
+                      "created_time": "2019-12-22 16:10:16",
+                      "access_permission": "公有",
+                      "ftp_enable": false,
+                      "ftp_password": "1a0cdf3283",
+                      "ftp_ro_password": "666666666"
+                    },
+                  ]
+                }
+            """
         }
     )
-
     def list(self, request, *args, **kwargs):
-        self.queryset = Bucket.objects.filter(user=request.user).all() # user's own
+        '''
+        获取存储桶列表
+        '''
+        self.queryset = Bucket.objects.select_related('user').filter(user=request.user).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -404,6 +420,12 @@ class BucketViewSet(CustomGenericViewSet):
             data = {'code': 200, 'buckets': serializer.data,}
         return Response(data)
 
+    @swagger_auto_schema(
+        operation_summary='创建一个存储桶',
+        responses={
+            status.HTTP_201_CREATED: 'OK'
+        }
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
@@ -447,11 +469,52 @@ class BucketViewSet(CustomGenericViewSet):
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(
+        operation_summary='获取一个存储桶详细信息',
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "bucket": {
+                    "id": 222,
+                    "name": "hhf",
+                    "user": {
+                      "id": 3,
+                      "username": "869588058@qq.com"
+                    },
+                    "created_time": "2019-12-22 16:10:16",
+                    "access_permission": "公有",
+                    "ftp_enable": false,
+                    "ftp_password": "1a0cdf3283",
+                    "ftp_ro_password": "666666666"
+                  }
+                }
+            """
+        }
+    )
     def retrieve(self, request, *args, **kwargs):
+        '''
+        获取一个存储桶详细信息
+        '''
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({'code': 200, 'bucket': serializer.data})
 
+    @swagger_auto_schema(
+        operation_summary='删除一个存储桶',
+        manual_parameters=[
+            openapi.Parameter(
+                name='ids', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_ARRAY,
+                items= openapi.Items(type=openapi.TYPE_INTEGER),
+                description="存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_204_NO_CONTENT: 'NO_CONTENT'
+        }
+    )
     def destroy(self, request, *args, **kwargs):
         ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
         if not ids and response:
@@ -468,6 +531,30 @@ class BucketViewSet(CustomGenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @swagger_auto_schema(
+        operation_summary='存储桶访问权限设置',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='public', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="设置访问权限, 1(公有)，2(私有)，3（公有可读可写）",
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "code_text": "存储桶权限设置成功",
+                  "public": 1,
+                  "share": [
+                    "http://159.226.91.140:8000/share/s/hhf"
+                  ]
+                }
+            """
+        }
+    )
     def partial_update(self, request, *args, **kwargs):
         public = str_to_int_or_default(request.query_params.get('public', ''), 0)
         if public not in [1, 2, 3]:
@@ -551,17 +638,11 @@ class ObjViewSet(CustomGenericViewSet):
     '''
     文件对象视图集
 
-    update:
-    通过文件对象绝对路径分片上传文件对象
-
-        同POST方法，请使用POST，此方法后续废除
-
     create_detail:
-    通过文件对象绝对路径分片上传文件对象
+        通过文件对象绝对路径分片上传文件对象
 
         说明：
         * 请求类型ContentType = multipart/form-data；不是json，请求体中分片chunk当成是一个文件或类文件处理；
-
         * 小文件可以作为一个分片上传，大文件请自行分片上传，分片过大可能上传失败，建议分片大小5-10MB；对象上传支持部分上传，
           分片上传数据直接写入对象，已成功上传的分片数据永久有效且不可撤销，请自行记录上传过程以实现断点续传；
         * 文件对象已存在时，数据上传会覆盖原数据，文件对象不存在，会自动创建文件对象，并且文件对象的大小只增不减；
@@ -578,8 +659,10 @@ class ObjViewSet(CustomGenericViewSet):
 
         Http Code: 状态码200：上传成功无异常时，返回数据：
         {
-            'created': True, # 上传第一个分片时，可用于判断对象是否是新建的，True(新建的)
-            'data': 客户端请求时，携带的参数,不包含数据块；
+          "chunk_offset": 0,    # 请求参数
+          "chunk": null,
+          "chunk_size": 34,     # 请求参数
+          "created": true       # 上传第一个分片时，可用于判断对象是否是新建的，True(新建的)
         }
         Http Code: 状态码400：参数有误时，返回数据：
             {
@@ -612,6 +695,8 @@ class ObjViewSet(CustomGenericViewSet):
         >>Http Code: 状态码500：服务器内部错误;
 
     destroy:
+        删除对象
+
         通过文件对象绝对路径,删除文件对象；
 
         >>Http Code: 状态码204：删除成功，NO_CONTENT；
@@ -642,89 +727,42 @@ class ObjViewSet(CustomGenericViewSet):
     # permission_classes = [IsAuthenticated]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
+    parser_classes = (parsers.MultiPartParser, parsers.FormParser)
 
-    # api docs
-    VERSION_METHOD_FEILD = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
 
-    OBJ_PATH_METHOD_FEILD = [
-        coreapi.Field(
-            name='objpath',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='文件对象绝对路径，类型String'),
-        ),
-    ]
-
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
-                coreapi.Field(
-                    name='offset',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='要读取的文件块在整个文件中的起始位置（bytes偏移量), 类型int'),
-                ),
-                coreapi.Field(
-                    name='size',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='要读取的文件块的字节大小, 类型int'),
-                ),
-            ],
-            'destroy': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-            'update': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
-                coreapi.Field(
-                    name='reset',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
-                ),
-            ],
-            'create_detail': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
-                coreapi.Field(
-                    name='reset',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Boolean(description='reset=true时，如果对象已存在，重置对象大小为0')
-                ),
-            ],
-            'partial_update': VERSION_METHOD_FEILD + [
-                coreapi.Field(
-                    name='share',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Integer(description='分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）'),
-                ),
-                coreapi.Field(
-                    name='days',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='对象公开分享天数(share=true时有效)，0表示永久公开，负数表示不公开，默认为0'),
-                ),
-            ],
+    @swagger_auto_schema(
+        operation_summary='分片上传文件对象',
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="文件对象绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='reset', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="reset=true时，如果对象已存在，重置对象大小为0",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "chunk_offset": 0,
+                  "chunk": null,
+                  "chunk_size": 34,
+                  "created": true
+                }
+            """
         }
     )
-
     def create_detail(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.upload_chunk_v1(request, *args, **kwargs)
 
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
-    # def update(self, request, *args, **kwargs):
-    #     if request.version == 'v1':
-    #         return self.upload_chunk_v1(request, *args, **kwargs)
-    #
-    #     return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
-
-    @log_used_time(debug_logger, mark_text='upload chunks')
     def upload_chunk_v1(self, request, *args, **kwargs):
 
         objpath = kwargs.get(self.lookup_field, '')
@@ -765,6 +803,28 @@ class ObjViewSet(CustomGenericViewSet):
         data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        operation_summary='下载文件对象，自定义读取对象数据块',
+        manual_parameters=[
+            openapi.Parameter(
+                name='offset', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="要读取的文件块在整个文件中的起始位置（bytes偏移量)",
+                required=False
+            ),
+            openapi.Parameter(
+                name='size', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="要读取的文件块的字节大小",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                Content-Type: application/octet-stream
+            """
+        }
+    )
     def retrieve(self, request, *args, **kwargs):
 
         objpath = kwargs.get(self.lookup_field, '')
@@ -818,6 +878,33 @@ class ObjViewSet(CustomGenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @swagger_auto_schema(
+        operation_summary='对象共享或私有权限设置',
+        manual_parameters=[
+            openapi.Parameter(
+                name='share', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）",
+                required=True
+            ),
+            openapi.Parameter(
+                name='days', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="对象公开分享天数(share=true时有效)，0表示永久公开，负数表示不公开，默认为0",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "code_text": "对象共享权限设置成功",
+                  "share": 1,
+                  "days": 2
+                }        
+            """
+        }
+    )
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
@@ -850,7 +937,6 @@ class ObjViewSet(CustomGenericViewSet):
             'days': days
         }
         return Response(data=data, status=status.HTTP_200_OK)
-
 
     def get_serializer_class(self):
         """
@@ -925,7 +1011,6 @@ class ObjViewSet(CustomGenericViewSet):
         response['evob_obj_size'] = obj_size
         return response
 
-    @log_used_time(debug_logger, mark_text='get request.data during upload file')
     def get_data(self, request):
         return request.data
 
@@ -935,7 +1020,7 @@ class DirectoryViewSet(CustomGenericViewSet):
     目录视图集
 
     list:
-    获取一个目录下的文件和文件夹信息
+    获取存储桶根目录下的文件和文件夹信息
 
         >>Http Code: 状态码200:
             {
@@ -1003,53 +1088,93 @@ class DirectoryViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     pagination_class = paginations.BucketFileLimitOffsetPagination
 
-    # api docs
-    VERSION_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
 
-    BASE_METHOD_FIELDS = VERSION_FIELDS + [
-        coreapi.Field(
-            name='dirpath',
-            required=False,
-            location='path',
-            schema=coreschema.String(description='目录绝对路径')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-            'create_detail': BASE_METHOD_FIELDS,
-            'destroy': BASE_METHOD_FIELDS,
-            'partial_update': BASE_METHOD_FIELDS + [
-                coreapi.Field(
-                    name='share',
-                    required=True,
-                    location='query',
-                    schema=coreschema.Integer(description='用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)'),
-                ),
-                coreapi.Field(
-                    name='days',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='对象公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0'),
-                ),
-            ],
+    @swagger_auto_schema(
+        operation_summary='获取存储桶根目录下的文件和文件夹信息',
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "bucket_name": "666",
+                  "dir_path": "",
+                  "files": [
+                    {
+                      "na": "sacva",                    # 全路径文件或目录名称
+                      "name": "sacva",                  # 文件或目录名称
+                      "fod": false,                     # true: 文件；false: 目录
+                      "did": 0,
+                      "si": 0,                          # size byte，目录为0
+                      "ult": "2019-12-27 18:19:55",     # 上传创建时间
+                      "upt": null,                      # 修改时间，目录为null
+                      "dlc": 0,                         # 下载次数
+                      "download_url": "",               # 下载url
+                      "access_permission": "公有"
+                    }
+                  ],
+                  "count": 5,
+                  "next": null,
+                  "page": {
+                    "current": 1,
+                    "final": 1
+                  },
+                  "previous": null
+                }
+            """
         }
     )
-
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.list_v1(request, *args, **kwargs)
 
         return Response(data={'code': 404, 'code_text': 'URL中包含无效的版本'}, status=status.HTTP_404_NOT_FOUND)
 
-    @log_used_time(debug_logger, mark_text='get dir files list')
+    @swagger_auto_schema(
+        operation_summary='获取一个目录下的文件和文件夹信息',
+        manual_parameters=[
+            openapi.Parameter(
+                name='dirpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="目录绝对路径",
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "bucket_name": "666",
+                  "dir_path": "sacva",
+                  "files": [
+                    {
+                      "na": "sacva/client.ovpn",        # 全路径文件或目录名称
+                      "name": "client.ovpn",            # 文件或目录名称
+                      "fod": true,                      # true: 文件；false: 目录
+                      "did": 11,
+                      "si": 1185,                       # size byte，目录为0
+                      "ult": "2019-12-27 18:20:15",     # 上传创建时间
+                      "upt": "2019-12-27 18:20:15",     # 修改时间
+                      "dlc": 1,
+                      "download_url": "http://159.226.91.140:8000/share/obs/666/sacva/client.ovpn",
+                      "access_permission": "公有"
+                    }
+                  ],
+                  "count": 1,
+                  "next": null,
+                  "page": {
+                    "current": 1,
+                    "final": 1
+                  },
+                  "previous": null
+                }
+            """
+        }
+    )
+    def list_detail(self, request, *args, **kwargs):
+        '''
+         获取一个目录下的文件和文件夹信息
+        '''
+        return self.list_v1(request, *args, **kwargs)
+
     def list_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
@@ -1079,6 +1204,43 @@ class DirectoryViewSet(CustomGenericViewSet):
         data_dict['files'] = serializer.data
         return paginator.get_paginated_response(data_dict)
 
+    @swagger_auto_schema(
+        operation_summary='创建一个目录',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='dirpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="目录绝对路径",
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_201_CREATED: """
+                {
+                  "code": 201,
+                  "code_text": "创建文件夹成功",
+                  "data": {
+                    "dir_name": "aaa",
+                    "bucket_name": "666",
+                    "dir_path": ""
+                  },
+                  "dir": {
+                    "na": "aaa",
+                    "name": "aaa",
+                    "fod": false,
+                    "did": 0,
+                    "si": 0,
+                    "ult": "2020-01-02 15:09:27",
+                    "upt": null,
+                    "dlc": 0,
+                    "download_url": "",
+                    "access_permission": "私有"
+                  }
+                }
+            """
+        }
+    )
     def create_detail(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         path = kwargs.get(self.lookup_field, '')
@@ -1096,6 +1258,21 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(
+        operation_summary='删除一个目录',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='dirpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="目录绝对路径",
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_204_NO_CONTENT: 'NO CONTENT'
+        }
+    )
     def destroy(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
@@ -1108,6 +1285,39 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @swagger_auto_schema(
+        operation_summary='设置目录访问权限',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='dirpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="目录绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='share', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)",
+                required=True
+            ),
+            openapi.Parameter(
+                name='days', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="对象公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "code": 200,
+                  "code_text": "设置目录权限成功",
+                  "share": "http://159.226.91.140:8000/share/s/666/aaa"
+                }
+            """
+        }
+    )
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
@@ -1147,9 +1357,9 @@ class DirectoryViewSet(CustomGenericViewSet):
 
 class BucketStatsViewSet(CustomGenericViewSet):
     '''
-        视图集
-
         retrieve:
+            存储桶资源统计
+
             统计存储桶对象数量和所占容量，字节
 
             >>Http Code: 状态码200:
@@ -1174,26 +1384,6 @@ class BucketStatsViewSet(CustomGenericViewSet):
     lookup_field = 'bucket_name'
     lookup_value_regex = '[a-z0-9-]{3,64}'
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-        coreapi.Field(
-            name='bucket_name',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='存储桶名称')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': BASE_METHOD_FIELDS,
-        }
-    )
 
     def retrieve(self, request, *args, **kwargs):
         bucket_name = kwargs.get(self.lookup_field)
@@ -1217,8 +1407,9 @@ class SecurityViewSet(CustomGenericViewSet):
     安全凭证视图集
 
     retrieve:
-        获取指定用户的安全凭证，需要超级用户权限
-        *注：默认只返回用户Auth Token和JWT(json web token)，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
+        获取指定用户的安全凭证, 需要超级用户权限
+
+            *注：默认只返回用户Auth Token和JWT(json web token)，如果希望返回内容包含访问密钥对，请显示携带query参数key,服务器不要求key有值
 
             >>Http Code: 状态码200:
                 {
@@ -1255,33 +1446,18 @@ class SecurityViewSet(CustomGenericViewSet):
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-        coreapi.Field(
-            name='username',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='用户名')
-        ),
-        coreapi.Field(
-            name='key',
-            required=False,
-            location='query',
-            schema=coreschema.String(description='访问密钥对')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': BASE_METHOD_FIELDS,
-        }
-    )
 
+    @swagger_auto_schema(
+        operation_summary='获取指定用户的安全凭证',
+        manual_parameters=[
+            openapi.Parameter(
+                name='key', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="访问密钥对",
+                required=False
+            ),
+        ]
+    )
     def retrieve(self, request, *args, **kwargs):
         username = kwargs.get(self.lookup_field)
         key = request.query_params.get('key', None)
@@ -1354,13 +1530,6 @@ class MoveViewSet(CustomGenericViewSet):
         请求时至少提交其中一个参数，亦可同时提交两个参数；只提交参数move_to只移动对象，只提交参数rename只重命名对象；
 
         >>Http Code: 状态码201,成功：
-            {
-                "code": 201,
-                "code_text": "移动对象操作成功",
-                "bucket_name": "6666",
-                "dir_path": "ddd/动次打次",
-                "obj": {},       //移动操作成功后文件对象详细信息
-            }
         >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
             {
                 "code": 400,
@@ -1382,43 +1551,52 @@ class MoveViewSet(CustomGenericViewSet):
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
-    # api docs
-    VERSION_METHOD_FEILD = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-
-    OBJ_PATH_METHOD_FEILD = [
-        coreapi.Field(
-            name='objpath',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='文件对象绝对路径，类型String'),
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'create_detail': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD + [
-                coreapi.Field(
-                    name='move_to',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='移动对象到此目录路径下，/或空字符串表示桶下根目录，类型String'),
-                ),
-                coreapi.Field(
-                    name='rename',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='重命名对象的新名称，类型String'),
-                ),
-            ],
+    @swagger_auto_schema(
+        operation_summary='移动或重命名一个对象',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="文件对象绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='move_to', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="移动对象到此目录路径下，/或空字符串表示桶下根目录",
+                required=False
+            ),
+            openapi.Parameter(
+                name='rename', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="重命名对象的新名称",
+                required=False
+            )
+        ],
+        responses={
+            status.HTTP_201_CREATED: """
+                {
+                  "code": 201,
+                  "code_text": "移动对象操作成功",
+                  "bucket_name": "666",
+                  "dir_path": "d d",
+                  "obj": {                      # 移动操作成功后文件对象详细信息
+                    "na": "d d/data.json2",
+                    "name": "data.json2",
+                    "fod": true,
+                    "did": 6,
+                    "si": 149888,
+                    "ult": "2019-12-12 19:37:50",
+                    "upt": "2019-12-12 19:37:50",
+                    "dlc": 1,
+                    "download_url": "http://159.226.91.140:8000/share/obs/666/d%20d/data.json2",
+                    "access_permission": "公有"
+                  }
+                }
+            """
         }
     )
-
     def create_detail(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.create_detail_v1(request, *args, **kwargs)
@@ -1497,30 +1675,22 @@ class MetadataViewSet(CustomGenericViewSet):
     lookup_field = 'path'
     lookup_value_regex = '.+'
 
-    # api docs
-    VERSION_METHOD_FEILD = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
 
-    OBJ_PATH_METHOD_FEILD = [
-        coreapi.Field(
-            name='path',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='对象或目录绝对路径，类型String'),
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
+    @swagger_auto_schema(
+        operation_summary='获取对象或目录元数据',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='path', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="对象或目录绝对路径",
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: ''
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.retrieve_v1(request, *args, **kwargs)
@@ -1565,6 +1735,8 @@ class CephStatsViewSet(CustomGenericViewSet):
         ceph集群视图集
 
         list:
+            CEPH集群资源统计
+
             统计ceph集群总容量、已用容量，可用容量、对象数量
 
             >>Http Code: 状态码200:
@@ -1593,24 +1765,8 @@ class CephStatsViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -1636,6 +1792,8 @@ class UserStatsViewSet(CustomGenericViewSet):
         用户资源统计视图集
 
         retrieve:
+            获取指定用户的资源统计信息
+
             获取指定用户的资源统计信息，需要超级用户权限
 
              >>Http Code: 状态码200:
@@ -1664,6 +1822,8 @@ class UserStatsViewSet(CustomGenericViewSet):
             }
 
         list:
+            获取当前用户的资源统计信息
+
             获取当前用户的资源统计信息
 
             >>Http Code: 状态码200:
@@ -1703,20 +1863,6 @@ class UserStatsViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -1786,7 +1932,9 @@ class CephComponentsViewSet(CustomGenericViewSet):
         ceph集群组件信息视图集
 
         list:
-            ceph的mon，osd，mgr，mds组件信息， 需要超级用户权限
+            ceph的mon，osd，mgr，mds组件信息
+
+            需要超级用户权限
 
             >>Http Code: 状态码200:
                 {
@@ -1805,24 +1953,8 @@ class CephComponentsViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -1845,7 +1977,9 @@ class CephErrorViewSet(CustomGenericViewSet):
         ceph集群当前故障信息查询
 
         list:
-            ceph集群当前故障信息查询，需要超级用户权限
+            ceph集群当前故障信息查询
+
+            需要超级用户权限
 
             >>Http Code: 状态码200:
                 {
@@ -1862,24 +1996,7 @@ class CephErrorViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
-
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -1901,7 +2018,9 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         ceph集群性能，需要超级用户权限
 
         list:
-            ceph集群的IOPS，I/O带宽，需要超级用户权限
+            ceph集群的IOPS，I/O带宽
+
+            需要超级用户权限
 
             >>Http Code: 状态码200:
                 {
@@ -1921,24 +2040,8 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -1955,10 +2058,12 @@ class CephPerformanceViewSet(CustomGenericViewSet):
 
 class UserCountViewSet(CustomGenericViewSet):
     '''
-        对象云存储系统用户总数查询
+        系统用户总数查询
 
         list:
-            对象云存储系统用户总数查询，需要超级用户权限
+            系统用户总数查询
+
+            系统用户总数查询，需要超级用户权限
 
             >>Http Code: 状态码200:
                 {
@@ -1974,24 +2079,8 @@ class UserCountViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -2012,6 +2101,8 @@ class AvailabilityViewSet(CustomGenericViewSet):
         系统可用性
 
         list:
+            系统可用性查询
+
             系统可用性查询，需要超级用户权限
 
             >>Http Code: 状态码200:
@@ -2019,33 +2110,10 @@ class AvailabilityViewSet(CustomGenericViewSet):
                     "code": 200,
                     'availability': '100%'
                 }
-
-            >>Http Code: 状态码404:
-                {
-                    'code': 404,
-                    'code_text': URL中包含无效的版本  //错误码描述
-                }
         '''
-    queryset = []
+    queryset = None
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
-
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -2065,6 +2133,8 @@ class VisitStatsViewSet(CustomGenericViewSet):
         访问统计
 
         list:
+            系统访问统计查询
+
             系统访问统计查询，需要超级用户权限
 
             >>Http Code: 状态码200:
@@ -2087,24 +2157,8 @@ class VisitStatsViewSet(CustomGenericViewSet):
         '''
     queryset = []
     permission_classes = [permissions.IsSuperUser]
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -2132,6 +2186,8 @@ class TestViewSet(CustomGenericViewSet):
         list:
             系统是否可用查询
 
+            系统是否可用查询
+
             >>Http Code: 状态码200:
                 {
                     "code": 200,
@@ -2148,24 +2204,8 @@ class TestViewSet(CustomGenericViewSet):
     queryset = []
     permission_classes = []
     throttle_classes = (throttles.TestRateThrottle,)
-    # lookup_field = 'bucket_name'
-    # lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'list': BASE_METHOD_FIELDS,
-        }
-    )
 
     def list(self, request, *args, **kwargs):
         if request.version == 'v1':
@@ -2209,46 +2249,40 @@ class FtpViewSet(CustomGenericViewSet):
     lookup_value_regex = '[a-z0-9-]{3,64}'
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'partial_update': BASE_METHOD_FIELDS + [
-                coreapi.Field(
-                    name='bucket_name',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='存储桶名称')
-                ),
-                coreapi.Field(
-                    name='enable',
-                    required=False,
-                    location='query',
-                    schema=coreschema.Boolean(description='是否使能存储桶ftp访问')
-                ),
-                coreapi.Field(
-                    name='password',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='存储桶ftp新的读写访问密码')
-                ),
-                coreapi.Field(
-                    name='ro_password',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='存储桶ftp新的只读访问密码')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='开启或关闭存储桶ftp访问限制',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='bucket_name', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="存储桶名称",
+                required=True
+            ),
+            openapi.Parameter(
+                name='enable', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="存储桶ftp访问,true(开启)；false(关闭)",
+                required=False
+            ),
+            openapi.Parameter(
+                name='password', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="存储桶ftp新的读写访问密码",
+                required=False
+            ),
+            openapi.Parameter(
+                name='ro_password', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="存储桶ftp新的只读访问密码",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: ''
         }
     )
-
     def partial_update(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.patch_v1(request, *args, **kwargs)
@@ -2365,28 +2399,13 @@ class VPNViewSet(CustomGenericViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
-    # api docs
-    BASE_METHOD_FIELDS = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-    schema = CustomAutoSchema(
-        manual_fields={
-            'partial_update': BASE_METHOD_FIELDS + [
-                coreapi.Field(
-                    name='password',
-                    required=True,
-                    location='body',
-                    schema=coreschema.String(description='存储桶ftp新的读写访问密码')
-                )
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='获取VPN口令',
+        responses={
+            status.HTTP_200_OK: ''
         }
     )
-
     def list(self, request, *args, **kwargs):
         '''
         获取VPN口令信息
@@ -2416,6 +2435,23 @@ class VPNViewSet(CustomGenericViewSet):
         vpn, created = VPNAuth.objects.get_or_create(user=request.user)
         return Response(data={'code': 200, 'code_text': '获取成功', 'vpn': serializers.VPNSerializer(vpn).data})
 
+    @swagger_auto_schema(
+        operation_summary='修改vpn口令',
+        responses={
+            status.HTTP_201_CREATED: """
+                {
+                    "code": 201,
+                    "code_text": "修改成功"
+                }
+            """,
+            status.HTTP_400_BAD_REQUEST: """
+                    {
+                        "code": 400,
+                        "code_text": "xxxx"
+                    }
+                """
+        }
+    )
     def create(self, request, *args, **kwargs):
         '''
         修改vpn口令
@@ -2487,31 +2523,19 @@ class ObjKeyViewSet(CustomGenericViewSet):
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
-    # api docs
-    VERSION_METHOD_FEILD = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1）')
-        ),
-    ]
 
-    OBJ_PATH_METHOD_FEILD = [
-        coreapi.Field(
-            name='objpath',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='文件对象绝对路径，类型String'),
-        ),
-    ]
-
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': VERSION_METHOD_FEILD + OBJ_PATH_METHOD_FEILD,
-        }
+    @swagger_auto_schema(
+        operation_summary='获取对象对应的ceph rados key信息',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="文件对象绝对路径",
+                required=True
+            )
+        ]
     )
-
     def retrieve(self, request, *args, **kwargs):
         if request.version == 'v1':
             return self.retrieve_v1(request, *args, **kwargs)

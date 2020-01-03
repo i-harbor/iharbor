@@ -1,8 +1,7 @@
 from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
-from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
-from .auth import obtain_auth_token
+from .auth import obtain_auth_token, obtain_jwt_token, refresh_jwt_token
 from . import views
 from .routers import DetailPostRouter, DetailListPostRouter
 from users.auth.views import ObtainAuthKey

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'rest_framework_swagger',
+    'drf_yasg',
     'ckeditor',
     # 'ckeditor_uploader',
     # 'raven.contrib.django.raven_compat',
@@ -398,6 +399,27 @@ THIRD_PARTY_APP_AUTH = {
         'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
         'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'
+    },
+}
+
+# drf-yasg
+SWAGGER_SETTINGS = {
+    # 'LOGIN_URL': reverse_lazy('admin:login'),
+    # 'LOGOUT_URL': '/admin/logout',
+    'PERSIST_AUTH': True,
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'REFETCH_SCHEMA_ON_LOGOUT': True,
+
+
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'basic'
+        },
+        'Bearer': {
+            'in': 'header',
+            'name': 'Authorization',
+            'type': 'apiKey',
+        }
     },
 }
 

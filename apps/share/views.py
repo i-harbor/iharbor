@@ -12,6 +12,8 @@ from rest_framework.compat import coreapi, coreschema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.serializers import Serializer
+from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg import openapi
 
 from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
@@ -78,20 +80,21 @@ class ObsViewSet(viewsets.GenericViewSet):
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='objpath',
-                    required=False,
-                    location='path',
-                    schema=coreschema.String(description='以存储桶名称开头文件对象绝对路径')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='浏览器端下载文件对象',
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="以存储桶名称开头文件对象绝对路径",
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
 
         objpath = kwargs.get(self.lookup_field, '')
@@ -328,26 +331,27 @@ class ShareDownloadViewSet(CustomGenericViewSet):
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='share_base',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
-                ),
-                coreapi.Field(
-                    name='subpath',
-                    required=True,
-                    location='query',
-                    schema=coreschema.String(description='分享根目录下的对象相对路径')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='下载分享的目录下载的文件对象',
+        manual_parameters=[
+            openapi.Parameter(
+                name='share_base', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='subpath', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="分享根目录下的对象相对子路径",
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         share_base = kwargs.get(self.lookup_field, '')
         subpath = request.query_params.get('subpath', '')
@@ -535,26 +539,27 @@ class ShareDirViewSet(CustomGenericViewSet):
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='share_base',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
-                ),
-                coreapi.Field(
-                    name='subpath',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='子目录路径，list此子目录')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='获取分享目录下的子目录和文件对象列表',
+        manual_parameters=[
+            openapi.Parameter(
+                name='share_base', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='subpath', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="子目录路径，list此子目录",
+                required=False
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         share_base = kwargs.get(self.lookup_field, '')
         subpath = request.query_params.get('subpath', '')

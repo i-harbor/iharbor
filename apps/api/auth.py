@@ -2,17 +2,21 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.response import Response
-from rest_framework.compat import coreapi, coreschema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg import openapi
+from rest_framework_jwt.views import ObtainJSONWebToken, RefreshJSONWebToken
+from rest_framework_jwt.serializers import JSONWebTokenSerializer, RefreshJSONWebTokenSerializer
 
-from .views import CustomAutoSchema
 from .serializers import AuthTokenDumpSerializer
 
 class CustomAuthToken(ObtainAuthToken):
     '''
     get:
-    获取当前用户的token，需要通过身份认证权限(如session认证)
+    获取当前用户的token
+
+    需要通过身份认证权限(如session认证)
 
         返回内容：
         {
@@ -23,57 +27,12 @@ class CustomAuthToken(ObtainAuthToken):
             }
         }
 
-    put:
-    刷新当前用户的token，旧token失效，需要通过身份认证权限
-
     post:
     身份验证并返回一个token，用于其他API验证身份
 
         令牌应包含在AuthorizationHTTP标头中。密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
         例如Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b；
-        此外，可选Path参数,“new”，?new=true用于刷新生成一个新token；
     '''
-    common_manual_fields = [
-        coreapi.Field(
-            name='version',
-            required=True,
-            location='path',
-            schema=coreschema.String(description='API版本（v1, v2）')
-        ),
-    ]
-
-    schema = CustomAutoSchema(
-        manual_fields={
-            'POST': common_manual_fields + [
-                coreapi.Field(
-                    name="username",
-                    required=True,
-                    location='form',
-                    schema=coreschema.String(
-                        title="Username",
-                        description="Valid username for authentication",
-                    ),
-                ),
-                coreapi.Field(
-                    name="password",
-                    required=True,
-                    location='form',
-                    schema=coreschema.String(
-                        title="Password",
-                        description="Valid password for authentication",
-                    ),
-                ),
-                coreapi.Field(
-                    name="new",
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description="为true时,生成一个新token"),
-                ),
-            ],
-            'GET': common_manual_fields,
-            'PUT': common_manual_fields,
-        }
-    )
     def get(self, request, *args, **kwargs):
         user = request.user
         if user.is_authenticated:
@@ -82,7 +41,25 @@ class CustomAuthToken(ObtainAuthToken):
             return Response({'token': slr.data})
         return Response({'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
+    @swagger_auto_schema(
+        responses={
+            status.HTTP_200_OK: """
+                        {
+                          "token": {
+                            "key": "a9da4ebad962036ca76ba748907ea71aa7cc502d",
+                            "user": "869588058@qq.com",
+                            "created": "2019-05-08 13:59:22"
+                          }
+                        }
+                    """
+        }
+    )
     def put(self, request, *args, **kwargs):
+        '''
+        刷新当前用户的token
+
+        刷新当前用户的token，旧token失效，需要通过身份认证权限
+        '''
         user = request.user
         if user.is_authenticated:
             token, created = Token.objects.get_or_create(user=user)
@@ -94,6 +71,28 @@ class CustomAuthToken(ObtainAuthToken):
             return Response({'token': slr.data})
         return Response({'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
+    @swagger_auto_schema(
+        request_body=AuthTokenSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                name='new', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="为true时,生成一个新token",
+                required=False
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                    {
+                      "token": {
+                        "key": "a9da4ebad962036ca76ba748907ea71aa7cc502d",
+                        "user": "869588058@qq.com",
+                        "created": "2019-05-08 13:59:22"
+                      }
+                    }
+                """
+        }
+    )
     def post(self, request, *args, **kwargs):
         new = request.query_params.get('new', None)
         serializer = self.serializer_class(data=request.data,
@@ -121,4 +120,44 @@ class CustomAuthToken(ObtainAuthToken):
 obtain_auth_token = CustomAuthToken.as_view()
 
 
+class ObtainJSONWebTokenView(ObtainJSONWebToken):
+    @swagger_auto_schema(
+        operation_summary='身份认证获取json web token',
+        request_body=JSONWebTokenSerializer,
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "token": "eyJ0eXAiOiJKV1QiLC.eyJzc3MDgs3OTUxMzA4fQ.vtGZtCxVGMabXUzuo6_ln_Y"
+                }
+            """
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        '''
+        身份认证获取json web token
 
+        '''
+        return super().post(request, *args, **kwargs)
+
+
+class RefreshJSONWebTokenView(RefreshJSONWebToken):
+    @swagger_auto_schema(
+        operation_summary='刷新json web token',
+        request_body=RefreshJSONWebTokenSerializer,
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "token": "eyJ0eXAiOiJKV1QiLC.eyJzc3MDgs3OTUxMzA4fQ.vtGZtCxVGMabXUzuo6_ln_Y"
+                }
+            """
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        '''
+        刷新json web token
+        '''
+        return super().post(request, *args, **kwargs)
+
+
+obtain_jwt_token = ObtainJSONWebTokenView.as_view()
+refresh_jwt_token = RefreshJSONWebTokenView.as_view()
