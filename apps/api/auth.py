@@ -8,6 +8,7 @@ from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 from rest_framework_jwt.views import ObtainJSONWebToken, RefreshJSONWebToken
 from rest_framework_jwt.serializers import JSONWebTokenSerializer, RefreshJSONWebTokenSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from .serializers import AuthTokenDumpSerializer
 
@@ -123,6 +124,7 @@ obtain_auth_token = CustomAuthToken.as_view()
 class ObtainJSONWebTokenView(ObtainJSONWebToken):
     @swagger_auto_schema(
         operation_summary='身份认证获取json web token',
+        deprecated=True,    # 弃用
         request_body=JSONWebTokenSerializer,
         responses={
             status.HTTP_200_OK: """
@@ -136,6 +138,7 @@ class ObtainJSONWebTokenView(ObtainJSONWebToken):
         '''
         身份认证获取json web token
 
+        *注：准备弃用，请使用新的jwt API
         '''
         return super().post(request, *args, **kwargs)
 
@@ -143,6 +146,7 @@ class ObtainJSONWebTokenView(ObtainJSONWebToken):
 class RefreshJSONWebTokenView(RefreshJSONWebToken):
     @swagger_auto_schema(
         operation_summary='刷新json web token',
+        deprecated=True,  # 弃用
         request_body=RefreshJSONWebTokenSerializer,
         responses={
             status.HTTP_200_OK: """
@@ -155,9 +159,104 @@ class RefreshJSONWebTokenView(RefreshJSONWebToken):
     def post(self, request, *args, **kwargs):
         '''
         刷新json web token
+
+        *注：准备弃用，请使用新的jwt API
         '''
         return super().post(request, *args, **kwargs)
 
 
 obtain_jwt_token = ObtainJSONWebTokenView.as_view()
 refresh_jwt_token = RefreshJSONWebTokenView.as_view()
+
+
+class JWTObtainPairView(TokenObtainPairView):
+    '''
+    JWT登录认证视图
+    '''
+    @swagger_auto_schema(
+        operation_summary='登录认证，获取JWT',
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "refresh": "xxx.xxx.xxx",
+                  "access": "xxx.xxx.xxx"
+                }
+            """
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        '''
+        登录认证，获取JWT
+
+            access jwt有效时长8h，refresh jwt有效时长2days；
+
+            http 200:
+            {
+              "refresh": "xxx.xxx.xxx",     # refresh JWT, 此JWT通过刷新API可以获取新的access JWT
+              "access": "xxx.xxx.xxx"       # access JWT, 用于身份认证，header 'Authorization Bearer access'
+            }
+            http 401:
+            {
+              "detail": "No active account found with the given credentials"
+            }
+        '''
+        return super().post(request, args, kwargs)
+
+
+class JWTRefreshView(TokenRefreshView):
+    '''
+    Refresh JWT视图
+    '''
+    @swagger_auto_schema(
+        operation_summary='刷新获取新的accessJWT',
+        responses={
+            status.HTTP_200_OK: """
+                {
+                  "access": "xxx.xxx.xxx"
+                }
+            """
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        '''
+        通过refresh JWT获取新的access JWT
+
+            http 200:
+            {
+              "access": "xxx"
+            }
+            http 401:
+            {
+              "detail": "Token is invalid or expired",
+              "code": "token_not_valid"
+            }
+        '''
+        return super().post(request, args, kwargs)
+
+
+class JWTVerifyView(TokenVerifyView):
+    '''
+    校验JWT视图
+    '''
+
+    @swagger_auto_schema(
+        operation_summary='校验JWT是否有效',
+        responses={
+            status.HTTP_200_OK: 'NO CONTENT'
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        '''
+        校验JWT是否有效
+
+            http 200:
+            {
+            }
+            http 401:
+            {
+              "detail": "Token is invalid or expired",
+              "code": "token_not_valid"
+            }
+        '''
+        return super().post(request, args, kwargs)
+

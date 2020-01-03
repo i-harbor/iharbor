@@ -10,9 +10,10 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 `Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b`  
 
 ## JWT认证
-Json web token认证方式，使用简单,有效期为1天，旧的jwt失效前可以通过对应API携带旧jwt在可刷新时限（7天）内刷新获取新的jwt。
+Json web token认证方式，使用简单，包括access jwt和refresh jwt，access jwt有效期为8h，旧的access jwt失效前可以通过对应API携
+带旧refresh jwt在有效时限（2天）内刷新获取新的access jwt。
 jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“JWT”为前缀，空格分隔两个字符串，例如：   
-`Authorization: JWT eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
+`Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
 
 ## 访问密钥  
 访问密钥是一个密钥对（AccessKey和SecretKey），AccessKey会在网络中传输，SecretKey不在网络上传输，需要用户妥善保管。

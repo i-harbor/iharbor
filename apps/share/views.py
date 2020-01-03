@@ -8,7 +8,6 @@ from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.compat import coreapi, coreschema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.serializers import Serializer
@@ -18,8 +17,8 @@ from drf_yasg import openapi
 from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
-from utils.jwt_token import JWTokenTool
-from utils.view import CustomGenericViewSet, CustomAutoSchema
+from utils.jwt_token import JWTokenTool, JWTokenTool2, InvalidToken
+from utils.view import CustomGenericViewSet
 from . import serializers
 from api.harbor import HarborError, HarborManager
 
@@ -288,6 +287,14 @@ class ObsViewSet(viewsets.GenericViewSet):
             request._authenticator = authenticator
             request.user, request.auth = user, token
         except AuthenticationFailed:
+            pass
+
+        authenticator = JWTokenTool2()
+        try:
+            user = authenticator.verify_jwt_return_user(jwt=jwt)
+            request._authenticator = authenticator
+            request.user, request.auth = user, jwt
+        except (AuthenticationFailed, InvalidToken):
             pass
 
 

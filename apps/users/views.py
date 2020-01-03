@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.template.loader import get_template
 from rest_framework.authtoken.models import Token
 
-from utils.jwt_token import JWTokenTool
+from utils.jwt_token import JWTokenTool2
 from .forms import UserRegisterForm, LoginForm, PasswordChangeForm, ForgetPasswordForm, PasswordResetForm
 from .models import Email, AuthKey
 from webserver.views import get_kjy_login_url, kjy_logout
@@ -197,9 +197,9 @@ def forget_password_confirm(request):
             user.save()
             return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
     else:
-        jwtt = JWTokenTool()
+        jwtt = JWTokenTool2()
         try:
-            ret = jwtt.authenticate(request)
+            ret = jwtt.authenticate_query(request)
         except:
             ret = None
         if not ret:
@@ -353,8 +353,8 @@ def get_find_password_link(request, user):
     :param user:
     :return: 正常：url; 错误：None
     '''
-    jwt = JWTokenTool()
-    token = jwt.obtain_one_jwt_token(user=user)
+    jwt = JWTokenTool2()
+    token = jwt.obtain_one_jwt(user=user)
     if not token:
         return None
 

@@ -1,7 +1,7 @@
 from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
 
-from .auth import obtain_auth_token, obtain_jwt_token, refresh_jwt_token
+from . import auth
 from . import views
 from .routers import DetailPostRouter, DetailListPostRouter
 from users.auth.views import ObtainAuthKey
@@ -43,8 +43,11 @@ urlpatterns = [
     path('', include(router.urls)), # The API URLs are now determined automatically by the router.
     path('', include(detail_router.urls)),
     path('', include(dlp_router.urls)),
-    path('jwt-token/', obtain_jwt_token),
-    path('jwt-token-refresh/', refresh_jwt_token),
-    path('auth-token/', obtain_auth_token),
+    path('jwt-token/', auth.obtain_jwt_token),
+    path('jwt-token-refresh/', auth.refresh_jwt_token),
+    path('auth-token/', auth.obtain_auth_token),
+    path('jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),
+    path('jwt-refresh/', auth.JWTRefreshView.as_view(), name='jwt-refresh'),
+    path('jwt-verify/', auth.JWTVerifyView.as_view(), name='jwt-verify'),
 ]
 
