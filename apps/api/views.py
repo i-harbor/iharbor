@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import logging
+import os, binascii
 from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, QueryDict
@@ -36,6 +37,13 @@ from .harbor import HarborError, HarborManager
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+
+
+def rand_hex_string(len=10):
+    return binascii.hexlify(os.urandom(len//2)).decode()
+
+def rand_share_code():
+    return rand_hex_string(4)
 
 
 def get_user_own_bucket(bucket_name, request):
@@ -700,6 +708,7 @@ class ObjViewSet(CustomGenericViewSet):
         {
             'code': 200,
             'code_text': '对象共享设置成功'，
+            "share_uri": "xxx"    # 分享下载uri
             'share': xxx,
             'days': xxx
         }
@@ -868,7 +877,13 @@ class ObjViewSet(CustomGenericViewSet):
             openapi.Parameter(
                 name='days', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="对象公开分享天数(share=true时有效)，0表示永久公开，负数表示不公开，默认为0",
+                description="对象公开分享天数(share!=0时有效)，0表示永久公开，负数表示不公开，默认为0",
+                required=False
+            ),
+            openapi.Parameter(
+                name='password', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="true(有密码的分享)，false(无分享密码), 默认false",
                 required=False
             ),
         ],
@@ -878,7 +893,8 @@ class ObjViewSet(CustomGenericViewSet):
                   "code": 200,
                   "code_text": "对象共享权限设置成功",
                   "share": 1,
-                  "days": 2
+                  "days": 2,
+                  "share_uri": "xxx"    # 分享下载uri
                 }        
             """
         }
@@ -886,6 +902,8 @@ class ObjViewSet(CustomGenericViewSet):
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
+        pw = request.query_params.get('password', 'false').lower()
+        pw = True if pw == 'true' else False
 
         days = str_to_int_or_default(request.query_params.get('days', 0), None)
         if days is None:
@@ -899,20 +917,26 @@ class ObjViewSet(CustomGenericViewSet):
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
+        password = rand_share_code() if pw else None
         hManager = HarborManager()
         try:
-            ok = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, user=request.user)
+            ok = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if not ok:
             return Response(data={'code': 500, 'code_text': '对象共享权限设置失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        share_uri = django_reverse('share:obs-detail', kwargs={'objpath': f'{bucket_name}/{objpath}'})
+        if password:
+            share_uri = f'{share_uri}?p={password}'
+        share_uri = request.build_absolute_uri(share_uri)
         data = {
             'code': 200,
             'code_text': '对象共享权限设置成功',
             'share': share,
-            'days': days
+            'days': days,
+            'share_uri': share_uri
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
@@ -1279,7 +1303,13 @@ class DirectoryViewSet(CustomGenericViewSet):
             openapi.Parameter(
                 name='days', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="对象公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0",
+                description="公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0",
+                required=False
+            ),
+            openapi.Parameter(
+                name='password', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="true(有密码的分享)，false(无分享密码), 默认false",
                 required=False
             ),
         ],
@@ -1288,7 +1318,8 @@ class DirectoryViewSet(CustomGenericViewSet):
                 {
                   "code": 200,
                   "code_text": "设置目录权限成功",
-                  "share": "http://159.226.91.140:8000/share/s/666/aaa"
+                  "share": "http://159.226.91.140:8000/share/s/666/aaa",
+                  "share_code": "ad46"          # 未设置共享密码时为空
                 }
             """
         }
@@ -1298,12 +1329,16 @@ class DirectoryViewSet(CustomGenericViewSet):
         dirpath = kwargs.get(self.lookup_field, '')
         days = str_to_int_or_default(request.query_params.get('days', 0), 0)
         share = str_to_int_or_default(request.query_params.get('share', ''), -1)
+        pw = request.query_params.get('password', 'false').lower()
+        pw = True if pw == 'true' else False
+
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
+        password = rand_share_code() if pw else ''
         hManager = HarborManager()
         try:
-            ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, user=request.user)
+            ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, password=password, user=request.user)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
@@ -1313,7 +1348,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         share_base = f'{bucket_name}/{dirpath}'
         share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
         share_url = request.build_absolute_uri(share_url)
-        return Response(data={'code': 200, 'code_text': '设置目录权限成功', 'share': share_url}, status=status.HTTP_200_OK)
+        return Response(data={'code': 200, 'code_text': '设置目录权限成功', 'share': share_url, 'share_code': password}, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         """

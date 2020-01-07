@@ -504,12 +504,13 @@ class BucketFileBase(models.Model):
             return False
         return True
 
-    def set_shared(self, share=SHARE_ACCESS_NO, days=0):
+    def set_shared(self, share=SHARE_ACCESS_NO, days=0, password:str=''):
         '''
         设置对象共享或私有权限
 
         :param share: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
+        :param password: 共享密码
         :return: True(success); False(error)
         '''
         if share not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
@@ -517,6 +518,7 @@ class BucketFileBase(models.Model):
 
         if share != self.SHARE_ACCESS_NO:
             self.share = share
+            self.set_share_password(password=password, commit=False) # 设置共享密码
             now = timezone.now()
             self.sst = now          # 共享时间
             if days == 0:
@@ -528,9 +530,10 @@ class BucketFileBase(models.Model):
                 self.set = now + timedelta(days=days) # 共享终止时间
         else:
             self.share = self.SHARE_ACCESS_NO
+            self.set_share_password(password='', commit=False)  # 设置共享密码       # 清除共享密码
 
         try:
-            self.save()
+            self.save(update_fields=['share', 'shp', 'stl', 'sst', 'set'])
         except:
             return False
         return True
@@ -550,6 +553,55 @@ class BucketFileBase(models.Model):
 
         # 检查是否已过共享终止时间
         if self.is_shared_end_time_out():
+            return False
+
+        return True
+
+    def has_share_password(self):
+        '''
+        是否设置了共享密码
+        :return:
+            True    # 是, 有密码
+            False   # 否, 无密码
+        '''
+        if self.shp:
+            return True
+
+        return False
+
+    def check_share_password(self, password: str):
+        '''
+        检测共享密码是否一致
+
+        :return:
+            True    # 一致, 或未设置密码
+            False   # 否
+        '''
+        shp = self.shp
+        if shp and shp == password:
+            return True
+
+        return False
+
+    def set_share_password(self, password: str, commit=True):
+        '''
+        设置新的共享密码
+
+        :param commit: 是否立即更新到数据库；默认True，立即更新
+        :return:
+            True    # success
+            False   # failed
+        '''
+        if not password:
+            password = ''
+
+        self.shp = password
+        if not commit:
+            return True
+
+        try:
+            self.save(update_fields=['shp'])
+        except Exception as e:
             return False
 
         return True
@@ -619,7 +671,7 @@ class BucketFileBase(models.Model):
         '''
         self.dlc = F('dlc') + 1 # (self.dlc or 0) + 1  # 下载次数+1
         try:
-            self.save()
+            self.save(update_fields=['dlc'])
         except:
             return False
         return True

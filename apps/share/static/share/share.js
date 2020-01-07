@@ -58,11 +58,16 @@
         }
     };
 
+    var SHARE_CODE = "";
+    function get_share_code(){
+        return SHARE_CODE;
+    }
     //
     // 页面刷新时执行
     window.onload = function() {
         let sharebase = $("#id-share-base").attr("data-sharebase");
-        let url = build_share_base_url(sharebase);
+        SHARE_CODE = $("#id-share-base").attr("data-sharecode");
+        let url = build_share_base_url(sharebase, {p:SHARE_CODE});
         get_bucket_files_and_render(url, render_bucket_files_view);
     };
 
@@ -261,7 +266,8 @@
         if (r.subpath){
             path = r.subpath + '/' + dirname;
         }
-        let url = build_share_base_url(r.sharebase, {subpath: path});
+        let sc = get_share_code();
+        let url = build_share_base_url(r.sharebase, {subpath: path, p: sc});
         get_bucket_files_and_render(url);
     });
 

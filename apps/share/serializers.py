@@ -27,11 +27,16 @@ class ShareObjInfoSerializer(serializers.Serializer):
             return  ''
         request = self.context.get('request', None)
         share_base = self._context.get('share_base', '')
+        share_code = self._context.get('share_code', '')
         subpath = self._context.get('subpath', '')
+
         filepath = f'{subpath}/{obj.name}' if subpath else obj.name
         filepath = urlquote(filepath)
         download_url = reverse('share:download-detail', kwargs={'share_base': share_base})
-        download_url = f'{download_url}?subpath={filepath}'
+        if share_code:
+            download_url = f'{download_url}?subpath={filepath}&p={share_code}'
+        else:
+            download_url = f'{download_url}?subpath={filepath}'
         if request:
             download_url = request.build_absolute_uri(download_url)
         return download_url
