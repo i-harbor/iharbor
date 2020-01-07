@@ -882,8 +882,8 @@ class ObjViewSet(CustomGenericViewSet):
             ),
             openapi.Parameter(
                 name='password', in_=openapi.IN_QUERY,
-                type=openapi.TYPE_BOOLEAN,
-                description="true(有密码的分享)，false(无分享密码), 默认false",
+                type=openapi.TYPE_STRING,
+                description="分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码",
                 required=False
             ),
         ],
@@ -902,8 +902,16 @@ class ObjViewSet(CustomGenericViewSet):
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
-        pw = request.query_params.get('password', 'false').lower()
-        pw = True if pw == 'true' else False
+        pw = request.query_params.get('password', None)
+
+        if pw:  # 指定密码
+            if not (4 <= len(pw) <= 8):
+                return Response(data={'code': 400, 'code_text': 'password参数长度为4-8个字符'}, status=status.HTTP_400_BAD_REQUEST)
+            password = pw
+        elif pw is None:  # 不设密码
+            password = ''
+        else:  # 随机分配密码
+            password = rand_share_code()
 
         days = str_to_int_or_default(request.query_params.get('days', 0), None)
         if days is None:
@@ -917,7 +925,6 @@ class ObjViewSet(CustomGenericViewSet):
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        password = rand_share_code() if pw else None
         hManager = HarborManager()
         try:
             ok = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
@@ -1308,8 +1315,8 @@ class DirectoryViewSet(CustomGenericViewSet):
             ),
             openapi.Parameter(
                 name='password', in_=openapi.IN_QUERY,
-                type=openapi.TYPE_BOOLEAN,
-                description="true(有密码的分享)，false(无分享密码), 默认false",
+                type=openapi.TYPE_STRING,
+                description="分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码",
                 required=False
             ),
         ],
@@ -1329,13 +1336,20 @@ class DirectoryViewSet(CustomGenericViewSet):
         dirpath = kwargs.get(self.lookup_field, '')
         days = str_to_int_or_default(request.query_params.get('days', 0), 0)
         share = str_to_int_or_default(request.query_params.get('share', ''), -1)
-        pw = request.query_params.get('password', 'false').lower()
-        pw = True if pw == 'true' else False
+        pw = request.query_params.get('password', None)
+
+        if pw:  # 指定密码
+            if not (4 <= len(pw) <= 8):
+                return Response(data={'code': 400, 'code_text': 'password参数长度为4-8个字符'}, status=status.HTTP_400_BAD_REQUEST)
+            password = pw
+        elif pw is None:  # 不设密码
+            password = ''
+        else:  # 随机分配密码
+            password = rand_share_code()
 
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        password = rand_share_code() if pw else ''
         hManager = HarborManager()
         try:
             ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, password=password, user=request.user)

@@ -1,6 +1,6 @@
 * [首页](/)
 * [指南](/guide)
-* [安全凭证](/security)
+* [安全&凭证](/security)
 * [搭建服务](/start_server)
 * [更新日志](/changelog)
 * [关于我们](/about_us)
