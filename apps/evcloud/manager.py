@@ -49,11 +49,16 @@ class evcloud_operations():
             # "host_id": 0,
             "remarks": remarks,
         }
-        vm = requests.post(f'{self.api_url}vms/', auth=(self.auth), data=data).json()
+        vm = requests.post(f'{self.api_url}vms/', auth=(self.auth), data=data)
+        if vm.status_code == 201:
         # return self.read_vm(vm_id)
-        return {'uuid': vm['vm']['uuid'],
-                'ipv4': vm['vm']['mac_ip'],
-                'group_id': vm['data']['group_id']}
+            return {'uuid': vm['vm']['uuid'],
+                    'ipv4': vm['vm']['mac_ip'],
+                    'group_id': vm['data']['group_id']}
+        if vm.status_code == 200:
+            raise Exception('200 创建失败')
+        if vm.status_code == 400:
+            raise Exception('400 请求数据有误')
 
     def get_status(self, vm_id):
         status_list = {0: 'no state',
