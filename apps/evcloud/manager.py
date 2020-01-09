@@ -94,11 +94,12 @@ class evcloud_operations():
 
     def delete(self, vm_id):
         try:
-            result = requests.delete(f'{self.api_url}vms/{vm_id}/', auth=(self.auth)).json()
-            if result['code'] == 200:
-                return (200, result['code_text'])
+            result = requests.delete(f'{self.api_url}vms/{vm_id}/', auth=(self.auth))
+            # print(result.status_code)
+            if result.status_code == 204:
+                return (200, '删除成功')
             else:
-                return (400, result['code_text'])
+                return (400, result.json()['code_text'])
         except Exception as e:
             return (400, str(e).encode('utf-8').decode('unicode_escape'))
 
