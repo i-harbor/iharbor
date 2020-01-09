@@ -29,7 +29,7 @@ class DetailListPostRouter(SimpleRouter):
         Route(
             url=r'^{prefix}/{lookup}{trailing_slash}$',
             mapping={
-                'get': 'list',
+                'get': 'list_detail',
                 'post': 'create_detail',
                 'put': 'update',
                 'patch': 'partial_update',

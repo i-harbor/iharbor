@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 
-from utils.jwt_token import JWTokenTool
+from utils.jwt_token import JWTokenTool2
 
 #获取用户模型
 User = get_user_model()
@@ -280,16 +280,15 @@ class PasswordResetForm(forms.Form):
         if new_password != confirm_new_password or not new_password:
             raise forms.ValidationError('新密码输入不一致，请重新输入')
 
-        jwtt = JWTokenTool()
+        jwtt = JWTokenTool2()
         try:
-            ret = jwtt.authenticate_jwt(jwt)
+            user = jwtt.verify_jwt_return_user(jwt)
         except:
-            ret = None
+            user = None
 
-        if not ret:
+        if not user:
             raise forms.ValidationError('重置密码失败，jwt无效或已过期，请重新找回密码获取新的链接')
 
-        user = ret[0]
         self.cleaned_data['user'] = user
 
         return self.cleaned_data

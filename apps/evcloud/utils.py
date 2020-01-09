@@ -1,5 +1,5 @@
 import coreapi
-from .models import APIAuth
+from evcloud.models import APIAuth
 
 # API_CONFIG_DICT = {}
 # API_CONFIG_NAME_DEFAULT = 'default'

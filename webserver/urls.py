@@ -16,20 +16,33 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_swagger.views import get_swagger_view
+# from rest_framework_swagger.views import get_swagger_view
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
 
 from .views import kjy_login_callback
 
+schema_view = get_schema_view(
+   openapi.Info(
+      title="iHarbor API",
+      default_version='v1',
+   ),
+   public=False,
+   permission_classes=(permissions.AllowAny,),
+)
 
 urlpatterns = [
-    path('api/', include('api.urls', namespace='api')),
+    path('api/v1/', include('api.urls', namespace='api')),
     path('evcloud/', include('evcloud.urls', namespace='evcloud')),
     path('share/', include('share.urls', namespace='share')),
     path('', include('buckets.urls', namespace='buckets')),
     path('users/', include('users.urls', namespace='users')),
     path('vpn/', include('vpn.urls', namespace='vpn')),
     path('admin/', admin.site.urls),
-    path('apidocs/', get_swagger_view(title='iHarbor API'), name='apidocs'),
+    # path('apidocs/', get_swagger_view(title='iHarbor API'), name='apidocs'),
+    path('apidocs/', schema_view.with_ui('swagger', cache_timeout=0), name='apidocs'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='redoc'),
     path('docs/', include('docs.urls', namespace='docs')),
     path('callback/', kjy_login_callback, name='callback'),
 ]

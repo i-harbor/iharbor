@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'rest_framework_swagger',
+    'drf_yasg',
     'ckeditor',
     # 'ckeditor_uploader',
     # 'raven.contrib.django.raven_compat',
@@ -188,6 +189,7 @@ REST_FRAMEWORK = {
         'users.auth.authentication.AuthKeyAuthentication',
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
@@ -205,10 +207,10 @@ REST_FRAMEWORK = {
     #     'user': '20/minute'  # 登陆认证的用户默认请求访问限制每分钟次数
     # },
     # api version settings
-    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
-    'DEFAULT_VERSION': 'v1',
-    'ALLOWED_VERSIONS': ('v1', ),
-    'VERSION_PARAM': 'version',
+    # 'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    # 'DEFAULT_VERSION': 'v1',
+    # 'ALLOWED_VERSIONS': ('v1', ),
+    # 'VERSION_PARAM': 'version',
 
     # 分页
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
@@ -227,6 +229,21 @@ JWT_AUTH = {
     'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
     # 'JWT_GET_USER_SECRET_KEY': 'utils.jwt_token.jwt_get_user_secret_key',
     'JWT_AUTH_HEADER_PREFIX': 'JWT',
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(hours=8),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=2),
+    'ROTATE_REFRESH_TOKENS': False, # True时，refresh API会返回内容中会包含一个新的refresh JWT
+    'BLACKLIST_AFTER_ROTATION': True,
+
+    # 'SIGNING_KEY': 'xxxxx',   # 默认SECRET_KEY
+
+    'AUTH_HEADER_TYPES': ('Bearer',), # Header "Authorization:{AUTH_HEADER_TYPES} xxx"
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
 # Ceph rados settings
@@ -285,7 +302,7 @@ LOGGING = {
         # debug logging file settings
         'debug': {
             'level': 'DEBUG',
-            'filters': ['require_debug_false'],# working with debug mode
+            'filters': ['require_debug_true'],# working with debug mode
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGGING_FILES_DIR, 'debug.log'),
             'formatter': 'dubug_formatter',
@@ -398,6 +415,27 @@ THIRD_PARTY_APP_AUTH = {
         'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
         'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'
+    },
+}
+
+# drf-yasg
+SWAGGER_SETTINGS = {
+    # 'LOGIN_URL': reverse_lazy('admin:login'),
+    # 'LOGOUT_URL': '/admin/logout',
+    'PERSIST_AUTH': True,
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'REFETCH_SCHEMA_ON_LOGOUT': True,
+
+
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'basic'
+        },
+        'Bearer': {
+            'in': 'header',
+            'name': 'Authorization',
+            'type': 'apiKey',
+        }
     },
 }
 

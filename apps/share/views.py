@@ -1,25 +1,28 @@
 import re
 from collections import OrderedDict
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views import View
 from django.http import FileResponse
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.compat import coreapi, coreschema
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.serializers import Serializer
+from rest_framework.utils.urls import replace_query_param
+from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg import openapi
 
 from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
-from utils.jwt_token import JWTokenTool
-from utils.view import CustomGenericViewSet, CustomAutoSchema
+from utils.jwt_token import JWTokenTool, JWTokenTool2, InvalidToken
+from utils.view import CustomGenericViewSet
 from . import serializers
 from api.harbor import HarborError, HarborManager
+from .forms import SharePasswordForm
 
 
 # Create your views here.
@@ -78,20 +81,27 @@ class ObsViewSet(viewsets.GenericViewSet):
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='objpath',
-                    required=False,
-                    location='path',
-                    schema=coreschema.String(description='以存储桶名称开头文件对象绝对路径')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='浏览器端下载文件对象',
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="以存储桶名称开头文件对象绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='p', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="分享密码",
+                required=False
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
 
         objpath = kwargs.get(self.lookup_field, '')
@@ -111,6 +121,12 @@ class ObsViewSet(viewsets.GenericViewSet):
         # 是否有文件对象的访问权限
         if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
             return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+
+        # 是否设置了分享密码
+        if fileobj.has_share_password():
+            p = request.query_params.get('p', None)
+            if (p is None) or (not fileobj.check_share_password(password=p)):
+                return Response(data={'code': 401, 'code_text': '共享密码无效'}, status=status.HTTP_401_UNAUTHORIZED)
 
         filesize = fileobj.si
         filename = fileobj.name
@@ -287,6 +303,14 @@ class ObsViewSet(viewsets.GenericViewSet):
         except AuthenticationFailed:
             pass
 
+        authenticator = JWTokenTool2()
+        try:
+            user = authenticator.verify_jwt_return_user(jwt=jwt)
+            request._authenticator = authenticator
+            request.user, request.auth = user, jwt
+        except (AuthenticationFailed, InvalidToken):
+            pass
+
 
 class ShareDownloadViewSet(CustomGenericViewSet):
     '''
@@ -328,26 +352,33 @@ class ShareDownloadViewSet(CustomGenericViewSet):
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='share_base',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
-                ),
-                coreapi.Field(
-                    name='subpath',
-                    required=True,
-                    location='query',
-                    schema=coreschema.String(description='分享根目录下的对象相对路径')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='下载分享的目录下载的文件对象',
+        manual_parameters=[
+            openapi.Parameter(
+                name='share_base', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='subpath', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="分享根目录下的对象相对子路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='p', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="分享密码",
+                required=False
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         share_base = kwargs.get(self.lookup_field, '')
         subpath = request.query_params.get('subpath', '')
@@ -372,8 +403,11 @@ class ShareDownloadViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         # 是否有文件对象的访问权限
-        if not self.has_access_permission(bucket=bucket, base_dir=dir_base):
-            return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            if not self.has_access_permission(request=request, bucket=bucket, base_dir=dir_base):
+                return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+        except InvalidError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         filesize = fileobj.si
         filename = fileobj.name
@@ -471,13 +505,16 @@ class ShareDownloadViewSet(CustomGenericViewSet):
             return None, None
         return start, end
 
-    def has_access_permission(self, bucket, base_dir:str):
+    def has_access_permission(self, request, bucket, base_dir:str):
         '''
         是否有访问对象的权限
 
         :param bucket: 存储桶对象
         :param base_dir: 分享根目录
-        :return: True(可访问)；False（不可访问）
+        :return:
+            True(可访问)；False（不可访问）
+
+        :raises: InvalidError
         '''
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
@@ -490,17 +527,23 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         bf = BucketFileManagement(collection_name=bucket.get_bucket_table_name())
         try:
             obj = bf.get_obj(path=base_dir)
-        except Exception:
-            return False
+        except Exception as e:
+            raise InvalidError(code=400, msg=str(e))
 
         if (not obj) or (obj and obj.is_file()):
             return False
 
         # 检查目录读写权限，并且在有效共享事件内
-        if obj.is_shared_and_in_shared_time():
-            return True
+        if not obj.is_shared_and_in_shared_time():
+            return False
 
-        return False
+        # 是否设置了分享密码
+        if obj.has_share_password():
+            p = request.query_params.get('p', None)
+            if (p is None) or (not obj.check_share_password(password=p)):
+                raise InvalidError(code=401, msg='共享密码无效')
+
+        return True
 
 
 class ShareDirViewSet(CustomGenericViewSet):
@@ -535,32 +578,37 @@ class ShareDirViewSet(CustomGenericViewSet):
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
 
-    # api docs
-    schema = CustomAutoSchema(
-        manual_fields={
-            'retrieve': [
-                coreapi.Field(
-                    name='share_base',
-                    required=True,
-                    location='path',
-                    schema=coreschema.String(description='分享根目录,以存储桶名称开头文件目录绝对路径')
-                ),
-                coreapi.Field(
-                    name='subpath',
-                    required=False,
-                    location='query',
-                    schema=coreschema.String(description='子目录路径，list此子目录')
-                ),
-            ],
+
+    @swagger_auto_schema(
+        operation_summary='获取分享目录下的子目录和文件对象列表',
+        manual_parameters=[
+            openapi.Parameter(
+                name='share_base', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                required=True
+            ),
+            openapi.Parameter(
+                name='subpath', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="子目录路径，list此子目录",
+                required=False
+            ),
+            openapi.Parameter(
+                name='p', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="分享密码",
+                required=False
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: "Content-Type: application/octet-stream"
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         share_base = kwargs.get(self.lookup_field, '')
         subpath = request.query_params.get('subpath', '')
-
-        # if not subpath:
-        #     return Response(data={'code': 400, 'code_text': 'subpath参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+        share_code = request.query_params.get('p', None)
 
         pp = PathParser(filepath=share_base)
         bucket_name, dir_base = pp.get_bucket_and_dirpath()
@@ -584,6 +632,11 @@ class ShareDirViewSet(CustomGenericViewSet):
             # 是否有文件对象的访问权限
             if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
                 return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+
+            # 分享根路径存在，检查分享密码
+            if base_obj and base_obj.has_share_password():
+                if (share_code is None) or (not base_obj.check_share_password(password=share_code)):
+                    return Response(data={'code': 401, 'code_text': '共享密码无效'}, status=status.HTTP_401_UNAUTHORIZED)
 
             if subpath: # 是否list子目录
                 if dir_base:
@@ -619,11 +672,11 @@ class ShareDirViewSet(CustomGenericViewSet):
         ])
         page = self.paginate_queryset(files)
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'share_base': share_base, 'subpath': subpath})
+            serializer = self.get_serializer(page, many=True, context={'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
             data_dict['files'] = serializer.data
             return self.get_paginated_response(data_dict)
         else:
-            serializer = self.get_serializer(files, many=True, context={'share_base': share_base, 'subpath': subpath})
+            serializer = self.get_serializer(files, many=True, context={'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
             data_dict['files'] = serializer.data
         return Response(data_dict)
 
@@ -695,7 +748,39 @@ class ShareView(View):
         except HarborError as e:
             return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
 
-        return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username})
+        # 分享密码
+        if (not base_obj) or (not base_obj.has_share_password()):
+            return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': None})
+
+        if request.method.upper() == 'GET':
+            p = request.GET.get('p', None)
+            if p and base_obj.check_share_password(p):
+                return render(request, 'share.html',
+                              context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
+            form = SharePasswordForm()
+        else:
+            form = SharePasswordForm(data=request.POST)
+            if form.is_valid():
+                password = form.cleaned_data.get('password')
+                if base_obj.check_share_password(password):
+                    return render(request, 'share.html',
+                                  context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': password})
+                else:
+                    form.add_error('password', error='分享密码有误')
+
+        content = {}
+        content['form_title'] = '分享密码验证'
+        content['submit_text'] = '确定'
+        content['form'] = form
+        content['share_base'] = share_base
+        content['share_user'] = bucket.user.username
+        return render(request, 'share_form.html', context=content)
+
+    def post(self, request, *args, **kwargs):
+        p = request.POST.get('password', '')
+        url = self.request.build_absolute_uri()
+        url = replace_query_param(url, 'p', p)
+        return redirect(to=url)
 
     def has_access_permission(self, bucket, base_dir_obj):
         '''

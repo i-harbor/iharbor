@@ -18,6 +18,8 @@ uwsgi = "==2.0.18"
 pyftpdlib = "*"
 djangorestframework = "==3.10.2"
 concurrent-log-handler = "*"
+drf-yasg = "==1.17.*"
+djangorestframework-simplejwt = "==4.4.*"
 
 [dev-packages]
 

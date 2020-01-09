@@ -179,11 +179,11 @@ class HarborFTPHandler(FTPHandler):
             time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
             logfun("[%s] %s %s" % (time, prefix, msg))
 
-    def logerror(self, msg, logfun=logger.error):
+    def logerror(self, msg):
         """Log an error including additional indentifying session data."""
         prefix = self.log_prefix % self.__dict__
         time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        logfun("[%s] %s %s" % (time, prefix, msg))
+        logger.error("[%s] %s %s" % (time, prefix, msg))
 
 
     # def push(self, s):

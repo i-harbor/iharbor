@@ -295,4 +295,4 @@ class VPNSerializer(serializers.Serializer):
         return {'id': u.id, 'username': u.username}
 
 class VPNPostSerializer(serializers.Serializer):
-    password = serializers.CharField(max_length=20, min_length=6, help_text='VPN口令密码')
+    password = serializers.CharField(max_length=20, min_length=6, help_text='新的VPN口令密码')

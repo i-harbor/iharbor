@@ -36,6 +36,7 @@ import logging
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer, ThreadedFTPServer, MultiprocessFTPServer
+from pyftpdlib.log import logger
 from harbor_file_system import HarborFileSystem
 from harbor_auth import HarborAuthorizer
 from harbor_handler import HarborDTPHandler, HarborFTPHandler
@@ -64,6 +65,7 @@ def main():
     #                                                                         use_gzip=True,)
     # logging.basicConfig(level=logging.INFO)
     logging.basicConfig(filename='/var/log/harbor/ftp.log', level=logging.INFO)
+    logger.addHandler(logging.handlers.RotatingFileHandler(filename='/var/log/harbor/ftp.log', maxBytes = 1024 ** 3, backupCount = 10))
     # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
     
 
@@ -84,7 +86,9 @@ def main():
     # set a limit for connections
     server.max_cons = 1024
     server.max_cons_per_ip = 50
- 
+
+    # set passive port 
+    handler.passive_ports = range(2000, 3001)
     # start ftp server
     server.serve_forever()
  

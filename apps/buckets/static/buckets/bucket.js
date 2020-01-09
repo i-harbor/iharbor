@@ -1108,31 +1108,40 @@
             bucket_name: bucket_name,
             dir_path: dir_path
         });
+
         let share = 1;
         Swal.fire({
-            title: '请选择公开时间',
-            input: 'select',
-            inputOptions: {
-                '0': '永久公开',
-                '1': '1天',
-                '7': '7天',
-                '30': '30天',
-                '-1': '私有'
-            },
+            title: '分享',
+            html:
+                `<select id="swal-select" class="swal2-select">
+                    <option value="0">永久公开</option>
+                    <option value="1">1天</option>
+                    <option value="7">7天</option>
+                    <option value="30">30天</option>
+                    <option value="-1">私有</option>
+                </select>
+                <div>
+                    <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>有分享密码保护</span>
+                </div> `,
             showCancelButton: true,
+            cancelButtonText: '取消',
             inputAttributes: {
                 autocapitalize: 'off'
             },
             confirmButtonText: '分享',
             showLoaderOnConfirm: true,
-            inputValidator: (value) => {
-                return !value && '请选择一个选项';
-            },
-            preConfirm: (value) => {
+            footer: '提示：创建新的带密码的分享，旧的分享密码会失效',
+            preConfirm: () => {
+                value = document.getElementById('swal-select').value;
+                is_pw = document.getElementById('swal-password').checked;
                 if (value === '-1'){
                     share = 0;
                 }
-                url = url + '?' + $.param({share: share, days: value}, true);
+
+                let params = {share: share, days: value};
+                if (is_pw)
+                    params.password = '';
+                url = url + '?' + $.param(params, true);
 
                 return $.ajax({
                     url: url,
@@ -1145,20 +1154,27 @@
                             status_node.html('私有');
                         }
                         return data;
-                    },
-                    error: function (xhr, msg, err) {
-                        Swal.showValidationMessage('Request failed:' + xhr.statusText);
-                    },
+                    }
                 });
             },
             allowOutsideClick: () => !Swal.isLoading()
         }).then((result) => {
             if (result.value && (share === 1)) {
+                let text = '<p>' + result.value.share + '</p>';
+                let pw = result.value.share_code;
+                if (pw)
+                    text = text + '<p>' + '分享密码：' + pw + '</p>';
                 Swal.fire({
                     title: "分享链接",
-                    text: result.value.share
+                    html: text
                 });
             }
+        }).catch((xhr) => {
+            let msg = xhr.statusText;
+            try{
+                msg = xhr.responseJSON.code_text;
+            }catch (e) {}
+            show_warning_dialog('分享公开设置失败！'+ msg, type='error');
         })
     });
 
@@ -1176,54 +1192,64 @@
 
         let detail_url = build_obj_detail_url(obj);
 
-        (async function() {
-            const {value: key} = await Swal({
-                title: '请选择公开时间',
-                input: 'select',
-                inputOptions: {
-                    '0': '永久公开',
-                    '1': '1天',
-                    '7': '7天',
-                    '30': '30天',
-                    '-1': '私有'
-                },
-                showCancelButton: true,
-                inputValidator: (value) => {
-                    return !value && '请选择一个选项';
-                }
-            });
-
-            let share = 1;
-            if (key === '-1'){
-                share = 0
-            }
-
-            if (key) {
-                let share_url = build_obj_share_url({
-                    detail_url: detail_url,
-                    share: share,
-                    days: key
-                });
-                set_obj_shared(share_url);
-            }
-        })();
-    });
-
-    //
-    // 文件对象分享公开权限设置
-    //
-    function set_obj_shared(url) {
-        $.ajax({
-            type: 'patch',
-            url: url,
-            success: function (data,status,xhr) {
-                show_auto_close_warning_dialog('分享公开设置成功', type='success');
+        let share = 1;
+        Swal.fire({
+            title: '分享',
+            html:
+                `<select id="swal-select" class="swal2-select">
+                    <option value="0">永久公开</option>
+                    <option value="1">1天</option>
+                    <option value="7">7天</option>
+                    <option value="30">30天</option>
+                    <option value="-1">私有</option>
+                </select>
+                <div>
+                    <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>有分享密码保护</span>
+                </div> `,
+            showCancelButton: true,
+            cancelButtonText: '取消',
+            inputAttributes: {
+                autocapitalize: 'off'
             },
-            error: function (error) {
-                show_warning_dialog('分享公开设置失败！', type='error');
+            confirmButtonText: '分享',
+            showLoaderOnConfirm: true,
+            footer: '提示：创建新的带密码的分享，旧的分享链接会失效',
+            preConfirm: () => {
+                value = document.getElementById('swal-select').value;
+                is_pw = document.getElementById('swal-password').checked;
+                if (value === '-1'){
+                    share = 0;
+                }
+
+                let params = {share: share, days: value};
+                if (is_pw)
+                    params.password = '';
+                let url = detail_url + '?' + $.param(params, true);
+                return $.ajax({
+                    url: url,
+                    type: 'patch',
+                    async: true,
+                    success: function (data, status_text, xhr) {
+                        return data;
+                    }
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.value && (share === 1)) {
+                Swal.fire({
+                    title: "分享链接",
+                    text: result.value.share_uri
+                });
             }
+        }).catch((xhr) => {
+            let msg = xhr.statusText;
+            try{
+                msg = xhr.responseJSON.code_text;
+            }catch (e) {}
+            show_warning_dialog('分享公开设置失败！'+ msg, type='error');
         })
-    }
+    });
 
 
     //

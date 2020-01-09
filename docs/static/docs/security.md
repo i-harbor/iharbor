@@ -10,15 +10,16 @@ Token应包含在Authorization HTTP标头中，密钥应以字符串文字“Tok
 `Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b`  
 
 ## JWT认证
-Json web token认证方式，使用简单,有效期为1天，旧的jwt失效前可以通过对应API携带旧jwt在可刷新时限（7天）内刷新获取新的jwt。
+Json web token认证方式，使用简单，包括access jwt和refresh jwt，access jwt有效期为8h，旧的access jwt失效前可以通过对应API携
+带旧refresh jwt在有效时限（2天）内刷新获取新的access jwt。
 jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“JWT”为前缀，空格分隔两个字符串，例如：   
-`Authorization: JWT eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
+`Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
 
 ## 访问密钥  
 访问密钥是一个密钥对（AccessKey和SecretKey），AccessKey会在网络中传输，SecretKey不在网络上传输，需要用户妥善保管。
 密钥对用于安全凭证的生成，通过一些签名算法，以SecretKey为加密参数，对一些适当的数据内容进行加密生成安全凭证。访问密钥认证
 方式安全性高，使用会复杂一些。  
-若SecretKey意外泄露或被恶意第三方窃取，可能导致数据泄漏风险。若发生密钥泄露等安全问题，密钥拥有着应第一时间在EBHarbor平台
+若SecretKey意外泄露或被恶意第三方窃取，可能导致数据泄漏风险。若发生密钥泄露等安全问题，密钥拥有着应第一时间在iHarbor平台
 的安全凭证中更换密钥。
 
 ### 访问密钥凭证格式和用法  
@@ -62,6 +63,25 @@ jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“JWT�
 
 具体请参考: [Python代码](https://github.com/i-harbor/webserver/blob/master/apps/users/auth/auth_key.py)，[Golang代码](https://github.com/i-harbor/goharbor/blob/master/authkey.go)    
 **注意**：由于安全凭证auth_key有时间戳deadline授权截止时间，客户端和服务器需要同步校准各自的时钟。
+
+## 资源访问权限
+
+存储桶下资源的访问权限分2级权限，存储桶访问权限和桶下资源自己的访问权限；非存储桶所有者对资源的可见性，存储桶访问权限优先于存储桶下资源自己的访问权限：
+* 存储桶权限是公有的，桶下所有资源都是公有权限；  
+* 存储桶私有权限时，桶下资源自己的访问权限才有效；
+
+
+### 存储桶访问权限
+存储桶的所有者拥有存储桶的所有权限和管理权限，存储桶权限包含“私有”、“公有只读”、“公有可读可写”。
+* 私有： 非存储桶所有者不可以访问桶下资源，桶下分享公开的资源除外；
+* 公有只读：非存储桶所有者只可读取下载桶下资源；
+* 公有可读可写：非存储桶所有者可上传可下载对象，创建和删除目录和对象；
+
+### 存储桶下资源单独访问权限
+存储桶下资源的单独访问权限包含“私有”、“公有只读”、“公有可读可写”，存储桶私有权限时才有效。
+
+### 公开和分享
+带密码的分享，同时只用一个分享密码有效，创建新的带密码的分享，旧的分享密码会失效。
 
 
 

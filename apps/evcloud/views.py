@@ -7,7 +7,7 @@ from django.views import View
 from django.core.exceptions import ObjectDoesNotExist
 
 from .models import (EvcloudVM, VMLimit, VMConfig, APIAuth, VMUsageDescription)
-from .utils import evcloud_operations
+from .manager import evcloud_operations
 
 # Create your views here.
 
