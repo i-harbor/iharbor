@@ -51,14 +51,15 @@ class evcloud_operations():
         }
         vm = requests.post(f'{self.api_url}vms/', auth=(self.auth), data=data)
         if vm.status_code == 201:
+            vm = vm.json()
         # return self.read_vm(vm_id)
             return {'uuid': vm['vm']['uuid'],
                     'ipv4': vm['vm']['mac_ip'],
                     'group_id': vm['data']['group_id']}
         if vm.status_code == 200:
-            raise Exception(vm['code_text'])
+            raise Exception(vm.json()['code_text'])
         if vm.status_code == 400:
-            raise Exception(vm['code_text'])
+            raise Exception(vm.json()['code_text'])
 
     def get_status(self, vm_id):
         status_list = {0: 'no state',
