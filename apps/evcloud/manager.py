@@ -56,9 +56,9 @@ class evcloud_operations():
                     'ipv4': vm['vm']['mac_ip'],
                     'group_id': vm['data']['group_id']}
         if vm.status_code == 200:
-            raise Exception('200 创建失败')
+            raise Exception(vm['code_text'])
         if vm.status_code == 400:
-            raise Exception('400 请求数据有误')
+            raise Exception(vm['code_text'])
 
     def get_status(self, vm_id):
         status_list = {0: 'no state',
