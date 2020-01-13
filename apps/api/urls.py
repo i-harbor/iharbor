@@ -18,7 +18,7 @@ router.register(r'stats/ceph', views.CephStatsViewSet, base_name='stats_ceph')
 router.register(r'stats/user', views.UserStatsViewSet, base_name='stats_user')
 router.register(r'stats/visit', views.VisitStatsViewSet, base_name='stats_visit')
 router.register(r'security', views.SecurityViewSet, base_name='security')
-router.register(r'metadata/(?P<bucket_name>[a-z0-9-]{3,64})', views.MetadataViewSet,
+router.register(r'metadata/(?P<bucket_name>[a-z0-9-_]{3,64})', views.MetadataViewSet,
                 base_name='metadata')
 router.register(r'ceph/comp', views.CephComponentsViewSet, base_name='ceph_components')
 router.register(r'ceph/perf', views.CephPerformanceViewSet, base_name='ceph_performance')
@@ -28,15 +28,15 @@ router.register(r'availability', views.AvailabilityViewSet, base_name='availabil
 router.register(r'test', views.TestViewSet, base_name='test')
 router.register(r'ftp', views.FtpViewSet, base_name='ftp')
 router.register(r'vpn', views.VPNViewSet, base_name='vpn')
-router.register(r'obj-rados/(?P<bucket_name>[a-z0-9-]{3,64})', views.ObjKeyViewSet, base_name='obj-rados')
+router.register(r'obj-rados/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ObjKeyViewSet, base_name='obj-rados')
 
 
 dlp_router = DetailListPostRouter()
-dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-]{3,64})', views.DirectoryViewSet, base_name='dir')
+dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryViewSet, base_name='dir')
 
 detail_router = DetailPostRouter()
-detail_router.register(r'obj/(?P<bucket_name>[a-z0-9-]{3,64})', views.ObjViewSet, base_name='obj')
-detail_router.register(r'move/(?P<bucket_name>[a-z0-9-]{3,64})', views.MoveViewSet, base_name='move')
+detail_router.register(r'obj/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ObjViewSet, base_name='obj')
+detail_router.register(r'move/(?P<bucket_name>[a-z0-9-_]{3,64})', views.MoveViewSet, base_name='move')
 
 
 urlpatterns = [

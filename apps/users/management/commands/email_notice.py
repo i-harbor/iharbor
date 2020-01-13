@@ -1,4 +1,6 @@
 import threading
+import time
+
 from django.core.management.base import BaseCommand, CommandError
 from django.core.mail import send_mass_mail
 from django.contrib.auth import get_user_model
@@ -10,7 +12,7 @@ class Command(BaseCommand):
     '''
     为bucket对应的表，清理满足彻底删除条件的对象和目录
     '''
-    pool_sem = threading.Semaphore(20)  # 定义最多同时启用多少个线程
+    pool_sem = threading.Semaphore(1)  # 定义最多同时启用多少个线程
 
     help = """** manage.py email_notice --all-user --msg="2019年10月22日18:00-19:00，iHarbor对象存储服务将维护更新，特此通知，给您带来的不便请谅解" """
 
@@ -40,7 +42,7 @@ class Command(BaseCommand):
         self.email_msg = msg
 
         title = options['title']
-        self.email_title = title if title else 'iHarbor服务维护通知'
+        self.email_title = title if title else '对象存储服务(iHarbor)维护通知'
 
         users = self.get_users(**options)
         if input('Are you sure you want to do this?\n\n' + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
@@ -65,7 +67,7 @@ class Command(BaseCommand):
         # 全部的桶
         if all is not None:
             self.stdout.write(self.style.NOTICE( 'Will send email to all user.'))
-            return User.objects.values_list('username').all()
+            return User.objects.values_list('username', flat=True).filter(is_active=True).all()
 
         raise CommandError("please give a username or all users")
 
@@ -91,6 +93,7 @@ class Command(BaseCommand):
     def send_email_to_users(self, users):
         for addrs in self.generator_wrapper(users):
             if self.pool_sem.acquire(): # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
+                time.sleep(1)
                 worker = threading.Thread(target=self.send_emails_task, kwargs={'addrs': addrs})
                 worker.start()
 
@@ -102,7 +105,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('Successfully send email'))
 
-    def generator_wrapper(self, users, num_per=100):
+    def generator_wrapper(self, users, num_per=10):
         '''
         包装生成器，每次从users中取出num_per个元素
         :param users: 生成器的源数据,需可被切片
