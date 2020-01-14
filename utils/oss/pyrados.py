@@ -198,14 +198,11 @@ class RadosAPI():
         return self
 
     def __exit__(self, type_, value, traceback):
-        if self._cluster is not None:
-            self.get_cluster().shutdown()
-            self._cluster = None
+        self.clear_cluster()
         return False  # __exit__返回的是False，有异常不被忽略会向上抛出。
 
     def __del__(self):
-        if self._cluster:
-            self._cluster.shutdown()
+        self.clear_cluster()
 
     def get_cluster(self):
         '''
@@ -226,6 +223,14 @@ class RadosAPI():
                 raise RadosError(msg, errno=e.errno)
 
         return self._cluster
+
+    def clear_cluster(self, cluster=None):
+        if cluster:
+            cluster.shutdown()
+
+        if self._cluster is not None:
+            self._cluster.shutdown()
+            self._cluster = None
 
     def _io_write(self,ioctx, obj_id, offset, data: bytes):
         '''
@@ -727,7 +732,7 @@ class HarborObject():
                 try:
                     rados = self.get_rados_api()
                     rados.write(obj_id=self._obj_id, offset=offset, data=chunk)
-                except RadosError as e:
+                except (RadosError, Exception) as e:
                     return False, str(e)
 
                 start += len(chunk)
@@ -750,7 +755,7 @@ class HarborObject():
         try:
             rados = self.get_rados_api()
             rados.write_file(obj_id=self._obj_id, offset=offset, file=file)
-        except RadosError as e:
+        except (RadosError, Exception) as e:
             return False, str(e)
 
         return True, 'success to write file'
@@ -767,7 +772,7 @@ class HarborObject():
         try:
             rados = self.get_rados_api()
             rados.delete(obj_id=self._obj_id, obj_size=size)
-        except RadosError as e:
+        except (RadosError, Exception) as e:
             return False, str(e)
 
         return True, 'delete success'
