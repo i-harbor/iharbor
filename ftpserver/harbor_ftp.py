@@ -65,7 +65,7 @@ def main():
     #                                                                         use_gzip=True,)
     # logging.basicConfig(level=logging.INFO)
     logging.basicConfig(filename='/var/log/harbor/ftp.log', level=logging.INFO)
-    logger.addHandler(logging.handlers.RotatingFileHandler(filename='/var/log/harbor/ftp.log', maxBytes = 1024 ** 3, backupCount = 10))
+    logger.addHandler(logging.handlers.RotatingFileHandler(filename='/var/log/harbor/ftp.log', maxBytes = 1024 ** 2 * 128, backupCount = 10))
     # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
     
 
