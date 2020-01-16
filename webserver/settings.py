@@ -302,7 +302,7 @@ LOGGING = {
         # debug logging file settings
         'debug': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],# working with debug mode
+            'filters': ['require_debug_false'],# working with debug mode
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGGING_FILES_DIR, 'debug.log'),
             'formatter': 'dubug_formatter',
@@ -329,7 +329,7 @@ LOGGING = {
         },
         'debug': {
             'handlers': ['debug'],
-            'level': 'DEBUG',
+            'level': 'WARNING',#'DEBUG',
             'propagate': False,
         },
         # 'django.db.backends': {

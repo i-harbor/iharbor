@@ -51,7 +51,7 @@ CEPH_RADOS = {
     'USER_NAME': 'client.objstore',
     'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
     'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
-    'POOL_NAME': 'objstore',
+    'POOL_NAME': ('poolname1', 'poolname1'),
 }
 ```
 
