@@ -61,6 +61,7 @@ class Bucket(models.Model):
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
+    pool_name  = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
 
     class Meta:
         ordering = ['-created_time']
@@ -72,6 +73,9 @@ class Bucket(models.Model):
 
     def __repr__(self):
         return f'<Bucket>{self.name}'
+
+    def get_pool_name(self):
+        return self.pool_name
 
     @classmethod
     def get_user_valid_bucket_count(cls, user):
@@ -121,6 +125,7 @@ class Bucket(models.Model):
             a.ftp_enable = self.ftp_enable
             a.ftp_password = self.ftp_password
             a.ftp_ro_password = self.ftp_ro_password
+            a.pool_name = self.pool_name
             a.save()
         except Exception as e:
             return False
@@ -343,6 +348,7 @@ class Archive(models.Model):
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
+    pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
 
     class Meta:
         ordering = ['-id']
@@ -363,6 +369,9 @@ class Archive(models.Model):
             self.save(update_fields=['table_name'])
 
         return self.table_name
+
+    def get_pool_name(self):
+        return self.pool_name
 
 
 class BucketLimitConfig(models.Model):

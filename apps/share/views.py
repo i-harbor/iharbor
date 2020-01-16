@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from django.shortcuts import render, redirect
 from django.views import View
-from django.http import FileResponse
+from django.http import FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import viewsets, status
@@ -748,25 +748,24 @@ class ShareView(View):
         except HarborError as e:
             return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
 
-        # 分享密码
+        # 无分享密码
         if (not base_obj) or (not base_obj.has_share_password()):
             return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': None})
 
-        if request.method.upper() == 'GET':
-            p = request.GET.get('p', None)
-            if p and base_obj.check_share_password(p):
+        # 验证分享密码
+        p = request.GET.get('p', None)
+        if p:
+            data = QueryDict(mutable=True)
+            data.setlist('password', [p])
+            form = SharePasswordForm(data)  # 模拟post请求数据
+            if base_obj.check_share_password(p):
                 return render(request, 'share.html',
-                              context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
-            form = SharePasswordForm()
+                          context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
+            else:
+                form.is_valid()
+                form.add_error('password', error='分享密码有误')
         else:
-            form = SharePasswordForm(data=request.POST)
-            if form.is_valid():
-                password = form.cleaned_data.get('password')
-                if base_obj.check_share_password(password):
-                    return render(request, 'share.html',
-                                  context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': password})
-                else:
-                    form.add_error('password', error='分享密码有误')
+            form = SharePasswordForm()
 
         content = {}
         content['form_title'] = '分享密码验证'

@@ -1,5 +1,6 @@
 import logging
 import traceback
+import random
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
@@ -7,12 +8,35 @@ from django.db.models import Sum, Count
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
+from django.conf import settings
 
 from .models import BucketFileBase, get_str_hexMD5
 
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+
+
+def get_ceph_poolname_rand():
+    '''
+    从配置的CEPH pool name随机获取一个
+    :return:
+        poolname: str
+
+    :raises: ValueError
+    '''
+    pools = settings.CEPH_RADOS.get('POOL_NAME', None)
+    if not pools:
+        raise ValueError('配置文件CEPH_RADOS中POOL_NAME配置项无效')
+
+    if isinstance(pools, str):
+        return pools
+
+    if isinstance(pools, tuple) or isinstance(pools, list):
+        return random.choice(pools)
+
+    raise ValueError('配置文件CEPH_RADOS中POOL_NAME配置项需要是一个元组tuple')
+
 
 def create_table_for_model_class(model):
     '''

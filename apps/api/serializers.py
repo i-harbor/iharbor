@@ -7,6 +7,7 @@ from .models import User, Bucket
 from utils.time import to_localtime_string_naive_by_utc
 from utils.log.decorators import log_used_time
 from .validators import DNSStringValidator, bucket_limit_validator
+from buckets.utils import get_ceph_poolname_rand
 
 
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -165,7 +166,8 @@ class BucketCreateSerializer(serializers.Serializer):
         if not request:
             return None
         user = request.user
-        bucket = Bucket.objects.create(user=user, **validated_data) # 创建并保存
+        pool_name = get_ceph_poolname_rand()
+        bucket = Bucket.objects.create(pool_name=pool_name, user=user, **validated_data) # 创建并保存
         return bucket
 
 

@@ -628,14 +628,14 @@ class HarborObject():
     '''
     iHarbor对象操作接口封装，
     '''
-    def __init__(self, obj_id, obj_size=0, cluster_name=None, pool_name=None, user_name=None, conf_file='',
+    def __init__(self, pool_name, obj_id, obj_size=0,cluster_name=None,  user_name=None, conf_file='',
                  keyring_file='', *args, **kwargs):
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', 'ceph')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
         self._keyring_file = keyring_file if os.path.exists(keyring_file) else settings.CEPH_RADOS.get(
             'KEYRING_FILE_PATH', '')
-        self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
+        self._pool_name = pool_name
         self._obj_id = obj_id
         self._obj_size = obj_size
         self._rados = None
