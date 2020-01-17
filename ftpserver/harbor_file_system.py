@@ -64,7 +64,10 @@ class HarborFileSystem(AbstractedFS):
             files = self.client.ftp_list_dir(self.bucket_name, path[1:])
             for file in files[0]:
                 if file.fod == True:
-                    dir_list.append((file.name, file.upt, file.si))
+                    if file.upt:
+                        dir_list.append((file.name, file.upt, file.si))
+                    else:
+                        dir_list.append((file.name, file.ult, file.si))
                 else:
                     # print(file.shp, file.si, file.sst, file.stl, file.ult, file.upt)
                     dir_list.append((file.name + '/', file.ult, 0))
