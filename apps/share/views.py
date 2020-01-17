@@ -119,14 +119,10 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         # 是否有文件对象的访问权限
-        if not self.has_access_permission(request=request, bucket=bucket, obj=fileobj):
-            return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
-
-        # 是否设置了分享密码
-        if fileobj.has_share_password():
-            p = request.query_params.get('p', None)
-            if (p is None) or (not fileobj.check_share_password(password=p)):
-                return Response(data={'code': 401, 'code_text': '共享密码无效'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            self.has_access_permission(request=request, bucket=bucket, obj=fileobj)
+        except InvalidError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         filesize = fileobj.si
         filename = fileobj.name
@@ -231,7 +227,11 @@ class ObsViewSet(viewsets.GenericViewSet):
         :param request: 请求体对象
         :param bucket: 存储桶对象
         :param obj: 文件对象
-        :return: True(可访问)；False（不可访问）
+        :return:
+            True(可访问)
+            raise InvalidError  # 不可访问
+
+        :raises: InvalidError
         '''
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
@@ -245,10 +245,18 @@ class ObsViewSet(viewsets.GenericViewSet):
             return True
 
         # 对象是否共享的，并且在有效共享事件内
-        if obj.is_shared_and_in_shared_time():
-            return True
+        if not obj.is_shared_and_in_shared_time():
+            raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg='您没有访问权限')
 
-        return False
+        # 是否设置了分享密码
+        if obj.has_share_password():
+            p = request.query_params.get('p', None)
+            if p is None:
+                raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg='资源设有共享密码访问权限')
+            if not obj.check_share_password(password=p):
+                raise InvalidError(code=status.HTTP_401_UNAUTHORIZED, msg= '共享密码无效')
+
+        return True
 
     def authentication_url_token(self, request):
         '''

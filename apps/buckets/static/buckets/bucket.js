@@ -1434,7 +1434,7 @@
             <div class="col-xs-12 col-sm-12">
                 <div>
                     <a class="btn btn-info" href="{{ obj.download_url }}">下载</a>
-                    <button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</button>
+                    <!--<button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</button>-->
                 </div>
                 <hr/>
                 <div>

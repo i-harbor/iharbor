@@ -592,6 +592,12 @@ class BucketFileBase(models.Model):
 
         return False
 
+    def get_share_password(self):
+        '''
+        共享密码
+        '''
+        return self.shp
+
     def set_share_password(self, password: str, commit=True):
         '''
         设置新的共享密码
