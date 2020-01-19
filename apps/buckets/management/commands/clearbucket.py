@@ -80,7 +80,7 @@ class Command(BaseCommand):
 
     def get_objs_and_dirs(self, modelclass, num=1000):
         '''
-        获取对象和目录,默认最多返回1000条
+        获取对象,默认最多返回1000条
 
         :param modelclass: 对象和目录的模型类
         :param num: 获取数量
@@ -88,7 +88,7 @@ class Command(BaseCommand):
         :return:
         '''
         try:
-            objs = modelclass.objects.all()[:num]
+            objs = modelclass.objects.filter(fod=True).all()[:num]
         except Exception as e:
             self.stdout.write(self.style.ERROR('Error when clearing bucket table named {0},'.format(
                 modelclass.Meta.db_table) + str(e)))
@@ -133,7 +133,8 @@ class Command(BaseCommand):
         if not self.is_meet_delete_time(bucket):
             return
 
-        ho = HarborObject(obj_id='')
+        pool_name = bucket.get_pool_name()
+        ho = HarborObject(pool_name=pool_name, obj_id='')
         try:
             while True:
                 objs = self.get_objs_and_dirs(modelclass=modelclass)
@@ -155,8 +156,8 @@ class Command(BaseCommand):
 
                 self.stdout.write(self.style.WARNING(f"Success deleted {objs.count()} objects from bucket {bucket.name}."))
 
-            # 如果bucket对应表已空，删除bucket和表
-            if modelclass.objects.count() == 0:
+            # 如果bucket对应表没有对象了，删除bucket和表
+            if modelclass.objects.filter(fod=True).count() == 0:
                 if delete_table_for_model_class(modelclass):
                     bucket.delete()
                     self.stdout.write(self.style.WARNING(f"deleted bucket and it's table:{bucket.name}"))

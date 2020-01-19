@@ -1,6 +1,6 @@
 import os
 import logging
-# import concurrent_log_handler
+import concurrent_log_handler
 
 # logging.handlers = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
 #                                                                             maxBytes=300,
@@ -58,14 +58,15 @@ def main():
     handler.dtp_handler = HarborDTPHandler
     handler.authorizer = authorizer
 
-    # log
-    # logging.handlers = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
-    #                                                                         maxBytes=300,
-    #                                                                         backupCount=10,
-    #                                                                         use_gzip=True,)
-    # logging.basicConfig(level=logging.INFO)
-    logging.basicConfig(filename='/var/log/harbor/ftp.log', level=logging.INFO)
-    logger.addHandler(logging.handlers.RotatingFileHandler(filename='/var/log/harbor/ftp.log', maxBytes = 1024 ** 3, backupCount = 10))
+    logging.basicConfig(level=logging.INFO)
+    # print(dir(logger))
+    
+    file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
+                                                                        maxBytes = 1024 ** 2 * 128,
+                                                                        backupCount = 10, use_gzip=True,)
+    file_handler.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
+    # print(logger.name)
     # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
     
 
@@ -84,8 +85,8 @@ def main():
     server = MultiprocessFTPServer(address, handler)
  
     # set a limit for connections
-    server.max_cons = 1024
-    server.max_cons_per_ip = 50
+    server.max_cons = 2048
+    server.max_cons_per_ip = 2048
 
     # set passive port 
     handler.passive_ports = range(2000, 3001)

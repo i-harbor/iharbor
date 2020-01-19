@@ -443,7 +443,10 @@ class BucketViewSet(CustomGenericViewSet):
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
         # 创建bucket,创建bucket的shard集合
-        bucket = serializer.save()
+        try:
+            bucket = serializer.save()
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': f'创建桶失败，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         col_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=col_name)
         model_class = bfm.get_obj_model_class()
@@ -1406,7 +1409,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
     queryset = []
     permission_classes = [IsAuthenticated]
     lookup_field = 'bucket_name'
-    lookup_value_regex = '[a-z0-9-]{3,64}'
+    lookup_value_regex = '[a-z0-9-_]{3,64}'
 
 
     def retrieve(self, request, *args, **kwargs):
@@ -1782,7 +1785,7 @@ class CephStatsViewSet(CustomGenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            stats = HarborObject(obj_id='').get_cluster_stats()
+            stats = HarborObject(pool_name='', obj_id='').get_cluster_stats()
         except RadosError as e:
             return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2024,7 +2027,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
     pagination_class = None
 
     def list(self, request, *args, **kwargs):
-        ok, data = HarborObject(obj_id='').get_ceph_io_status()
+        ok, data = HarborObject(pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
             return Response(data={'code': 500, 'code_text': 'Get io status error:' + data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(data=data)
@@ -2193,7 +2196,7 @@ class FtpViewSet(CustomGenericViewSet):
     queryset = []
     permission_classes = [IsAuthenticated]
     lookup_field = 'bucket_name'
-    lookup_value_regex = '[a-z0-9-]{3,64}'
+    lookup_value_regex = '[a-z0-9-_]{3,64}'
     pagination_class = None
 
 
@@ -2479,7 +2482,8 @@ class ObjKeyViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': '对象不存在'}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados_key = HarborObject(obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+        pool_name = bucket.get_pool_name()
+        rados_key = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
         info = {
             'rados': rados_key,
             'size': obj.obj_size,

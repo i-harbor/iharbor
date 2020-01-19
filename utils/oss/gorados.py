@@ -41,7 +41,7 @@ class HarborObjectGo(HarborObjectBase):
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', '')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
-        self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
+        self._pool_name = pool_name
         self._obj_id = obj_id
         self._obj_size = obj_size
         self._rados_dll = rados_dll

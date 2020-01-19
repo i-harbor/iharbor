@@ -198,14 +198,11 @@ class RadosAPI():
         return self
 
     def __exit__(self, type_, value, traceback):
-        if self._cluster is not None:
-            self.get_cluster().shutdown()
-            self._cluster = None
+        self.clear_cluster()
         return False  # __exit__返回的是False，有异常不被忽略会向上抛出。
 
     def __del__(self):
-        if self._cluster:
-            self._cluster.shutdown()
+        self.clear_cluster()
 
     def get_cluster(self):
         '''
@@ -226,6 +223,14 @@ class RadosAPI():
                 raise RadosError(msg, errno=e.errno)
 
         return self._cluster
+
+    def clear_cluster(self, cluster=None):
+        if cluster:
+            cluster.shutdown()
+
+        if self._cluster is not None:
+            self._cluster.shutdown()
+            self._cluster = None
 
     def _io_write(self,ioctx, obj_id, offset, data: bytes):
         '''
@@ -623,14 +628,14 @@ class HarborObject():
     '''
     iHarbor对象操作接口封装，
     '''
-    def __init__(self, obj_id, obj_size=0, cluster_name=None, pool_name=None, user_name=None, conf_file='',
+    def __init__(self, pool_name, obj_id, obj_size=0,cluster_name=None,  user_name=None, conf_file='',
                  keyring_file='', *args, **kwargs):
         self._cluster_name = cluster_name if cluster_name else settings.CEPH_RADOS.get('CLUSTER_NAME', 'ceph')
         self._user_name = user_name if user_name else settings.CEPH_RADOS.get('USER_NAME', '')
         self._conf_file = conf_file if os.path.exists(conf_file) else settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
         self._keyring_file = keyring_file if os.path.exists(keyring_file) else settings.CEPH_RADOS.get(
             'KEYRING_FILE_PATH', '')
-        self._pool_name = pool_name if pool_name else settings.CEPH_RADOS.get('POOL_NAME', '')
+        self._pool_name = pool_name
         self._obj_id = obj_id
         self._obj_size = obj_size
         self._rados = None
@@ -727,7 +732,7 @@ class HarborObject():
                 try:
                     rados = self.get_rados_api()
                     rados.write(obj_id=self._obj_id, offset=offset, data=chunk)
-                except RadosError as e:
+                except (RadosError, Exception) as e:
                     return False, str(e)
 
                 start += len(chunk)
@@ -750,7 +755,7 @@ class HarborObject():
         try:
             rados = self.get_rados_api()
             rados.write_file(obj_id=self._obj_id, offset=offset, file=file)
-        except RadosError as e:
+        except (RadosError, Exception) as e:
             return False, str(e)
 
         return True, 'success to write file'
@@ -767,7 +772,7 @@ class HarborObject():
         try:
             rados = self.get_rados_api()
             rados.delete(obj_id=self._obj_id, obj_size=size)
-        except RadosError as e:
+        except (RadosError, Exception) as e:
             return False, str(e)
 
         return True, 'delete success'

@@ -1,3 +1,12 @@
+## v0.3.6
+* 多ceph pool实现，桶记录自己的pool name
+
+## v0.3.5
+* 使用drf-yasg生成API文档
+* 新的jwt api， 旧api弃用
+* evcloud v3版
+* 带密码的分享
+
 ## v0.3.4
 * clearbucket命令修改，增加selectobject命令，桶归档桶名去除唯一索引   
 * 对象rados存储信息API obj-rados   

@@ -64,9 +64,13 @@ class HarborFileSystem(AbstractedFS):
             files = self.client.ftp_list_dir(self.bucket_name, path[1:])
             for file in files[0]:
                 if file.fod == True:
-                    dir_list.append((file.name, file.upt, file.si))
+                    if file.upt:
+                        dir_list.append((file.name, file.upt, file.si))
+                    else:
+                        dir_list.append((file.name, file.ult, file.si))
                 else:
-                    dir_list.append((file.name + '/', '', 0))
+                    # print(file.shp, file.si, file.sst, file.stl, file.ult, file.upt)
+                    dir_list.append((file.name + '/', file.ult, 0))
         except HarborError as error:
             raise FilesystemError(error.msg)
         # print('listdir return', dir_list)
@@ -84,7 +88,9 @@ class HarborFileSystem(AbstractedFS):
             ftp_path = os.path.join(path, filename)
             if filename.endswith('/'):
                 perm = "drwxrwxrwx"
-                mtimestr = 'Jan 01 00:00'
+                # print(mtimestr, '-----------')
+                # mtimestr = 'Jan 01 00:00'
+                mtimestr = mtimestr.strftime('%b %d %X')[:-3]
                 filename = filename[:-1]
             else:
                 mtimestr = mtimestr.strftime('%b %d %X')[:-3]
@@ -110,7 +116,10 @@ class HarborFileSystem(AbstractedFS):
                     type = "dir"
                     perm = 'r'
                     filename = listing[0][0][:-1]
-                    mtimestr = '20000101000000'
+                    # print(listing[0][1], '--------------1')
+                    # mtimestr = '20000101000000'
+                    mtimestr = listing[0][1]
+                    mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = listing[0][2]
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                         type, size, perm, mtimestr, '', filename)
@@ -162,11 +171,12 @@ class HarborFileSystem(AbstractedFS):
                     type = "dir"
                     perm = 'r'
                     filename = filename[:-1]
-                    mtimestr = '20000101000000'
+                    # print(mtimestr, '--------------2')
+                    # mtimestr = '20000101000000'
                 else:
                     perm = 'el'
                     type = "file"
-                    mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
+                mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                 line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                     type, size, perm, mtimestr, '', filename)
 

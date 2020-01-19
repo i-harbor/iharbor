@@ -614,7 +614,8 @@ class HarborManager():
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
         obj_key = obj.get_obj_key(bucket.id)
-        rados = HarborObject(obj_key, obj_size=obj.si)
+        pool_name = bucket.get_pool_name()
+        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
@@ -848,7 +849,8 @@ class HarborManager():
         if not fileobj.do_delete():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='删除对象原数据时错误')
 
-        ho = HarborObject(obj_id=obj_key, obj_size=fileobj.si)
+        pool_name = bucket.get_pool_name()
+        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=fileobj.si)
         ok, _ = ho.delete()
         if not ok:
             # 恢复元数据
@@ -890,7 +892,8 @@ class HarborManager():
             return (bytes(), obj.si)
 
         obj_key = obj.get_obj_key(bucket.id)
-        rados = HarborObject(obj_key, obj_size=obj.si)
+        pool_name = bucket.get_pool_name()
+        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         ok, chunk = rados.read(offset=offset, size=size)
         if not ok:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块读取失败')
@@ -952,7 +955,8 @@ class HarborManager():
         '''
         # 读取文件对象生成器
         obj_key = obj.get_obj_key(bucket.id)
-        rados = HarborObject(obj_key, obj_size=obj.si)
+        pool_name = bucket.get_pool_name()
+        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
     def get_write_generator(self, bucket_name:str, obj_path:str, user=None):
@@ -989,10 +993,11 @@ class HarborManager():
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
         obj_key = obj.get_obj_key(bucket.id)
+        pool_name = bucket.get_pool_name()
 
         def generator():
             ok = True
-            rados = HarborObject(obj_key, obj_size=obj.si)
+            rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
             if created is False:  # 对象已存在，不是新建的,重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
 

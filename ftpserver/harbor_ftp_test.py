@@ -30,7 +30,7 @@ def work(bucket_name):
     except Exception:
         pass
     harborftp.change_dir()
-    harborftp.upload(100000)
+    harborftp.upload(1000000)
 
 def multi_upload():
     works = []
@@ -45,7 +45,7 @@ def create_bucket(bucket_name):
     cmd = 'curl -X POST "http://159.226.91.141/api/v1/buckets/" -H "Content-Type: application/json" -H "Authorization: token e1d7b5301280bc9760d4435e64f7cae643239955" -d "{  \\"name\\": \\"' + bucket_name + '\\"}" >/dev/null 2>&1'
     os.system(cmd)
 
-def get_bucket_names(num=5):
+def get_bucket_names(num=33):
     hostname = socket.gethostname()
     ip_end = socket.gethostbyname(hostname).split('.')[-1]
     return [ip_end + '-' + str(i) for i in range(num)]
