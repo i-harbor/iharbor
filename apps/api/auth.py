@@ -6,8 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
-from rest_framework_jwt.views import ObtainJSONWebToken, RefreshJSONWebToken
-from rest_framework_jwt.serializers import JSONWebTokenSerializer, RefreshJSONWebTokenSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from .serializers import AuthTokenDumpSerializer
@@ -119,54 +117,6 @@ class CustomAuthToken(ObtainAuthToken):
 
 
 obtain_auth_token = CustomAuthToken.as_view()
-
-
-class ObtainJSONWebTokenView(ObtainJSONWebToken):
-    @swagger_auto_schema(
-        operation_summary='身份认证获取json web token',
-        deprecated=True,    # 弃用
-        request_body=JSONWebTokenSerializer,
-        responses={
-            status.HTTP_200_OK: """
-                {
-                  "token": "eyJ0eXAiOiJKV1QiLC.eyJzc3MDgs3OTUxMzA4fQ.vtGZtCxVGMabXUzuo6_ln_Y"
-                }
-            """
-        }
-    )
-    def post(self, request, *args, **kwargs):
-        '''
-        身份认证获取json web token
-
-        *注：准备弃用，请使用新的jwt API
-        '''
-        return super().post(request, *args, **kwargs)
-
-
-class RefreshJSONWebTokenView(RefreshJSONWebToken):
-    @swagger_auto_schema(
-        operation_summary='刷新json web token',
-        deprecated=True,  # 弃用
-        request_body=RefreshJSONWebTokenSerializer,
-        responses={
-            status.HTTP_200_OK: """
-                {
-                  "token": "eyJ0eXAiOiJKV1QiLC.eyJzc3MDgs3OTUxMzA4fQ.vtGZtCxVGMabXUzuo6_ln_Y"
-                }
-            """
-        }
-    )
-    def post(self, request, *args, **kwargs):
-        '''
-        刷新json web token
-
-        *注：准备弃用，请使用新的jwt API
-        '''
-        return super().post(request, *args, **kwargs)
-
-
-obtain_jwt_token = ObtainJSONWebTokenView.as_view()
-refresh_jwt_token = RefreshJSONWebTokenView.as_view()
 
 
 class JWTObtainPairView(TokenObtainPairView):

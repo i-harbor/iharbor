@@ -43,8 +43,6 @@ urlpatterns = [
     path('', include(router.urls)), # The API URLs are now determined automatically by the router.
     path('', include(detail_router.urls)),
     path('', include(dlp_router.urls)),
-    path('jwt-token/', auth.obtain_jwt_token),
-    path('jwt-token-refresh/', auth.refresh_jwt_token),
     path('auth-token/', auth.obtain_auth_token),
     path('jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),
     path('jwt-refresh/', auth.JWTRefreshView.as_view(), name='jwt-refresh'),
