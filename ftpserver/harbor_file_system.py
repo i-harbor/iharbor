@@ -100,10 +100,10 @@ class HarborFileSystem(AbstractedFS):
 
             if self.cmd_channel is not None:
                 # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("gbk", self.cmd_channel.unicode_errors)
+                yield line.encode("utf8", self.cmd_channel.unicode_errors)
             else:
                 # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("gbk")
+                yield line.encode("utf8")
 
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         assert isinstance(basedir, str), basedir

@@ -18,7 +18,7 @@ from drf_yasg import openapi
 from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
-from utils.jwt_token import JWTokenTool, JWTokenTool2, InvalidToken
+from utils.jwt_token import JWTokenTool2, InvalidToken
 from utils.view import CustomGenericViewSet
 from . import serializers
 from api.harbor import HarborError, HarborManager
@@ -302,14 +302,6 @@ class ObsViewSet(viewsets.GenericViewSet):
         jwt = request.query_params.get('jwt')
         if not jwt:
             return
-
-        authenticator = JWTokenTool()
-        try:
-            user, token = authenticator.authenticate_jwt(jwt_value=jwt)
-            request._authenticator = authenticator
-            request.user, request.auth = user, token
-        except AuthenticationFailed:
-            pass
 
         authenticator = JWTokenTool2()
         try:

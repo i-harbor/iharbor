@@ -24,7 +24,7 @@ from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import PathParser
 from utils.oss import HarborObject, RadosError
 from utils.log.decorators import log_used_time
-from utils.jwt_token import JWTokenTool
+from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
 from vpn.models import VPNAuth
 from .models import User, Bucket
@@ -1499,7 +1499,7 @@ class SecurityViewSet(CustomGenericViewSet):
         token, created = Token.objects.get_or_create(user=user)
 
         # jwt token
-        jwtoken = JWTokenTool().obtain_one_jwt_token(user=user)
+        jwtoken = JWTokenTool2().obtain_one_jwt(user=user)
 
         data = {
             'user': {

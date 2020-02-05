@@ -5,8 +5,8 @@ from django.utils.translation import ugettext_lazy as _
 from .models import UserProfile, Email, AuthKey
 # Register your models here.
 
-admin.site.site_header = 'EVHarbor管理'
-admin.site.site_title = 'EVHarbor站点管理'
+admin.site.site_header = 'iHarbor管理'
+admin.site.site_title = 'iHarbor站点管理'
 
 
 @admin.register(UserProfile)

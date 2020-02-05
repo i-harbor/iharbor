@@ -14,7 +14,6 @@ import os
 import sys
 import datetime
 
-# import raven
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,11 +42,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'rest_framework_swagger',
     'drf_yasg',
     'ckeditor',
     # 'ckeditor_uploader',
-    # 'raven.contrib.django.raven_compat',
 
     #自定义apps
     'buckets.apps.BucketsConfig',
@@ -164,18 +161,6 @@ APPEND_SLASH=False
 LOGIN_URL = '/users/login/'
 LOGOUT_URL = '/users/logout/'
 
-# api docs
-SWAGGER_SETTINGS = {
-    # 'SECURITY_DEFINITIONS': {
-    #     'basic': {
-    #         'type': 'basic'
-    #     }
-    # },
-    # 'SHOW_REQUEST_HEADERS': True,
-    # 'JSON_EDITOR': True,
-    'DOC_EXPANSION': 'list',
-}
-
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
@@ -188,7 +173,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'users.auth.authentication.AuthKeyAuthentication',
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -219,17 +203,6 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
-JWT_AUTH = {
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
-    'JWT_ALLOW_REFRESH': True,
-    # 刷新jwt的过期时间增量，第一次登录获取jwt（记录了登录的时间戳T），可以通过未过期的jwt刷新获取新jwt(继承了旧jwt登录的时间戳T),
-    # 刷新jwt时会检查当前到登录的时间戳T之间的时间增量，如果超过了此设置时间增量不允许刷新。
-    # 好比每个jwt有效期为1天，但是想N天内免密码登录，就可以通过此参数设置第一次登录以后N天内，可以通过刷新获取新的有效期为1天的jwt
-    # N天后就不允许刷新了，只能重新用户名和密码登录认证
-    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
-    # 'JWT_GET_USER_SECRET_KEY': 'utils.jwt_token.jwt_get_user_secret_key',
-    'JWT_AUTH_HEADER_PREFIX': 'JWT',
-}
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': datetime.timedelta(hours=8),
