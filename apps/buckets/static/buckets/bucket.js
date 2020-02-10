@@ -1042,8 +1042,8 @@
     //
     $("#content-display-div").on("click", '#btn-path-item', function (e) {
         e.preventDefault();
-        bucket_name = $(this).attr('bucket_name');
-        dir_path = $(this).attr('dir_path');
+        let bucket_name = $(this).attr('bucket_name');
+        let dir_path = $(this).attr('dir_path');
 
         let url = build_dir_detail_url({
             bucket_name: bucket_name,
@@ -1058,7 +1058,7 @@
     //
     $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
         get_bucket_files_and_render(url);
     });
 
@@ -1067,7 +1067,7 @@
     //
     $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
         get_bucket_files_and_render(url);
     });
 
@@ -1078,8 +1078,8 @@
         e.preventDefault();
 
         let list_item_dom = $(this).parents("tr.bucket-files-table-item");
-        filename = $(this).attr("filename");
-        obj = get_bucket_name_and_cur_path();
+        let filename = $(this).attr("filename");
+        let obj = get_bucket_name_and_cur_path();
         obj.filename = filename;
 
         let url = build_obj_detail_url(obj);
@@ -1244,11 +1244,9 @@
                 });
             }
         }).catch((xhr) => {
-            let msg = xhr.statusText;
-            try{
-                msg = xhr.responseJSON.code_text;
-            }catch (e) {}
-            show_warning_dialog('分享公开设置失败！'+ msg, type='error');
+            let msg = '分享公开设置失败！'+ xhr.statusText;
+            msg = get_err_msg_or_default(xhr, msg);
+            show_warning_dialog(msg,'error');
         })
     });
 
@@ -1289,8 +1287,8 @@
             showLoaderOnConfirm: true,
             footer: '提示：创建新的带密码的分享，旧的分享链接会失效',
             preConfirm: () => {
-                value = document.getElementById('swal-select').value;
-                is_pw = document.getElementById('swal-password').checked;
+                let value = document.getElementById('swal-select').value;
+                let is_pw = document.getElementById('swal-password').checked;
                 if (value === '-1'){
                     share = 0;
                 }
@@ -1317,11 +1315,9 @@
                 });
             }
         }).catch((xhr) => {
-            let msg = xhr.statusText;
-            try{
-                msg = xhr.responseJSON.code_text;
-            }catch (e) {}
-            show_warning_dialog('分享公开设置失败！'+ msg, type='error');
+            let msg = '分享公开设置失败！'+ xhr.statusText;
+            msg = get_err_msg_or_default(xhr, msg);
+            show_warning_dialog(msg, 'error');
         })
     });
 
@@ -1353,8 +1349,8 @@
     $("#content-display-div").on("click", '#bucket-files-item-delete-dir', function (e) {
         e.preventDefault();
         let list_item_dom = $(this).parents("tr.bucket-files-table-item");
-        bucket_name = get_bucket_name_and_cur_path().bucket_name;
-        dir_path = $(this).attr('dir_path');
+        let bucket_name = get_bucket_name_and_cur_path().bucket_name;
+        let dir_path = $(this).attr('dir_path');
 
         let url = build_dir_detail_url({
             bucket_name: bucket_name,
@@ -1382,14 +1378,13 @@
             success: function(data,status,xhr){
                 swal.close();
                 success_do();
-                show_auto_close_warning_dialog('删除成功', type='success');
+                show_auto_close_warning_dialog('删除成功', 'success');
             },
             error: function (error,status) {
                 swal.close();
-                if ((error.status < 500) && error.responseJSON.hasOwnProperty('code_text'))
-                    show_warning_dialog('删除失败:'+ error.responseJSON.code_text, type='error');
-                else
-                    show_warning_dialog('上传文件发生错误,'+ error.statusText);
+                let msg = '上传文件发生错误,'+ error.statusText;
+                msg = get_err_msg_or_default(error, msg);
+                show_warning_dialog(msg, 'error');
             }
         });
     }
@@ -1400,7 +1395,7 @@
     //
     $("#content-display-div").on("click", '#bucket-list-item-enter', function (e) {
         e.preventDefault();
-        bucket_name = $(this).attr('bucket_name');
+        let bucket_name = $(this).attr('bucket_name');
 
         let url = build_dir_detail_url({
             bucket_name: bucket_name,
@@ -1577,7 +1572,7 @@
             show_warning_dialog("无法上传一个空文件");
             return;
         }
-        obj = get_bucket_name_and_cur_path();
+        let obj = get_bucket_name_and_cur_path();
         if(!obj.bucket_name){
             show_warning_dialog('上传文件失败，无法获取当前存储桶下路径');
             return;
@@ -1670,7 +1665,7 @@
             return;
         }
 
-        params = {
+        let params = {
             bucket_name: obj.bucket_name,
             dir_path: obj.dir_path,
             filename: filename
@@ -1726,7 +1721,7 @@
     function setProgressBar(obj_bar, width, hide=false){
         width = Math.floor(width);
         var $bar = $(obj_bar);
-        percent = width + '%';
+        let percent = width + '%';
         $bar.find("div.progress-bar").attr({"style": "min-width: 2em;width: " + percent + ";"});
         $bar.find("div.progress-bar").text(percent);
         if (hide === true)
