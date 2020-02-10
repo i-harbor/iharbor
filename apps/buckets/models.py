@@ -239,13 +239,23 @@ class Bucket(models.Model):
         space = data.get('space')
         if space is None:
             space = 0
+
+        now_time = timezone.now()
         if (self.objs_count != count) or (self.size != space):
             self.objs_count = count
             self.size = space
-            self.stats_time = timezone.now()
+            self.stats_time = now_time
             try:
-                self.save()
-            except:
+                self.save(update_fields=['objs_count', 'size', 'stats_time'])
+            except Exception as e:
+                pass
+
+        # 数量大小没有变化，更新一次统计时间
+        if self.stats_time.date() != now_time.date():
+            self.stats_time = now_time
+            try:
+                self.save(update_fields=['stats_time'])
+            except Exception as e:
                 pass
 
     def get_stats(self, now=False):
@@ -262,7 +272,7 @@ class Bucket(models.Model):
             }
         '''
         # 强制重新统计，或者对象数量较小，或者旧的统计结果时间超过了一天， 满足其一条件重新统计
-        if now or (self.objs_count < 500000) or (timezone.now().date()  > self.stats_time.date()):
+        if now or (self.objs_count < 500000) or (timezone.now().date() > self.stats_time.date()):
             self.__update_stats()
 
         stats = {'space': self.size, 'count': self.objs_count}

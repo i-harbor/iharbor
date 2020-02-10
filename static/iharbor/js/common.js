@@ -111,7 +111,6 @@ function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:n
         confirmButtonText: '确定',
         cancelButtonText: '取消'
     }).then((result) => {
-        console.log(result);
         if (result.value) {
             if(typeof obj.ok_todo === "function")//是函数
                 obj.ok_todo();

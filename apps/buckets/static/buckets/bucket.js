@@ -203,12 +203,25 @@
         let breadcrumb = [];
         path = path.strip('/');
         if (path !== '') {
-            arr = path.split('/');
-            for (var i = 0, j = arr.length; i < j; i++) {
+            let arr = path.split('/');
+            for (let i = 0, j = arr.length; i < j; i++) {
                 breadcrumb.push([arr[i], arr.slice(0, i + 1).join('/')]);
             }
         }
         return breadcrumb;
+    }
+
+    function get_err_msg_or_default(xhr, default_msg) {
+        let msg = default_msg;
+        try {
+            let data = xhr.responseJSON;
+            if (data.hasOwnProperty('code_text')) {
+                msg = default_msg + data.code_text;
+            }
+        } catch (e) {
+
+        }
+        return msg;
     }
 
     //art-template渲染模板注册过滤器
@@ -365,30 +378,33 @@
     // 单个存储桶列表项渲染模板
     //
     let render_bucket_item = template.compile(`
-        <tr class="mouse-hover" id="bucket-list-item">
+        <tr class="" id="bucket-list-item">
             <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $data['created_time'] }}</td>
             <td class="access-perms-enable">
                 <span>{{ $data['access_permission'] }}</span>
-                <span class="btn-share-bucket mouse-hover-show"><span class="glyphicon glyphicon-share"></span></span>
+                <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
             </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
-                    开启
+                    <span>开启</span>
                 {{/if}}
                 {{if !$data['ftp_enable']}}
-                    关闭
+                    <span>关闭</span>
                 {{/if}}
-                <span class=" ftp-enable-btn mouse-hover-show"><span class="glyphicon glyphicon-edit"></span></span>
+                <span class="ftp-enable-btn" data-bucket-name="{{ $data['name'] }}"><span class="glyphicon glyphicon-edit"></span></span>
             </td>
-            <td class="ftp-password" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
-                <span class="glyphicon glyphicon-info-sign"></span>
-                <span class="ftp-password-value">{{ $data['ftp_password'] }}</span>
+            <td class="ftp-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+                <span class="mouse-hover-no-show">******</span>
+                <span class="ftp-password-value mouse-hover-show">{{ $data['ftp_password'] }}</span>
             </td>
             <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
-                <span class="glyphicon glyphicon-info-sign"></span>
+                <span class="mouse-hover-no-show">******</span>
                 <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
+            </td>
+            <td>
+                <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">资源统计</bucket>
             </td>
         </tr>
     `);
@@ -420,6 +436,7 @@
                             <th>FTP状态</th>
                             <th>FTP读写密码(双击修改)</th>
                             <th>FTP只读密码(双击修改)</th>
+                            <th>操作</th>
                         </tr>
                         {{if buckets}}
                             {{ each buckets }}
@@ -433,13 +450,13 @@
                                         <span class="btn-share-bucket"><span class="glyphicon glyphicon-edit"></span></span>
                                     </td>
                                     <td class="ftp-enable">
-                                    {{if $value.ftp_enable}}
-                                        开启
-                                    {{/if}}
-                                    {{if !$value.ftp_enable}}
-                                        关闭
-                                    {{/if}}
-                                    <span class=" ftp-enable-btn"><span class="glyphicon glyphicon-edit"></span></span>
+                                        {{if $value.ftp_enable}}
+                                            <span>开启</span>
+                                        {{/if}}
+                                        {{if !$value.ftp_enable}}
+                                            <span>关闭</span>
+                                        {{/if}}
+                                        <span class=" ftp-enable-btn" data-bucket-name="{{ $value.name }}"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
                                     <td class="ftp-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
@@ -448,6 +465,9 @@
                                     <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
+                                    </td>
+                                    <td>
+                                        <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">资源统计</bucket>
                                     </td>
                                 </tr>
                             {{/each}}
@@ -490,11 +510,67 @@
     `);
 
     //
+    // 单个存储桶资源统计信息渲染模板
+    let render_bucket_stats = template.compile(`
+        <div>
+            <table class="table table-bordered">
+                <tr>
+                    <td>存储桶名：</td>
+                    <td>{{ $data["bucket_name"] }}</td>
+                </tr>
+                <tr>
+                    <td>容量大小：</td>
+                    <td>{{ stats.space }}B ({{ $imports.sizeFormat(stats.space, "B") }})</td>
+                </tr>
+                <tr>
+                    <td>对象数量：</td>
+                    <td>{{ stats.count }}</td>
+                </tr>
+                <tr>
+                    <td>统计时间：</td>
+                    <td>{{ $data["stats_time"] }}</td>
+                </tr>
+            </table>
+        </div>         
+    `);
+
+    //
+    // 存储桶资源统计点击事件
+    $("#content-display-div").on("click", '.btn-bucket-stats', function (e) {
+        e.preventDefault();
+        let bucket = $(this).attr("data-bucket-name");
+        swal.showLoading();
+        $.ajax({
+            url: build_url_with_domain_name("api/v1/stats/bucket/" + bucket + "/"),
+            type: "get",
+            timeout: 30000,
+            success: function(data,status,xhr){
+                swal.close();
+                let html = render_bucket_stats(data);
+                Swal.fire({
+                    title: '存储桶资源统计',
+                    html: html,
+                    footer: '提示：当对象数量较多时，每天只统计一次'
+                })
+            },
+            error: function (xhr, errtype, error) {
+                swal.close();
+                if (errtype === 'timeout'){
+                    show_warning_dialog('请求超时', 'error');
+                }else{
+                    let msg = get_err_msg_or_default(xhr, "请求失败，" + xhr.statusText);
+                    show_warning_dialog(msg, 'error');
+                }
+            }
+        });
+    });
+
+    //
     // 存储桶列表上一页Previous点击事件
     //
     $("#content-display-div").on("click", '.pager #page_previous_buckets', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
         get_buckets_and_render(url);
     });
 
@@ -503,7 +579,7 @@
     //
     $("#content-display-div").on("click", '.pager #page_next_buckets', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
         get_buckets_and_render(url);
     });
 
@@ -574,7 +650,7 @@
                     return;
                 }
                 // 请求修改ftp密码
-                data = {};
+                let data = {};
                 data.bucket_name = remarks.parent().attr('data-bucket-name');
                 data.password = input_text;
                 let url = build_ftp_patch_url(data);
@@ -629,7 +705,7 @@
                     return;
                 }
                 // 请求修改ftp密码
-                data = {};
+                let data = {};
                 data.bucket_name = remarks.parent().attr('data-bucket-name');
                 data.ro_password = input_text;
                 let url = build_ftp_patch_url(data);
@@ -689,8 +765,8 @@
     $("#content-display-div").on("click", '.ftp-enable-btn', function (e) {
         e.preventDefault();
 
-        data = {};
-        data.bucket_name = $(this).parent().next().attr('data-bucket-name');
+        let data = {};
+        data.bucket_name = $(this).attr('data-bucket-name');
         let status_node = $(this).prev();
         (async function() {
             const {value: result} = await Swal({
@@ -719,10 +795,8 @@
             let ret = ftp_enable_password_ajax(url);
             if(ret.ok){
                 if (enable){
-                    status_node.removeClass().addClass("glyphicon glyphicon-ok");
                     status_node.html("开启");
                 }else{
-                    status_node.removeClass().addClass("glyphicon glyphicon-remove");
                     status_node.html("关闭");
                 }
                 show_warning_dialog("配置存储桶FTP成功", "success");
@@ -1132,8 +1206,8 @@
             showLoaderOnConfirm: true,
             footer: '提示：创建新的带密码的分享，旧的分享密码会失效',
             preConfirm: () => {
-                value = document.getElementById('swal-select').value;
-                is_pw = document.getElementById('swal-password').checked;
+                let value = document.getElementById('swal-select').value;
+                let is_pw = document.getElementById('swal-password').checked;
                 if (value === '-1'){
                     share = 0;
                 }
