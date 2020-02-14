@@ -550,7 +550,7 @@
                 Swal.fire({
                     title: '存储桶资源统计',
                     html: html,
-                    footer: '提示：当对象数量较多时，每天只统计一次'
+                    footer: '提示：数据非实时统计，有一定时间间隔'
                 })
             },
             error: function (xhr, errtype, error) {
