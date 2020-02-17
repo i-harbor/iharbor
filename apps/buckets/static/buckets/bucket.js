@@ -403,6 +403,9 @@
                 <span class="mouse-hover-no-show">******</span>
                 <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
             </td>
+            <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $data['id'] }}">
+                <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
+            </td>
             <td>
                 <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">资源统计</bucket>
             </td>
@@ -434,8 +437,9 @@
                             <th>创建时间</th>
                             <th>访问权限</th>
                             <th>FTP状态</th>
-                            <th>FTP读写密码(双击修改)</th>
-                            <th>FTP只读密码(双击修改)</th>
+                            <th>FTP读写密码</th>
+                            <th>FTP只读密码</th>
+                            <th>备注</th>
                             <th>操作</th>
                         </tr>
                         {{if buckets}}
@@ -465,6 +469,9 @@
                                     <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
+                                    </td>
+                                    <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $value.id }}">
+                                        <span class="bucket-remarks-value">{{ $value.remarks }}</span>
                                     </td>
                                     <td>
                                         <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">资源统计</bucket>
@@ -533,6 +540,71 @@
             </table>
         </div>         
     `);
+
+    // 存储桶备注信息修改
+    $("#content-display-div").on("dblclick", '.bucket-remarks-edit', function (e) {
+        e.preventDefault();
+        let bucket_id = $(this).attr('data-bucket-id');
+        let remarks = $(this).children('.bucket-remarks-value');
+        let old_html = remarks.text();
+        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
+
+        //如果已经双击过，正在编辑中
+        if(remarks.attr('data-in-edit') === 'true'){
+            return;
+        }
+        // 标记正在编辑中
+        remarks.attr('data-in-edit', 'true');
+        //创建新的input元素，初始内容为原备注信息
+        let newobj = document.createElement('input');
+        newobj.type = 'text';
+        newobj.value = old_html;
+        //设置该标签的子节点为空
+        remarks.empty();
+        remarks.append(newobj);
+        newobj.setSelectionRange(0, old_html.length);
+        //设置获得光标
+        newobj.focus();
+        //为新增元素添加光标离开事件
+        newobj.onblur = function () {
+            remarks.attr('data-in-edit', '');
+            remarks.empty();
+            let input_text = this.value;
+            // 如果输入内容修改了
+            if (input_text && (input_text !== old_html)){
+                if (input_text.length > 255){
+                    show_warning_dialog('备注长度不得大于255个字符', 'warning');
+                    remarks.append(old_html);
+                    return;
+                }
+                // 请求修改备注信息
+                let url = build_url_with_domain_name('api/v1/buckets/' + bucket_id + '/remark/?remarks=' + input_text);
+                $.ajax({
+                    url: url,
+                    type: "PATCH",
+                    content_type: "application/json",
+                    timeout: 10000,
+                    success: function (res) {
+                        if (res.code === 200) {
+                            show_warning_dialog('修改备注成功', 'success');
+                            remarks.append(input_text);
+                        }
+                    },
+                    error: function (xhr, status) {
+                        if (status === 'timeout') {
+                            alert("请求超时");
+                        }else{
+                            let msg = get_err_msg_or_default(xhr, '请求失败');
+                            show_warning_dialog('修改备注失败,' + msg, 'error');
+                        }
+                        remarks.append(old_html);
+                    }
+                });
+            }else{
+                remarks.append(old_html);
+            }
+        };
+    });
 
     //
     // 存储桶资源统计点击事件

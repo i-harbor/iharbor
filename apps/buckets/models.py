@@ -54,17 +54,18 @@ class Bucket(models.Model):
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
-    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间') # 修改时间可以指示删除时间
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
     objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
     size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
-    pool_name  = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
+    pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
+    remarks = models.CharField(verbose_name='备注', max_length=255, default='')
 
     class Meta:
-        ordering = ['-created_time']
+        ordering = ['-id']
         verbose_name = '存储桶'
         verbose_name_plural = verbose_name
 
@@ -103,13 +104,13 @@ class Bucket(models.Model):
         super().save(**kwargs)
 
     def delete_and_archive(self):
-        '''
+        """
         删除bucket,并归档
 
         :return:
             True    # success
             False   # failed
-        '''
+        """
         try:
             a = Archive()
             a.original_id = self.id
@@ -142,7 +143,7 @@ class Bucket(models.Model):
         # bucket是否属于当前用户
         if not user.id:
             return False
-        return user.id == self.user.id
+        return user.id == self.user_id
 
     def get_bucket_table_name(self):
         '''
@@ -326,6 +327,23 @@ class Bucket(models.Model):
             return False, '只读密码不得和可读写密码一致'
         self.ftp_ro_password = password
         return True, '修改成功'
+
+    def set_remarks(self, remarks: str):
+        """
+        修改备注信息
+
+        :param remarks: 备注信息
+        :return:
+            True    # 设置成功
+            False   # 设置失败
+        """
+        self.remarks = remarks
+        try:
+            self.save(update_fields=['remarks', 'modified_time'])
+        except Exception as e:
+            return False
+
+        return True
 
 
 class Archive(models.Model):
