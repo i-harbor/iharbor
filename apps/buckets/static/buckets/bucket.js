@@ -403,7 +403,7 @@
                 <span class="mouse-hover-no-show">******</span>
                 <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
             </td>
-            <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $data['id'] }}">
+            <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $data['id'] }}" style="max-width: 150px; word-wrap: break-word;">
                 <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
             </td>
             <td>
@@ -439,7 +439,7 @@
                             <th>FTP状态</th>
                             <th>FTP读写密码</th>
                             <th>FTP只读密码</th>
-                            <th>备注</th>
+                            <th style="max-width: 150px; word-wrap: break-word;">备注</th>
                             <th>操作</th>
                         </tr>
                         {{if buckets}}
@@ -470,7 +470,7 @@
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
                                     </td>
-                                    <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $value.id }}">
+                                    <td class="bucket-remarks-edit" style="max-width: 150px; word-wrap: break-word;" title="双击修改备注" data-bucket-id="{{ $value.id }}">
                                         <span class="bucket-remarks-value">{{ $value.remarks }}</span>
                                     </td>
                                     <td>
