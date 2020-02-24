@@ -43,8 +43,28 @@ debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting�
 def rand_hex_string(len=10):
     return binascii.hexlify(os.urandom(len//2)).decode()
 
+
 def rand_share_code():
     return rand_hex_string(4)
+
+
+def serializer_error_text(errors, default: str = ''):
+    """
+    序列化器验证错误信息
+
+    :param errors: serializer.errors, type: ReturnDict()
+    :param default: 获取信息失败时默认返回信息
+    """
+    msg = default if default else '参数有误，验证未通过'
+    try:
+        for key in errors:
+            val = errors[key]
+            msg = f'{key}, {val[0]}'
+            break
+    except Exception as e:
+        pass
+
+    return msg
 
 
 def get_user_own_bucket(bucket_name, request):
@@ -822,10 +842,8 @@ class ObjViewSet(CustomGenericViewSet):
 
         serializer = self.get_serializer(data=put_data)
         if not serializer.is_valid(raise_exception=False):
-            return Response({
-                'code': 400,
-                'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
-            }, status=status.HTTP_400_BAD_REQUEST)
+            msg = serializer_error_text(serializer.errors)
+            return Response({'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.data
         offset = data.get('chunk_offset')
