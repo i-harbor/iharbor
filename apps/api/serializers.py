@@ -110,10 +110,10 @@ class BucketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Bucket
-        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password', 'ftp_ro_password')
+        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password', 'ftp_ro_password', 'remarks')
         # depth = 1
 
-    def get_user(selfself, obj):
+    def get_user(self, obj):
         return {'id': obj.user.id, 'username': obj.user.username}
 
     def get_created_time(self, obj):
@@ -194,9 +194,9 @@ class ObjPutSerializer(serializers.Serializer):
         if not chunk:
             # chunk_size != 0时，此时却获得一个空文件块
             if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小(0)不一致'})
+                raise serializers.ValidationError(detail={'chunk': 'chunk_size与空文件块大小(0)不一致'})
             # 如果上传确实是一个空文件块不做处理
-            return data
+            raise serializers.ValidationError(detail={'chunk': '无效的空文件块'})
         elif chunk.size != chunk_size:
             raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
 

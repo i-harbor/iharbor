@@ -14,6 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.authtoken.models import Token
 from rest_framework import parsers
+from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 
@@ -42,8 +43,28 @@ debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting�
 def rand_hex_string(len=10):
     return binascii.hexlify(os.urandom(len//2)).decode()
 
+
 def rand_share_code():
     return rand_hex_string(4)
+
+
+def serializer_error_text(errors, default: str = ''):
+    """
+    序列化器验证错误信息
+
+    :param errors: serializer.errors, type: ReturnDict()
+    :param default: 获取信息失败时默认返回信息
+    """
+    msg = default if default else '参数有误，验证未通过'
+    try:
+        for key in errors:
+            val = errors[key]
+            msg = f'{key}, {val[0]}'
+            break
+    except Exception as e:
+        pass
+
+    return msg
 
 
 def get_user_own_bucket(bucket_name, request):
@@ -367,7 +388,7 @@ class BucketViewSet(CustomGenericViewSet):
 
 
     @swagger_auto_schema(
-        operation_summary= '获取存储桶列表',
+        operation_summary='获取存储桶列表',
         responses={
             status.HTTP_200_OK: """
                 {
@@ -582,6 +603,53 @@ class BucketViewSet(CustomGenericViewSet):
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        operation_summary='存储桶备注信息设置',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='remarks', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="备注信息",
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                    {
+                      "code": 200,
+                      "code_text": "存储桶备注信息设置成功",
+                    }
+                """
+        }
+    )
+    @action(methods=['patch'], detail=True, url_path='remark', url_name='remark')
+    def remarks(self, request, *args, **kwargs):
+        """
+        存储桶备注信息设置
+        """
+        bid = str_to_int_or_default(kwargs.get(self.lookup_field, 0), 0)
+        remarks = request.query_params.get('remarks', '')
+        if not remarks:
+            return Response(data={'code': 400, 'code_text': '备注信息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+        bucket = Bucket.objects.filter(id=bid).first()
+        if not bucket:
+            return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not bucket.check_user_own_bucket(request.user):
+            return Response(data={'code': 403, 'code_text': '无访问权限'}, status=status.HTTP_403_FORBIDDEN)
+
+        if not bucket.set_remarks(remarks=remarks):
+            return Response(data={'code': 500, 'code_text': '设置备注信息失败，更新数据库数据时错误'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = {
+            'code': 200,
+            'code_text': '存储桶备注信息设置成功',
+        }
+        return Response(data=data, status=status.HTTP_200_OK)
+
     def get_buckets_ids_or_error_response(self, request, **kwargs):
         '''
         获取存储桶id列表
@@ -774,10 +842,8 @@ class ObjViewSet(CustomGenericViewSet):
 
         serializer = self.get_serializer(data=put_data)
         if not serializer.is_valid(raise_exception=False):
-            return Response({
-                'code': 400,
-                'code_text': serializer.errors.get('non_field_errors', '参数有误，验证未通过'),
-            }, status=status.HTTP_400_BAD_REQUEST)
+            msg = serializer_error_text(serializer.errors)
+            return Response({'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.data
         offset = data.get('chunk_offset')
