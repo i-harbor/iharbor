@@ -1778,7 +1778,6 @@ class MetadataViewSet(CustomGenericViewSet):
             status.HTTP_200_OK: ''
         }
     )
-
     def retrieve(self, request, *args, **kwargs):
         path_name = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
@@ -1801,6 +1800,61 @@ class MetadataViewSet(CustomGenericViewSet):
         return Response(data={'code': 200, 'code_text': '获取元数据成功', 'bucket_name': bucket_name,
                               'dir_path': path, 'obj': serializer.data})
 
+    @swagger_auto_schema(
+        operation_summary='创建一个空对象元数据',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='path', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="对象绝对路径",
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: """
+            {
+              "code": 200,
+              "code_text": "创建空对象元数据成功",
+              "info": {
+                "rados": "iharbor:ceph/obs_test/471_5",
+                "size": 0,
+                "filename": "test2.txt"
+              }
+            }
+            """
+        }
+    )
+    def create_detail(self, request, *args, **kwargs):
+        path_name = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name', '')
+        path, name = PathParser(filepath=path_name).get_path_and_filename()
+        if not bucket_name or not name:
+            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hManager = HarborManager()
+        try:
+            bucket, obj, created = hManager.create_empty_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not obj or not created:
+            return Response(data={'code': 404, 'code_text': '创建失败，对象已存在'}, status=status.HTTP_404_NOT_FOUND)
+
+        obj_key = obj.get_obj_key(bucket.id)
+        pool_name = bucket.get_pool_name()
+        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        rados_key = ho.get_rados_key_info()
+        info = {
+            'rados': rados_key,
+            'size': obj.obj_size,
+            'filename': obj.name
+        }
+        return Response(data={'code': 200, 'code_text': '创建空对象元数据成功', 'info': info})
+
     def get_serializer_class(self):
         """
         Return the class to use for the serializer.
@@ -1810,6 +1864,91 @@ class MetadataViewSet(CustomGenericViewSet):
         if self.action in ['retrieve']:
             return serializers.ObjInfoSerializer
         return Serializer
+
+
+class RefreshMetadataViewSet(CustomGenericViewSet):
+    queryset = []
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'path'
+    lookup_value_regex = '.+'
+
+    @swagger_auto_schema(
+        operation_summary='自动同步对象大小元数据',
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='path', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description="对象绝对路径",
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: ''
+        }
+    )
+    def create_detail(self, request, *args, **kwargs):
+        """
+        自动更新对象大小元数据
+
+            警告：特殊API，未与技术人员沟通不可使用；对象大小2GB内适用
+
+            >>Http Code: 状态码200,成功：
+                {
+                  "code": 200,
+                  "code_text": "更新对象大小元数据成功",
+                  "info": {
+                    "size": 867840,
+                    "filename": "7zFM.exe"
+                  }
+                }
+            >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
+                {
+                    "code": 400,
+                    "code_text": 'xxxxx'        //错误信息
+                }
+            >>Http Code: 状态码404, bucket桶、对象或目录不存在:
+                {
+                    "code": 404,
+                    "code_text": 'xxxxx'        //错误信息，
+        """
+        path_name = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name', '')
+        path, name = PathParser(filepath=path_name).get_path_and_filename()
+        if not bucket_name or not name:
+            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hManager = HarborManager()
+        try:
+            bucket, obj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except Exception as e:
+            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not obj:
+            return Response(data={'code': 404, 'code_text': '对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+
+        obj_key = obj.get_obj_key(bucket.id)
+        pool_name = bucket.get_pool_name()
+        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ok, ret = ho.get_rados_stat(obj_id=obj_key)
+        if not ok:
+            return Response(data={'code': 400, 'code_text': f'获取rados对象大小失败，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        size, mtime = ret
+        obj.si = size
+        obj.upt = mtime
+        try:
+            obj.save(update_fields=['si', 'upt'])
+        except Exception as e:
+            return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        info = {
+            'size': size,
+            'filename': obj.name
+        }
+        return Response(data={'code': 200, 'code_text': '更新对象大小元数据成功', 'info': info})
 
 
 class CephStatsViewSet(CustomGenericViewSet):

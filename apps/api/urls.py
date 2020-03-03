@@ -18,8 +18,6 @@ router.register(r'stats/ceph', views.CephStatsViewSet, base_name='stats_ceph')
 router.register(r'stats/user', views.UserStatsViewSet, base_name='stats_user')
 router.register(r'stats/visit', views.VisitStatsViewSet, base_name='stats_visit')
 router.register(r'security', views.SecurityViewSet, base_name='security')
-router.register(r'metadata/(?P<bucket_name>[a-z0-9-_]{3,64})', views.MetadataViewSet,
-                base_name='metadata')
 router.register(r'ceph/comp', views.CephComponentsViewSet, base_name='ceph_components')
 router.register(r'ceph/perf', views.CephPerformanceViewSet, base_name='ceph_performance')
 router.register(r'ceph/errors', views.CephErrorViewSet, base_name='ceph_errors')
@@ -37,6 +35,9 @@ dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryVie
 detail_router = DetailPostRouter()
 detail_router.register(r'obj/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ObjViewSet, base_name='obj')
 detail_router.register(r'move/(?P<bucket_name>[a-z0-9-_]{3,64})', views.MoveViewSet, base_name='move')
+detail_router.register(r'metadata/(?P<bucket_name>[a-z0-9-_]{3,64})', views.MetadataViewSet, base_name='metadata')
+detail_router.register(r'refresh-meta/(?P<bucket_name>[a-z0-9-_]{3,64})', views.RefreshMetadataViewSet,
+                       base_name='refresh-meta')
 
 
 urlpatterns = [

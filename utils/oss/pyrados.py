@@ -1,6 +1,8 @@
 import os
 import math
 import json
+import datetime
+from pytz import utc
 
 import rados
 
@@ -107,7 +109,7 @@ def get_size(fd):
     raise AttributeError("Unable to determine the file's size.")
 
 
-class HarborObjectStructure():
+class HarborObjectStructure:
     '''
     每个EVHarbor对象可能有多个部分part(rados对象)组成
     OBJ(part0, part1, part2, ...)
@@ -173,7 +175,7 @@ class CephClusterCommand(dict):
                 self.update(json.loads(buf))
 
 
-class RadosAPI():
+class RadosAPI:
     '''
     ceph cluster rados对象接口封装
     '''
@@ -433,6 +435,29 @@ class RadosAPI():
         except Exception as e:
             raise RadosError(str(e))
 
+    def rados_stat(self, obj_id):
+        '''
+        获取rados对象大小和修改时间
+
+        :param obj_id: 对象id
+        :return:
+                (int, datetime())   # size, mtime
+        :raises: class:`RadosError`
+        '''
+        cluster = self.get_cluster()
+        try:
+            with cluster.open_ioctx(self._pool_name) as ioctx:
+                size, t = ioctx.stat(obj_id)
+        except rados.ObjectNotFound:
+            raise RadosError('rados对象不存在')
+        except rados.Error as e:
+            msg = e.args[0] if e.args else f'Failed to get rados size({self._pool_name})'
+            raise RadosError(msg, errno=e.errno)
+
+        mtime = datetime.datetime(year=t.tm_year, month=t.tm_mon, day=t.tm_mday, hour=t.tm_hour,
+                                  minute=t.tm_min, second=t.tm_sec, tzinfo=utc)
+        return size, mtime
+
     def get_cluster_stats(self):
         '''
         获取ceph集群总容量和已使用容量
@@ -624,7 +649,7 @@ class HarborObjectBase():
         raise NotImplementedError('`reset_obj_id_and_size()` must be implemented.')
 
 
-class HarborObject():
+class HarborObject:
     '''
     iHarbor对象操作接口封装，
     '''
@@ -869,3 +894,14 @@ class HarborObject():
         '''
         return f'iharbor:{self._cluster_name}/{self._pool_name}/{self._obj_id}'
 
+    def get_rados_stat(self, obj_id: str):
+        """
+        :return:
+            (bool, (int, datetime))   # size, mtime
+        """
+        try:
+            rados = self.get_rados_api()
+            r = rados.rados_stat(obj_id=obj_id)
+            return True, r
+        except RadosError as e:
+            return False, str(e)

@@ -597,22 +597,7 @@ class HarborManager():
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
         '''
-        # 对象路径分析
-        pp = PathParser(filepath=obj_path)
-        path, filename = pp.get_path_and_filename()
-        if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
-
-        if len(filename) > 255:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称长度最大为255字符')
-
-        # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name, user=user)
-        if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
-
-        collection_name = bucket.get_bucket_table_name()
-        obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+        bucket, obj, created = self.create_empty_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
         rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
@@ -632,6 +617,37 @@ class HarborManager():
             raise e
 
         return created
+
+    def create_empty_obj(self, bucket_name: str, obj_path: str, user):
+        """
+        创建一个空对象
+
+        :param bucket_name: 桶名
+        :param obj_path: 对象全路径
+        :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
+        :return:
+                (bucket, obj, False) # 对象已存在
+                (bucket, obj, True)  # 对象不存在，创建一个新对象
+                raise HarborError # 有错误，路径不存在，或已存在同名目录
+
+        :raise HarborError
+        """
+        pp = PathParser(filepath=obj_path)
+        path, filename = pp.get_path_and_filename()
+        if not bucket_name or not filename:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+
+        if len(filename) > 255:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称长度最大为255字符')
+
+        # 存储桶验证和获取桶对象
+        bucket = self.get_bucket(bucket_name, user=user)
+        if not bucket:
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        collection_name = bucket.get_bucket_table_name()
+        obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+        return bucket, obj, created
 
     def _get_obj_and_check_limit_or_create(self, table_name, path, filename):
         '''
