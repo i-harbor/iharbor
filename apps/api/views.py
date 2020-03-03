@@ -383,9 +383,27 @@ class BucketViewSet(CustomGenericViewSet):
 
     '''
     queryset = Bucket.objects.select_related('user').all()
-    permission_classes = [IsAuthenticated, permissions.IsOwnBucket]
+    permission_classes = [IsAuthenticated]
     pagination_class = paginations.BucketsLimitOffsetPagination
+    lookup_field = 'id_or_name'
+    lookup_value_regex = '[a-z0-9-]+'
 
+    DETAIL_BASE_PARAMS = [
+        openapi.Parameter(
+            name='id_or_name',
+            in_=openapi.IN_PATH,
+            type=openapi.TYPE_STRING,
+            required=True,
+            description='默认为bucket ID，使用bucket name需要通过参数by-name指示'
+        ),
+        openapi.Parameter(
+            name='by-name',
+            in_=openapi.IN_QUERY,
+            type=openapi.TYPE_BOOLEAN,
+            required=False,
+            description='true,表示使用bucket name指定bucket；其他值忽略'
+        )
+    ]
 
     @swagger_auto_schema(
         operation_summary='获取存储桶列表',
@@ -487,7 +505,8 @@ class BucketViewSet(CustomGenericViewSet):
         return Response(data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
-        operation_summary='获取一个存储桶详细信息',
+        operation_summary='通过桶ID或name获取一个存储桶详细信息',
+        manual_parameters=DETAIL_BASE_PARAMS,
         responses={
             status.HTTP_200_OK: """
                 {
@@ -513,17 +532,20 @@ class BucketViewSet(CustomGenericViewSet):
         '''
         获取一个存储桶详细信息
         '''
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
+        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
+        if not ok:
+            return ret
+
+        serializer = self.get_serializer(ret)
         return Response({'code': 200, 'bucket': serializer.data})
 
     @swagger_auto_schema(
         operation_summary='删除一个存储桶',
-        manual_parameters=[
+        manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='ids', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_ARRAY,
-                items= openapi.Items(type=openapi.TYPE_INTEGER),
+                items=openapi.Items(type=openapi.TYPE_INTEGER),
                 description="存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id",
                 required=False
             ),
@@ -533,16 +555,23 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def destroy(self, request, *args, **kwargs):
-        ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
-        if not ids and response:
-            return response
+        try:
+            ids = self.get_buckets_ids(request)
+        except ValueError as e:
+            return Response(data={'code': 400, 'code_text': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        buckets = Bucket.objects.filter(id__in=ids)
-        if not buckets.exists():
-            return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
-        for bucket in buckets:
-            # 只删除用户自己的buckets
-            if bucket.user.id == request.user.id:
+        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
+        if not ok:
+            return ret
+        bucket = ret
+        if not bucket.delete_and_archive():  # 删除归档
+            return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if ids:
+            buckets = Bucket.objects.select_related('user').filter(id__in=ids).filter(user=request.user).all()
+            if not buckets.exists():
+                return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+            for bucket in buckets:
                 if not bucket.delete_and_archive():  # 删除归档
                     return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -551,7 +580,7 @@ class BucketViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary='存储桶访问权限设置',
         request_body=no_body,
-        manual_parameters=[
+        manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='public', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
@@ -577,23 +606,17 @@ class BucketViewSet(CustomGenericViewSet):
         if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': 'public参数有误'}, status=status.HTTP_400_BAD_REQUEST)
 
-        ids, response = self.get_buckets_ids_or_error_response(request, **kwargs)
-        if not ids and response:
-            return response
+        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
+        if not ok:
+            return ret
 
-        buckets = Bucket.objects.filter(id__in=ids)
-        if not buckets.exists():
-            return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
-
+        bucket = ret
         share_urls = []
-        for bucket in buckets:
-            # 只设置用户自己的buckets
-            if bucket.user.id == request.user.id:
-                url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
-                url = request.build_absolute_uri(url)
-                share_urls.append(url)
-                if not bucket.set_permission(public=public):
-                    return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
+        url = request.build_absolute_uri(url)
+        share_urls.append(url)
+        if not bucket.set_permission(public=public):
+            return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
@@ -606,7 +629,7 @@ class BucketViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary='存储桶备注信息设置',
         request_body=no_body,
-        manual_parameters=[
+        manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='remarks', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
@@ -628,17 +651,14 @@ class BucketViewSet(CustomGenericViewSet):
         """
         存储桶备注信息设置
         """
-        bid = str_to_int_or_default(kwargs.get(self.lookup_field, 0), 0)
         remarks = request.query_params.get('remarks', '')
         if not remarks:
             return Response(data={'code': 400, 'code_text': '备注信息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
 
-        bucket = Bucket.objects.filter(id=bid).first()
-        if not bucket:
-            return Response(data={'code': 404, 'code_text': '未找到存储桶'}, status=status.HTTP_404_NOT_FOUND)
-
-        if not bucket.check_user_own_bucket(request.user):
-            return Response(data={'code': 403, 'code_text': '无访问权限'}, status=status.HTTP_403_FORBIDDEN)
+        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
+        if not ok:
+            return ret
+        bucket = ret
 
         if not bucket.set_remarks(remarks=remarks):
             return Response(data={'code': 500, 'code_text': '设置备注信息失败，更新数据库数据时错误'},
@@ -650,32 +670,52 @@ class BucketViewSet(CustomGenericViewSet):
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
-    def get_buckets_ids_or_error_response(self, request, **kwargs):
+    def get_user_bucket(self, request, kwargs):
+        """
+        :return:
+            (True, Bucket())
+            (False, Response())
+        """
+        id_or_name = kwargs.get(self.lookup_field, '')
+        by_name = request.query_params.get('by-name', '').lower()
+        if by_name == 'true':
+            bucket = Bucket.objects.select_related('user').filter(name=id_or_name).first()
+        else:
+            try:
+                bid = int(id_or_name)
+            except Exception as e:
+                return False, Response({'code': 400, 'code_text': '无效的存储桶ID'}, status=status.HTTP_400_BAD_REQUEST)
+            bucket = Bucket.objects.filter(id=bid).first()
+
+        if not bucket:
+            return False, Response({'code': 404, 'code_text': '存储桶不存在'})
+
+        if not bucket.check_user_own_bucket(request.user):
+            return False, Response({'code': 403, 'code_text': '您没有操作此存储桶的权限'}, status=status.HTTP_403_FORBIDDEN)
+        return True, bucket
+
+    def get_buckets_ids(self, request, **kwargs):
         '''
         获取存储桶id列表
         :param request:
         :return:
-            error: None, Response
-            success:[ids], None
+            ids: list
+        :raises: ValueError
         '''
-        id = kwargs.get(self.lookup_field, None)
-
         if isinstance(request.query_params, QueryDict):
             ids = request.query_params.getlist('ids')
         else:
             ids = request.query_params.get('ids')
 
         if not isinstance(ids, list):
-            ids = []
+            return []
 
-        if id and id not in ids:
-            ids.append(id)
         try:
             ids = [int(i) for i in ids]
         except ValueError:
-            return None, Response(data={'code': 400, 'code_text': '存储桶id有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return ValueError('存储桶id有误')
 
-        return ids, None
+        return ids
 
     def get_serializer_class(self):
         """
