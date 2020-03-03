@@ -354,14 +354,20 @@
     //
     function delete_selected_buckets(){
         //获取选中的存储桶的id
-        var arr = [];
+        let arr = [];
         let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
         bucket_list_checked.each(function (i) {
             arr.push($(this).val());
         });
         if (arr.length > 0) {
+            let b_id = arr[0];
+            arr.splice(0,1);
+            let url = '/api/v1/buckets/' + b_id + '/';
+            if (arr.length > 0) {
+                url = url + '?' + $.param({"ids": arr}, true);
+            }
             $.ajax({
-                url: build_url_with_domain_name('/api/v1/buckets/0/?' + $.param({"ids": arr}, true)),
+                url: build_url_with_domain_name(url),
                 type: 'delete',
                 success: function (data) {
                     bucket_list_checked.parents('tr').remove();
