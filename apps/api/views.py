@@ -1952,7 +1952,8 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
                   "code_text": "更新对象大小元数据成功",
                   "info": {
                     "size": 867840,
-                    "filename": "7zFM.exe"
+                    "filename": "7zFM.exe",
+                    "mtime": "2020-03-04T08:05:28.210658+00:00"     # 修改时间
                   }
                 }
             >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
@@ -1991,15 +1992,23 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 400, 'code_text': f'获取rados对象大小失败，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
 
         size, mtime = ret
-        obj.si = size
-        obj.upt = mtime
-        try:
-            obj.save(update_fields=['si', 'upt'])
-        except Exception as e:
-            return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        if size == 0 and mtime is None:  # rados对象不存在
+            mtime = obj.upt if obj.upt else obj.ult
+
+        if obj.upt != mtime:
+            pass
+        if obj.si != size or obj.upt != mtime:
+            obj.si = size
+            obj.upt = mtime
+            try:
+                obj.save(update_fields=['si', 'upt'])
+            except Exception as e:
+                return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
         info = {
             'size': size,
-            'filename': obj.name
+            'filename': obj.name,
+            'mtime': mtime.isoformat()
         }
         return Response(data={'code': 200, 'code_text': '更新对象大小元数据成功', 'info': info})
 

@@ -691,8 +691,8 @@ class HarborManager():
         full_filename = bfm.build_dir_full_name(filename)
         bfinfo = BucketFileClass(na=full_filename,  # 全路径文件名
                                  name=filename, #  文件名
-                                fod=True,  # 文件
-                                si=0)  # 文件大小
+                                 fod=True,  # 文件
+                                 si=0, upt=timezone.now())  # 文件大小
         # 有父节点
         if did:
             bfinfo.did = did

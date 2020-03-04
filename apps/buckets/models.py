@@ -275,7 +275,7 @@ class Bucket(models.Model):
             self.__update_stats()
 
         stats = {'space': self.size, 'count': self.objs_count}
-        time_str = self.stats_time.isoformat()
+        time_str = self.stats_time.astimezone(timezone.get_current_timezone()).isoformat()
         return {'stats': stats, 'stats_time': time_str}
 
     def is_ftp_enable(self):

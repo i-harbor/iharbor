@@ -2,7 +2,7 @@ import os
 import math
 import json
 import datetime
-from pytz import utc
+import pytz
 
 import rados
 
@@ -11,6 +11,10 @@ from django.conf import settings
 
 class RadosError(rados.Error):
     '''def __init__(self, message, errno=None)'''
+    pass
+
+
+class RadosNotFound(RadosError):
     pass
 
 
@@ -442,20 +446,21 @@ class RadosAPI:
         :param obj_id: 对象id
         :return:
                 (int, datetime())   # size, mtime
-        :raises: class:`RadosError`
+        :raises: class:`RadosError`, `RadosNotFound`
         '''
         cluster = self.get_cluster()
         try:
             with cluster.open_ioctx(self._pool_name) as ioctx:
                 size, t = ioctx.stat(obj_id)
         except rados.ObjectNotFound:
-            raise RadosError('rados对象不存在')
+            raise RadosNotFound('rados对象不存在')
         except rados.Error as e:
             msg = e.args[0] if e.args else f'Failed to get rados size({self._pool_name})'
             raise RadosError(msg, errno=e.errno)
 
+        cn_zone = pytz.timezone('Asia/Shanghai')
         mtime = datetime.datetime(year=t.tm_year, month=t.tm_mon, day=t.tm_mday, hour=t.tm_hour,
-                                  minute=t.tm_min, second=t.tm_sec, tzinfo=utc)
+                                  minute=t.tm_min, second=t.tm_sec).astimezone(cn_zone)
         return size, mtime
 
     def get_cluster_stats(self):
@@ -897,11 +902,15 @@ class HarborObject:
     def get_rados_stat(self, obj_id: str):
         """
         :return:
-            (bool, (int, datetime))   # size, mtime
+            (True, (int, datetime))   # success, (size, mtime)
+            (True, (0, None))         # rados object not found
+            (False, str)              # error
         """
         try:
             rados = self.get_rados_api()
             r = rados.rados_stat(obj_id=obj_id)
             return True, r
+        except RadosNotFound as e:
+            return True, (0, None)
         except RadosError as e:
             return False, str(e)
