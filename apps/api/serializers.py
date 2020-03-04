@@ -105,7 +105,6 @@ class BucketSerializer(serializers.ModelSerializer):
     存储桶序列化器
     '''
     user = serializers.SerializerMethodField() # 自定义user字段内容
-    created_time = serializers.SerializerMethodField()  # 自定义字段内容
     access_permission = serializers.SerializerMethodField()
 
     class Meta:
@@ -115,11 +114,6 @@ class BucketSerializer(serializers.ModelSerializer):
 
     def get_user(self, obj):
         return {'id': obj.user.id, 'username': obj.user.username}
-
-    def get_created_time(self, obj):
-        if not obj.created_time:
-            return ''
-        return to_localtime_string_naive_by_utc(obj.created_time)
 
     def get_access_permission(self, obj):
         return obj.get_access_permission_display()
@@ -219,9 +213,9 @@ class ObjInfoSerializer(serializers.Serializer):
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.IntegerField()  # 父节点ID
     si = serializers.IntegerField()  # 文件大小,字节数
-    ult = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的上传时间，或目录的创建时间
+    ult = serializers.DateTimeField()  # 文件的上传时间，或目录的创建时间
     # ult = serializers.SerializerMethodField()  # 自定义字段序列化方法
-    upt = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的最近修改时间，目录，则upt为空
+    upt = serializers.DateTimeField()  # 文件的最近修改时间，目录，则upt为空，format='%Y-%m-%d %H:%M:%S'
     # upt = serializers.SerializerMethodField()  # 自定义字段序列化方法
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
@@ -278,25 +272,23 @@ class ObjInfoSerializer(serializers.Serializer):
 class AuthTokenDumpSerializer(serializers.Serializer):
     key = serializers.CharField()
     user = serializers.SerializerMethodField()
-    created = serializers.SerializerMethodField()
+    created = serializers.DateTimeField()
 
     def get_user(self, obj):
         return obj.user.username
-
-    def get_created(self, obj):
-        return to_localtime_string_naive_by_utc(obj.created)
 
 
 class VPNSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     password = serializers.CharField()
-    created_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
-    modified_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    created_time = serializers.DateTimeField()  # format='%Y-%m-%d %H:%M:%S'
+    modified_time = serializers.DateTimeField()
     user = serializers.SerializerMethodField()
 
     def get_user(self, obj):
         u = obj.user
         return {'id': u.id, 'username': u.username}
+
 
 class VPNPostSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=20, min_length=6, help_text='新的VPN口令密码')

@@ -22,7 +22,7 @@ class CustomAuthToken(ObtainAuthToken):
             "token": {
                 "key": "655e0bcc7216d0ccf7d2be7466f94fa241dc32cb",
                 "user": "username",
-                "created": "2018-12-10 14:04:01"
+                "created": "2019-02-20T13:56:25+08:00"
             }
         }
 
@@ -47,7 +47,7 @@ class CustomAuthToken(ObtainAuthToken):
                           "token": {
                             "key": "a9da4ebad962036ca76ba748907ea71aa7cc502d",
                             "user": "869588058@qq.com",
-                            "created": "2019-05-08 13:59:22"
+                            "created": "2019-02-20T13:56:25+08:00"
                           }
                         }
                     """
@@ -86,7 +86,7 @@ class CustomAuthToken(ObtainAuthToken):
                       "token": {
                         "key": "a9da4ebad962036ca76ba748907ea71aa7cc502d",
                         "user": "869588058@qq.com",
-                        "created": "2019-05-08 13:59:22"
+                        "created": "2019-02-20T13:56:25+08:00"
                       }
                     }
                 """

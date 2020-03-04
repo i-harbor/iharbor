@@ -44,12 +44,13 @@
         });
     });
 
+    template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
     //
     // token渲染模板
     //
     let render_auth_token_table = template.compile(`       
         <tr>
-            <th>{{ token.created }}</th>
+            <th>{{ $imports.isoTimeToLocal(token.created) }}</th>
             <th>
                 <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
                 <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
@@ -59,7 +60,7 @@
     `);
     
     //
-    // 获取和新建suth token,并渲染
+    // 获取和新建auth token,并渲染
     //@type: 'get':获取； 'put':新建
     function get_or_refresh_auth_token(type, render) {
         $.ajax({
@@ -71,7 +72,7 @@
                     let $btn_tr = $("#btn-new-token").parent();
                     let $token_tr = $btn_tr.prev();
                     $token_tr.children('input').val(result.token.key);
-                    $token_tr.prev(2).text(result.token.created);
+                    $token_tr.prev(2).text(isoTimeToLocal(result.token.created));
                 },
                 error:function(xhr, status, errortext){
                     show_warning_dialog('刷新token失败');
@@ -199,7 +200,7 @@
     //
     let render_auth_key_table_item = template.compile(`
         <tr>
-            <td>{{ key.create_time }}</td>
+            <td>{{ $imports.isoTimeToLocal(key.create_time) }}</td>
             <td>{{ key.access_key }}</td>
             <td class="col-sm-5">
                 <input title="secret_key" class="secret-key col-sm-10" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
