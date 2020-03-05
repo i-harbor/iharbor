@@ -227,6 +227,7 @@
     //art-template渲染模板注册过滤器
     template.defaults.imports.get_breadcrumb = get_breadcrumb;
     template.defaults.imports.sizeFormat = sizeFormat;
+    template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
 
     //
     // 创建存储桶按钮点击事件
@@ -387,7 +388,7 @@
         <tr class="" id="bucket-list-item">
             <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
             <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
-            <td>{{ $data['created_time'] }}</td>
+            <td>{{ $imports.isoTimeToLocal($data['created_time']) }}</td>
             <td class="access-perms-enable">
                 <span>{{ $data['access_permission'] }}</span>
                 <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
@@ -454,7 +455,7 @@
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
                                     <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
-                                    <td>{{ $value.created_time }}</td>
+                                    <td>{{ $imports.isoTimeToLocal($value.created_time) }}</td>
                                     <td>
                                         <span>{{ $value.access_permission }}</span>
                                         <span class="btn-share-bucket"><span class="glyphicon glyphicon-edit"></span></span>
@@ -541,7 +542,7 @@
                 </tr>
                 <tr>
                     <td>统计时间：</td>
-                    <td>{{ $data["stats_time"] }}</td>
+                    <td>{{ $imports.isoTimeToLocal($data["stats_time"]) }}</td>
                 </tr>
             </table>
         </div>         
@@ -999,7 +1000,7 @@
                                         <span class="glyphicon glyphicon-file"></span>
                                         <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.name }}</a>
                                     </td>
-                                    <td>{{ $value.ult }}</td>
+                                    <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>{{ $imports.sizeFormat($value.si, "B") }}</td>
                                 {{/if}}
                                 {{ if !$value.fod }}
@@ -1007,7 +1008,7 @@
                                         <span class="glyphicon glyphicon-folder-open"></span>
                                         <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
                                     </td>
-                                    <td>{{ $value.ult }}</td>
+                                    <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>--</td>
                                 {{/if}}
                                 <td id="id-access-perms">{{ $value.access_permission}}</td>
@@ -1084,7 +1085,7 @@
                 <span class="glyphicon glyphicon-file"></span>
                 <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.name }}</a>
             </td>
-            <td>{{ obj.ult }}</td>
+            <td>{{ $imports.isoTimeToLocal(obj.ult) }}</td>
             <td>{{ $imports.sizeFormat(obj.si, "B") }}</td>
             <td>{{ obj.access_permission }}</td>
             <td>
@@ -1588,8 +1589,8 @@
                     <strong>对象名称：</strong>
                     <p>{{ obj.name }}</p>
                     <p><strong>对象大小：</strong>{{ obj.si }}</p>                   
-                    <p><strong>创建日期：</strong>{{ obj.ult }}</p>                   
-                    <p><strong>修改日期：</strong>{{ obj.upt }}</p> 
+                    <p><strong>创建日期：</strong>{{ $imports.isoTimeToLocal(obj.ult) }}</p>                   
+                    <p><strong>修改日期：</strong>{{ $imports.isoTimeToLocal(obj.upt) }}</p> 
                                       
                     {{if obj.dlc}}
                         <p><strong>下载次数：</strong>{{ obj.dlc }}</p>
@@ -1932,7 +1933,7 @@
                 <span class="glyphicon glyphicon-folder-open"></span>
                 <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong class="bucket-files-table-item">{{ dir.name }}</strong></a>
             </td>
-            <td>{{ dir.ult }}</td>
+            <td>{{ $imports.isoTimeToLocal(dir.ult) }}</td>
             <td>--</td>
             <td id="id-access-perms">{{ dir.access_permission}}</td>
             <td>

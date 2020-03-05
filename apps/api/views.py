@@ -332,7 +332,7 @@ class BucketViewSet(CustomGenericViewSet):
                   "id": 3,
                   "username": "869588058@qq.com"
                 },
-                "created_time": "2020-01-02 14:02:34",
+                "created_time": "2019-02-20T13:56:25+08:00",
                 "access_permission": "私有",
                 "ftp_enable": false,
                 "ftp_password": "696674124f",
@@ -425,7 +425,7 @@ class BucketViewSet(CustomGenericViewSet):
                         "id": 3,
                         "username": "869588058@qq.com"
                       },
-                      "created_time": "2019-12-22 16:10:16",
+                      "created_time": "2019-02-20T13:56:25+08:00",
                       "access_permission": "公有",
                       "ftp_enable": false,
                       "ftp_password": "1a0cdf3283",
@@ -518,7 +518,7 @@ class BucketViewSet(CustomGenericViewSet):
                       "id": 3,
                       "username": "869588058@qq.com"
                     },
-                    "created_time": "2019-12-22 16:10:16",
+                    "created_time": "2019-02-20T13:56:25+08:00",
                     "access_permission": "公有",
                     "ftp_enable": false,
                     "ftp_password": "1a0cdf3283",
@@ -1222,7 +1222,7 @@ class DirectoryViewSet(CustomGenericViewSet):
                       "fod": false,                     # true: 文件；false: 目录
                       "did": 0,
                       "si": 0,                          # size byte，目录为0
-                      "ult": "2019-12-27 18:19:55",     # 上传创建时间
+                      "ult": "2019-02-20T13:56:25+08:00",     # 上传创建时间
                       "upt": null,                      # 修改时间，目录为null
                       "dlc": 0,                         # 下载次数
                       "download_url": "",               # 下载url
@@ -1266,8 +1266,8 @@ class DirectoryViewSet(CustomGenericViewSet):
                       "fod": true,                      # true: 文件；false: 目录
                       "did": 11,
                       "si": 1185,                       # size byte，目录为0
-                      "ult": "2019-12-27 18:20:15",     # 上传创建时间
-                      "upt": "2019-12-27 18:20:15",     # 修改时间
+                      "ult": "2019-02-20T13:56:25+08:00",     # 上传创建时间
+                      "upt": "2019-02-20T13:56:25+08:00",     # 修改时间
                       "dlc": 1,
                       "download_url": "http://159.226.91.140:8000/share/obs/666/sacva/client.ovpn",
                       "access_permission": "公有"
@@ -1346,7 +1346,7 @@ class DirectoryViewSet(CustomGenericViewSet):
                     "fod": false,
                     "did": 0,
                     "si": 0,
-                    "ult": "2020-01-02 15:09:27",
+                    "ult": "2019-02-20T13:56:25+08:00",
                     "upt": null,
                     "dlc": 0,
                     "download_url": "",
@@ -1501,7 +1501,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
                       "space": 12500047770969,             # 桶内对象总大小，单位字节
                       "count": 5000004,                    # 桶内对象总数量
                     },
-                    "stats_time": "2019-03-06 08:19:43", # 统计时间
+                    "stats_time": "2020-03-04T06:01:50+00:00", # 统计时间
                     "code": 200,
                     "bucket_name": "xxx"    # 存储桶名称
                 }
@@ -1557,7 +1557,7 @@ class SecurityViewSet(CustomGenericViewSet):
                       "access_key": "xxx",
                       "secret_key": "xxxx",
                       "user": "xxx",
-                      "create_time": "2019-02-20 13:56:25",
+                      "create_time": "2020-03-03T20:52:04.187179+08:00",
                       "state": true,                        # true(使用中) false(停用)
                       "permission": "可读可写"
                     },
@@ -1720,8 +1720,8 @@ class MoveViewSet(CustomGenericViewSet):
                     "fod": true,
                     "did": 6,
                     "si": 149888,
-                    "ult": "2019-12-12 19:37:50",
-                    "upt": "2019-12-12 19:37:50",
+                    "ult": "2020-03-03T20:52:04.187179+08:00",
+                    "upt": "2020-03-03T20:52:04.187179+08:00",
                     "dlc": 1,
                     "download_url": "http://159.226.91.140:8000/share/obs/666/d%20d/data.json2",
                     "access_permission": "公有"
@@ -1780,8 +1780,8 @@ class MetadataViewSet(CustomGenericViewSet):
                     "fod": true,                        # true(文件对象)；false(目录)
                     "did": 42,                          # 父目录节点id
                     "si": 399336,                       # 对象大小，单位字节； 目录时此字段为0
-                    "ult": "2019-01-31 10:55:51",       # 创建时间
-                    "upt": "2019-01-31 10:55:51",       # 最后修改时间； 目录时此字段为空
+                    "ult": "2019-02-20T13:56:25+08:00",       # 创建时间
+                    "upt": "2019-02-20T13:56:25+08:00",       # 最后修改时间； 目录时此字段为空
                     "dlc": 2,                           # 下载次数； 目录时此字段为0
                     "download_url": "http://10.0.86.213/obs/gggg/upload/Firefox-latest.exe", # 对象下载url; 目录此字段为空
                     "access_permission": "私有"          # 访问权限，‘私有’或‘公有’； 目录此字段为空
@@ -1860,6 +1860,18 @@ class MetadataViewSet(CustomGenericViewSet):
                 "rados": "iharbor:ceph/obs_test/471_5",
                 "size": 0,
                 "filename": "test2.txt"
+              },
+              "obj": {
+                "na": "test5",
+                "name": "test5",
+                "fod": true,
+                "did": 0,
+                "si": 0,
+                "ult": "2020-03-04T14:21:01.422096+08:00",
+                "upt": null,
+                "dlc": 0,
+                "download_url": "http://xxx/share/obs/6666/test5",
+                "access_permission": "私有"
               }
             }
             """
@@ -1893,7 +1905,8 @@ class MetadataViewSet(CustomGenericViewSet):
             'size': obj.obj_size,
             'filename': obj.name
         }
-        return Response(data={'code': 200, 'code_text': '创建空对象元数据成功', 'info': info})
+        serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
+        return Response(data={'code': 200, 'code_text': '创建空对象元数据成功', 'info': info, 'obj': serializer.data})
 
     def get_serializer_class(self):
         """
@@ -1901,7 +1914,7 @@ class MetadataViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in ['retrieve']:
+        if self.action in ['retrieve', 'create_detail']:
             return serializers.ObjInfoSerializer
         return Serializer
 
@@ -1939,7 +1952,8 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
                   "code_text": "更新对象大小元数据成功",
                   "info": {
                     "size": 867840,
-                    "filename": "7zFM.exe"
+                    "filename": "7zFM.exe",
+                    "mtime": "2020-03-04T08:05:28.210658+00:00"     # 修改时间
                   }
                 }
             >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
@@ -1978,15 +1992,23 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 400, 'code_text': f'获取rados对象大小失败，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
 
         size, mtime = ret
-        obj.si = size
-        obj.upt = mtime
-        try:
-            obj.save(update_fields=['si', 'upt'])
-        except Exception as e:
-            return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        if size == 0 and mtime is None:  # rados对象不存在
+            mtime = obj.upt if obj.upt else obj.ult
+
+        if obj.upt != mtime:
+            pass
+        if obj.si != size or obj.upt != mtime:
+            obj.si = size
+            obj.upt = mtime
+            try:
+                obj.save(update_fields=['si', 'upt'])
+            except Exception as e:
+                return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
         info = {
             'size': size,
-            'filename': obj.name
+            'filename': obj.name,
+            'mtime': mtime.isoformat()
         }
         return Response(data={'code': 200, 'code_text': '更新对象大小元数据成功', 'info': info})
 
@@ -2062,7 +2084,7 @@ class UserStatsViewSet(CustomGenericViewSet):
                             "space": 16843103, # 桶内对象总大小，单位字节
                             "count": 4          # 桶内对象总数量
                         },
-                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "stats_time": "2020-03-04T14:21:01.422096+08:00", # 统计时间
                         "bucket_name": "wwww"       # 存储桶名称
                     },
                     {
@@ -2070,7 +2092,7 @@ class UserStatsViewSet(CustomGenericViewSet):
                             "space": 959820827,
                             "count": 17
                         },
-                        "stats_time": "2019-05-14 10:50:02",
+                        "stats_time": "2020-03-04T06:01:50+00:00",
                         "bucket_name": "gggg"
                     },
                 ]
@@ -2092,7 +2114,7 @@ class UserStatsViewSet(CustomGenericViewSet):
                             "space": 16843103, # 桶内对象总大小，单位字节
                             "count": 4          # 桶内对象总数量
                         },
-                        "stats_time": "2019-05-14 10:49:39", # 统计时间
+                        "stats_time": "2020-03-04T06:01:50+00:00", # 统计时间
                         "bucket_name": "wwww"       # 存储桶名称
                     },
                     {
@@ -2100,7 +2122,7 @@ class UserStatsViewSet(CustomGenericViewSet):
                             "space": 959820827,
                             "count": 17
                         },
-                        "stats_time": "2019-05-14 10:50:02",
+                        "stats_time": "2020-03-04T06:01:50+00:00",
                         "bucket_name": "gggg"
                     },
                 ]
@@ -2606,8 +2628,8 @@ class VPNViewSet(CustomGenericViewSet):
                 "vpn": {
                     "id": 2,
                     "password": "2523c77e7b",
-                    "created_time": "2019-12-22 11:44:43",
-                    "modified_time": "2019-12-22 11:44:43",
+                    "created_time": "2020-03-04T06:01:50+00:00",
+                    "modified_time": "2020-03-04T06:01:50+00:00",
                     "user": {
                         "id": 3,
                         "username": "869588058@qq.com"
