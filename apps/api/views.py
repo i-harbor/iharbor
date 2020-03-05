@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import logging
-import os, binascii
+import os
+import binascii
 from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, QueryDict
@@ -27,6 +28,7 @@ from utils.oss import HarborObject, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
+from utils.time import to_django_timezone
 from vpn.models import VPNAuth
 from .models import User, Bucket
 from . import serializers
@@ -1686,6 +1688,7 @@ class MoveViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary='移动或重命名一个对象',
+        operation_id='v1_move_create_detail',
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
@@ -1927,6 +1930,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary='自动同步对象大小元数据',
+        operation_id='v1_refresh-meta_create_detail',
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
@@ -1994,6 +1998,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
         size, mtime = ret
         if size == 0 and mtime is None:  # rados对象不存在
             mtime = obj.upt if obj.upt else obj.ult
+            mtime = to_django_timezone(mtime)
 
         if obj.upt != mtime:
             pass

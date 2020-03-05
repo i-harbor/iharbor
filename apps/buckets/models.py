@@ -1,5 +1,4 @@
 import uuid
-import logging
 import binascii
 import os
 import hashlib
@@ -11,23 +10,22 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from ckeditor.fields import RichTextField
 
-# from utils.log.decorators import log_used_time
-from utils.time import to_localtime_string_naive_by_utc
 from utils.storagers import PathParser
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
-#获取用户模型
+# 获取用户模型
 User = get_user_model()
 
-# Create your models here.
 
 def get_uuid1_hex_string():
     return uuid.uuid1().hex
 
+
 def rand_hex_string(len=10):
     return binascii.hexlify(os.urandom(len//2)).decode()
+
 
 def get_str_hexMD5(s:str):
     '''
