@@ -1035,12 +1035,8 @@
                                 </td>
                             </tr>
                         {{/each}}
+                        <tr><td colspan="6">共 {{ count }} 个项目</td></tr>
                     </table>
-                    {{if files}}
-                        {{if files.length === 0}}
-                              <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
-                         {{/if}}
-                     {{/if}}
                 </div>
             </div>
             
