@@ -49,7 +49,13 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
     def pagenate_to_list(self, queryset, offset, limit, request=None):
         if request:
             self.request = request
-        self.count = self.get_count(queryset)
+
+        if not hasattr(self, 'count'):
+            self.count = self.get_count(queryset)
+
+        if self.offset > self.count:
+            self.offset = self.count
+
         count = self.count
         if count > limit and self.template is not None:
             self.display_page_controls = True
@@ -125,7 +131,7 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
         if current > final:
             current = final
 
-        return (current, final)
+        return current, final
 
 
 class BucketsLimitOffsetPagination(LimitOffsetPagination):

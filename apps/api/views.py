@@ -1208,7 +1208,6 @@ class DirectoryViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     pagination_class = paginations.BucketFileLimitOffsetPagination
 
-
     @swagger_auto_schema(
         operation_summary='获取存储桶根目录下的文件和文件夹信息',
         responses={
@@ -1254,6 +1253,18 @@ class DirectoryViewSet(CustomGenericViewSet):
                 description="目录绝对路径",
                 required=True
             ),
+            openapi.Parameter(
+                name='offset', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="The initial index from which to return the results",
+                required=False,
+            ),
+            openapi.Parameter(
+                name='limit', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description="Number of results to return per page",
+                required=False,
+            )
         ],
         responses={
             status.HTTP_200_OK: """

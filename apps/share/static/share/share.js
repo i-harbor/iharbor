@@ -176,12 +176,8 @@
                                 </td>
                             </tr>
                         {{/each}}
+                        <tr><td colspan="6">共 {{ count }} 个项目</td></tr>
                     </table>
-                    {{if files}}
-                        {{if files.length === 0}}
-                              <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
-                         {{/if}}
-                     {{/if}}
                 </div>
             </div>
             
@@ -206,6 +202,11 @@
                         {{/if}}
                         {{if !next}}
                             <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if page.final > 2}}
+                            <li>跳转到第<input type="text" name="page-skip-to" style="max-width: 60px;">页
+                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page">跳转</button>
+                            </li>
                         {{/if}}
                       </ul>
                     </nav>
@@ -242,7 +243,7 @@
     //
     $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
         get_bucket_files_and_render(url);
     });
 
@@ -251,7 +252,25 @@
     //
     $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
         e.preventDefault();
-        url = $(this).attr('href');
+        let url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
+
+    // 文件夹、文件对象列表 跳转到页码点击事件
+    $("#content-display-div").on("click", '.pager #btn-skip-to-page', function (e) {
+        e.preventDefault();
+        let page_num = $(":input[name='page-skip-to']").val();
+        page_num = parseInt(page_num);
+        if (isNaN(page_num) || page_num <= 0){
+            show_auto_close_warning_dialog("请输入一个有效的正整数页码");
+            return;
+        }
+
+        let r = get_share_base_and_sub();
+        let limit = 200;
+        let offset = (page_num - 1) * limit;
+        let sc = get_share_code();
+        let url = build_share_base_url(r.sharebase, {subpath: r.subpath, offset: offset, limit: limit, p: sc});
         get_bucket_files_and_render(url);
     });
 
