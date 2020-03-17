@@ -63,8 +63,8 @@ class HarborFileSystem(AbstractedFS):
         try:
             # files = self.client.ftp_list_dir(self.bucket_name, path[1:])
             files = []
-            files_generator = self.client.ftp_list_dir_generator(self.bucket_name, path[1:])
-            for _ in range(20):
+            files_generator = self.client.ftp_list_dir_generator(self.bucket_name, path[1:], per_num=2000)
+            for _ in range(10):
                 try:
                     data = next(files_generator)
                 except StopIteration as error:

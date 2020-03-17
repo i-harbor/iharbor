@@ -35,32 +35,29 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
     default_limit = 200
     limit_query_param = 'limit'
     offset_query_param = 'offset'
-    max_limit = 1000
+    max_limit = 2000
 
     def paginate_queryset(self, queryset, request, view=None):
-        self.count = self.get_count(queryset)
-        self.limit = self.get_limit(request)
-        if self.limit is None:
-            return None
-
-        self.offset = self.get_offset(request)
-        return self.pagenate_to_list(queryset, request=request, offset=self.offset, limit=self.limit)
+        limit = self.get_limit(request)
+        offset = self.get_offset(request)
+        return self.pagenate_to_list(queryset, request=request, offset=offset, limit=limit)
 
     def pagenate_to_list(self, queryset, offset, limit, request=None):
         if request:
             self.request = request
 
-        if not hasattr(self, 'count'):
-            self.count = self.get_count(queryset)
+        self.offset = offset
+        self.limit = limit
 
-        if self.offset > self.count:
-            self.offset = self.count
+        if not hasattr(self, 'count'):      # 避免多次调用时重复查询
+            self.count = self.get_count(queryset)
 
         count = self.count
         if count > limit and self.template is not None:
             self.display_page_controls = True
 
         if count == 0 or offset > count:
+            self.offset = self.count
             return []
 
         # 当数据少时
