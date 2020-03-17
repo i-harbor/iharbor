@@ -1035,12 +1035,8 @@
                                 </td>
                             </tr>
                         {{/each}}
+                        <tr><td colspan="6">共 {{ count }} 个项目</td></tr>
                     </table>
-                    {{if files}}
-                        {{if files.length === 0}}
-                              <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
-                         {{/if}}
-                     {{/if}}
                 </div>
             </div>
             
@@ -1057,7 +1053,7 @@
                         {{/if}}
                         
                         {{if page}}
-                            <li>第{{page.current}}页 共{{page.final}}页</li>
+                            <li>第{{page.current}}页 / 共{{page.final}}页</li>
                         {{/if}}
                         
                         {{if next}}
@@ -1065,6 +1061,11 @@
                         {{/if}}
                         {{if !next}}
                             <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                        {{/if}}
+                        {{if page.final > 2}}
+                            <li>跳转到第<input type="text" name="page-skip-to" style="max-width: 60px;">页
+                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">跳转</button>
+                            </li>
                         {{/if}}
                       </ul>
                     </nav>
@@ -1147,6 +1148,31 @@
     $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
+        get_bucket_files_and_render(url);
+    });
+
+    // 文件夹、文件对象列表 跳转到页码点击事件
+    $("#content-display-div").on("click", '.pager #btn-skip-to-page', function (e) {
+        e.preventDefault();
+        let page_num = $(":input[name='page-skip-to']").val();
+        page_num = parseInt(page_num);
+        if (isNaN(page_num) || page_num <= 0){
+            show_auto_close_warning_dialog("请输入一个有效的正整数页码");
+            return;
+        }
+
+        let bucket_name = $(this).attr('data-bucket_name');
+        let dir_path = $(this).attr('data-dir_path');
+
+        let url = build_dir_detail_url({
+            bucket_name: bucket_name,
+            dir_path: dir_path
+        });
+
+        let limit = 200;
+        let offset = (page_num - 1) * limit;
+        let q = encode_params({offset: offset, limit: limit});
+        url = url + "?" + q;
         get_bucket_files_and_render(url);
     });
 

@@ -61,16 +61,26 @@ class HarborFileSystem(AbstractedFS):
         # print('functioin: listdir', 'path:' + path)
         dir_list = []
         try:
-            files = self.client.ftp_list_dir(self.bucket_name, path[1:])
-            for file in files[0]:
-                if file.fod == True:
-                    if file.upt:
-                        dir_list.append((file.name, file.upt, file.si))
+            # files = self.client.ftp_list_dir(self.bucket_name, path[1:])
+            files = []
+            files_generator = self.client.ftp_list_dir_generator(self.bucket_name, path[1:], per_num=2000)
+            for _ in range(10):
+                try:
+                    data = next(files_generator)
+                except StopIteration as error:
+                    break 
+                files.append(data)
+            # print(files)
+            for fi in files:
+                for file in fi: 
+                    if file.fod == True:
+                        if file.upt:
+                            dir_list.append((file.name, file.upt, file.si))
+                        else:
+                            dir_list.append((file.name, file.ult, file.si))
                     else:
-                        dir_list.append((file.name, file.ult, file.si))
-                else:
-                    # print(file.shp, file.si, file.sst, file.stl, file.ult, file.upt)
-                    dir_list.append((file.name + '/', file.ult, 0))
+                        # print(file.shp, file.si, file.sst, file.stl, file.ult, file.upt)
+                        dir_list.append((file.name + '/', file.ult, 0))
         except HarborError as error:
             raise FilesystemError(error.msg)
         # print('listdir return', dir_list)

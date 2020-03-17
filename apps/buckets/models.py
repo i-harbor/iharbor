@@ -88,11 +88,7 @@ class Bucket(models.Model):
         :param bucket_name: 存储通名称
         :return: Bucket对象; None(不存在)
         '''
-        query_set = Bucket.objects.select_related('user').filter(name=bucket_name)
-        if query_set.exists():
-            return query_set.first()
-
-        return None
+        return Bucket.objects.select_related('user').filter(name=bucket_name).first()
 
     def save(self, *args, **kwargs):
         if not self.ftp_password or len(self.ftp_password) < 6:
