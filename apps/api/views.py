@@ -2722,8 +2722,14 @@ class ObjKeyViewSet(CustomGenericViewSet):
                 "code": 200,
                 "code_text": "请求成功",
                 "info": {
-                    "rados": "iharbor:ceph/obs/217_12", # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
-                    "size": 1185,                       # 对象大小Byte
+                    "rados": [                          # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
+                        "iharbor:ceph/obs/217_12",      # 大小为 chunk_size
+                        "iharbor:ceph/obs/217_12_1",     # 大小为 chunk_size
+                        ...
+                        "iharbor:ceph/obs/217_12_N",     # 最后一个数据块大小=(size - chunk_size * N)；N = len(rados数组) - 1
+                     ],
+                    "chunk_size": 2147483648,                  # 对象分片（rados）的大小
+                    "size": xxxx,                       # 对象大小Byte
                     "filename": "client.ovpn"           # 对象名称
                 }
             }
@@ -2741,7 +2747,6 @@ class ObjKeyViewSet(CustomGenericViewSet):
     permission_classes = [IsAuthenticated]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
-
 
     @swagger_auto_schema(
         operation_summary='获取对象对应的ceph rados key信息',
@@ -2770,9 +2775,10 @@ class ObjKeyViewSet(CustomGenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        rados_key = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+        chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
         info = {
-            'rados': rados_key,
+            'rados': keys,
+            'chunk_size': chunk_size,
             'size': obj.obj_size,
             'filename': obj.name
         }
