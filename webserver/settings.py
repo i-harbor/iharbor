@@ -59,6 +59,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -87,6 +88,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.i18n',
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
@@ -120,6 +122,15 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.11/topics/i18n/
+LANGUAGES = (
+    ('en', 'English'),
+    ('zh-hans', '中文简体'),
+)
+
+# 翻译文件所在目录
+LOCALE_PATHS = (
+    os.path.join(BASE_DIR, 'locale'),
+)
 
 LANGUAGE_CODE = 'zh-hans'
 

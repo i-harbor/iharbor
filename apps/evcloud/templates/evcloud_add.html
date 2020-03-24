@@ -1,5 +1,6 @@
 {% extends "base_with_sidebar.html" %}
 {% load static %}
+{% load i18n %}
 {# 加载自定义过滤器 #}
 {% load custom_filters %}
 
@@ -16,8 +17,8 @@
         <div class="row">
             <div class="col-xs-12 col-sm-12">
                 <div>
-                    <button class="btn btn-primary" id="btn-evcloud-list"><span class="glyphicon glyphicon-th-list"></span> 我的云主机</button>
-                    <button class="btn btn-danger disabled" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span> 创建云主机</button>
+                    <button class="btn btn-primary" id="btn-evcloud-list"><span class="glyphicon glyphicon-th-list"></span>{% trans '我的云主机' %}</button>
+                    <button class="btn btn-danger disabled" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span>{% trans '创建云主机' %}</button>
                 </div>
             </div>
         </div>
@@ -26,7 +27,7 @@
             <form id="form-create" class="form-horizontal">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="api" class="col-sm-2 control-label">类型</label>
+                    <label for="api" class="col-sm-2 control-label">{% trans '类型' %}</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="api" name="api">
                             {% for api in api_list_dict %}
@@ -38,7 +39,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="image" class="col-sm-2 control-label">镜像</label>
+                    <label for="image" class="col-sm-2 control-label">{% trans '镜像' %}</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="image" name="image">
                             {% for image in image_list.values %}
@@ -50,7 +51,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="configure" class="col-sm-2 control-label">配置</label>
+                    <label for="configure" class="col-sm-2 control-label">{% trans '配置' %}</label>
                     <div class="col-sm-6">
                         <select class="form-control" id="configure" name="configure">
                             {% for config in config_list_dict %}
@@ -63,7 +64,7 @@
 
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
-                        <button id="btn-evcloud-create" type="submit" class="btn btn-default">创建</button>
+                        <button id="btn-evcloud-create" type="submit" class="btn btn-default">{% trans '创建' %}</button>
                     </div>
                 </div>
             </form>

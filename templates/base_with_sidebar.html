@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% load static %}
+{% load i18n %}
 
 {% block head %}
     {% block head_extends %}{% endblock %}
@@ -11,31 +12,31 @@
         <ul class="nav nav-tabs nav-stacked">
             <li role="presentation" class="active menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
-                    <h5><span class="glyphicon glyphicon-list"></span>  对象存储<span class="glyphicon glyphicon-menu-down"></span></h5>
+                    <h5><span class="glyphicon glyphicon-list"></span>{% trans '对象存储' %}<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
                 <ul class="bg-info nav nav-pills nav-stacked collapse in" id="oos-nav-list-group">
-                    <li class="bg-info"><a href="{% url 'buckets:bucket_view' %}" >存储桶</a></li>
-                    <li class="bg-info"><a href="{% url 'buckets:ftp-usage' %}" >FTP访问说明</a></li>
-                    <li class="bg-info"><a href="{% url 'buckets:api-usage' %}">API使用说明</a></li>
+                    <li class="bg-info"><a href="{% url 'buckets:bucket_view' %}" >{% trans '存储桶' %}</a></li>
+                    <li class="bg-info"><a href="{% url 'buckets:ftp-usage' %}" >{% trans 'FTP访问说明' %}</a></li>
+                    <li class="bg-info"><a href="{% url 'buckets:api-usage' %}">{% trans 'API使用说明' %}</a></li>
                 </ul>
             </li>
             <li role="presentation" class="menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#cloud-nav-list-group">
-                    <h5><span class="glyphicon glyphicon-list"></span>  云主机<span class="glyphicon glyphicon-menu-down"></span></h5>
+                    <h5><span class="glyphicon glyphicon-list"></span>{% trans '云主机' %}<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
                 <ul class="bg-info nav nav-pills nav-stacked collapse in" id="cloud-nav-list-group">
-                    <li><a href="{% url 'evcloud:list' %}">云主机列表</a></li>
-                    <li><a href="{% url 'evcloud:add' %}">创建云主机</a></li>
-                    <li><a href="{% url 'evcloud:usage' %}">云主机使用说明</a></li>
+                    <li><a href="{% url 'evcloud:list' %}">{% trans '云主机列表' %}</a></li>
+                    <li><a href="{% url 'evcloud:add' %}">{% trans '创建云主机' %}</a></li>
+                    <li><a href="{% url 'evcloud:usage' %}">{% trans '云主机使用说明' %}</a></li>
                 </ul>
             </li>
             <li role="presentation" class="menu-list">
                 <li class="nav-list-toggle" data-toggle="collapse" data-target="#vpn-nav-list-group">
-                    <h5><span class="glyphicon glyphicon-list"></span>  VPN<span class="glyphicon glyphicon-menu-down"></span></h5>
+                    <h5><span class="glyphicon glyphicon-list"></span>VPN<span class="glyphicon glyphicon-menu-down"></span></h5>
                 </li>
                 <ul class="bg-info nav nav-pills nav-stacked collapse in" id="vpn-nav-list-group">
-                    <li><a href="{% url 'vpn:home' %}">VPN口令管理</a></li>
-                    <li><a href="{% url 'vpn:usage' %}">VPN安装配置说明</a></li>
+                    <li><a href="{% url 'vpn:home' %}">{% trans 'VPN口令管理' %}</a></li>
+                    <li><a href="{% url 'vpn:usage' %}">{% trans 'VPN安装配置说明' %}</a></li>
                 </ul>
             </li>
         </ul>

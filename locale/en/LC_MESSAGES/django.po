@@ -1,0 +1,442 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-03-23 16:18+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps/evcloud/templates/evcloud_add.html:20
+#: apps/evcloud/templates/evcloud_list.html:21
+msgid "我的云主机"
+msgstr "My host"
+
+#: apps/evcloud/templates/evcloud_add.html:21
+#: apps/evcloud/templates/evcloud_list.html:24
+#: templates/base_with_sidebar.html:29
+msgid "创建云主机"
+msgstr "Create"
+
+#: apps/evcloud/templates/evcloud_add.html:30
+#: apps/evcloud/templates/evcloud_list.html:42
+msgid "类型"
+msgstr "Type"
+
+#: apps/evcloud/templates/evcloud_add.html:42
+#: apps/evcloud/templates/evcloud_list.html:37
+msgid "镜像"
+msgstr "Image"
+
+#: apps/evcloud/templates/evcloud_add.html:54
+msgid "配置"
+msgstr "Configuration"
+
+#: apps/evcloud/templates/evcloud_add.html:67
+msgid "创建"
+msgstr "Create"
+
+#: apps/evcloud/templates/evcloud_list.html:39
+msgid "内存"
+msgstr "Memory"
+
+#: apps/evcloud/templates/evcloud_list.html:40 apps/vpn/templates/vpn.html:26
+msgid "创建时间"
+msgstr "Creation time"
+
+#: apps/evcloud/templates/evcloud_list.html:41
+msgid "到期时间"
+msgstr "Due time"
+
+#: apps/evcloud/templates/evcloud_list.html:43
+msgid "状态"
+msgstr "Status"
+
+#: apps/evcloud/templates/evcloud_list.html:44
+msgid "任务"
+msgstr "Task"
+
+#: apps/evcloud/templates/evcloud_list.html:45
+msgid "备注(双击修改)"
+msgstr "Remark"
+
+#: apps/evcloud/templates/evcloud_list.html:46
+msgid "操作"
+msgstr "Operations"
+
+#: apps/evcloud/templates/evcloud_list.html:67 apps/vpn/templates/vpn.html:34
+msgid "双击修改"
+msgstr "Double-click to modify"
+
+#: apps/evcloud/templates/evcloud_list.html:78
+msgid "启动"
+msgstr "Start"
+
+#: apps/evcloud/templates/evcloud_list.html:79
+msgid "关机"
+msgstr "Shutdown"
+
+#: apps/evcloud/templates/evcloud_list.html:80
+msgid "关闭电源"
+msgstr "Power off"
+
+#: apps/evcloud/templates/evcloud_list.html:81
+msgid "重启"
+msgstr "Restart"
+
+#: apps/evcloud/templates/evcloud_list.html:82
+msgid "删除"
+msgstr "Delete"
+
+#: apps/users/admin.py:21
+msgid "Personal info"
+msgstr ""
+
+#: apps/users/admin.py:22
+msgid "Permissions"
+msgstr ""
+
+#: apps/users/admin.py:24
+msgid "Important dates"
+msgstr ""
+
+#: apps/users/auth/authentication.py:38
+msgid "Invalid auth header. No credentials provided."
+msgstr ""
+
+#: apps/users/auth/authentication.py:41
+msgid "Invalid auth header. Auth string should not contain spaces."
+msgstr ""
+
+#: apps/users/auth/authentication.py:47
+msgid "Invalid auth header. Auth string should not contain invalid characters."
+msgstr ""
+
+#: apps/users/auth/authentication.py:64
+msgid "Invalid access_key."
+msgstr ""
+
+#: apps/users/auth/authentication.py:67
+msgid "User inactive or deleted."
+msgstr ""
+
+#: apps/users/auth/authentication.py:71
+msgid "Invalid access_key. Key is inactive and unavailable"
+msgstr ""
+
+#: apps/users/auth/authentication.py:75
+msgid "Invalid auth header"
+msgstr ""
+
+#: apps/users/auth/authentication.py:82
+msgid "Invalid auth header. Auth string should contain 2 colons."
+msgstr ""
+
+#: apps/users/auth/authentication.py:100 apps/users/auth/authentication.py:103
+msgid "Invalid auth header."
+msgstr ""
+
+#: apps/users/auth/authentication.py:113 apps/users/auth/authentication.py:119
+msgid "Invalid auth header. Invalid path of request url."
+msgstr ""
+
+#: apps/users/auth/authentication.py:127
+msgid "Invalid auth header. Now the deadline has passed."
+msgstr ""
+
+#: apps/users/auth/authentication.py:136
+msgid "Invalid auth header. Request method is different."
+msgstr ""
+
+#: apps/users/forms.py:18 apps/users/forms.py:127 apps/users/forms.py:223
+msgid "用户名(邮箱)"
+msgstr "Username(Email)"
+
+#: apps/users/forms.py:23
+msgid "请输入邮箱作为用户名"
+msgstr "Please enter email as user name"
+
+#: apps/users/forms.py:25 apps/users/forms.py:134
+msgid "密码"
+msgstr "Password"
+
+#: apps/users/forms.py:30 apps/users/forms.py:139
+msgid "请输入一个8-20位的密码"
+msgstr "Please enter an 8-20 character password"
+
+#: apps/users/forms.py:32
+msgid "确认密码"
+msgstr "Confirm password"
+
+#: apps/users/forms.py:37
+msgid "请输入确认密码"
+msgstr "Please enter the confirmation password"
+
+#: apps/users/forms.py:40
+msgid "姓氏"
+msgstr "Last name"
+
+#: apps/users/forms.py:43 apps/users/forms.py:49 apps/users/forms.py:55
+#: apps/users/forms.py:60
+msgid "请如实填写"
+msgstr "Please fill out correctly"
+
+#: apps/users/forms.py:46
+msgid "名字"
+msgstr "First name"
+
+#: apps/users/forms.py:52
+msgid "电话"
+msgstr "Telephone"
+
+#: apps/users/forms.py:57
+msgid "公司/单位"
+msgstr "Company"
+
+#: apps/users/forms.py:74 apps/users/forms.py:238
+msgid "用户名不能为空"
+msgstr "User name cannot be empty"
+
+#: apps/users/forms.py:80
+msgid "用户名已存在，请重新输入"
+msgstr "User name already exists, please try enter another one"
+
+#: apps/users/forms.py:86 apps/users/forms.py:200 apps/users/forms.py:282
+msgid "密码输入不一致"
+msgstr "Confirmation password is not identical"
+
+#: apps/users/forms.py:132 apps/users/forms.py:227
+msgid "请输入用户名"
+msgstr "Please enter one username"
+
+#: apps/users/forms.py:152
+msgid "用户名或密码有误，请注意区分字母大小写"
+msgstr ""
+"The username or password is incorrect. Please pay attention to case "
+"sensitivity"
+
+#: apps/users/forms.py:166
+msgid "原密码"
+msgstr "Old password"
+
+#: apps/users/forms.py:171
+msgid "请输入原密码"
+msgstr "Please enter the old password"
+
+#: apps/users/forms.py:173 apps/users/forms.py:258
+msgid "新密码"
+msgstr "New password"
+
+#: apps/users/forms.py:178 apps/users/forms.py:263
+msgid "请输入一个8-20位的新密码"
+msgstr "Please enter a new password of 8-20 characters"
+
+#: apps/users/forms.py:180 apps/users/forms.py:265
+msgid "确认新密码"
+msgstr "Confirm new password"
+
+#: apps/users/forms.py:185 apps/users/forms.py:270
+msgid "请再次输入新密码"
+msgstr "Please enter the new password again"
+
+#: apps/users/forms.py:215
+msgid "原密码有误"
+msgstr "Wrong old password"
+
+#: apps/users/forms.py:244
+msgid "用户不存在"
+msgstr "User does not exist"
+
+#: apps/users/forms.py:291
+msgid "重置密码失败，jwt无效或已过期，请重新找回密码获取新的链接"
+msgstr ""
+"Failed to reset the password. JWT is invalid or expired. Please retrieve the "
+"password to get a new link"
+
+#: apps/users/templates/login.html:5
+msgid "忘记密码"
+msgstr "Forget password"
+
+#: apps/users/templates/login.html:6 apps/users/views.py:42
+#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:55
+msgid "注册"
+msgstr "Sign up"
+
+#: apps/users/templates/login.html:11
+msgid "第三方帐号登录"
+msgstr "Third party login"
+
+#: apps/users/views.py:32
+msgid "用户注册成功，请登录邮箱访问收到的连接以激活用户"
+msgstr ""
+"The user is registered successfully. Please log in to the mailbox to access "
+"the received connection to activate the user"
+
+#: apps/users/views.py:34
+msgid "邮件发送失败，请检查邮箱输入是否有误"
+msgstr ""
+"Failed to send the email. Please check whether the email input is wrong"
+
+#: apps/users/views.py:36
+msgid "用户注册失败，保存用户数据是错误"
+msgstr "User registration failed, failed saving user metadata"
+
+#: apps/users/views.py:41
+msgid "用户注册"
+msgstr "Sign up user"
+
+#: apps/users/views.py:68
+msgid "用户登录"
+msgstr "User log in"
+
+#: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
+#: apps/users/views.py:219 templates/base.html:54
+msgid "登录"
+msgstr "Sign in"
+
+#: apps/users/views.py:123 templates/base.html:45
+msgid "修改密码"
+msgstr "Change password"
+
+#: apps/users/views.py:124 apps/users/views.py:171 apps/users/views.py:207
+msgid "确定"
+msgstr "Confirm"
+
+#: apps/users/views.py:161
+msgid "用户未激活，请先登录邮箱访问收到的链接以激活用户"
+msgstr ""
+"The user is not activated. Please log in to the mailbox to access the "
+"received connection to activate the user"
+
+#: apps/users/views.py:162 apps/users/views.py:166
+msgid "邮件发送失败，请检查用户名输入是否有误，稍后重试"
+msgstr ""
+"Failed to send the email. Please check the user name and try again later"
+
+#: apps/users/views.py:165
+msgid ""
+"重置密码确认邮件已发送，请尽快登录邮箱访问收到的链接以完成密码重置，以防链接"
+"过期无效"
+msgstr "Reset password confirmation email has been sent. Please log in to the email as soon as possible to visit the received link to complete password reset, in case the link expires and is invalid"
+
+#: apps/users/views.py:171
+msgid "找回密码"
+msgstr "Find back password"
+
+#: apps/users/views.py:194
+msgid "用户重置密码成功，请尝试登录"
+msgstr "User reset password successfully, please try to login"
+
+#: apps/users/views.py:202
+msgid "链接无效或已过期，请重新找回密码获取新的链接"
+msgstr ""
+"The link is invalid or expired. Please retrieve the password to get a new "
+"link"
+
+#: apps/users/views.py:207
+msgid "重置密码"
+msgstr "Change password"
+
+#: apps/users/views.py:228
+msgid "用户激活失败，无待激活账户，或者账户已被激活，请直接尝试登录"
+msgstr ""
+"User activation failed, no account to be activated, or the account has been "
+"activated, please login directly"
+
+#: apps/vpn/templates/vpn.html:19
+msgid "我的VPN"
+msgstr "My VPN"
+
+#: apps/vpn/templates/vpn.html:24
+msgid "用户名"
+msgstr "Username"
+
+#: apps/vpn/templates/vpn.html:25
+msgid "VPN口令(双击修改)"
+msgstr "VPN password"
+
+#: apps/vpn/templates/vpn.html:27
+msgid "修改时间"
+msgstr "Modification time"
+
+#: templates/base.html:24
+msgid "中国科技云对象存储服务"
+msgstr "China Science & Technology Cloud Object Storage"
+
+#: templates/base.html:30
+msgid "帮助"
+msgstr "Help"
+
+#: templates/base.html:32
+msgid "API文档"
+msgstr "API Doc"
+
+#: templates/base.html:34
+msgid "帮助文档"
+msgstr "Help Doc"
+
+#: templates/base.html:44
+msgid "登出"
+msgstr "Sign out"
+
+#: templates/base.html:46
+msgid "安全凭证"
+msgstr "Security credential"
+
+#: templates/base.html:49
+msgid "后台管理"
+msgstr "Admin"
+
+#: templates/base.html:65
+msgid "语言"
+msgstr "Language"
+
+#: templates/base_with_sidebar.html:15
+msgid "对象存储"
+msgstr "Object storage"
+
+#: templates/base_with_sidebar.html:18
+msgid "存储桶"
+msgstr "Bucket"
+
+#: templates/base_with_sidebar.html:19
+msgid "FTP访问说明"
+msgstr "FTP usage"
+
+#: templates/base_with_sidebar.html:20
+msgid "API使用说明"
+msgstr "API usage"
+
+#: templates/base_with_sidebar.html:25
+msgid "云主机"
+msgstr "Cloud host"
+
+#: templates/base_with_sidebar.html:28
+msgid "云主机列表"
+msgstr "Host list"
+
+#: templates/base_with_sidebar.html:30
+msgid "云主机使用说明"
+msgstr "Host usage"
+
+#: templates/base_with_sidebar.html:38
+msgid "VPN口令管理"
+msgstr "VPN password"
+
+#: templates/base_with_sidebar.html:39
+msgid "VPN安装配置说明"
+msgstr "VPN usage"
+
+#~ msgid "地球大数据科学工程对象云存储"
+#~ msgstr "Big Earth Data Science Project Object storage"

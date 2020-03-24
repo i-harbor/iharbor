@@ -1,15 +1,14 @@
-import json
 import datetime
 
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import gettext as _
 
 from .models import (EvcloudVM, VMLimit, VMConfig, APIAuth, VMUsageDescription)
 from .manager import evcloud_operations
 
-# Create your views here.
 
 def evcloud_list(request):
     if request.method == "GET":

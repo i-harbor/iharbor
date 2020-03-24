@@ -6,6 +6,7 @@ from django.views import View
 from django.http import FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
+from django.utils.translation import gettext as _
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
