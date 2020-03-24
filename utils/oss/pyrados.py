@@ -132,6 +132,10 @@ class HarborObjectStructure:
 
         return self._parts_id
 
+    @property
+    def size_part_by(self):
+        return MAXSIZE_PER_RADOS_OBJ
+
     def _build(self):
         last_part_num = int(math.ceil(self._obj_size / MAXSIZE_PER_RADOS_OBJ)) - 1
         self.build_parts_id(last_part_num=last_part_num)
@@ -895,9 +899,14 @@ class HarborObject:
         获取对象在ceph rados中的存储信息
 
         :return:
-               str   # format = iharbor:{cluster_name}/{pool_name}/{rados-key}
+               int, [item, ...]   # item: str; format = iharbor:{cluster_name}/{pool_name}/{rados-key}
         '''
-        return f'iharbor:{self._cluster_name}/{self._pool_name}/{self._obj_id}'
+        hos = HarborObjectStructure(obj_id=self._obj_id, obj_size=self._obj_size)
+        parts = hos.parts_id
+        cn = self._cluster_name
+        pn = self._pool_name
+        info = [f'iharbor:{cn}/{pn}/{k}' for k in parts]
+        return hos.size_part_by, info
 
     def get_rados_stat(self, obj_id: str):
         """
