@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.serializers import AuthTokenSerializer
@@ -32,6 +33,10 @@ class CustomAuthToken(ObtainAuthToken):
         令牌应包含在AuthorizationHTTP标头中。密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
         例如Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b；
     '''
+
+    @swagger_auto_schema(
+        operation_summary=_('获取当前用户的token')
+    )
     def get(self, request, *args, **kwargs):
         user = request.user
         if user.is_authenticated:
@@ -41,6 +46,7 @@ class CustomAuthToken(ObtainAuthToken):
         return Response({'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
     @swagger_auto_schema(
+        operation_summary=_('刷新当前用户的token'),
         responses={
             status.HTTP_200_OK: """
                         {
@@ -55,8 +61,6 @@ class CustomAuthToken(ObtainAuthToken):
     )
     def put(self, request, *args, **kwargs):
         '''
-        刷新当前用户的token
-
         刷新当前用户的token，旧token失效，需要通过身份认证权限
         '''
         user = request.user
@@ -71,6 +75,7 @@ class CustomAuthToken(ObtainAuthToken):
         return Response({'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
 
     @swagger_auto_schema(
+        operation_summary=_('身份验证并返回一个token'),
         request_body=AuthTokenSerializer,
         manual_parameters=[
             openapi.Parameter(
@@ -124,7 +129,7 @@ class JWTObtainPairView(TokenObtainPairView):
     JWT登录认证视图
     '''
     @swagger_auto_schema(
-        operation_summary='登录认证，获取JWT',
+        operation_summary=_('登录认证，获取JWT'),
         responses={
             status.HTTP_200_OK: """
                 {
@@ -158,7 +163,7 @@ class JWTRefreshView(TokenRefreshView):
     Refresh JWT视图
     '''
     @swagger_auto_schema(
-        operation_summary='刷新获取新的accessJWT',
+        operation_summary=_('刷新获取新的accessJWT'),
         responses={
             status.HTTP_200_OK: """
                 {
@@ -190,7 +195,7 @@ class JWTVerifyView(TokenVerifyView):
     '''
 
     @swagger_auto_schema(
-        operation_summary='校验JWT是否有效',
+        operation_summary=_('校验JWT是否有效'),
         responses={
             status.HTTP_200_OK: 'NO CONTENT'
         }

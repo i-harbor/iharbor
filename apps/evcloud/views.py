@@ -79,8 +79,8 @@ def evcloud_add(request):
 
     elif request.method == "POST":
         api_id = int(request.POST.get('api'))
+        api = APIAuth.objects.get(id=api_id)
         try:
-            api = APIAuth.objects.get(id=api_id)
             limit = VMLimit.objects.filter(user=user).filter(api=api)[0].limit
         except :
             VMLimit.objects.create(user=user, limit=api.limit, api=api)
@@ -114,7 +114,6 @@ def evcloud_add(request):
             result['code'] = 200
         except Exception as e:
             result['code'] = 400
-            print(e)
             result['error_text'] = str(e).encode('utf-8').decode('unicode_escape')
         return JsonResponse(data = result)
     else:
@@ -144,15 +143,15 @@ class VMRemarksView(View):
         try:
             vm = EvcloudVM.objects.get(vm_id=vm_id)
         except ObjectDoesNotExist as e:
-            return JsonResponse({'code': 404, 'code_text': '虚拟机不存在'}, status=404)
+            return JsonResponse({'code': 404, 'code_text': _('虚拟机不存在')}, status=404)
 
         vm.remarks = remarks
         try:
             vm.save()
         except:
-            return JsonResponse({'code': 500, 'code_text': '虚拟机备注信息修改失败'}, status=500)
+            return JsonResponse({'code': 500, 'code_text': _('虚拟机备注信息修改失败')}, status=500)
 
-        return JsonResponse({'code': 200, 'code_text': '虚拟机备注信息修改成功'}, status=200)
+        return JsonResponse({'code': 200, 'code_text': _('虚拟机备注信息修改成功')}, status=200)
 
     def post_validate(self, request):
         '''
@@ -165,9 +164,9 @@ class VMRemarksView(View):
         vm_id = request.POST.get('vm_id', None)
         remarks = request.POST.get('remarks', None)
         if not vm_id or not remarks:
-            return False, JsonResponse({'code': 400, 'code_text': '错误的请求，vm_id或者remarks参数未提交'}, status=400)
+            return False, JsonResponse({'code': 400, 'code_text': _('错误的请求，vm_id或者remarks参数未提交')}, status=400)
 
         if not isinstance(remarks, str) or not isinstance(vm_id, str):
-            return False, JsonResponse({'code': 400, 'code_text': '错误的请求，vm_id或者remarks参数有误'}, status=400)
+            return False, JsonResponse({'code': 400, 'code_text': _('错误的请求，vm_id或者remarks参数有误')}, status=400)
 
         return True, {'vm_id': vm_id, 'remarks': remarks}

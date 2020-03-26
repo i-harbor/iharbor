@@ -1,5 +1,6 @@
 {% extends 'html.html' %}
 {% load static %}
+{% load i18n %}
 
 {% block page-head %}
 	{% block head %}{% endblock %}
@@ -11,14 +12,27 @@
         <div class="container-fluid">
             <div class="navbar-header">
 {#                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">#}
-{#                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">地球大数据科学工程对象云存储</a>#}
+{#                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
                 <img class="navbar-brand" src="{% static 'images/icon/logo.png' %}">
-                <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">中国科技云对象存储服务</a>
+                <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '中国科技云对象存储服务' %}</a>
             </div>
             <ul class="nav navbar-nav pull-right">
                 {% if share_user %}
-                    <li><a><b>{{ share_user }}</b> 的分享</a></li>
+                    <li><a>{% blocktrans %}{{ share_user }} 的分享{% endblocktrans %}</a></li>
                 {% endif %}
+                <li>
+                    {% get_available_languages as LANGUAGES %}
+                    <form action="{% url 'set_language' %}" method="post" id="id-language-switcher" hidden>
+                        {% csrf_token %}
+                    </form>
+                    <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                       aria-expanded="false">{% trans '语言' %}<span class="caret"></span></a>
+                    <ul class="dropdown-menu" id="language-switcher">
+                        {% for code, name in LANGUAGES %}
+                            <li class="language-switcher-item" value="{{ code }}"><a href="#">{{ name }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
             </ul>
         </div>
     </nav>
@@ -30,5 +44,17 @@
 
 {% block page-script %}
     <script type="text/javascript" src="{% static 'iharbor/js/common.js' %}"></script>
+    <script>
+        $("#language-switcher").on("click", ".language-switcher-item", function () {
+            let langValue = $(this).attr('value');
+            let form = $("#id-language-switcher");
+            let langInput = document.createElement("input");
+            langInput.type="text";
+            langInput.name="language";
+            langInput.value = langValue;
+            form.append(langInput);
+            form.submit();
+        })
+    </script>
 	{% block script %}{% endblock %}
 {% endblock %}

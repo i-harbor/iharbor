@@ -7,6 +7,7 @@ from django.http import FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
@@ -84,18 +85,18 @@ class ObsViewSet(viewsets.GenericViewSet):
 
 
     @swagger_auto_schema(
-        operation_summary='浏览器端下载文件对象',
+        operation_summary=gettext_lazy('浏览器端下载文件对象'),
         manual_parameters=[
             openapi.Parameter(
                 name='objpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="以存储桶名称开头文件对象绝对路径",
+                description=gettext_lazy("以存储桶名称开头文件对象绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='p', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享密码",
+                description=gettext_lazy("分享密码"),
                 required=False
             )
         ],
@@ -117,7 +118,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if fileobj is None:
-            return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         # 是否有文件对象的访问权限
         try:
@@ -247,15 +248,15 @@ class ObsViewSet(viewsets.GenericViewSet):
 
         # 对象是否共享的，并且在有效共享事件内
         if not obj.is_shared_and_in_shared_time():
-            raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg='您没有访问权限')
+            raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg=_('您没有访问权限'))
 
         # 是否设置了分享密码
         if obj.has_share_password():
             p = request.query_params.get('p', None)
             if p is None:
-                raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg='资源设有共享密码访问权限')
+                raise InvalidError(code=status.HTTP_403_FORBIDDEN, msg=_('资源设有共享密码访问权限'))
             if not obj.check_share_password(password=p):
-                raise InvalidError(code=status.HTTP_401_UNAUTHORIZED, msg= '共享密码无效')
+                raise InvalidError(code=status.HTTP_401_UNAUTHORIZED, msg= _('共享密码无效'))
 
         return True
 
@@ -355,24 +356,24 @@ class ShareDownloadViewSet(CustomGenericViewSet):
 
 
     @swagger_auto_schema(
-        operation_summary='下载分享的目录下载的文件对象',
+        operation_summary=gettext_lazy('下载分享的目录下的文件对象'),
         manual_parameters=[
             openapi.Parameter(
                 name='share_base', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                description=gettext_lazy("分享根目录,以存储桶名称开头的目录的绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='subpath', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享根目录下的对象相对子路径",
+                description=gettext_lazy("分享根目录下的对象相对子路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='p', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享密码",
+                description=gettext_lazy("分享密码"),
                 required=False
             )
         ],
@@ -385,12 +386,12 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         subpath = request.query_params.get('subpath', '')
 
         if not subpath:
-            return Response(data={'code': 400, 'code_text': 'subpath参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('subpath参数无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         pp = PathParser(filepath=share_base)
         bucket_name, dir_base = pp.get_bucket_and_dirpath()
         if not bucket_name:
-            return Response(data={'code': 400, 'code_text': '分享路径无效'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('分享路径无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         obj_path = f'{dir_base}/{subpath}' if dir_base else subpath
         # 存储桶验证和获取桶对象
@@ -401,12 +402,12 @@ class ShareDownloadViewSet(CustomGenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if fileobj is None:
-            return Response(data={'code': 404, 'code_text': '文件对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         # 是否有文件对象的访问权限
         try:
             if not self.has_access_permission(request=request, bucket=bucket, base_dir=dir_base):
-                return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+                return Response(data={'code': 403, 'code_text': _('您没有访问权限')}, status=status.HTTP_403_FORBIDDEN)
         except InvalidError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
@@ -542,7 +543,7 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         if obj.has_share_password():
             p = request.query_params.get('p', None)
             if (p is None) or (not obj.check_share_password(password=p)):
-                raise InvalidError(code=401, msg='共享密码无效')
+                raise InvalidError(code=401, msg=_('共享密码无效'))
 
         return True
 
@@ -581,24 +582,24 @@ class ShareDirViewSet(CustomGenericViewSet):
 
 
     @swagger_auto_schema(
-        operation_summary='获取分享目录下的子目录和文件对象列表',
+        operation_summary=gettext_lazy('获取分享目录下的子目录和文件对象列表'),
         manual_parameters=[
             openapi.Parameter(
                 name='share_base', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="分享根目录,以存储桶名称开头文件目录绝对路径",
+                description=gettext_lazy("分享根目录,以存储桶名称开头的目录的绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='subpath', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="子目录路径，list此子目录",
+                description=gettext_lazy("子目录路径，list此子目录"),
                 required=False
             ),
             openapi.Parameter(
                 name='p', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享密码",
+                description=gettext_lazy("分享密码"),
                 required=False
             )
         ],
@@ -614,30 +615,30 @@ class ShareDirViewSet(CustomGenericViewSet):
         pp = PathParser(filepath=share_base)
         bucket_name, dir_base = pp.get_bucket_and_dirpath()
         if not bucket_name:
-            return Response(data={'code': 400, 'code_text': '分享路径无效'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('分享路径无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         # 存储桶验证和获取桶对象
         hManager = HarborManager()
         try:
             bucket = hManager.get_bucket(bucket_name=bucket_name)
             if not bucket:
-                return Response(data={'code': 404, 'code_text': '存储桶不存在'}, status=status.HTTP_404_NOT_FOUND)
+                return Response(data={'code': 404, 'code_text': _('存储桶不存在')}, status=status.HTTP_404_NOT_FOUND)
 
             if dir_base:
                 base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
-                    return Response(data={'code': 404, 'code_text': '分享根目录不存在'}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(data={'code': 404, 'code_text': _('分享根目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
                 base_obj = None
 
             # 是否有文件对象的访问权限
             if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
-                return Response(data={'code': 403, 'code_text': '您没有访问权限'}, status=status.HTTP_403_FORBIDDEN)
+                return Response(data={'code': 403, 'code_text': _('您没有访问权限')}, status=status.HTTP_403_FORBIDDEN)
 
             # 分享根路径存在，检查分享密码
             if base_obj and base_obj.has_share_password():
                 if (share_code is None) or (not base_obj.check_share_password(password=share_code)):
-                    return Response(data={'code': 401, 'code_text': '共享密码无效'}, status=status.HTTP_401_UNAUTHORIZED)
+                    return Response(data={'code': 401, 'code_text': _('共享密码无效')}, status=status.HTTP_401_UNAUTHORIZED)
 
             if subpath: # 是否list子目录
                 if dir_base:
@@ -646,7 +647,7 @@ class ShareDirViewSet(CustomGenericViewSet):
                     sub_path = subpath
                 sub_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=sub_path)
                 if not sub_obj or (sub_obj and sub_obj.is_file()):
-                    return Response(data={'code': 404, 'msg': '子目录不存在'}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(data={'code': 404, 'msg': _('子目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
                 sub_obj = None
         except HarborError as e:
@@ -663,7 +664,7 @@ class ShareDirViewSet(CustomGenericViewSet):
         bfm = BucketFileManagement(collection_name=collection_name)
         ok, files = bfm.get_cur_dir_files(cur_dir_id=list_dir_id)
         if not ok:
-            return Response(data={'code': 404, 'msg': '未找到相关记录'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'msg': _('未找到相关记录')}, status=status.HTTP_404_NOT_FOUND)
 
         data_dict = OrderedDict([
             ('code', 200),
@@ -727,25 +728,25 @@ class ShareView(View):
         pp = PathParser(filepath=share_base)
         bucket_name, dir_base = pp.get_bucket_and_dirpath()
         if not bucket_name:
-            return render(request, 'info.html', context={'code': 400, 'code_text': '分享路径无效'})
+            return render(request, 'info.html', context={'code': 400, 'code_text': _('分享路径无效')})
 
         # 存储桶验证和获取桶对象
         hManager = HarborManager()
         try:
             bucket = hManager.get_bucket(bucket_name=bucket_name)
             if not bucket:
-                return render(request, 'info.html', context={'code': 404, 'code_text': '存储桶不存在'})
+                return render(request, 'info.html', context={'code': 404, 'code_text': _('存储桶不存在')})
 
             if dir_base:
                 base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
-                    return render(request, 'info.html', context={'code': 404, 'code_text': '分享根目录不存在'})
+                    return render(request, 'info.html', context={'code': 404, 'code_text': _('分享根目录不存在')})
             else:
                 base_obj = None
 
             # 是否有文件对象的访问权限
             if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
-                return render(request, 'info.html', context={'code': 403, 'code_text': '您没有访问权限'})
+                return render(request, 'info.html', context={'code': 403, 'code_text': _('您没有访问权限')})
         except HarborError as e:
             return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
 
@@ -764,13 +765,13 @@ class ShareView(View):
                           context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
             else:
                 form.is_valid()
-                form.add_error('password', error='分享密码有误')
+                form.add_error('password', error=_('分享密码有误'))
         else:
             form = SharePasswordForm()
 
         content = {}
-        content['form_title'] = '分享密码验证'
-        content['submit_text'] = '确定'
+        content['form_title'] = _('验证分享密码')
+        content['submit_text'] = _('确定')
         content['form'] = form
         content['share_base'] = share_base
         content['share_user'] = bucket.user.username

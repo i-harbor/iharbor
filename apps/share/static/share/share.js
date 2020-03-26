@@ -96,6 +96,7 @@
     //art-template渲染模板注册过滤器
     template.defaults.imports.get_breadcrumb = get_breadcrumb;
     template.defaults.imports.sizeFormat = sizeFormat;
+    template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
 
     //
     // 表格中每一行单选checkbox
@@ -147,7 +148,7 @@
                                     <td class="bucket-files-table-item">
                                         <span class="glyphicon glyphicon-file"></span>{{ $value.name }}
                                     </td>
-                                    <td>{{ $value.ult }}</td>
+                                    <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>{{ $imports.sizeFormat($value.si, "B") }}</td>
                                 {{/if}}
                                 {{ if !$value.fod }}
@@ -155,7 +156,7 @@
                                         <span class="glyphicon glyphicon-folder-open"></span>
                                         <a href="#" id="bucket-files-item-enter-dir" data-dirname="{{$value.name}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
                                     </td>
-                                    <td>{{ $value.ult }}</td>
+                                    <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>--</td>
                                 {{/if}}
                                 <td>

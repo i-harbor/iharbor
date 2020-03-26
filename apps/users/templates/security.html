@@ -33,7 +33,7 @@
                                         <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
                                         <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
                                     </th>
-                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>{% trans '创建新密钥' %}</span></th>
+                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>{% trans '创建新Token' %}</span></th>
                                 </tr>
                             </table>
                         {% endif %}
@@ -43,7 +43,7 @@
             <hr>
             <div class="panel panel-danger nav-list-item" id="nav-list-auth-key">
                 <div class="panel-heading" data-toggle="collapse" data-target="#nav-list-auth-key-body">
-                    <span class="glyphicon glyphicon-record"></span><span>访问密钥(访问密钥和秘密访问密钥)</span></div>
+                    <span class="glyphicon glyphicon-record"></span><span>{% trans '访问密钥对' %}</span></div>
                 <div class="panel-body collapse in"  id="nav-list-auth-key-body">
                     <div class="">
                         <p>每个访问密钥包含access_key和secret_key密钥对，访问密钥不只是简单的身份认证，每次http请求前都需要根据请求的url的path和有效期时间戳重新计算auth_key字符串，此认证方式安全性高，使用稍微复杂一些(具体生成过程请参考帮助文档)。
@@ -54,7 +54,7 @@
                             <tr class="bg-info">
                                 <th>{% trans '创建时间' %}</th>
                                 <th>{% trans '访问密钥' %}(access_key)</th>
-                                <th>{% trans '秘密访问密钥' %}(secret_key)</th>
+                                <th>{% trans '秘密密钥' %}(secret_key)</th>
                                 <th>{% trans '状态' %}</th>
                                 <th>{% trans '操作' %}</th>
                             </tr>

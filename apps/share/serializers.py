@@ -12,8 +12,8 @@ class ShareObjInfoSerializer(serializers.Serializer):
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.IntegerField()  # 父节点ID
     si = serializers.IntegerField()  # 文件大小,字节数
-    ult = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的上传时间，或目录的创建时间
-    upt = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')  # 文件的最近修改时间，目录，则upt为空
+    ult = serializers.DateTimeField()  # 文件的上传时间，或目录的创建时间
+    upt = serializers.DateTimeField()  # 文件的最近修改时间，目录，则upt为空
     dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
     download_url = serializers.SerializerMethodField()
 
