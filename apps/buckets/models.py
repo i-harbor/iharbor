@@ -8,6 +8,7 @@ from django.db import models
 from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.utils.translation import gettext_lazy
 from ckeditor.fields import RichTextField
 
 from utils.storagers import PathParser
@@ -42,9 +43,9 @@ class Bucket(models.Model):
     PRIVATE = 2
     PUBLIC_READWRITE = 3
     ACCESS_PERMISSION_CHOICES = (
-        (PUBLIC, '公有'),
-        (PRIVATE, '私有'),
-        (PUBLIC_READWRITE, '公有（可读写）'),
+        (PUBLIC, gettext_lazy('公有')),
+        (PRIVATE, gettext_lazy('私有')),
+        (PUBLIC_READWRITE, gettext_lazy('公有（可读写）')),
     )
 
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')

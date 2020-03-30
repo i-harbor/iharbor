@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-03-26 11:41+0800\n"
+"POT-Creation-Date: 2020-03-30 17:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -84,7 +84,7 @@ msgstr "username or password cannot be empty"
 msgid "用户名已存在"
 msgstr "User name already exists"
 
-#: apps/api/serializers.py:127 apps/api/views.py:2526
+#: apps/api/serializers.py:127 apps/api/views.py:2540
 msgid "存储桶名称"
 msgstr "bucket name"
 
@@ -148,10 +148,11 @@ msgid "公有（读写）"
 msgstr "public(rw)"
 
 #: apps/api/serializers.py:250 apps/api/serializers.py:256
+#: apps/buckets/models.py:46
 msgid "公有"
 msgstr "public"
 
-#: apps/api/serializers.py:259
+#: apps/api/serializers.py:259 apps/buckets/models.py:47
 msgid "私有"
 msgstr "private"
 
@@ -167,7 +168,11 @@ msgstr "String does not conform to DNS standards"
 msgid "您可以拥有的存储桶数量已达上限"
 msgstr "The number of your buckets reached maximum limit"
 
-#: apps/api/views.py:205
+#: apps/api/views.py:202
+msgid "获取用户列表"
+msgstr "Get user list"
+
+#: apps/api/views.py:219
 msgid "注册一个用户"
 msgstr "register a user"
 
@@ -634,6 +639,10 @@ msgstr "failed to modify"
 msgid "获取对象对应的ceph rados key信息"
 msgstr "Get the CEPH Rados key information of the object"
 
+#: apps/buckets/models.py:48
+msgid "公有（可读写）"
+msgstr "public(rw)"
+
 #: apps/evcloud/templates/evcloud_add.html:20
 #: apps/evcloud/templates/evcloud_list.html:21
 msgid "我的云主机"
@@ -739,7 +748,7 @@ msgstr "Bad request, parameter 'vm_id' or 'remarks' not submitted"
 msgid "错误的请求，vm_id或者remarks参数有误"
 msgstr "Bad request, parameter 'vm_id' or 'remarks' is invalid"
 
-#: apps/share/templates/share_base.html:17 templates/base.html:24
+#: apps/share/templates/share_base.html:17 templates/base.html:25
 msgid "中国科技云对象存储服务"
 msgstr "China Science & Technology Cloud Object Storage"
 
@@ -748,7 +757,7 @@ msgstr "China Science & Technology Cloud Object Storage"
 msgid "%(share_user)s 的分享"
 msgstr "Shared by %(share_user)s"
 
-#: apps/share/templates/share_base.html:29 templates/base.html:65
+#: apps/share/templates/share_base.html:29 templates/base.html:66
 msgid "语言"
 msgstr "Language"
 
@@ -998,7 +1007,7 @@ msgid "忘记密码"
 msgstr "Forget password"
 
 #: apps/users/templates/login.html:6 apps/users/views.py:42
-#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:55
+#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:56
 msgid "注册"
 msgstr "Sign up"
 
@@ -1044,11 +1053,11 @@ msgid "用户登录"
 msgstr "User log in"
 
 #: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
-#: apps/users/views.py:219 templates/base.html:54
+#: apps/users/views.py:219 templates/base.html:55
 msgid "登录"
 msgstr "Sign in"
 
-#: apps/users/views.py:123 templates/base.html:45
+#: apps/users/views.py:123 templates/base.html:46
 msgid "修改密码"
 msgstr "Change password"
 
@@ -1116,27 +1125,27 @@ msgstr "VPN password"
 msgid "修改时间"
 msgstr "Modification time"
 
-#: templates/base.html:30
+#: templates/base.html:31
 msgid "帮助"
 msgstr "Help"
 
-#: templates/base.html:32
+#: templates/base.html:33
 msgid "API文档"
 msgstr "API Doc"
 
-#: templates/base.html:34
+#: templates/base.html:35
 msgid "帮助文档"
 msgstr "Help Doc"
 
-#: templates/base.html:44
+#: templates/base.html:45
 msgid "登出"
 msgstr "Sign out"
 
-#: templates/base.html:46
+#: templates/base.html:47
 msgid "安全凭证"
 msgstr "Security credential"
 
-#: templates/base.html:49
+#: templates/base.html:50
 msgid "后台管理"
 msgstr "Admin"
 

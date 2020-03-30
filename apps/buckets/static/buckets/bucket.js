@@ -224,10 +224,35 @@
         return msg;
     }
 
+    // 翻译字符串，包装django的gettext
+    function getTransText(str){
+        try{
+            return gettext(str);
+        }catch (e) {}
+        return str;
+    }
+    function transInterpolate(fmt, obj, named){
+        try {
+            return interpolate(fmt, obj, named)
+        }catch (e) {}
+
+        if (named) {
+            return fmt.replace(/%\(\w+\)s/g, function (match) {
+                return String(obj[match.slice(2, -2)])
+            });
+        } else {
+            return fmt.replace(/%s/g, function (match) {
+                return String(obj.shift())
+            });
+        }
+    }
+
     //art-template渲染模板注册过滤器
     template.defaults.imports.get_breadcrumb = get_breadcrumb;
     template.defaults.imports.sizeFormat = sizeFormat;
     template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
+    template.defaults.imports.getTransText = getTransText;
+    template.defaults.imports.interpolate = transInterpolate;
 
     //
     // 创建存储桶按钮点击事件
@@ -239,15 +264,15 @@
     //
     function on_create_bucket(){
         swal({
-            title: '请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-',
+            title: getTransText('请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-'),
             input: 'text',
             inputValidator: (value) => {
-                return (value.length<3 || value.length>63) && '请输入3-63个字符';
+                return (value.length<3 || value.length>63) && getTransText('请输入3-63个字符');
             },
             showCloseButton: true,
             showCancelButton: true,
-            cancelButtonText: '取消',
-            confirmButtonText: '创建',
+            cancelButtonText: getTransText('取消'),
+            confirmButtonText: getTransText('创建'),
             showLoaderOnConfirm: true,
             preConfirm: (input_name) => {
                 return $.ajax({
@@ -269,16 +294,17 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    item_html = render_bucket_item(result.value.bucket);
+                    let item_html = render_bucket_item(result.value.bucket);
                     $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
-                    show_warning_dialog(`创建存储桶“${result.value.data.name}”成功`, 'success');
+                    show_warning_dialog(getTransText(`创建存储桶成功`), 'success');
                 }
              },
             (error) => {
+                let msg = getTransText(`创建失败`) + ";";
                 if(error.status<500)
-                    show_warning_dialog(`创建失败:`+ error.responseJSON.code_text);
+                    show_warning_dialog(msg + error.responseJSON.code_text);
                 else
-                    show_warning_dialog(`创建失败:` + error.statusText);
+                    show_warning_dialog(msg + error.statusText);
             }
         )
     }
@@ -339,12 +365,13 @@
     //
     $("#content-display-div").on('click', '#btn-del-bucket', function () {
         if(!is_exists_checked()){
-            show_warning_dialog('请先选择要删除的存储桶');
+            show_warning_dialog(getTransText('请先选择要删除的存储桶'));
             return;
         }
 
         show_confirm_dialog({
-            title: '确认删除选中的存储桶？',
+            title: getTransText('确认删除选中的存储桶吗'),
+            text: getTransText('此操作是不可逆的'),
             ok_todo: delete_selected_buckets,
         })
     });
@@ -372,10 +399,10 @@
                 type: 'delete',
                 success: function (data) {
                     bucket_list_checked.parents('tr').remove();
-                    show_auto_close_warning_dialog('已成功删除存储桶', 'success', 'top-end');
+                    show_auto_close_warning_dialog(getTransText('已成功删除存储桶'), 'success', 'top-end');
                 },
                 error: function (err) {
-                    show_auto_close_warning_dialog('删除失败,' + err.status + ':' + err.statusText, 'error');
+                    show_auto_close_warning_dialog(getTransText('删除失败') + err.status + ':' + err.statusText, 'error');
                 },
             })
         }
@@ -395,26 +422,28 @@
             </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
-                    <span>开启</span>
+                    <span>{{$imports.getTransText('开启')}}</span>
                 {{/if}}
                 {{if !$data['ftp_enable']}}
-                    <span>关闭</span>
+                    <span>{{$imports.getTransText('关闭')}}</span>
                 {{/if}}
                 <span class="ftp-enable-btn" data-bucket-name="{{ $data['name'] }}"><span class="glyphicon glyphicon-edit"></span></span>
             </td>
-            <td class="ftp-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+            <td class="mouse-hover" data-bucket-name="{{ $data['name'] }}">
                 <span class="mouse-hover-no-show">******</span>
                 <span class="ftp-password-value mouse-hover-show">{{ $data['ftp_password'] }}</span>
+                <span class="glyphicon glyphicon-edit mouse-hover-show ftp-password-edit"></span>
             </td>
-            <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $data['name'] }}">
+            <td class="mouse-hover" data-bucket-name="{{ $data['name'] }}">
                 <span class="mouse-hover-no-show">******</span>
-                <span class="ftp-ro-password-value mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
+                <span class="mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
+                <span class="glyphicon glyphicon-edit mouse-hover-show ftp-ro-password-edit"></span>
             </td>
-            <td class="bucket-remarks-edit" title="双击修改备注" data-bucket-id="{{ $data['id'] }}" style="max-width: 150px; word-wrap: break-word;">
+            <td class="bucket-remarks-edit" title="{{$imports.getTransText('双击修改备注')}}" data-bucket-id="{{ $data['id'] }}" style="max-width: 150px; word-wrap: break-word;">
                 <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
             </td>
             <td>
-                <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">资源统计</bucket>
+                <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('资源统计')}}</bucket>
             </td>
         </tr>
     `);
@@ -427,10 +456,9 @@
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
                     <div>
-                        <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span> 创建存储桶
+                        <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span>{{$imports.getTransText('创建存储桶')}}
                         </button>
-                        <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span> 删除存储桶</button>
-                        <!--<button class="btn btn-success" id="btn-public-bucket">公开</button>-->
+                        <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span>{{$imports.getTransText('删除存储桶')}}</button>
                     </div>
                 </div>
             </div>
@@ -440,16 +468,21 @@
                     <table class="table table-hover" id="bucket-table">
                         <tr class="bg-info">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
-                            <th>存储桶名称</th>
-                            <th>创建时间</th>
-                            <th>访问权限</th>
-                            <th>FTP状态</th>
-                            <th>FTP读写密码</th>
-                            <th>FTP只读密码</th>
-                            <th style="max-width: 150px; word-wrap: break-word;">备注</th>
-                            <th>操作</th>
+                            <th>{{$imports.getTransText('存储桶名称')}}</th>
+                            <th>{{$imports.getTransText('创建时间')}}</th>
+                            <th>{{$imports.getTransText('访问权限')}}</th>
+                            <th>{{$imports.getTransText('FTP状态')}}</th>
+                            <th>{{$imports.getTransText('FTP读写密码')}}</th>
+                            <th>{{$imports.getTransText('FTP只读密码')}}</th>
+                            <th style="max-width: 150px; word-wrap: break-word;">{{$imports.getTransText('备注')}}</th>
+                            <th>{{$imports.getTransText('操作')}}</th>
                         </tr>
                         {{if buckets}}
+                            {{set str_open = $imports.getTransText('开启')}}
+                            {{set str_close = $imports.getTransText('关闭')}}
+                            {{set str_db_passwd = $imports.getTransText('双击修改密码')}}
+                            {{set str_db_remark = $imports.getTransText('双击修改备注')}}
+                            {{set str_stat = $imports.getTransText('资源统计')}}
                             {{ each buckets }}
                                 <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
@@ -462,58 +495,57 @@
                                     </td>
                                     <td class="ftp-enable">
                                         {{if $value.ftp_enable}}
-                                            <span>开启</span>
+                                            <span>{{str_open}}</span>
                                         {{/if}}
                                         {{if !$value.ftp_enable}}
-                                            <span>关闭</span>
+                                            <span>{{str_close}}</span>
                                         {{/if}}
                                         <span class=" ftp-enable-btn" data-bucket-name="{{ $value.name }}"><span class="glyphicon glyphicon-edit"></span></span>
                                      </td>
-                                    <td class="ftp-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
+                                    <td class="mouse-hover" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="ftp-password-value mouse-hover-show">{{ $value.ftp_password }}</span>
+                                        <span class="glyphicon glyphicon-edit mouse-hover-show ftp-password-edit"></span>
                                     </td>
-                                    <td class="ftp-ro-password mouse-hover" title="双击修改密码" data-bucket-name="{{ $value.name }}">
+                                    <td class="mouse-hover" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
-                                        <span class="ftp-ro-password-value mouse-hover-show">{{ $value.ftp_ro_password }}</span>
+                                        <span class="mouse-hover-show">{{ $value.ftp_ro_password }}</span>
+                                        <span class="glyphicon glyphicon-edit mouse-hover-show ftp-ro-password-edit"></span>
                                     </td>
-                                    <td class="bucket-remarks-edit" style="max-width: 150px; word-wrap: break-word;" title="双击修改备注" data-bucket-id="{{ $value.id }}">
+                                    <td class="bucket-remarks-edit" style="max-width: 150px; word-wrap: break-word;" title="{{str_db_remark}}" data-bucket-id="{{ $value.id }}">
                                         <span class="bucket-remarks-value">{{ $value.remarks }}</span>
                                     </td>
                                     <td>
-                                        <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">资源统计</bucket>
+                                        <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">{{str_stat}}</bucket>
                                     </td>
                                 </tr>
                             {{/each}}
                         {{/if}}
                     </table>
                      {{if buckets.length === 0}}
-                          <p class="text-info text-center">肚子空空如也哦 =^_^=</p>
+                          <p class="text-info text-center">{{$imports.getTransText('肚子空空如也哦')}} =^_^=</p>
                      {{/if}}
                 </div>
-            </div>
-            
+            </div>           
             {{if (previous || next)}}
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
                    <nav aria-label="...">
                       <ul class="pager">
                         {{if previous}}
-                            <li><a id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                            <li><a id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
                         {{/if}}
                         {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
-                        {{/if}}
-                        
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
+                        {{/if}}                       
                         {{if page}}
-                            <li>第{{page.current}}页 共{{page.final}}页</li>
-                        {{/if}}
-                        
+                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
+                        {{/if}}                       
                         {{if next}}
-                            <li><a id="page_next_buckets" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li><a id="page_next_buckets" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                         {{if !next}}
-                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                       </ul>
                     </nav>
@@ -529,19 +561,19 @@
         <div>
             <table class="table table-bordered">
                 <tr>
-                    <td>存储桶名：</td>
+                    <td>{{$imports.getTransText("存储桶名称")}}：</td>
                     <td>{{ $data["bucket_name"] }}</td>
                 </tr>
                 <tr>
-                    <td>容量大小：</td>
+                    <td>{{$imports.getTransText("容量大小")}}：</td>
                     <td>{{ stats.space }}B ({{ $imports.sizeFormat(stats.space, "B") }})</td>
                 </tr>
                 <tr>
-                    <td>对象数量：</td>
+                    <td>{{$imports.getTransText('对象数量')}}：</td>
                     <td>{{ stats.count }}</td>
                 </tr>
                 <tr>
-                    <td>统计时间：</td>
+                    <td>{{$imports.getTransText("统计时间")}}：</td>
                     <td>{{ $imports.isoTimeToLocal($data["stats_time"]) }}</td>
                 </tr>
             </table>
@@ -580,7 +612,7 @@
             // 如果输入内容修改了
             if (input_text && (input_text !== old_html)){
                 if (input_text.length > 255){
-                    show_warning_dialog('备注长度不得大于255个字符', 'warning');
+                    show_warning_dialog(getTransText('备注长度不得大于255个字符'), 'warning');
                     remarks.append(old_html);
                     return;
                 }
@@ -593,16 +625,16 @@
                     timeout: 10000,
                     success: function (res) {
                         if (res.code === 200) {
-                            show_warning_dialog('修改备注成功', 'success');
+                            show_warning_dialog(getTransText('修改备注成功'), 'success');
                             remarks.append(input_text);
                         }
                     },
                     error: function (xhr, status) {
                         if (status === 'timeout') {
-                            alert("请求超时");
+                            alert("timeout");
                         }else{
-                            let msg = get_err_msg_or_default(xhr, '请求失败');
-                            show_warning_dialog('修改备注失败,' + msg, 'error');
+                            let msg = get_err_msg_or_default(xhr, 'request failed');
+                            show_warning_dialog(getTransText('修改备注失败') + msg, 'error');
                         }
                         remarks.append(old_html);
                     }
@@ -627,17 +659,17 @@
                 swal.close();
                 let html = render_bucket_stats(data);
                 Swal.fire({
-                    title: '存储桶资源统计',
+                    title: getTransText('存储桶资源统计'),
                     html: html,
-                    footer: '提示：数据非实时统计，有一定时间间隔'
+                    footer: getTransText('提示：数据非实时统计，有一定时间间隔')
                 })
             },
             error: function (xhr, errtype, error) {
                 swal.close();
                 if (errtype === 'timeout'){
-                    show_warning_dialog('请求超时', 'error');
+                    show_warning_dialog('timeout', 'error');
                 }else{
-                    let msg = get_err_msg_or_default(xhr, "请求失败，" + xhr.statusText);
+                    let msg = get_err_msg_or_default(xhr, "request failed，" + xhr.statusText);
                     show_warning_dialog(msg, 'error');
                 }
             }
@@ -690,118 +722,74 @@
         get_buckets_and_render();
     });
 
+    // 修改FTP读写和只读密码
+    // @param dom_pw: 密码dom节点
+    // @param pw_query_name: API中密码对应的query参数名称
+    function changeFtpPassword(dom_pw, pw_query_name){
+        let old_password = dom_pw.text();
 
-    //
-    // FTP密码双击修改事件
-    //
-    $("#content-display-div").on("dblclick", '.ftp-password', function (e) {
-        e.preventDefault();
-        let remarks = $(this).children('.ftp-password-value');
-        let old_html = remarks.text();
-        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
-
-        //如果已经双击过，正在编辑中
-        if(remarks.attr('data-in-edit') === 'true'){
-            return;
-        }
-        // 标记正在编辑中
-        remarks.attr('data-in-edit', 'true');
-        //创建新的input元素，初始内容为原备注信息
-        var newobj = document.createElement('input');
-        newobj.type = 'text';
-        newobj.value = old_html;
-        //设置该标签的子节点为空
-        remarks.empty();
-        remarks.append(newobj);
-        newobj.setSelectionRange(0, old_html.length);
-        //设置获得光标
-        newobj.focus();
-        //为新增元素添加光标离开事件
-        newobj.onblur = function () {
-            remarks.attr('data-in-edit', '');
-            remarks.empty();
-            let input_text = this.value;
-            // 如果输入内容修改了
-            if (input_text && (input_text !== old_html)){
-                if (input_text.length < 6){
-                    show_warning_dialog('密码长度不得小于6个字符', 'warning');
-                    remarks.append(old_html);
-                    return;
+        swal({
+            title: getTransText('修改FTP密码'),
+            input: 'text',
+            inputValue: old_password,
+            inputValidator: (value) => {
+                return (value.length<6 || value.length>20) && getTransText('密码长度6-20个字符');
+            },
+            showCloseButton: true,
+            showCancelButton: true,
+            cancelButtonText: getTransText('取消'),
+            confirmButtonText: getTransText('确定'),
+            showLoaderOnConfirm: true,
+            preConfirm: (value) => {
+                if (value && (value !== old_password)){
+                    let data = {};
+                    data.bucket_name = dom_pw.parent().attr('data-bucket-name');
+                    data[pw_query_name] = value;
+                    let url = build_ftp_patch_url(data);
+                    return $.ajax({
+                        url: url,
+                        type: "PATCH",
+                        content_type: "application/json",
+                        timeout: 10000,
+                        success: function (xhr) {
+                            dom_pw.text(value);
+                        }
+                    });
                 }
-                // 请求修改ftp密码
-                let data = {};
-                data.bucket_name = remarks.parent().attr('data-bucket-name');
-                data.password = input_text;
-                let url = build_ftp_patch_url(data);
-                let ret = ftp_enable_password_ajax(url);
-                if(ret.ok){
-                    show_warning_dialog("修改密码成功", "success");
+            },
+            allowOutsideClick: () => !swal.isLoading()
+        }).then(
+            (result) => {
+                let res = result.value;
+                if (res && res.code === 200){
+                    show_warning_dialog(getTransText("修改密码成功"), "success");
+                }
+            },
+            (error) => {
+                if(error.statusText === "timeout"){
+                    show_warning_dialog("timeout");
                 }else{
-                    // 修改失败，显示原内容
-                    input_text = old_html;
-                    show_warning_dialog('修改密码失败,' + ret.msg, 'error');
+                    let msg = get_err_msg_or_default(error, getTransText("修改密码失败") + ';');
+                    show_warning_dialog(msg, "error");
                 }
             }
-            remarks.append(input_text);
-        };
+        )
+    }
+
+    // FTP密码修改事件
+    $("#content-display-div").on("click", '.ftp-password-edit', function (e) {
+        e.preventDefault();
+        let dom_pw = $(this).prev();
+        changeFtpPassword(dom_pw, 'password');
     });
 
-     //
     // FTP只读密码双击修改事件
-    //
-    $("#content-display-div").on("dblclick", '.ftp-ro-password', function (e) {
+    $("#content-display-div").on("click", '.ftp-ro-password-edit', function (e) {
         e.preventDefault();
-        let remarks = $(this).children('.ftp-ro-password-value');
-        let old_html = remarks.text();
-        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
-
-        //如果已经双击过，正在编辑中
-        if(remarks.attr('data-in-edit') === 'true'){
-            return;
-        }
-        // 标记正在编辑中
-        remarks.attr('data-in-edit', 'true');
-        //创建新的input元素，初始内容为原备注信息
-        var newobj = document.createElement('input');
-        newobj.type = 'text';
-        newobj.value = old_html;
-        //设置该标签的子节点为空
-        remarks.empty();
-        remarks.append(newobj);
-        newobj.setSelectionRange(0, old_html.length);
-        //设置获得光标
-        newobj.focus();
-        //为新增元素添加光标离开事件
-        newobj.onblur = function () {
-            remarks.attr('data-in-edit', '');
-            remarks.empty();
-            let input_text = this.value;
-            // 如果输入内容修改了
-            if (input_text && (input_text !== old_html)){
-                if (input_text.length < 6){
-                    show_warning_dialog('密码长度不得小于6个字符', 'warning');
-                    remarks.append(old_html);
-                    return;
-                }
-                // 请求修改ftp密码
-                let data = {};
-                data.bucket_name = remarks.parent().attr('data-bucket-name');
-                data.ro_password = input_text;
-                let url = build_ftp_patch_url(data);
-                let ret = ftp_enable_password_ajax(url);
-                if(ret.ok){
-                    show_warning_dialog("修改密码成功", "success");
-                }else{
-                    // 修改失败，显示原内容
-                    input_text = old_html;
-                    show_warning_dialog('修改密码失败,' + ret.msg, 'error');
-                }
-            }
-            remarks.append(input_text);
-        };
+        let dom_pw = $(this).prev();
+        changeFtpPassword(dom_pw, 'ro_password');
     });
 
-    //
     //  同步请求使能ftp或修改FTP密码
     //@ return:
     //      success: true
@@ -821,26 +809,19 @@
                 }
             },
             error: function(xhr){
-                if (xhr.responseJSON.hasOwnProperty('code_text')){
-                    ret.msg = xhr.responseJSON.code_text;
-                }else{
-                    ret.msg = '请求失败';
-                }
+                ret.msg = get_err_msg_or_default(xhr, getTransText('请求失败') + '!');
             },
             complete : function(xhr,status){
                 if (status === 'timeout') {// 判断超时后 执行
-                    alert("请求超时");
+                    alert("timeout");
                 }
             },
-            headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
         });
 
         return ret;
     }
 
-    //
     // FTP开启或关闭点击修改事件
-    //
     $("#content-display-div").on("click", '.ftp-enable-btn', function (e) {
         e.preventDefault();
 
@@ -849,11 +830,11 @@
         let status_node = $(this).prev();
         (async function() {
             const {value: result} = await Swal({
-                title: '开启或关闭FTP',
+                title: getTransText('开启或关闭FTP'),
                 input: 'radio',
                 inputOptions: {
-                    true: '开启',
-                    false: '关闭',
+                    true: getTransText('开启'),
+                    false: getTransText('关闭'),
                 },
                 showCancelButton: true,
                 inputValidator: (value) => {
@@ -874,13 +855,13 @@
             let ret = ftp_enable_password_ajax(url);
             if(ret.ok){
                 if (enable){
-                    status_node.html("开启");
+                    status_node.html(getTransText("开启"));
                 }else{
-                    status_node.html("关闭");
+                    status_node.html(getTransText("关闭"));
                 }
-                show_warning_dialog("配置存储桶FTP成功", "success");
+                show_warning_dialog(getTransText("配置存储桶FTP成功"), "success");
             }else{
-                show_warning_dialog('配置存储桶FTP失败,' + ret.msg, 'error');
+                show_warning_dialog(getTransText('配置存储桶FTP失败') + ret.msg, 'error');
             }
         })();
     });
@@ -897,11 +878,11 @@
         let op = '1';
 
         Swal.fire({
-            title: '选择权限',
+            title: getTransText('选择权限'),
             input: 'radio',
             inputOptions: {
-                '1': '公开',
-                '2': '私有',
+                '1': getTransText('公开'),
+                '2': getTransText('私有'),
             },
             showCancelButton: true,
             inputValidator: (value) => {
@@ -910,7 +891,7 @@
             inputAttributes: {
                 autocapitalize: 'off'
             },
-            confirmButtonText: '分享',
+            confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
             preConfirm: (value) => {
                 op = value;
@@ -920,9 +901,9 @@
                     async: true,
                     success: function (data, status_text, xhr) {
                         if (op === "1") {
-                            status_node.html('公有');
+                            status_node.html(getTransText('公有'));
                         } else {
-                            status_node.html('私有');
+                            status_node.html(getTransText('私有'));
                         }
                         return data;
                     },
@@ -935,7 +916,7 @@
         }).then((result) => {
             if (result.value && (op === "1")) {
                 Swal.fire({
-                    title: "分享链接",
+                    title: getTransText("分享链接"),
                     text: result.value.share[0]
                 });
             }
@@ -953,7 +934,7 @@
                     <!--{#目录导航栏#}-->
                     <div>
                         <ol class="breadcrumb">
-                            <a href="#" id="btn-path-bucket">存储桶</a>
+                            <a href="#" id="btn-path-bucket">{{$imports.getTransText('存储桶')}}</a>
                             <span>></span>
                             <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
@@ -964,11 +945,11 @@
                     </div>
                     <hr>
                     <div>
-                        <button class="btn btn-info" id="btn-new-directory"><span class="glyphicon glyphicon-plus"></span>创建文件夹</button>
-                        <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}">上传文件</button>
+                        <button class="btn btn-info" id="btn-new-directory"><span class="glyphicon glyphicon-plus"></span>{{$imports.getTransText('创建文件夹')}}</button>
+                        <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-upload"></span>{{$imports.getTransText('上传文件')}}</button>
                         <button class="btn btn-success" id="btn-path-item" bucket_name="{{ $data['bucket_name'] }}" dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-refresh"></span></button>
                         <div  id="upload-progress-bar" style="display: none;">
-                            <p class="text-warning">请勿离开此页面，以防文件上传过程中断！</p>
+                            <p class="text-warning">{{$imports.getTransText('请勿离开此页面，以防文件上传过程中断！')}}</p>
                             <div class="progress text-warning">             
                                 <div class="progress-bar"  role="progressbar" aria-valuenow="0" aria-valuemin="0"
                                      aria-valuemax="100" style="min-width: 2em;width: 0%;">
@@ -985,12 +966,18 @@
                     <table class="table table-responsive" id="bucket-files-table">
                         <tr class="bg-info">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
-                            <th>名称</th>
-                            <th>上传时间</th>
-                            <th>大小</th>
-                            <th>权限</th>
+                            <th>{{$imports.getTransText('名称')}}</th>
+                            <th>{{$imports.getTransText('上传时间')}}</th>
+                            <th>{{$imports.getTransText('大小')}}</th>
+                            <th>{{$imports.getTransText('权限')}}</th>
                             <th></th>
                         </tr>
+                        {{set str_operation = $imports.getTransText('操作')}}
+                        {{set str_open = $imports.getTransText('打开')}}
+                        {{set str_delete = $imports.getTransText('删除')}}
+                        {{set str_share = $imports.getTransText('分享公开')}}
+                        {{set str_download = $imports.getTransText('下载')}}
+                        {{set str_rename = $imports.getTransText('重命名')}}
                         {{each files}}
                             <tr class="bucket-files-table-item">
                                 <td><input type="checkbox" class="item-checkbox" value=""></td>
@@ -1015,56 +1002,53 @@
                                 <td>
                                     <li class="dropdown btn">
                                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                   aria-expanded="false">操作<span class="caret"></span></a>
+                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></a>
                                         <ul class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">打开</a></li>
-                                                <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">删除</a></li>
-                                                <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">分享公开</a></li>
+                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a></li>
+                                                <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a></li>
+                                                <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">{{str_share}}</a></li>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
-                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
-                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">删除</a></li>
-                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">分享公开</a></li>
-                                                <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">重命名</a></li>
+                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a></li>
+                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">{{str_delete}}</a></li>
+                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_share}}</a></li>
+                                                <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
                                 </td>
                             </tr>
                         {{/each}}
-                        <tr><td colspan="6">共 {{ count }} 个项目</td></tr>
+                        <tr><td colspan="6"><%= $imports.interpolate($imports.getTransText('共 %s 个项目'), [count]) %></td></tr>
                     </table>
                 </div>
             </div>
-            
             {{if (previous || next)}}
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
                    <nav aria-label="...">
                       <ul class="pager">
                         {{if previous}}
-                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
                         {{/if}}
                         {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
-                        {{/if}}
-                        
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
+                        {{/if}}                
                         {{if page}}
-                            <li>第{{page.current}}页 / 共{{page.final}}页</li>
+                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
                         {{/if}}
-                        
                         {{if next}}
-                            <li><a id="page_next_bucket_files" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li><a id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                         {{if !next}}
-                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                         {{if page.final > 2}}
-                            <li>跳转到第<input type="text" name="page-skip-to" style="max-width: 60px;">页
-                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">跳转</button>
+                            <li>{{$imports.getTransText('跳转到')}}<input type="text" name="page-skip-to" style="max-width: 60px;">{{$imports.getTransText('页')}}
+                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
                             </li>
                         {{/if}}
                       </ul>
@@ -1092,12 +1076,12 @@
             <td>
                 <li class="dropdown btn">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-               aria-expanded="false">操作<span class="caret"></span></a>
+               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></a>
                     <ul class="dropdown-menu">
-                        <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >下载</a></li>
-                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">删除</a></li>
-                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</a></li>
-                        <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">重命名</a></li>
+                        <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >{{$imports.getTransText('下载')}}</a></li>
+                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">{{$imports.getTransText('删除')}}</a></li>
+                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('分享公开')}}</a></li>
+                        <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('重命名')}}</a></li>
                     </ul>
                 </li>
             </td>
@@ -1157,7 +1141,7 @@
         let page_num = $(":input[name='page-skip-to']").val();
         page_num = parseInt(page_num);
         if (isNaN(page_num) || page_num <= 0){
-            show_auto_close_warning_dialog("请输入一个有效的正整数页码");
+            show_auto_close_warning_dialog(getTransText("请输入一个有效的正整数页码"));
             return;
         }
 
@@ -1190,7 +1174,7 @@
         let url = build_obj_detail_url(obj);
 
         show_confirm_dialog({
-            title: '确定要删除吗？',
+            title: getTransText('确定要删除吗？'),
             ok_todo: function() {
                 delete_one_file(url, function () {
                     list_item_dom.remove();
@@ -1214,7 +1198,7 @@
         let paths=[bucket_name, dir_path, filename];
 
         swal({
-            title: '请修改对象名称',
+            title: getTransText('请修改对象名称'),
             input: 'text',
             inputValue: filename,
             inputAutoTrim: true,
@@ -1222,18 +1206,18 @@
                 autocapitalize: 'off'
             },
             showCancelButton: true,
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
+            confirmButtonText: getTransText('确定'),
+            cancelButtonText: getTransText('取消'),
             showLoaderOnConfirm: true,
             inputValidator: (value) => {
                 if (value==='')
-                    return !value && '请输入一些内容, 前后空格会自动去除';
+                    return !value && getTransText('请输入一些内容, 前后空格会自动去除');
                 else if (value.length > 255)
-                    return "对象名长度不能大于255字符";
-                return !(value.indexOf('/') === -1) && '对象名不能包含‘/’';
+                    return getTransText("对象名长度不能大于255字符");
+                return !(value.indexOf('/') === -1) && getTransText('对象名不能包含‘/’');
               },
             preConfirm: (input_name) => {
-                let url = build_move_rename_url(paths=[bucket_name, dir_path, filename], params={rename: input_name});
+                let url = build_move_rename_url(paths=[bucket_name, dir_path, filename], {rename: input_name});
                 return $.ajax({
                     url: url,
                     type: 'post',
@@ -1258,7 +1242,7 @@
                     let html = render_bucket_file_item(result.value);
                     list_item_dom.after(html);
                     list_item_dom.remove();
-                    show_warning_dialog('重命名成功', 'success');
+                    show_warning_dialog(getTransText('重命名成功'), 'success');
                 }
              },
             (error) => {
@@ -1269,11 +1253,23 @@
                 catch (e) {
                     msg = error.statusText;
                 }
-                show_warning_dialog('重命名失败:'+ msg);
+                show_warning_dialog(getTransText('重命名失败')+ msg);
             }
         )
     });
 
+    let render_share_dialog_select = template.compile(`
+        <select id="swal-select" class="swal2-select">
+            {{set str_day = $imports.getTransText('天')}}
+            <option value="0">{{$imports.getTransText('永久公开')}}</option>
+            <option value="1">1{{str_day}}</option>
+            <option value="7">7{{str_day}}</option>
+            <option value="30">30{{str_day}}</option>
+            <option value="-1">{{$imports.getTransText('私有')}}</option>
+        </select>
+        <div>
+            <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>{{$imports.getTransText('有分享密码保护')}}</span>
+        </div> `);
     //
     // 目录文件夹分享公开点击事件处理
     //
@@ -1288,28 +1284,19 @@
             dir_path: dir_path
         });
 
+        let select_html = render_share_dialog_select({});
         let share = 1;
         Swal.fire({
-            title: '分享',
-            html:
-                `<select id="swal-select" class="swal2-select">
-                    <option value="0">永久公开</option>
-                    <option value="1">1天</option>
-                    <option value="7">7天</option>
-                    <option value="30">30天</option>
-                    <option value="-1">私有</option>
-                </select>
-                <div>
-                    <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>有分享密码保护</span>
-                </div> `,
+            title: getTransText('分享'),
+            html: select_html,
             showCancelButton: true,
-            cancelButtonText: '取消',
+            cancelButtonText: getTransText('取消'),
             inputAttributes: {
                 autocapitalize: 'off'
             },
-            confirmButtonText: '分享',
+            confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
-            footer: '提示：创建新的带密码的分享，旧的分享密码会失效',
+            footer: getTransText('提示：创建新的带密码的分享，旧的分享密码会失效'),
             preConfirm: () => {
                 let value = document.getElementById('swal-select').value;
                 let is_pw = document.getElementById('swal-password').checked;
@@ -1328,9 +1315,11 @@
                     async: true,
                     success: function (data, status_text, xhr) {
                         if (share === 1) {
-                            status_node.html('公有');
+                            let s = getTransText('公有');
+                            status_node.html(s);
                         } else {
-                            status_node.html('私有');
+                            let s = getTransText('私有');
+                            status_node.html(s);
                         }
                         return data;
                     }
@@ -1342,14 +1331,14 @@
                 let text = '<p>' + result.value.share + '</p>';
                 let pw = result.value.share_code;
                 if (pw)
-                    text = text + '<p>' + '分享密码：' + pw + '</p>';
+                    text = text + '<p>' + getTransText('分享密码') + ':' + pw + '</p>';
                 Swal.fire({
-                    title: "分享链接",
+                    title: getTransText("分享链接"),
                     html: text
                 });
             }
         }).catch((xhr) => {
-            let msg = '分享公开设置失败！'+ xhr.statusText;
+            let msg = getTransText('分享公开设置失败')+ xhr.statusText;
             msg = get_err_msg_or_default(xhr, msg);
             show_warning_dialog(msg,'error');
         })
@@ -1369,28 +1358,19 @@
 
         let detail_url = build_obj_detail_url(obj);
 
+        let select_html = render_share_dialog_select({});
         let share = 1;
         Swal.fire({
-            title: '分享',
-            html:
-                `<select id="swal-select" class="swal2-select">
-                    <option value="0">永久公开</option>
-                    <option value="1">1天</option>
-                    <option value="7">7天</option>
-                    <option value="30">30天</option>
-                    <option value="-1">私有</option>
-                </select>
-                <div>
-                    <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>有分享密码保护</span>
-                </div> `,
+            title: getTransText('分享'),
+            html: select_html,
             showCancelButton: true,
-            cancelButtonText: '取消',
+            cancelButtonText: getTransText('取消'),
             inputAttributes: {
                 autocapitalize: 'off'
             },
-            confirmButtonText: '分享',
+            confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
-            footer: '提示：创建新的带密码的分享，旧的分享链接会失效',
+            footer: getTransText('提示：创建新的带密码的分享，旧的分享链接会失效'),
             preConfirm: () => {
                 let value = document.getElementById('swal-select').value;
                 let is_pw = document.getElementById('swal-password').checked;
@@ -1415,12 +1395,12 @@
         }).then((result) => {
             if (result.value && (share === 1)) {
                 Swal.fire({
-                    title: "分享链接",
+                    title: getTransText("分享链接"),
                     text: result.value.share_uri
                 });
             }
         }).catch((xhr) => {
-            let msg = '分享公开设置失败！'+ xhr.statusText;
+            let msg = getTransText('分享公开设置失败！')+ xhr.statusText;
             msg = get_err_msg_or_default(xhr, msg);
             show_warning_dialog(msg, 'error');
         })
@@ -1438,11 +1418,11 @@
             success: function(data,status,xhr){
                 swal.close();
                 success_do();
-                show_auto_close_warning_dialog('删除成功', type='success');
+                show_auto_close_warning_dialog(getTransText('删除成功'), type='success');
             },
             error: function (error) {
                 swal.close();
-                show_warning_dialog('删除失败！', type='error');
+                show_warning_dialog(getTransText('删除失败'), type='error');
             }
         });
     }
@@ -1463,7 +1443,7 @@
         });
 
         show_confirm_dialog({
-            title: '确定要删除吗？',
+            title: getTransText('确定要删除吗？'),
             ok_todo: function() {
                 delete_one_directory(url, function () {
                     list_item_dom.remove();
@@ -1483,11 +1463,11 @@
             success: function(data,status,xhr){
                 swal.close();
                 success_do();
-                show_auto_close_warning_dialog('删除成功', 'success');
+                show_auto_close_warning_dialog(getTransText('删除成功'), 'success');
             },
             error: function (error,status) {
                 swal.close();
-                let msg = '上传文件发生错误,'+ error.statusText;
+                let msg = getTransText('删除失败')+ error.statusText;
                 msg = get_err_msg_or_default(error, msg);
                 show_warning_dialog(msg, 'error');
             }
@@ -1570,15 +1550,15 @@
                     $content_display_div.empty();
                     $content_display_div.append(html);
                 }else{
-                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                    show_warning_dialog(getTransText('好像出问题了，跑丢了') + '( T__T ) …', 'error');
                 }
             },
             error: function (xhr, errtype, error) {
                 swal.close();
                 if (errtype === 'timeout'){
-                    show_warning_dialog('请求超时', 'error');
+                    show_warning_dialog(getTransText('请求超时'), 'error');
                 }else{
-                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                    show_warning_dialog(getTransText('好像出问题了，跑丢了') + '( T__T ) …', 'error');
                 }
             }
         });
@@ -1593,7 +1573,7 @@
             <div class="col-xs-12 col-sm-12">
                 <div>
                     <ol class="breadcrumb">
-                        <a href="#" id="btn-path-bucket">存储桶</a>
+                        <a href="#" id="btn-path-bucket">{{$imports.getTransText('存储桶')}}</a>
                         <span>></span>
                         <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                         {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
@@ -1607,32 +1587,33 @@
             <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>
             <div class="col-xs-12 col-sm-12">
                 <div>
-                    <a class="btn btn-info" href="{{ obj.download_url }}">下载</a>
-                    <!--<button class="btn btn-warning" id="bucket-files-obj-share" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">分享公开</button>-->
+                    <a class="btn btn-info" href="{{ obj.download_url }}">{{$imports.getTransText('下载')}}</a>
                 </div>
                 <hr/>
                 <div>
-                    <strong>对象名称：</strong>
+                    <strong>{{$imports.getTransText('对象名称')}}：</strong>
                     <p>{{ obj.name }}</p>
-                    <p><strong>对象大小：</strong>{{ obj.si }}</p>                   
-                    <p><strong>创建日期：</strong>{{ $imports.isoTimeToLocal(obj.ult) }}</p>                   
-                    <p><strong>修改日期：</strong>{{ $imports.isoTimeToLocal(obj.upt) }}</p> 
-                                      
+                    <p><strong>{{$imports.getTransText('对象大小')}}：</strong>{{ obj.si }}</p>                   
+                    <p><strong>{{$imports.getTransText('创建日期')}}：</strong>{{ $imports.isoTimeToLocal(obj.ult) }}</p>                   
+                    <p><strong>{{$imports.getTransText('修改日期')}}：</strong>{{ $imports.isoTimeToLocal(obj.upt) }}</p> 
+                    <p><strong>{{$imports.getTransText('下载次数')}}：</strong>                
                     {{if obj.dlc}}
-                        <p><strong>下载次数：</strong>{{ obj.dlc }}</p>
+                        {{ obj.dlc }}
                     {{else if !obj.dlc}}
-                        <p><strong>下载次数：</strong>0</p>
+                        0
                     {{/if}}
-                    
-                    <p><strong>访问权限：</strong>{{obj.access_permission}}</p>
+                    </p>                    
+                    <p><strong>{{$imports.getTransText('访问权限')}}：</strong>{{obj.access_permission}}</p>
                     {{if obj.sh}}
+                        <p><strong>分享终止时间：</strong>
                         {{if obj.stl}}
-                            <p><strong>公共访问终止时间：</strong>{{obj.set}}</p>
+                            {{$imports.isoTimeToLocal(obj.set)}}
                         {{else if !obj.stl}}
-                            <p><strong>公终止时间：</strong>永久公开</p>
+                            {{$imports.getTransText('永久公开')}}
                         {{/if}}
+                        </p>
                     {{/if}}
-                    <strong>下载连接：</strong>
+                    <strong>{{$imports.getTransText('下载连接')}}：</strong>
                     <p><a href="{{ obj.download_url }}" class="text-auto-break">{{ obj.download_url }}</a></p>
                 </div>
             </div>
@@ -1648,9 +1629,11 @@
             // $("#div-upload-file").show();
 
             const {value: file} = await swal({
-                title: '选择文件',
+                title: getTransText('选择文件'),
                 input: 'file',
                 showCancelButton: true,
+                cancelButtonText: getTransText('取消'),
+                confirmButtonText: getTransText('确定'),
                 inputAttributes: {
                     'accept': '*',
                     'aria-label': 'Upload your select file'
@@ -1664,7 +1647,7 @@
                 reader.readAsDataURL(file);
             }
             else if(file === null){
-                show_warning_dialog("没有选择文件，请先选择一个文件");
+                show_warning_dialog(getTransText("没有选择文件，请先选择一个文件"));
             }
         }
     );
@@ -1674,12 +1657,12 @@
     //
     function uploadOneFile(file) {
         if(file.size === 0) {
-            show_warning_dialog("无法上传一个空文件");
+            show_warning_dialog(getTransText("无法上传一个空文件"));
             return;
         }
         let obj = get_bucket_name_and_cur_path();
         if(!obj.bucket_name){
-            show_warning_dialog('上传文件失败，无法获取当前存储桶下路径');
+            show_warning_dialog(getTransText('上传文件失败，无法获取当前存储桶下路径'));
             return;
         }
 
@@ -1717,7 +1700,7 @@
             //进度条
             fileUploadProgressBar(0, 1, true);
             endFileUploading();
-            show_auto_close_warning_dialog('文件已成功上传', 'success', 'top-end');
+            show_auto_close_warning_dialog(getTransText('文件已成功上传'), 'success', 'top-end');
             // 如果不是覆盖上传
             if (overwrite === false){
                 // 如果上传的文件在当前页面的列表中，插入文件列表
@@ -1752,10 +1735,11 @@
                 uploadFileChunk(url, file, offset, overwrite, false);
             },
             error: function (err) {
+                let msg = getTransText('上传文件发生错误,请重新上传');
                 if (err.responseJSON && err.responseJSON.hasOwnProperty('code_text'))
-                    show_warning_dialog('上传文件发生错误,'+ err.responseJSON.code_text + '请重新上传');
+                    show_warning_dialog(msg + err.responseJSON.code_text);
                 else
-                    show_warning_dialog('上传文件发生错误,'+ err.statusText + '请重新上传');
+                    show_warning_dialog(msg + err.statusText);
 
                 endFileUploading();
             },
@@ -1886,20 +1870,20 @@
     $("#content-display-div").on('click', '#btn-new-directory', on_create_directory);
     function on_create_directory(){
         swal({
-            title: '请输入一个文件夹名称',
+            title: getTransText('请输入一个文件夹名称'),
             input: 'text',
             inputAutoTrim: true,
             inputAttributes: {
                 autocapitalize: 'off'
             },
             showCancelButton: true,
-            confirmButtonText: '创建',
-            cancelButtonText: '取消',
+            confirmButtonText: getTransText('确定'),
+            cancelButtonText: getTransText('取消'),
             showLoaderOnConfirm: true,
             inputValidator: (value) => {
                 if (value==='')
-                    return !value && '请输入一些内容, 前后空格会自动去除';
-                return !(value.indexOf('/') === -1) && '目录名不能包含‘/’'
+                    return !value && getTransText('请输入一些内容, 前后空格会自动去除');
+                return !(value.indexOf('/') === -1) && getTransText('目录名不能包含‘/’')
               },
             preConfirm: (input_name) => {
                 let obj = get_bucket_name_and_cur_path();
@@ -1932,7 +1916,7 @@
                 if (result.value) {
                     let html = render_bucket_dir_item(result.value);
                     $("#bucket-files-table tr:eq(0)").after(html);
-                    show_warning_dialog(`创建文件夹“${result.value.data.dir_name}”成功`, 'success');
+                    show_warning_dialog(transInterpolate(getTransText('创建文件夹“%s”成功'), result.value.data.dir_name), 'success');
                 }
              },
             (error) => {
@@ -1944,7 +1928,7 @@
                     msg = error.statusText;
                 }
 
-                show_warning_dialog(`创建失败:`+ msg);
+                show_warning_dialog(getTransText('创建失败') + msg);
             }
         )
     }
@@ -1965,11 +1949,11 @@
             <td>
                 <li class="dropdown btn">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-               aria-expanded="false">操作<span class="caret"></span></a>
+               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></a>
                     <ul class="dropdown-menu">
-                         <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">打开</a></li>
-                         <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">删除</a></li>
-                         <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">分享公开</a></li>
+                         <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">{{$imports.getTransText('打开')}}</a></li>
+                         <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">{{$imports.getTransText('删除')}}</a></li>
+                         <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">{{$imports.getTransText('分享公开')}}</a></li>
                     </ul>
                 </li>
             </td>

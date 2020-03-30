@@ -108,8 +108,8 @@ function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:n
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
         cancelButtonColor: '#d33',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
+        confirmButtonText: 'Confirm',
+        cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.value) {
             if(typeof obj.ok_todo === "function")//是函数

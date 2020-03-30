@@ -104,13 +104,10 @@ def str_to_int_or_default(val, default):
         return default
 
 
-class UserViewSet(mixins.ListModelMixin,
-                  CustomGenericViewSet):
+class UserViewSet(CustomGenericViewSet):
     '''
     用户类视图
     list:
-        获取用户列表
-
         获取用户列表,需要超级用户权限
 
         >> http code 200 返回内容:
@@ -200,6 +197,23 @@ class UserViewSet(mixins.ListModelMixin,
     queryset = User.objects.all()
     lookup_field = 'username'
     lookup_value_regex = '.+'
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取用户列表'),
+        responses={
+            status.HTTP_200_OK: ''
+        }
+    )
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('注册一个用户'),
