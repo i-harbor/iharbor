@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-03-30 17:05+0800\n"
+"POT-Creation-Date: 2020-03-30 18:34+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -93,6 +93,7 @@ msgstr "FTP password(ro)"
 #: apps/buckets/static/buckets/bucket.js:478
 #: apps/buckets/static/buckets/bucket.js:1079
 #: apps/buckets/static/buckets/bucket.js:1952
+#: apps/share/static/share/share.js:166
 msgid "操作"
 msgstr "operation"
 
@@ -118,6 +119,7 @@ msgstr "Double click to modify remarks"
 
 #: apps/buckets/static/buckets/bucket.js:536
 #: apps/buckets/static/buckets/bucket.js:539
+#: apps/share/static/share/share.js:217 apps/share/static/share/share.js:220
 msgid "上页"
 msgstr "Previous"
 
@@ -232,6 +234,7 @@ msgid "上传文件"
 msgstr "Upload files"
 
 #: apps/buckets/static/buckets/bucket.js:970
+#: apps/share/static/share/share.js:162
 msgid "上传时间"
 msgstr "Upload time"
 
@@ -263,6 +266,7 @@ msgstr "Jump"
 
 #: apps/buckets/static/buckets/bucket.js:1081
 #: apps/buckets/static/buckets/bucket.js:1590
+#: apps/share/static/share/share.js:168
 msgid "下载"
 msgstr "Download"
 
@@ -431,8 +435,14 @@ msgid "创建失败"
 msgstr "Create failure"
 
 #: apps/buckets/static/buckets/bucket.js:1954
+#: apps/share/static/share/share.js:167
 msgid "打开"
 msgstr "Open"
+
+#: apps/share/static/share/share.js:206
+#, javascript-format
+msgid "共 %s 个项目"
+msgstr "Total %s items"
 
 #: docs/static/docs/js/docsify.min.js:1
 msgid "style"
@@ -458,9 +468,6 @@ msgstr "Name"
 
 msgid "大小"
 msgstr "Size"
-
-msgid "共 %s 个项目"
-msgstr "Total %s items"
 
 msgid "存储桶名称"
 msgstr "Bucket name"

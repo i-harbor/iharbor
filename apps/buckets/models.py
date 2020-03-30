@@ -8,7 +8,7 @@ from django.db import models
 from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext_lazy, gettext as _
 from ckeditor.fields import RichTextField
 
 from utils.storagers import PathParser
@@ -301,11 +301,11 @@ class Bucket(models.Model):
             (False, str)   # 设置失败
         '''
         if not (6 <= len(password) <= 20):
-            return False, '密码长度必须为6-20个字符'
+            return False, _('密码长度必须为6-20个字符')
         if self.ftp_ro_password == password:
-            return False, '可读写密码不得和只读密码一致'
+            return False, _('可读写密码不得和只读密码一致')
         self.ftp_password = password
-        return True, '修改成功'
+        return True, _('修改成功')
 
     def set_ftp_ro_password(self, password):
         '''
@@ -317,11 +317,11 @@ class Bucket(models.Model):
             (False, str)   # 设置失败
         '''
         if not (6 <= len(password) <= 20):
-            return False, '密码长度必须为6-20个字符'
+            return False, _('密码长度必须为6-20个字符')
         if self.ftp_password == password:
-            return False, '只读密码不得和可读写密码一致'
+            return False, _('只读密码不得和可读写密码一致')
         self.ftp_ro_password = password
-        return True, '修改成功'
+        return True, _('修改成功')
 
     def set_remarks(self, remarks: str):
         """

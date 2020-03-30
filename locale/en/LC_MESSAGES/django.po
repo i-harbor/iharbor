@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-03-30 17:17+0800\n"
+"POT-Creation-Date: 2020-03-30 18:34+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -176,472 +176,481 @@ msgstr "Get user list"
 msgid "注册一个用户"
 msgstr "register a user"
 
-#: apps/api/views.py:215
+#: apps/api/views.py:229
 msgid "激活链接邮件发送失败"
 msgstr "Failed to send activation link mail"
 
-#: apps/api/views.py:218 apps/users/views.py:32
+#: apps/api/views.py:232 apps/users/views.py:32
 msgid "用户注册成功，请登录邮箱访问收到的连接以激活用户"
 msgstr ""
 "The user is registered successfully. Please log in to the mailbox to access "
 "the received connection to activate the user"
 
-#: apps/api/views.py:224
+#: apps/api/views.py:238
 msgid "获取一个用户详细信息"
 msgstr "Get a user's details"
 
-#: apps/api/views.py:229
+#: apps/api/views.py:243
 msgid "您没有执行该操作的权限"
 msgstr "You do not have permission to perform this operation"
 
-#: apps/api/views.py:234
+#: apps/api/views.py:248
 msgid "修改用户信息"
 msgstr "Modify user information"
 
-#: apps/api/views.py:254
+#: apps/api/views.py:268
 msgid "删除一个用户"
 msgstr "delete a user"
 
-#: apps/api/views.py:408
+#: apps/api/views.py:422
 msgid "默认为bucket ID，使用bucket name需要通过参数by-name指示"
 msgstr ""
 "The default value is bucket ID. using bucket name needs to be indicated by "
 "the parameter 'by_name'"
 
-#: apps/api/views.py:415
+#: apps/api/views.py:429
 msgid "true,表示使用bucket name指定bucket；其他值忽略"
 msgstr ""
 "True indicates that bucket name is used to specify bucket; other values are "
 "ignored"
 
-#: apps/api/views.py:420
+#: apps/api/views.py:434
 msgid "获取存储桶列表"
 msgstr "Get bucket list"
 
-#: apps/api/views.py:467
+#: apps/api/views.py:481
 msgid "创建一个存储桶"
 msgstr "Create a bucket"
 
-#: apps/api/views.py:499
+#: apps/api/views.py:513
 msgid "创建桶失败"
 msgstr "Failed to create bucket"
 
-#: apps/api/views.py:508
+#: apps/api/views.py:522
 msgid "创建桶失败，数据库错误"
 msgstr "Failed to create bucket，database error"
 
-#: apps/api/views.py:519
+#: apps/api/views.py:533
 msgid "通过桶ID或name获取一个存储桶详细信息"
 msgstr "Get a bucket details by bucket ID or name"
 
-#: apps/api/views.py:554
+#: apps/api/views.py:568
 msgid "删除一个存储桶"
 msgstr "Delete a bucket"
 
-#: apps/api/views.py:560
+#: apps/api/views.py:574
 msgid "存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id"
 msgstr ""
 "Bucket ID list or array. When deleting multiple buckets, pass other bucket "
 "IDS through this parameter"
 
-#: apps/api/views.py:579 apps/api/views.py:587
+#: apps/api/views.py:593 apps/api/views.py:601
 msgid "删除存储桶失败"
 msgstr "Failed to delete bucket"
 
-#: apps/api/views.py:584
+#: apps/api/views.py:598
 msgid "未找到要删除的存储桶"
 msgstr "bucket to delete not found"
 
-#: apps/api/views.py:592
+#: apps/api/views.py:606
 msgid "存储桶访问权限设置"
 msgstr "set bucket access permission"
 
-#: apps/api/views.py:598
+#: apps/api/views.py:612
 msgid "设置访问权限, 1(公有)，2(私有)，3（公有可读可写）"
 msgstr ""
 "Set access permission, 1 (public), 2 (private), 3 (public readable and "
 "writable)"
 
-#: apps/api/views.py:618
+#: apps/api/views.py:632
 msgid "public参数有误"
 msgstr "Invalid parameter 'public'"
 
-#: apps/api/views.py:630
+#: apps/api/views.py:644
 msgid "更新数据库数据时错误"
 msgstr "Error updating database data"
 
-#: apps/api/views.py:634
+#: apps/api/views.py:648
 msgid "存储桶权限设置成功"
 msgstr "Bucket permissions set successfully"
 
-#: apps/api/views.py:641
+#: apps/api/views.py:655
 msgid "存储桶备注信息设置"
 msgstr "set bucket remarks information"
 
-#: apps/api/views.py:647
+#: apps/api/views.py:661
 msgid "备注信息"
 msgstr "remarks information"
 
-#: apps/api/views.py:667
+#: apps/api/views.py:681
 msgid "备注信息不能为空"
 msgstr "remarks cannot be empty"
 
-#: apps/api/views.py:675
+#: apps/api/views.py:689
 msgid "设置备注信息失败，更新数据库数据时错误"
 msgstr "Failed to set remark information, error updating database data"
 
-#: apps/api/views.py:680
+#: apps/api/views.py:694
 msgid "存储桶备注信息设置成功"
 msgstr "bucket remarks information set successfully"
 
-#: apps/api/views.py:698 apps/api/views.py:727
+#: apps/api/views.py:712 apps/api/views.py:741
 msgid "无效的存储桶ID"
 msgstr "invalid bucket ID"
 
-#: apps/api/views.py:702 apps/api/views.py:2569 apps/share/views.py:625
+#: apps/api/views.py:716 apps/api/views.py:2583 apps/share/views.py:625
 #: apps/share/views.py:738
 msgid "存储桶不存在"
 msgstr "bucket does not exist"
 
-#: apps/api/views.py:705
+#: apps/api/views.py:719
 msgid "您没有操作此存储桶的权限"
 msgstr "ou do not have permission to operate this bucket"
 
-#: apps/api/views.py:847
+#: apps/api/views.py:861
 msgid "分片上传文件对象"
 msgstr "multipart upload an object"
 
-#: apps/api/views.py:852 apps/api/views.py:1723 apps/api/views.py:2780
+#: apps/api/views.py:866 apps/api/views.py:1737 apps/api/views.py:2800
 msgid "文件对象绝对路径"
 msgstr "absolute path of file object"
 
-#: apps/api/views.py:858
+#: apps/api/views.py:872
 msgid "reset=true时，如果对象已存在，重置对象大小为0"
 msgstr "reset = true, reset the object size to 0 if the object already exists"
 
-#: apps/api/views.py:911
+#: apps/api/views.py:925
 msgid "下载文件对象，自定义读取对象数据块"
 msgstr "Download file objects, custom read object data block"
 
-#: apps/api/views.py:916
+#: apps/api/views.py:930
 msgid "要读取的文件块在整个文件中的起始位置(bytes偏移量)"
 msgstr ""
 "The starting position (byte offset) of the file block to read in the object"
 
-#: apps/api/views.py:922
+#: apps/api/views.py:936
 msgid "要读取的文件块的字节大小"
 msgstr "Byte size of file block to read"
 
-#: apps/api/views.py:972
+#: apps/api/views.py:986
 msgid "删除一个对象"
 msgstr "delete a object"
 
-#: apps/api/views.py:984
+#: apps/api/views.py:998
 msgid "删除失败"
 msgstr "delete failed"
 
-#: apps/api/views.py:989
+#: apps/api/views.py:1003
 msgid "对象共享或私有权限设置"
 msgstr "Object sharing or private permission settings"
 
-#: apps/api/views.py:994
+#: apps/api/views.py:1008
 msgid "分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）"
 msgstr ""
 "Share access permission, 0 (do not share access is forbidden), 1 (share read-"
 "only), 2 (share read-write)"
 
-#: apps/api/views.py:1000
+#: apps/api/views.py:1014
 msgid ""
 "对象公开分享天数(share!=0时有效)，0表示永久公开，负数表示不公开，默认为0"
 msgstr ""
 "Object public sharing days (valid when share! = 0), 0 means permanent "
 "public, negative means not public, default is 0"
 
-#: apps/api/views.py:1006 apps/api/views.py:1450
+#: apps/api/views.py:1020 apps/api/views.py:1464
 msgid "分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码"
 msgstr ""
 "Sharing password, no password is set if this parameter does not exist; 4-8 "
 "characters can be specified; if it is blank, password will be randomly "
 "assigned"
 
-#: apps/api/views.py:1029 apps/api/views.py:1474
+#: apps/api/views.py:1043 apps/api/views.py:1488
 msgid "password参数长度为4-8个字符"
 msgstr "The password parameter is 4-8 characters long"
 
-#: apps/api/views.py:1038
+#: apps/api/views.py:1052
 msgid "days参数有误"
 msgstr "Invalid parameter 'days'"
 
-#: apps/api/views.py:1042
+#: apps/api/views.py:1056
 msgid "缺少share参数"
 msgstr "Missing parameter 'share'"
 
-#: apps/api/views.py:1046 apps/api/views.py:1482
+#: apps/api/views.py:1060 apps/api/views.py:1496
 msgid "share参数有误"
 msgstr "Invalid parameter 'share'"
 
-#: apps/api/views.py:1055
+#: apps/api/views.py:1069
 msgid "对象共享权限设置失败"
 msgstr "Object sharing permission setting failed"
 
-#: apps/api/views.py:1063
+#: apps/api/views.py:1077
 msgid "对象共享权限设置成功"
 msgstr "Object sharing permission set successfully"
 
-#: apps/api/views.py:1114
+#: apps/api/views.py:1128
 msgid "offset或size参数有误"
 msgstr "invalid parameter offset or size"
 
-#: apps/api/views.py:1122
+#: apps/api/views.py:1136
 msgid "offset和size参数必须同时提交"
 msgstr "parameter offset and size must be submitted together"
 
-#: apps/api/views.py:1221
+#: apps/api/views.py:1235
 msgid "获取存储桶根目录下的文件和文件夹信息"
 msgstr "Get the file and subdirectory information under the bucket root"
 
-#: apps/api/views.py:1257
+#: apps/api/views.py:1271
 msgid "获取一个目录下的文件和文件夹信息"
 msgstr "Get file and subdirectory information under a directory"
 
-#: apps/api/views.py:1262 apps/api/views.py:1351 apps/api/views.py:1405
-#: apps/api/views.py:1432
+#: apps/api/views.py:1276 apps/api/views.py:1365 apps/api/views.py:1419
+#: apps/api/views.py:1446
 msgid "目录绝对路径"
 msgstr "absolute path of directory"
 
-#: apps/api/views.py:1325
+#: apps/api/views.py:1339
 msgid "offset或limit参数无效"
 msgstr "invalid parameter 'offset' or 'limit'"
 
-#: apps/api/views.py:1345
+#: apps/api/views.py:1359
 msgid "创建一个目录"
 msgstr "create a directory"
 
-#: apps/api/views.py:1392
+#: apps/api/views.py:1406
 msgid "创建文件夹成功"
 msgstr "directory created successfully"
 
-#: apps/api/views.py:1399
+#: apps/api/views.py:1413
 msgid "删除一个目录"
 msgstr "delete a directory"
 
-#: apps/api/views.py:1426
+#: apps/api/views.py:1440
 msgid "设置目录访问权限"
 msgstr "Set directory access permission"
 
-#: apps/api/views.py:1438
+#: apps/api/views.py:1452
 msgid "用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)"
 msgstr ""
 "Used to set directory access permission, 0 (private), 1 (public read-only), "
 "2 (public read-write)"
 
-#: apps/api/views.py:1444
+#: apps/api/views.py:1458
 msgid "公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0"
 msgstr ""
 "Days of public sharing (valid when share = 1 or 2), 0 means permanent "
 "public, negative means not public, default is 0"
 
-#: apps/api/views.py:1491
+#: apps/api/views.py:1505
 msgid "设置目录权限失败"
 msgstr "Failed to set directory permissions"
 
-#: apps/api/views.py:1496
+#: apps/api/views.py:1510
 msgid "设置目录权限成功"
 msgstr "Set directory permission succeeded"
 
-#: apps/api/views.py:1543
+#: apps/api/views.py:1557
 msgid "获取一个存储桶资源统计信息"
 msgstr "Get resource statistics for a bucket"
 
-#: apps/api/views.py:1555
+#: apps/api/views.py:1569
 msgid "bucket_name参数有误，存储桶不存在"
 msgstr "invalid parameter 'bucket_name', bucket does not exist"
 
-#: apps/api/views.py:1612
+#: apps/api/views.py:1626
 msgid "获取指定用户的安全凭证"
 msgstr "Get user's security credentials"
 
-#: apps/api/views.py:1617 apps/users/templates/security.html:46
+#: apps/api/views.py:1631 apps/users/templates/security.html:46
 msgid "访问密钥对"
 msgstr "Access key pair"
 
-#: apps/api/views.py:1716
+#: apps/api/views.py:1730
 msgid "移动或重命名一个对象"
 msgstr "Move or rename an object"
 
-#: apps/api/views.py:1729
+#: apps/api/views.py:1743
 msgid "移动对象到此目录路径下，/或空字符串表示桶下根目录"
 msgstr ""
 "Move the object to this directory path, / or an empty string represents the "
 "root directory under the bucket"
 
-#: apps/api/views.py:1735
+#: apps/api/views.py:1749
 msgid "重命名对象的新名称"
 msgstr "New name of the object to be renamed"
 
-#: apps/api/views.py:1776
+#: apps/api/views.py:1790
 msgid "移动对象操作成功"
 msgstr "move object succeeded"
 
-#: apps/api/views.py:1836
+#: apps/api/views.py:1850
 msgid "获取对象或目录元数据"
 msgstr "Get object or directory metadata"
 
-#: apps/api/views.py:1842
+#: apps/api/views.py:1856
 msgid "对象或目录绝对路径"
 msgstr "absolute path of object or directory"
 
-#: apps/api/views.py:1855 apps/api/views.py:1914 apps/api/views.py:2003
+#: apps/api/views.py:1869 apps/api/views.py:1928 apps/api/views.py:2017
 msgid "path参数有误"
 msgstr "invalid parameter 'path'"
 
-#: apps/api/views.py:1866
+#: apps/api/views.py:1880
 msgid "对象或目录不存在"
 msgstr "object or directory does not exist"
 
-#: apps/api/views.py:1869
+#: apps/api/views.py:1883
 msgid "获取元数据成功"
 msgstr "get metadata successfully"
 
-#: apps/api/views.py:1873
+#: apps/api/views.py:1887
 msgid "创建一个空对象元数据"
 msgstr "create an empty object metadata"
 
-#: apps/api/views.py:1879 apps/api/views.py:1965
+#: apps/api/views.py:1893 apps/api/views.py:1979
 msgid "对象绝对路径"
 msgstr "absolute path of object"
 
-#: apps/api/views.py:1926
+#: apps/api/views.py:1940
 msgid "创建失败，对象已存在"
 msgstr "creation failed, object already exists"
 
-#: apps/api/views.py:1938
+#: apps/api/views.py:1952
 msgid "创建空对象元数据成功"
 msgstr "create empty object metadata succeeded"
 
-#: apps/api/views.py:1958
+#: apps/api/views.py:1972
 msgid "自动同步对象大小元数据"
 msgstr "Automatically synchronize object size metadata"
 
-#: apps/api/views.py:2015 apps/api/views.py:2796
+#: apps/api/views.py:2029 apps/api/views.py:2816
 msgid "对象不存在"
 msgstr "object does not exist"
 
-#: apps/api/views.py:2037
+#: apps/api/views.py:2051
 msgid "更新对象大小元数据失败"
 msgstr "failed to update object size metadata"
 
-#: apps/api/views.py:2044
+#: apps/api/views.py:2058
 msgid "更新对象大小元数据成功"
 msgstr "Update object size metadata succeeded"
 
-#: apps/api/views.py:2085
+#: apps/api/views.py:2099
 msgid "CEPH集群资源统计"
 msgstr "CEPH cluster resource statistics"
 
-#: apps/api/views.py:2091
+#: apps/api/views.py:2105
 msgid "获取ceph集群信息错误："
 msgstr "Error getting CEPH cluster information:"
 
-#: apps/api/views.py:2175
+#: apps/api/views.py:2189
 msgid "获取当前用户的资源统计信息"
 msgstr "Get user's resource statistics"
 
-#: apps/api/views.py:2185
+#: apps/api/views.py:2199
 msgid "获取指定用户的资源统计信息"
 msgstr "Get user's resource statistics"
 
-#: apps/api/views.py:2192
+#: apps/api/views.py:2206
 msgid "username参数有误，用户不存在"
 msgstr "Invalid username parameter, user does not exist"
 
-#: apps/api/views.py:2260
+#: apps/api/views.py:2274
 msgid "ceph的mon，osd，mgr，mds组件信息"
 msgstr "Mon, OSD, Mgr, MDS component information of CEPH"
 
-#: apps/api/views.py:2299
+#: apps/api/views.py:2313
 msgid "ceph集群当前故障信息查询"
 msgstr "CEPH cluster fault information query"
 
-#: apps/api/views.py:2340
+#: apps/api/views.py:2354
 msgid "ceph集群的IOPS，I/O带宽"
 msgstr "IOPs and I/O bandwidth of CEPH cluster"
 
-#: apps/api/views.py:2373
+#: apps/api/views.py:2387
 msgid "系统用户总数查询"
 msgstr "get system user count"
 
-#: apps/api/views.py:2401
+#: apps/api/views.py:2415
 msgid "系统可用性查询"
 msgstr "System availability query"
 
-#: apps/api/views.py:2440
+#: apps/api/views.py:2454
 msgid "系统访问统计查询"
 msgstr "System visit statistics query"
 
-#: apps/api/views.py:2481
+#: apps/api/views.py:2495
 msgid "系统是否可用查询"
 msgstr "System available query"
 
-#: apps/api/views.py:2520
+#: apps/api/views.py:2534
 msgid "开启或关闭存储桶ftp访问限制"
 msgstr "Turn on or off bucket FTP access permission"
 
-#: apps/api/views.py:2532
+#: apps/api/views.py:2546
 msgid "存储桶ftp访问,true(开启)；false(关闭)"
 msgstr "Bucket FTP access permission, true (on); false (off)"
 
-#: apps/api/views.py:2538
+#: apps/api/views.py:2552
 msgid "存储桶ftp新的读写访问密码"
 msgstr "A new read-write access password for bucket FTP"
 
-#: apps/api/views.py:2544
+#: apps/api/views.py:2558
 msgid "存储桶ftp新的只读访问密码"
 msgstr "A new read-only access password for bucket FTP "
 
-#: apps/api/views.py:2555
+#: apps/api/views.py:2569
 msgid "存储桶名称有误"
 msgstr "invalid bucket name"
 
-#: apps/api/views.py:2615
+#: apps/api/views.py:2629
 msgid "参数enable,password或ro_password必须提交一个"
 msgstr "Parameter 'enable' or 'password' or 'password' must submit one of them"
 
-#: apps/api/views.py:2625
+#: apps/api/views.py:2639
 msgid "无效的enable参数"
 msgstr "invalid parameter 'enable'"
 
-#: apps/api/views.py:2632 apps/api/views.py:2639
+#: apps/api/views.py:2646 apps/api/views.py:2653 apps/buckets/models.py:304
+#: apps/buckets/models.py:320
 msgid "密码长度必须为6-20个字符"
 msgstr "Password length must be 6-20 characters"
 
-#: apps/api/views.py:2663
+#: apps/api/views.py:2677
 msgid "获取VPN口令"
 msgstr "get VPN password"
 
-#: apps/api/views.py:2689
+#: apps/api/views.py:2703
 msgid "获取成功"
 msgstr "get success"
 
-#: apps/api/views.py:2692
+#: apps/api/views.py:2706
 msgid "修改vpn口令"
 msgstr "modify VPN password"
 
-#: apps/api/views.py:2726
+#: apps/api/views.py:2740 apps/buckets/models.py:308 apps/buckets/models.py:324
 msgid "修改成功"
 msgstr "modified successfully"
 
-#: apps/api/views.py:2728
+#: apps/api/views.py:2742
 msgid "修改失败"
 msgstr "failed to modify"
 
-#: apps/api/views.py:2774
+#: apps/api/views.py:2794
 msgid "获取对象对应的ceph rados key信息"
 msgstr "Get the CEPH Rados key information of the object"
 
 #: apps/buckets/models.py:48
 msgid "公有（可读写）"
 msgstr "public(rw)"
+
+#: apps/buckets/models.py:306
+msgid "可读写密码不得和只读密码一致"
+msgstr "Read write password cannot be the same as read-only password"
+
+#: apps/buckets/models.py:322
+msgid "只读密码不得和可读写密码一致"
+msgstr "Read only password must not be the same as read-write password"
 
 #: apps/evcloud/templates/evcloud_add.html:20
 #: apps/evcloud/templates/evcloud_list.html:21
@@ -748,16 +757,16 @@ msgstr "Bad request, parameter 'vm_id' or 'remarks' not submitted"
 msgid "错误的请求，vm_id或者remarks参数有误"
 msgstr "Bad request, parameter 'vm_id' or 'remarks' is invalid"
 
-#: apps/share/templates/share_base.html:17 templates/base.html:25
+#: apps/share/templates/share_base.html:18 templates/base.html:25
 msgid "中国科技云对象存储服务"
 msgstr "China Science & Technology Cloud Object Storage"
 
-#: apps/share/templates/share_base.html:21
+#: apps/share/templates/share_base.html:22
 #, python-format
 msgid "%(share_user)s 的分享"
 msgstr "Shared by %(share_user)s"
 
-#: apps/share/templates/share_base.html:29 templates/base.html:66
+#: apps/share/templates/share_base.html:30 templates/base.html:44
 msgid "语言"
 msgstr "Language"
 
@@ -1007,7 +1016,7 @@ msgid "忘记密码"
 msgstr "Forget password"
 
 #: apps/users/templates/login.html:6 apps/users/views.py:42
-#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:56
+#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:69
 msgid "注册"
 msgstr "Sign up"
 
@@ -1053,11 +1062,11 @@ msgid "用户登录"
 msgstr "User log in"
 
 #: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
-#: apps/users/views.py:219 templates/base.html:55
+#: apps/users/views.py:219 templates/base.html:68
 msgid "登录"
 msgstr "Sign in"
 
-#: apps/users/views.py:123 templates/base.html:46
+#: apps/users/views.py:123 templates/base.html:59
 msgid "修改密码"
 msgstr "Change password"
 
@@ -1137,15 +1146,15 @@ msgstr "API Doc"
 msgid "帮助文档"
 msgstr "Help Doc"
 
-#: templates/base.html:45
+#: templates/base.html:58
 msgid "登出"
 msgstr "Sign out"
 
-#: templates/base.html:47
+#: templates/base.html:60
 msgid "安全凭证"
 msgstr "Security credential"
 
-#: templates/base.html:50
+#: templates/base.html:63
 msgid "后台管理"
 msgstr "Admin"
 

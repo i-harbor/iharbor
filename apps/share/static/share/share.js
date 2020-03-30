@@ -93,14 +93,37 @@
         return breadcrumb;
     }
 
+    // 翻译字符串，包装django的gettext
+    function getTransText(str){
+        try{
+            return gettext(str);
+        }catch (e) {}
+        return str;
+    }
+    function transInterpolate(fmt, obj, named){
+        try {
+            return interpolate(fmt, obj, named)
+        }catch (e) {}
+
+        if (named) {
+            return fmt.replace(/%\(\w+\)s/g, function (match) {
+                return String(obj[match.slice(2, -2)])
+            });
+        } else {
+            return fmt.replace(/%s/g, function (match) {
+                return String(obj.shift())
+            });
+        }
+    }
+
     //art-template渲染模板注册过滤器
     template.defaults.imports.get_breadcrumb = get_breadcrumb;
     template.defaults.imports.sizeFormat = sizeFormat;
     template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
+    template.defaults.imports.getTransText = getTransText;
+    template.defaults.imports.interpolate = transInterpolate;
 
-    //
     // 表格中每一行单选checkbox
-    //
     $("#content-display-div").on('click', '.item-checkbox', function () {
         if ($(this).prop('checked')){
             $(this).parents('tr').addClass('danger');
@@ -135,11 +158,14 @@
                     <table class="table table-responsive" id="bucket-files-table">
                         <tr class="bg-info">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
-                            <th>名称</th>
-                            <th>上传时间</th>
-                            <th>大小</th>
+                            <th>{{$imports.getTransText('名称')}}</th>
+                            <th>{{$imports.getTransText('上传时间')}}</th>
+                            <th>{{$imports.getTransText('大小')}}</th>
                             <th></th>
                         </tr>
+                        {{set str_operation = $imports.getTransText('操作')}}
+                        {{set str_open = $imports.getTransText('打开')}}
+                        {{set str_download = $imports.getTransText('下载')}}
                         {{each files}}
                             <tr class="bucket-files-table-item">
                                 <td><input type="checkbox" class="item-checkbox" value=""></td>
@@ -162,22 +188,22 @@
                                 <td>
                                     <li class="dropdown btn">
                                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                   aria-expanded="false">操作<span class="caret"></span></a>
+                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></a>
                                         <ul class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" data-subpath="{{ $data['share_base']}}" data-dirname="{{$value.name}}">打开</a></li>
+                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" data-subpath="{{ $data['share_base']}}" data-dirname="{{$value.name}}">{{str_open}}</a></li>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
-                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >下载</a></li>
+                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a></li>
                                         {{/if}}
                                         </ul>
                                     </li>
                                 </td>
                             </tr>
                         {{/each}}
-                        <tr><td colspan="6">共 {{ count }} 个项目</td></tr>
+                        <tr><td colspan="6"><%= $imports.interpolate($imports.getTransText('共 %s 个项目'), [count]) %></td></tr>
                     </table>
                 </div>
             </div>
@@ -188,25 +214,23 @@
                    <nav aria-label="...">
                       <ul class="pager">
                         {{if previous}}
-                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>上页</a></li>
+                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
                         {{/if}}
                         {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>上页</a></li>
-                        {{/if}}
-                        
+                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
+                        {{/if}}                
                         {{if page}}
-                            <li>第{{page.current}}页 共{{page.final}}页</li>
+                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
                         {{/if}}
-                        
                         {{if next}}
-                            <li><a id="page_next_bucket_files" href="{{next}}">下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li><a id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                         {{if !next}}
-                            <li class="disabled"><a>下页<span aria-hidden="true">&rarr;</span></a></li>
+                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
                         {{/if}}
                         {{if page.final > 2}}
-                            <li>跳转到第<input type="text" name="page-skip-to" style="max-width: 60px;">页
-                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page">跳转</button>
+                            <li>{{$imports.getTransText('跳转到')}}<input type="text" name="page-skip-to" style="max-width: 60px;">{{$imports.getTransText('页')}}
+                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
                             </li>
                         {{/if}}
                       </ul>

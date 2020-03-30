@@ -36,28 +36,6 @@
                         </ul>
                     </li>
                     <li>
-                        <ul class="nav navbar-nav">
-                            {% if user.is_authenticated %}
-                                <li class="dropdown">
-                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                       aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
-                                    <ul class="dropdown-menu">
-                                        <li><a href="{% url 'users:logout' %}">{% trans '登出' %}</a></li>
-                                        <li><a href="{% url 'users:change_password' %}">{% trans '修改密码' %}</a></li>
-                                        <li><a href="{% url 'users:security' %}">{% trans '安全凭证' %}</a></li>
-                                        <li role="separator" class="divider"></li>
-                                        {% if user.is_superuser %}
-                                            <li><a href="{% url 'admin:index' %}">{% trans '后台管理' %}</a></li>
-                                        {% endif %}
-                                    </ul>
-                                </li>
-                            {% else %}
-                                <li><a href="{% url 'users:login' %}">{% trans '登录' %}</a></li>
-                                <li><a href="{% url 'users:register' %}">{% trans '注册' %}</a></li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                    <li>
                         {% get_available_languages as LANGUAGES %}
                         <form action="{% url 'set_language' %}" method="post" id="id-language-switcher" hidden>
                             {% csrf_token %}
@@ -68,6 +46,28 @@
                             {% for code, name in LANGUAGES %}
                                 <li class="language-switcher-item" value="{{ code }}"><a href="#">{{ name }}</a></li>
                             {% endfor %}
+                        </ul>
+                    </li>
+                    <li>
+                        <ul class="nav navbar-nav">
+                            {% if user.is_authenticated %}
+                                <li class="dropdown">
+                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                       aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a href="{% url 'users:logout' %}">{% trans '登出' %}</a></li>
+                                        <li><a href="{% url 'users:change_password' %}">{% trans '修改密码' %}</a></li>
+                                        <li><a href="{% url 'users:security' %}">{% trans '安全凭证' %}</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        {% if user.is_staff %}
+                                            <li><a href="{% url 'admin:index' %}">{% trans '后台管理' %}</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </li>
+                            {% else %}
+                                <li><a href="{% url 'users:login' %}">{% trans '登录' %}</a></li>
+                                <li><a href="{% url 'users:register' %}">{% trans '注册' %}</a></li>
+                            {% endif %}
                         </ul>
                     </li>
                 </ul>
