@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-03-30 18:34+0800\n"
+"POT-Creation-Date: 2020-03-31 18:05+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1023,6 +1023,10 @@ msgstr "Sign up"
 #: apps/users/templates/login.html:11
 msgid "第三方帐号登录"
 msgstr "Third party login"
+
+#: apps/users/templates/login.html:13
+msgid "中国科技云通行证"
+msgstr "CSTCloud passport"
 
 #: apps/users/templates/security.html:11
 msgid "您的安全凭证"
