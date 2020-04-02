@@ -6,6 +6,7 @@ from io import BytesIO
 
 from django.http import StreamingHttpResponse, FileResponse, QueryDict
 from django.utils.http import urlquote
+from django.utils.translation import gettext_lazy, gettext as _
 from django.core.validators import validate_email
 from django.core import exceptions
 from django.urls import reverse as django_reverse
@@ -103,13 +104,10 @@ def str_to_int_or_default(val, default):
         return default
 
 
-class UserViewSet(mixins.ListModelMixin,
-                  CustomGenericViewSet):
+class UserViewSet(CustomGenericViewSet):
     '''
     用户类视图
     list:
-        获取用户列表
-
         获取用户列表,需要超级用户权限
 
         >> http code 200 返回内容:
@@ -201,7 +199,24 @@ class UserViewSet(mixins.ListModelMixin,
     lookup_value_regex = '.+'
 
     @swagger_auto_schema(
-        operation_summary='注册一个用户',
+        operation_summary=gettext_lazy('获取用户列表'),
+        responses={
+            status.HTTP_200_OK: ''
+        }
+    )
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('注册一个用户'),
         responses={
             status.HTTP_200_OK: ''
         }
@@ -211,21 +226,27 @@ class UserViewSet(mixins.ListModelMixin,
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         if not send_active_url_email(request._request, user.email, user):
-            return Response({'detail': '激活链接邮件发送失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'detail': _('激活链接邮件发送失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         data = {
             'code': 201,
-            'code_text': '用户注册成功，请登录邮箱访问收到的连接以激活用户',
+            'code_text': _('用户注册成功，请登录邮箱访问收到的连接以激活用户'),
             'data': serializer.validated_data,
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取一个用户详细信息'),
+    )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         if not (request.user.id == instance.id):
-            return Response(data={"detail": "您没有执行该操作的权限。"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(data={"detail": _("您没有执行该操作的权限")}, status=status.HTTP_403_FORBIDDEN)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('修改用户信息'),
+    )
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         if not self.has_update_user_permission(request, instance=instance):
@@ -243,6 +264,9 @@ class UserViewSet(mixins.ListModelMixin,
 
         return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.validated_data})
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('删除一个用户'),
+    )
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
         if user.is_active != False:
@@ -284,7 +308,6 @@ class UserViewSet(mixins.ListModelMixin,
             return True
 
         return False
-
 
     def get_serializer_class(self):
         '''
@@ -396,19 +419,19 @@ class BucketViewSet(CustomGenericViewSet):
             in_=openapi.IN_PATH,
             type=openapi.TYPE_STRING,
             required=True,
-            description='默认为bucket ID，使用bucket name需要通过参数by-name指示'
+            description=gettext_lazy('默认为bucket ID，使用bucket name需要通过参数by-name指示')
         ),
         openapi.Parameter(
             name='by-name',
             in_=openapi.IN_QUERY,
             type=openapi.TYPE_BOOLEAN,
             required=False,
-            description='true,表示使用bucket name指定bucket；其他值忽略'
+            description=gettext_lazy('true,表示使用bucket name指定bucket；其他值忽略')
         )
     ]
 
     @swagger_auto_schema(
-        operation_summary='获取存储桶列表',
+        operation_summary=gettext_lazy('获取存储桶列表'),
         responses={
             status.HTTP_200_OK: """
                 {
@@ -455,7 +478,7 @@ class BucketViewSet(CustomGenericViewSet):
         return Response(data)
 
     @swagger_auto_schema(
-        operation_summary='创建一个存储桶',
+        operation_summary=gettext_lazy('创建一个存储桶'),
         responses={
             status.HTTP_201_CREATED: 'OK'
         }
@@ -487,7 +510,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = serializer.save()
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': f'创建桶失败，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('创建桶失败') + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         col_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=col_name)
         model_class = bfm.get_obj_model_class()
@@ -496,7 +519,7 @@ class BucketViewSet(CustomGenericViewSet):
                 bucket.delete()
                 delete_table_for_model_class(model=model_class)
                 logger.error(f'创建桶“{bucket.name}”的数据库表失败')
-                return Response(data={'code': 500, 'code_text': '创建桶失败，数据库错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(data={'code': 500, 'code_text': _('创建桶失败，数据库错误')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,
@@ -507,7 +530,7 @@ class BucketViewSet(CustomGenericViewSet):
         return Response(data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
-        operation_summary='通过桶ID或name获取一个存储桶详细信息',
+        operation_summary=gettext_lazy('通过桶ID或name获取一个存储桶详细信息'),
         manual_parameters=DETAIL_BASE_PARAMS,
         responses={
             status.HTTP_200_OK: """
@@ -542,13 +565,13 @@ class BucketViewSet(CustomGenericViewSet):
         return Response({'code': 200, 'bucket': serializer.data})
 
     @swagger_auto_schema(
-        operation_summary='删除一个存储桶',
+        operation_summary=gettext_lazy('删除一个存储桶'),
         manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='ids', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_ARRAY,
                 items=openapi.Items(type=openapi.TYPE_INTEGER),
-                description="存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id",
+                description=gettext_lazy("存储桶id列表或数组，删除多个存储桶时，通过此参数传递其他存储桶id"),
                 required=False
             ),
         ],
@@ -567,26 +590,26 @@ class BucketViewSet(CustomGenericViewSet):
             return ret
         bucket = ret
         if not bucket.delete_and_archive():  # 删除归档
-            return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if ids:
             buckets = Bucket.objects.select_related('user').filter(id__in=ids).filter(user=request.user).all()
             if not buckets.exists():
-                return Response(data={'code': 404, 'code_text': '未找到要删除的存储桶'}, status=status.HTTP_404_NOT_FOUND)
+                return Response(data={'code': 404, 'code_text': _('未找到要删除的存储桶')}, status=status.HTTP_404_NOT_FOUND)
             for bucket in buckets:
                 if not bucket.delete_and_archive():  # 删除归档
-                    return Response(data={'code': 500, 'code_text': '删除存储桶失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @swagger_auto_schema(
-        operation_summary='存储桶访问权限设置',
+        operation_summary=gettext_lazy('存储桶访问权限设置'),
         request_body=no_body,
         manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='public', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="设置访问权限, 1(公有)，2(私有)，3（公有可读可写）",
+                description=gettext_lazy("设置访问权限, 1(公有)，2(私有)，3（公有可读可写）"),
                 required=True
             ),
         ],
@@ -606,7 +629,7 @@ class BucketViewSet(CustomGenericViewSet):
     def partial_update(self, request, *args, **kwargs):
         public = str_to_int_or_default(request.query_params.get('public', ''), 0)
         if public not in [1, 2, 3]:
-            return Response(data={'code': 400, 'code_text': 'public参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('public参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
         if not ok:
@@ -618,24 +641,24 @@ class BucketViewSet(CustomGenericViewSet):
         url = request.build_absolute_uri(url)
         share_urls.append(url)
         if not bucket.set_permission(public=public):
-            return Response(data={'code': 500, 'code_text': '更新数据库数据时错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('更新数据库数据时错误')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
-            'code_text': '存储桶权限设置成功',
+            'code_text': _('存储桶权限设置成功'),
             'public': public,
             'share': share_urls
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_summary='存储桶备注信息设置',
+        operation_summary=gettext_lazy('存储桶备注信息设置'),
         request_body=no_body,
         manual_parameters=DETAIL_BASE_PARAMS + [
             openapi.Parameter(
                 name='remarks', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="备注信息",
+                description=gettext_lazy("备注信息"),
                 required=True
             ),
         ],
@@ -655,7 +678,7 @@ class BucketViewSet(CustomGenericViewSet):
         """
         remarks = request.query_params.get('remarks', '')
         if not remarks:
-            return Response(data={'code': 400, 'code_text': '备注信息不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('备注信息不能为空')}, status=status.HTTP_400_BAD_REQUEST)
 
         ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
         if not ok:
@@ -663,12 +686,12 @@ class BucketViewSet(CustomGenericViewSet):
         bucket = ret
 
         if not bucket.set_remarks(remarks=remarks):
-            return Response(data={'code': 500, 'code_text': '设置备注信息失败，更新数据库数据时错误'},
+            return Response(data={'code': 500, 'code_text': _('设置备注信息失败，更新数据库数据时错误')},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
-            'code_text': '存储桶备注信息设置成功',
+            'code_text': _('存储桶备注信息设置成功'),
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
@@ -686,14 +709,14 @@ class BucketViewSet(CustomGenericViewSet):
             try:
                 bid = int(id_or_name)
             except Exception as e:
-                return False, Response({'code': 400, 'code_text': '无效的存储桶ID'}, status=status.HTTP_400_BAD_REQUEST)
+                return False, Response({'code': 400, 'code_text': _('无效的存储桶ID')}, status=status.HTTP_400_BAD_REQUEST)
             bucket = Bucket.objects.filter(id=bid).first()
 
         if not bucket:
-            return False, Response({'code': 404, 'code_text': '存储桶不存在'})
+            return False, Response({'code': 404, 'code_text': _('存储桶不存在')})
 
         if not bucket.check_user_own_bucket(request.user):
-            return False, Response({'code': 403, 'code_text': '您没有操作此存储桶的权限'}, status=status.HTTP_403_FORBIDDEN)
+            return False, Response({'code': 403, 'code_text': _('您没有操作此存储桶的权限')}, status=status.HTTP_403_FORBIDDEN)
         return True, bucket
 
     def get_buckets_ids(self, request, **kwargs):
@@ -715,7 +738,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             ids = [int(i) for i in ids]
         except ValueError:
-            return ValueError('存储桶id有误')
+            return ValueError(_('无效的存储桶ID'))
 
         return ids
 
@@ -727,7 +750,7 @@ class BucketViewSet(CustomGenericViewSet):
         """
         if self.action in ['list', 'retrieve']:
             return serializers.BucketSerializer
-        elif self.action =='create':
+        elif self.action == 'create':
             return serializers.BucketCreateSerializer
         return Serializer
 
@@ -801,8 +824,6 @@ class ObjViewSet(CustomGenericViewSet):
         >>Http Code: 状态码500：服务器内部错误;
 
     destroy:
-        删除对象
-
         通过文件对象绝对路径,删除文件对象；
 
         >>Http Code: 状态码204：删除成功，NO_CONTENT；
@@ -836,20 +857,19 @@ class ObjViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     parser_classes = (parsers.MultiPartParser, parsers.FormParser)
 
-
     @swagger_auto_schema(
-        operation_summary='分片上传文件对象',
+        operation_summary=gettext_lazy('分片上传文件对象'),
         manual_parameters=[
             openapi.Parameter(
                 name='objpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="文件对象绝对路径",
+                description=gettext_lazy("文件对象绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='reset', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_BOOLEAN,
-                description="reset=true时，如果对象已存在，重置对象大小为0",
+                description=gettext_lazy("reset=true时，如果对象已存在，重置对象大小为0"),
                 required=False
             ),
         ],
@@ -902,18 +922,18 @@ class ObjViewSet(CustomGenericViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_summary='下载文件对象，自定义读取对象数据块',
+        operation_summary=gettext_lazy('下载文件对象，自定义读取对象数据块'),
         manual_parameters=[
             openapi.Parameter(
                 name='offset', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="要读取的文件块在整个文件中的起始位置（bytes偏移量)",
+                description=gettext_lazy("要读取的文件块在整个文件中的起始位置(bytes偏移量)"),
                 required=False
             ),
             openapi.Parameter(
                 name='size', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="要读取的文件块的字节大小",
+                description=gettext_lazy("要读取的文件块的字节大小"),
                 required=False
             ),
         ],
@@ -962,6 +982,9 @@ class ObjViewSet(CustomGenericViewSet):
         response['evob_obj_size'] = obj.si
         return response
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('删除一个对象')
+    )
     def destroy(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name','')
@@ -972,29 +995,29 @@ class ObjViewSet(CustomGenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if not ok:
-            return Response(data={'code': 500, 'code_text': '删除失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('删除失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @swagger_auto_schema(
-        operation_summary='对象共享或私有权限设置',
+        operation_summary=gettext_lazy('对象共享或私有权限设置'),
         manual_parameters=[
             openapi.Parameter(
                 name='share', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）",
+                description=gettext_lazy("分享访问权限，0（不分享禁止访问），1（分享只读），2（分享可读可写）"),
                 required=True
             ),
             openapi.Parameter(
                 name='days', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="对象公开分享天数(share!=0时有效)，0表示永久公开，负数表示不公开，默认为0",
+                description=gettext_lazy("对象公开分享天数(share!=0时有效)，0表示永久公开，负数表示不公开，默认为0"),
                 required=False
             ),
             openapi.Parameter(
                 name='password', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码",
+                description=gettext_lazy("分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码"),
                 required=False
             ),
         ],
@@ -1017,7 +1040,7 @@ class ObjViewSet(CustomGenericViewSet):
 
         if pw:  # 指定密码
             if not (4 <= len(pw) <= 8):
-                return Response(data={'code': 400, 'code_text': 'password参数长度为4-8个字符'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')}, status=status.HTTP_400_BAD_REQUEST)
             password = pw
         elif pw is None:  # 不设密码
             password = ''
@@ -1026,15 +1049,15 @@ class ObjViewSet(CustomGenericViewSet):
 
         days = str_to_int_or_default(request.query_params.get('days', 0), None)
         if days is None:
-            return Response(data={'code': 400, 'code_text': 'days参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('days参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         share = request.query_params.get('share', None)
         if share is None:
-            return Response(data={'code': 400, 'code_text': '缺少share参数'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('缺少share参数')}, status=status.HTTP_400_BAD_REQUEST)
 
         share = str_to_int_or_default(share, -1)
         if share not in [0, 1, 2]:
-            return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('share参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1043,7 +1066,7 @@ class ObjViewSet(CustomGenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if not ok:
-            return Response(data={'code': 500, 'code_text': '对象共享权限设置失败'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('对象共享权限设置失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         share_uri = django_reverse('share:obs-detail', kwargs={'objpath': f'{bucket_name}/{objpath}'})
         if password:
@@ -1051,7 +1074,7 @@ class ObjViewSet(CustomGenericViewSet):
         share_uri = request.build_absolute_uri(share_uri)
         data = {
             'code': 200,
-            'code_text': '对象共享权限设置成功',
+            'code_text': _('对象共享权限设置成功'),
             'share': share,
             'days': days,
             'share_uri': share_uri
@@ -1102,7 +1125,7 @@ class ObjViewSet(CustomGenericViewSet):
                 validated_data['offset'] = offset
                 validated_data['size'] = size
             except:
-                response = Response(data={'code': 400, 'code_text': 'offset或size参数有误'},
+                response = Response(data={'code': 400, 'code_text': _('offset或size参数有误')},
                                 status=status.HTTP_400_BAD_REQUEST)
                 return None, response
         # 未提交参数
@@ -1110,7 +1133,7 @@ class ObjViewSet(CustomGenericViewSet):
             return None, None
         # 参数提交不全
         else:
-            response = Response(data={'code': 400, 'code_text': 'offset和size参数必须同时提交'},
+            response = Response(data={'code': 400, 'code_text': _('offset和size参数必须同时提交')},
                                 status=status.HTTP_400_BAD_REQUEST)
             return None, response
         return validated_data, None
@@ -1209,7 +1232,7 @@ class DirectoryViewSet(CustomGenericViewSet):
     pagination_class = paginations.BucketFileLimitOffsetPagination
 
     @swagger_auto_schema(
-        operation_summary='获取存储桶根目录下的文件和文件夹信息',
+        operation_summary=gettext_lazy('获取存储桶根目录下的文件和文件夹信息'),
         responses={
             status.HTTP_200_OK: """
                 {
@@ -1245,12 +1268,12 @@ class DirectoryViewSet(CustomGenericViewSet):
         return self.list_v1(request, *args, **kwargs)
 
     @swagger_auto_schema(
-        operation_summary='获取一个目录下的文件和文件夹信息',
+        operation_summary=gettext_lazy('获取一个目录下的文件和文件夹信息'),
         manual_parameters=[
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="目录绝对路径",
+                description=gettext_lazy("目录绝对路径"),
                 required=True
             ),
             openapi.Parameter(
@@ -1313,7 +1336,7 @@ class DirectoryViewSet(CustomGenericViewSet):
             offset = paginator.get_offset(request)
             limit = paginator.get_limit(request)
         except Exception as e:
-            return Response(data={'code': 400, 'code_text': 'offset或limit参数无效'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('offset或limit参数无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1333,13 +1356,13 @@ class DirectoryViewSet(CustomGenericViewSet):
         return paginator.get_paginated_response(data_dict)
 
     @swagger_auto_schema(
-        operation_summary='创建一个目录',
+        operation_summary=gettext_lazy('创建一个目录'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="目录绝对路径",
+                description=gettext_lazy("目录绝对路径"),
                 required=True
             ),
         ],
@@ -1380,20 +1403,20 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         data = {
             'code': 201,
-            'code_text': '创建文件夹成功',
+            'code_text': _('创建文件夹成功'),
             'data': {'dir_name': dir.name, 'bucket_name': bucket_name, 'dir_path': dir.get_parent_path()},
             'dir': serializers.ObjInfoSerializer(dir).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
-        operation_summary='删除一个目录',
+        operation_summary=gettext_lazy('删除一个目录'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="目录绝对路径",
+                description=gettext_lazy("目录绝对路径"),
                 required=True
             ),
         ],
@@ -1414,31 +1437,31 @@ class DirectoryViewSet(CustomGenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @swagger_auto_schema(
-        operation_summary='设置目录访问权限',
+        operation_summary=gettext_lazy('设置目录访问权限'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="目录绝对路径",
+                description=gettext_lazy("目录绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='share', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)",
+                description=gettext_lazy("用于设置目录访问权限, 0（私有），1(公有只读)，2(公有可读可写)"),
                 required=True
             ),
             openapi.Parameter(
                 name='days', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_INTEGER,
-                description="公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0",
+                description=gettext_lazy("公开分享天数(share=1或2时有效)，0表示永久公开，负数表示不公开，默认为0"),
                 required=False
             ),
             openapi.Parameter(
                 name='password', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码",
+                description=gettext_lazy("分享密码，此参数不存在，不设密码；可指定4-8字符；若为空，随机分配密码"),
                 required=False
             ),
         ],
@@ -1462,7 +1485,7 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         if pw:  # 指定密码
             if not (4 <= len(pw) <= 8):
-                return Response(data={'code': 400, 'code_text': 'password参数长度为4-8个字符'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')}, status=status.HTTP_400_BAD_REQUEST)
             password = pw
         elif pw is None:  # 不设密码
             password = ''
@@ -1470,7 +1493,7 @@ class DirectoryViewSet(CustomGenericViewSet):
             password = rand_share_code()
 
         if share not in [0, 1, 2]:
-            return Response(data={'code': 400, 'code_text': 'share参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('share参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1479,12 +1502,12 @@ class DirectoryViewSet(CustomGenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if not ok:
-            return Response(data={'code': 400, 'code_text': '设置目录权限失败'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('设置目录权限失败')}, status=status.HTTP_400_BAD_REQUEST)
 
         share_base = f'{bucket_name}/{dirpath}'
         share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
         share_url = request.build_absolute_uri(share_url)
-        return Response(data={'code': 200, 'code_text': '设置目录权限成功', 'share': share_url, 'share_code': password}, status=status.HTTP_200_OK)
+        return Response(data={'code': 200, 'code_text': _('设置目录权限成功'), 'share': share_url, 'share_code': password}, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         """
@@ -1530,6 +1553,9 @@ class BucketStatsViewSet(CustomGenericViewSet):
     lookup_field = 'bucket_name'
     lookup_value_regex = '[a-z0-9-_]{3,64}'
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取一个存储桶资源统计信息'),
+    )
     def retrieve(self, request, *args, **kwargs):
         bucket_name = kwargs.get(self.lookup_field)
 
@@ -1540,7 +1566,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
             bucket = get_user_own_bucket(bucket_name, request)
 
         if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+            return Response(data={'code': 404, 'code_text': _('bucket_name参数有误，存储桶不存在')},
                                   status=status.HTTP_404_NOT_FOUND)
 
         data = bucket.get_stats()
@@ -1596,14 +1622,13 @@ class SecurityViewSet(CustomGenericViewSet):
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
-
     @swagger_auto_schema(
-        operation_summary='获取指定用户的安全凭证',
+        operation_summary=gettext_lazy('获取指定用户的安全凭证'),
         manual_parameters=[
             openapi.Parameter(
                 name='key', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="访问密钥对",
+                description=gettext_lazy("访问密钥对"),
                 required=False
             ),
         ]
@@ -1702,26 +1727,26 @@ class MoveViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
 
     @swagger_auto_schema(
-        operation_summary='移动或重命名一个对象',
+        operation_summary=gettext_lazy('移动或重命名一个对象'),
         operation_id='v1_move_create_detail',
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='objpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="文件对象绝对路径",
+                description=gettext_lazy("文件对象绝对路径"),
                 required=True
             ),
             openapi.Parameter(
                 name='move_to', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="移动对象到此目录路径下，/或空字符串表示桶下根目录",
+                description=gettext_lazy("移动对象到此目录路径下，/或空字符串表示桶下根目录"),
                 required=False
             ),
             openapi.Parameter(
                 name='rename', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="重命名对象的新名称",
+                description=gettext_lazy("重命名对象的新名称"),
                 required=False
             )
         ],
@@ -1762,7 +1787,7 @@ class MoveViewSet(CustomGenericViewSet):
 
         context = self.get_serializer_context()
         context.update({'bucket_name': bucket.name, 'bucket': bucket})
-        return Response(data={'code': 201, 'code_text': '移动对象操作成功',
+        return Response(data={'code': 201, 'code_text': _('移动对象操作成功'),
                               'bucket_name': bucket.name,
                               'dir_path': obj.get_parent_path(),
                               'obj': serializers.ObjInfoSerializer(obj, context=context).data},
@@ -1822,13 +1847,13 @@ class MetadataViewSet(CustomGenericViewSet):
 
 
     @swagger_auto_schema(
-        operation_summary='获取对象或目录元数据',
+        operation_summary=gettext_lazy('获取对象或目录元数据'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='path', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="对象或目录绝对路径",
+                description=gettext_lazy("对象或目录绝对路径"),
                 required=True
             )
         ],
@@ -1841,7 +1866,7 @@ class MetadataViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         path, name = PathParser(filepath=path_name).get_path_and_filename()
         if not bucket_name or not name:
-            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1849,23 +1874,23 @@ class MetadataViewSet(CustomGenericViewSet):
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': f'error，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj:
-            return Response(data={'code': 404, 'code_text': '对象或目录不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('对象或目录不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
-        return Response(data={'code': 200, 'code_text': '获取元数据成功', 'bucket_name': bucket_name,
+        return Response(data={'code': 200, 'code_text': _('获取元数据成功'), 'bucket_name': bucket_name,
                               'dir_path': path, 'obj': serializer.data})
 
     @swagger_auto_schema(
-        operation_summary='创建一个空对象元数据',
+        operation_summary=gettext_lazy('创建一个空对象元数据'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='path', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="对象绝对路径",
+                description=gettext_lazy("对象绝对路径"),
                 required=True
             )
         ],
@@ -1900,7 +1925,7 @@ class MetadataViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         path, name = PathParser(filepath=path_name).get_path_and_filename()
         if not bucket_name or not name:
-            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1908,11 +1933,11 @@ class MetadataViewSet(CustomGenericViewSet):
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'},
+            return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj or not created:
-            return Response(data={'code': 404, 'code_text': '创建失败，对象已存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('创建失败，对象已存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
@@ -1924,7 +1949,7 @@ class MetadataViewSet(CustomGenericViewSet):
             'filename': obj.name
         }
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
-        return Response(data={'code': 200, 'code_text': '创建空对象元数据成功', 'info': info, 'obj': serializer.data})
+        return Response(data={'code': 200, 'code_text': _('创建空对象元数据成功'), 'info': info, 'obj': serializer.data})
 
     def get_serializer_class(self):
         """
@@ -1944,14 +1969,14 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
 
     @swagger_auto_schema(
-        operation_summary='自动同步对象大小元数据',
+        operation_summary=gettext_lazy('自动同步对象大小元数据'),
         operation_id='v1_refresh-meta_create_detail',
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='path', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="对象绝对路径",
+                description=gettext_lazy("对象绝对路径"),
                 required=True
             )
         ],
@@ -1989,7 +2014,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         path, name = PathParser(filepath=path_name).get_path_and_filename()
         if not bucket_name or not name:
-            return Response(data={'code': 400, 'code_text': 'path参数有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         hManager = HarborManager()
         try:
@@ -1997,18 +2022,18 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': f'错误，{str(e)}'},
+            return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj:
-            return Response(data={'code': 404, 'code_text': '对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
         ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         ok, ret = ho.get_rados_stat(obj_id=obj_key)
         if not ok:
-            return Response(data={'code': 400, 'code_text': f'获取rados对象大小失败，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
 
         size, mtime = ret
         if size == 0 and mtime is None:  # rados对象不存在
@@ -2023,14 +2048,14 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             try:
                 obj.save(update_fields=['si', 'upt'])
             except Exception as e:
-                return Response(data={'code': 400, 'code_text': f'更新对象大小元数据失败，{str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('更新对象大小元数据失败') + str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         info = {
             'size': size,
             'filename': obj.name,
             'mtime': mtime.isoformat()
         }
-        return Response(data={'code': 200, 'code_text': '更新对象大小元数据成功', 'info': info})
+        return Response(data={'code': 200, 'code_text': _('更新对象大小元数据成功'), 'info': info})
 
 
 class CephStatsViewSet(CustomGenericViewSet):
@@ -2070,11 +2095,14 @@ class CephStatsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('CEPH集群资源统计'),
+    )
     def list(self, request, *args, **kwargs):
         try:
             stats = HarborObject(pool_name='', obj_id='').get_cluster_stats()
         except RadosError as e:
-            return Response(data={'code': 500, 'code_text': '获取ceph集群信息错误：' + str(e)},
+            return Response(data={'code': 500, 'code_text': _('获取ceph集群信息错误：') + str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
@@ -2089,7 +2117,6 @@ class UserStatsViewSet(CustomGenericViewSet):
         用户资源统计视图集
 
         retrieve:
-            获取指定用户的资源统计信息
 
             获取指定用户的资源统计信息，需要超级用户权限
 
@@ -2119,8 +2146,6 @@ class UserStatsViewSet(CustomGenericViewSet):
             }
 
         list:
-            获取当前用户的资源统计信息
-
             获取当前用户的资源统计信息
 
             >>Http Code: 状态码200:
@@ -2160,6 +2185,9 @@ class UserStatsViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取当前用户的资源统计信息'),
+    )
     def list(self, request, *args, **kwargs):
         user = request.user
         data = self.get_user_stats(user)
@@ -2167,12 +2195,15 @@ class UserStatsViewSet(CustomGenericViewSet):
         data['username'] = user.username
         return Response(data)
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取指定用户的资源统计信息'),
+    )
     def retrieve(self, request, *args, **kwargs):
         username = kwargs.get(self.lookup_field)
         try:
             user = User.objects.get(username=username)
         except exceptions.ObjectDoesNotExist:
-            return Response(data={'code': 404, 'code_text': 'username参数有误，用户不存在'},
+            return Response(data={'code': 404, 'code_text': _('username参数有误，用户不存在')},
                             status=status.HTTP_404_NOT_FOUND)
 
         data = self.get_user_stats(user)
@@ -2239,6 +2270,9 @@ class CephComponentsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('ceph的mon，osd，mgr，mds组件信息'),
+    )
     def list(self, request, *args, **kwargs):
         return Response({
             'code': 200,
@@ -2275,6 +2309,9 @@ class CephErrorViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('ceph集群当前故障信息查询'),
+    )
     def list(self, request, *args, **kwargs):
         return Response({
             'code': 200,
@@ -2313,6 +2350,9 @@ class CephPerformanceViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('ceph集群的IOPS，I/O带宽'),
+    )
     def list(self, request, *args, **kwargs):
         ok, data = HarborObject(pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
@@ -2325,8 +2365,6 @@ class UserCountViewSet(CustomGenericViewSet):
         系统用户总数查询
 
         list:
-            系统用户总数查询
-
             系统用户总数查询，需要超级用户权限
 
             >>Http Code: 状态码200:
@@ -2345,6 +2383,9 @@ class UserCountViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('系统用户总数查询'),
+    )
     def list(self, request, *args, **kwargs):
         count = User.objects.filter(is_active=True).count()
         return Response({
@@ -2358,8 +2399,6 @@ class AvailabilityViewSet(CustomGenericViewSet):
         系统可用性
 
         list:
-            系统可用性查询
-
             系统可用性查询，需要超级用户权限
 
             >>Http Code: 状态码200:
@@ -2372,6 +2411,9 @@ class AvailabilityViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('系统可用性查询'),
+    )
     def list(self, request, *args, **kwargs):
         return Response({
             'code': 200,
@@ -2384,8 +2426,6 @@ class VisitStatsViewSet(CustomGenericViewSet):
         访问统计
 
         list:
-            系统访问统计查询
-
             系统访问统计查询，需要超级用户权限
 
             >>Http Code: 状态码200:
@@ -2410,6 +2450,9 @@ class VisitStatsViewSet(CustomGenericViewSet):
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('系统访问统计查询'),
+    )
     def list(self, request, *args, **kwargs):
         stats = User.active_user_stats()
         stats.update({
@@ -2430,8 +2473,6 @@ class TestViewSet(CustomGenericViewSet):
         list:
             系统是否可用查询
 
-            系统是否可用查询
-
             >>Http Code: 状态码200:
                 {
                     "code": 200,
@@ -2450,6 +2491,9 @@ class TestViewSet(CustomGenericViewSet):
     throttle_classes = (throttles.TestRateThrottle,)
     pagination_class = None
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('系统是否可用查询'),
+    )
     def list(self, request, *args, **kwargs):
         return Response({
             'code': 200,
@@ -2486,33 +2530,32 @@ class FtpViewSet(CustomGenericViewSet):
     lookup_value_regex = '[a-z0-9-_]{3,64}'
     pagination_class = None
 
-
     @swagger_auto_schema(
-        operation_summary='开启或关闭存储桶ftp访问限制',
+        operation_summary=gettext_lazy('开启或关闭存储桶ftp访问限制'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='bucket_name', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="存储桶名称",
+                description=gettext_lazy("存储桶名称"),
                 required=True
             ),
             openapi.Parameter(
                 name='enable', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_BOOLEAN,
-                description="存储桶ftp访问,true(开启)；false(关闭)",
+                description=gettext_lazy("存储桶ftp访问,true(开启)；false(关闭)"),
                 required=False
             ),
             openapi.Parameter(
                 name='password', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="存储桶ftp新的读写访问密码",
+                description=gettext_lazy("存储桶ftp新的读写访问密码"),
                 required=False
             ),
             openapi.Parameter(
                 name='ro_password', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description="存储桶ftp新的只读访问密码",
+                description=gettext_lazy("存储桶ftp新的只读访问密码"),
                 required=False
             ),
         ],
@@ -2523,7 +2566,7 @@ class FtpViewSet(CustomGenericViewSet):
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get(self.lookup_field, '')
         if not bucket_name:
-            return Response(data={'code': 400, 'code_text': '桶名称有误'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': _('存储桶名称有误')}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             params = self.validate_patch_params(request)
@@ -2537,7 +2580,7 @@ class FtpViewSet(CustomGenericViewSet):
         # 存储桶验证和获取桶对象
         bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
         if not bucket:
-            return Response(data={'code': 404, 'code_text': 'bucket_name参数有误，存储桶不存在'},
+            return Response(data={'code': 404, 'code_text': _('存储桶不存在')},
                             status=status.HTTP_404_NOT_FOUND)
 
         data = {}
@@ -2583,7 +2626,7 @@ class FtpViewSet(CustomGenericViewSet):
         ro_password = request.query_params.get('ro_password', None)
 
         if not enable and not password and not ro_password:
-            raise ValidationError('参数enable,password或ro_password必须提交一个')
+            raise ValidationError(_('参数enable,password或ro_password必须提交一个'))
 
         if enable is not None:
             if isinstance(enable, str):
@@ -2593,21 +2636,21 @@ class FtpViewSet(CustomGenericViewSet):
                 elif enable == 'false':
                     enable = False
                 else:
-                    raise ValidationError('无效的enable参数')
+                    raise ValidationError(_('无效的enable参数'))
 
             validated_data['enable'] = enable
 
         if password is not None:
             password = password.strip()
             if not (6 <= len(password) <= 20):
-                raise ValidationError('密码长度必须为6-20个字符')
+                raise ValidationError(_('密码长度必须为6-20个字符'))
 
             validated_data['password'] = password
 
         if ro_password is not None:
             ro_password = ro_password.strip()
             if not (6 <= len(ro_password) <= 20):
-                raise ValidationError('密码长度必须为6-20个字符')
+                raise ValidationError(_('密码长度必须为6-20个字符'))
 
             validated_data['ro_password'] = ro_password
 
@@ -2630,9 +2673,8 @@ class VPNViewSet(CustomGenericViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
-
     @swagger_auto_schema(
-        operation_summary='获取VPN口令',
+        operation_summary=gettext_lazy('获取VPN口令'),
         responses={
             status.HTTP_200_OK: ''
         }
@@ -2658,10 +2700,10 @@ class VPNViewSet(CustomGenericViewSet):
             }
         '''
         vpn, created = VPNAuth.objects.get_or_create(user=request.user)
-        return Response(data={'code': 200, 'code_text': '获取成功', 'vpn': serializers.VPNSerializer(vpn).data})
+        return Response(data={'code': 200, 'code_text': _('获取成功'), 'vpn': serializers.VPNSerializer(vpn).data})
 
     @swagger_auto_schema(
-        operation_summary='修改vpn口令',
+        operation_summary=gettext_lazy('修改vpn口令'),
         responses={
             status.HTTP_201_CREATED: """
                 {
@@ -2683,7 +2725,7 @@ class VPNViewSet(CustomGenericViewSet):
         '''
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
-            code_text = 'password有误'
+            code_text = 'password error'
             try:
                 for key, err_list in serializer.errors.items():
                     code_text = f'{key},{err_list[0]}'
@@ -2695,9 +2737,9 @@ class VPNViewSet(CustomGenericViewSet):
         password = serializer.validated_data['password']
         vpn, created = VPNAuth.objects.get_or_create(user=request.user)
         if vpn.reset_password(password):
-            return Response(data={'code': 201, 'code_text': '修改成功', 'vpn': serializers.VPNSerializer(vpn).data}, status=status.HTTP_201_CREATED)
+            return Response(data={'code': 201, 'code_text': _('修改成功'), 'vpn': serializers.VPNSerializer(vpn).data}, status=status.HTTP_201_CREATED)
 
-        return Response(data={'code': 400, 'code_text': '修改失败'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'code': 400, 'code_text': _('修改失败')}, status=status.HTTP_400_BAD_REQUEST)
 
     def get_serializer_class(self):
         """
@@ -2749,13 +2791,13 @@ class ObjKeyViewSet(CustomGenericViewSet):
     lookup_value_regex = '.+'
 
     @swagger_auto_schema(
-        operation_summary='获取对象对应的ceph rados key信息',
+        operation_summary=gettext_lazy('获取对象对应的ceph rados key信息'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
                 name='objpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
-                description="文件对象绝对路径",
+                description=gettext_lazy("文件对象绝对路径"),
                 required=True
             )
         ]
@@ -2771,7 +2813,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
         if not obj:
-            return Response(data={'code': 404, 'code_text': '对象不存在'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
@@ -2782,5 +2824,5 @@ class ObjKeyViewSet(CustomGenericViewSet):
             'size': obj.obj_size,
             'filename': obj.name
         }
-        return Response(data={'code': 200, 'code_text': '请求成功', 'info': info}, status=status.HTTP_200_OK)
+        return Response(data={'code': 200, 'code_text': 'ok', 'info': info}, status=status.HTTP_200_OK)
 

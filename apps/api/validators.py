@@ -1,5 +1,6 @@
 import re
 
+from django.utils.translation import gettext as _
 from rest_framework.serializers import ValidationError
 
 from .models import Bucket, BucketLimitConfig
@@ -16,7 +17,7 @@ def DNSStringValidator(value):
     验证字符串是否符合NDS标准
     '''
     if dns_regex.match(value) == None:
-        raise ValidationError('字符串不符合DNS标准')
+        raise ValidationError(_('字符串不符合DNS标准'))
 
 
 def bucket_limit_validator(user):
@@ -27,6 +28,6 @@ def bucket_limit_validator(user):
     count = Bucket.get_user_valid_bucket_count(user=user)
     limit = BucketLimitConfig.get_user_bucket_limit(user=user)
     if count >= limit:
-        raise ValidationError('您可以拥有的存储桶数量已达上限')
+        raise ValidationError(_('您可以拥有的存储桶数量已达上限'))
 
 

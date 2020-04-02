@@ -1,0 +1,485 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-03-30 18:34+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps/buckets/static/buckets/bucket.js:267
+msgid ""
+"请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-"
+msgstr ""
+"Please enter a bucket name that conforms to DNS standard. You can enter a-z, "
+"0-9 and '-'"
+
+#: apps/buckets/static/buckets/bucket.js:270
+msgid "请输入3-63个字符"
+msgstr "Please enter 3-63 characters"
+
+#: apps/buckets/static/buckets/bucket.js:274
+#: apps/buckets/static/buckets/bucket.js:740
+#: apps/buckets/static/buckets/bucket.js:1210
+#: apps/buckets/static/buckets/bucket.js:1293
+#: apps/buckets/static/buckets/bucket.js:1367
+#: apps/buckets/static/buckets/bucket.js:1635
+#: apps/buckets/static/buckets/bucket.js:1881
+msgid "取消"
+msgstr "Cancel"
+
+#: apps/buckets/static/buckets/bucket.js:275
+msgid "创建"
+msgstr "Create"
+
+#: apps/buckets/static/buckets/bucket.js:368
+msgid "请先选择要删除的存储桶"
+msgstr "Please select the bucket to delete first"
+
+#: apps/buckets/static/buckets/bucket.js:373
+msgid "确认删除选中的存储桶吗"
+msgstr "Are you sure to delete the selected bucket"
+
+#: apps/buckets/static/buckets/bucket.js:374
+msgid "此操作是不可逆的"
+msgstr "This operation cannot be undone"
+
+#: apps/buckets/static/buckets/bucket.js:402
+msgid "已成功删除存储桶"
+msgstr "Bucket deleted successfully"
+
+#: apps/buckets/static/buckets/bucket.js:405
+#: apps/buckets/static/buckets/bucket.js:1425
+#: apps/buckets/static/buckets/bucket.js:1470
+msgid "删除失败"
+msgstr "Delete failed"
+
+#: apps/buckets/static/buckets/bucket.js:446
+#: apps/buckets/static/buckets/bucket.js:485
+msgid "资源统计"
+msgstr "Statistics"
+
+#: apps/buckets/static/buckets/bucket.js:459
+msgid "创建存储桶"
+msgstr "Create bucket"
+
+#: apps/buckets/static/buckets/bucket.js:461
+msgid "删除存储桶"
+msgstr "Delete bucket"
+
+#: apps/buckets/static/buckets/bucket.js:472
+msgid "创建时间"
+msgstr "Crete time"
+
+#: apps/buckets/static/buckets/bucket.js:474
+msgid "FTP状态"
+msgstr "FTP status"
+
+#: apps/buckets/static/buckets/bucket.js:476
+msgid "FTP只读密码"
+msgstr "FTP password(ro)"
+
+#: apps/buckets/static/buckets/bucket.js:478
+#: apps/buckets/static/buckets/bucket.js:1079
+#: apps/buckets/static/buckets/bucket.js:1952
+#: apps/share/static/share/share.js:166
+msgid "操作"
+msgstr "operation"
+
+#: apps/buckets/static/buckets/bucket.js:481
+#: apps/buckets/static/buckets/bucket.js:836
+#: apps/buckets/static/buckets/bucket.js:858
+msgid "开启"
+msgstr "Opened"
+
+#: apps/buckets/static/buckets/bucket.js:482
+#: apps/buckets/static/buckets/bucket.js:837
+#: apps/buckets/static/buckets/bucket.js:860
+msgid "关闭"
+msgstr "Closed"
+
+#: apps/buckets/static/buckets/bucket.js:483
+msgid "双击修改密码"
+msgstr "Double click to change password"
+
+#: apps/buckets/static/buckets/bucket.js:484
+msgid "双击修改备注"
+msgstr "Double click to modify remarks"
+
+#: apps/buckets/static/buckets/bucket.js:536
+#: apps/buckets/static/buckets/bucket.js:539
+#: apps/share/static/share/share.js:217 apps/share/static/share/share.js:220
+msgid "上页"
+msgstr "Previous"
+
+#: apps/buckets/static/buckets/bucket.js:568
+msgid "容量大小"
+msgstr "data size"
+
+#: apps/buckets/static/buckets/bucket.js:576
+msgid "统计时间"
+msgstr "Stat time"
+
+#: apps/buckets/static/buckets/bucket.js:615
+msgid "备注长度不得大于255个字符"
+msgstr "Remarks cannot be longer than 255 characters"
+
+#: apps/buckets/static/buckets/bucket.js:628
+msgid "修改备注成功"
+msgstr "Remarks modified successfully"
+
+#: apps/buckets/static/buckets/bucket.js:637
+msgid "修改备注失败"
+msgstr "Failed to modify remarks"
+
+#: apps/buckets/static/buckets/bucket.js:662
+msgid "存储桶资源统计"
+msgstr "Count resource size of buckets"
+
+#: apps/buckets/static/buckets/bucket.js:664
+msgid "提示：数据非实时统计，有一定时间间隔"
+msgstr ""
+"Tips: the data is not real-time statistics, with a certain time interval"
+
+#: apps/buckets/static/buckets/bucket.js:732
+msgid "修改FTP密码"
+msgstr "Change FTP password"
+
+#: apps/buckets/static/buckets/bucket.js:736
+msgid "密码长度6-20个字符"
+msgstr "Password length 6-20 characters"
+
+#: apps/buckets/static/buckets/bucket.js:741
+#: apps/buckets/static/buckets/bucket.js:894
+#: apps/buckets/static/buckets/bucket.js:1209
+#: apps/buckets/static/buckets/bucket.js:1297
+#: apps/buckets/static/buckets/bucket.js:1371
+#: apps/buckets/static/buckets/bucket.js:1636
+#: apps/buckets/static/buckets/bucket.js:1880
+msgid "确定"
+msgstr "Confirm"
+
+#: apps/buckets/static/buckets/bucket.js:765
+msgid "修改密码成功"
+msgstr "Password changed successfully"
+
+#: apps/buckets/static/buckets/bucket.js:772
+msgid "修改密码失败"
+msgstr "Failed to change password"
+
+#: apps/buckets/static/buckets/bucket.js:812
+msgid "请求失败"
+msgstr "Request failed"
+
+#: apps/buckets/static/buckets/bucket.js:833
+msgid "开启或关闭FTP"
+msgstr "Turn FTP on or off"
+
+#: apps/buckets/static/buckets/bucket.js:862
+msgid "配置存储桶FTP成功"
+msgstr "Setting bucket FTP succeeded"
+
+#: apps/buckets/static/buckets/bucket.js:864
+msgid "配置存储桶FTP失败"
+msgstr "Failed to set bucket FTP"
+
+#: apps/buckets/static/buckets/bucket.js:881
+msgid "选择权限"
+msgstr "Select permissions"
+
+#: apps/buckets/static/buckets/bucket.js:884
+msgid "公开"
+msgstr "Public"
+
+#: apps/buckets/static/buckets/bucket.js:885
+#: apps/buckets/static/buckets/bucket.js:906
+#: apps/buckets/static/buckets/bucket.js:1268
+#: apps/buckets/static/buckets/bucket.js:1321
+msgid "私有"
+msgstr "private"
+
+#: apps/buckets/static/buckets/bucket.js:904
+#: apps/buckets/static/buckets/bucket.js:1318
+msgid "公有"
+msgstr "Public"
+
+#: apps/buckets/static/buckets/bucket.js:919
+#: apps/buckets/static/buckets/bucket.js:1336
+#: apps/buckets/static/buckets/bucket.js:1398
+msgid "分享链接"
+msgstr "Share links"
+
+#: apps/buckets/static/buckets/bucket.js:937
+#: apps/buckets/static/buckets/bucket.js:1576
+msgid "存储桶"
+msgstr "Bucket"
+
+#: apps/buckets/static/buckets/bucket.js:948
+msgid "创建文件夹"
+msgstr "Create directory"
+
+#: apps/buckets/static/buckets/bucket.js:949
+msgid "上传文件"
+msgstr "Upload files"
+
+#: apps/buckets/static/buckets/bucket.js:970
+#: apps/share/static/share/share.js:162
+msgid "上传时间"
+msgstr "Upload time"
+
+#: apps/buckets/static/buckets/bucket.js:972
+msgid "权限"
+msgstr "Permissions"
+
+#: apps/buckets/static/buckets/bucket.js:1041
+#, javascript-format
+msgid "第%s页 / 共%s页"
+msgstr "Page %s of %s"
+
+#: apps/buckets/static/buckets/bucket.js:1044
+#: apps/buckets/static/buckets/bucket.js:1047
+msgid "下页"
+msgstr "Next"
+
+#: apps/buckets/static/buckets/bucket.js:1050
+msgid "跳转到"
+msgstr "Jump to"
+
+#: apps/buckets/static/buckets/bucket.js:1050
+msgid "页"
+msgstr "Page"
+
+#: apps/buckets/static/buckets/bucket.js:1051
+msgid "跳转"
+msgstr "Jump"
+
+#: apps/buckets/static/buckets/bucket.js:1081
+#: apps/buckets/static/buckets/bucket.js:1590
+#: apps/share/static/share/share.js:168
+msgid "下载"
+msgstr "Download"
+
+#: apps/buckets/static/buckets/bucket.js:1082
+#: apps/buckets/static/buckets/bucket.js:1955
+msgid "删除"
+msgstr "Delete"
+
+#: apps/buckets/static/buckets/bucket.js:1083
+#: apps/buckets/static/buckets/bucket.js:1956
+msgid "分享公开"
+msgstr "Share"
+
+#: apps/buckets/static/buckets/bucket.js:1084
+msgid "重命名"
+msgstr "Rename"
+
+#: apps/buckets/static/buckets/bucket.js:1144
+msgid "请输入一个有效的正整数页码"
+msgstr "Please enter a valid positive integer page number"
+
+#: apps/buckets/static/buckets/bucket.js:1177
+#: apps/buckets/static/buckets/bucket.js:1446
+msgid "确定要删除吗？"
+msgstr "Are you sure you want to delete?"
+
+#: apps/buckets/static/buckets/bucket.js:1201
+msgid "请修改对象名称"
+msgstr "Please modify the object name"
+
+#: apps/buckets/static/buckets/bucket.js:1214
+#: apps/buckets/static/buckets/bucket.js:1885
+msgid "请输入一些内容, 前后空格会自动去除"
+msgstr ""
+"Please input some content, the space before and after will be removed "
+"automatically"
+
+#: apps/buckets/static/buckets/bucket.js:1216
+msgid "对象名长度不能大于255字符"
+msgstr "Object name cannot be longer than 255 characters"
+
+#: apps/buckets/static/buckets/bucket.js:1217
+msgid "对象名不能包含‘/’"
+msgstr "Object name cannot contain '/'"
+
+#: apps/buckets/static/buckets/bucket.js:1245
+msgid "重命名成功"
+msgstr "Rename successful"
+
+#: apps/buckets/static/buckets/bucket.js:1256
+msgid "重命名失败"
+msgstr "Rename failed"
+
+#: apps/buckets/static/buckets/bucket.js:1263
+msgid "天"
+msgstr "days"
+
+#: apps/buckets/static/buckets/bucket.js:1264
+#: apps/buckets/static/buckets/bucket.js:1612
+msgid "永久公开"
+msgstr "Share forever"
+
+#: apps/buckets/static/buckets/bucket.js:1271
+msgid "有分享密码保护"
+msgstr "With shared password protection"
+
+#: apps/buckets/static/buckets/bucket.js:1290
+#: apps/buckets/static/buckets/bucket.js:1364
+msgid "分享"
+msgstr "Share"
+
+#: apps/buckets/static/buckets/bucket.js:1299
+msgid "提示：创建新的带密码的分享，旧的分享密码会失效"
+msgstr ""
+"Tip: create a new share with password, the old share password will fail"
+
+#: apps/buckets/static/buckets/bucket.js:1334
+msgid "分享密码"
+msgstr "Share password"
+
+#: apps/buckets/static/buckets/bucket.js:1341
+msgid "分享公开设置失败"
+msgstr "Share public failure"
+
+#: apps/buckets/static/buckets/bucket.js:1373
+msgid "提示：创建新的带密码的分享，旧的分享链接会失效"
+msgstr "Tip: create a new share with password, the old share link will fail"
+
+#: apps/buckets/static/buckets/bucket.js:1403
+msgid "分享公开设置失败！"
+msgstr "Share public failure"
+
+#: apps/buckets/static/buckets/bucket.js:1421
+#: apps/buckets/static/buckets/bucket.js:1466
+msgid "删除成功"
+msgstr "Delete successful"
+
+#: apps/buckets/static/buckets/bucket.js:1553
+#: apps/buckets/static/buckets/bucket.js:1561
+msgid "好像出问题了，跑丢了"
+msgstr "Something's wrong. I'm lost"
+
+#: apps/buckets/static/buckets/bucket.js:1559
+msgid "请求超时"
+msgstr "request timeout"
+
+#: apps/buckets/static/buckets/bucket.js:1594
+msgid "对象名称"
+msgstr "Object name"
+
+#: apps/buckets/static/buckets/bucket.js:1596
+msgid "对象大小"
+msgstr "Object size"
+
+#: apps/buckets/static/buckets/bucket.js:1597
+msgid "创建日期"
+msgstr "Creation time"
+
+#: apps/buckets/static/buckets/bucket.js:1598
+msgid "修改日期"
+msgstr "Modification time"
+
+#: apps/buckets/static/buckets/bucket.js:1599
+msgid "下载次数"
+msgstr "Download count"
+
+#: apps/buckets/static/buckets/bucket.js:1632
+msgid "选择文件"
+msgstr "select file"
+
+#: apps/buckets/static/buckets/bucket.js:1650
+msgid "没有选择文件，请先选择一个文件"
+msgstr "No file selected, please select a file first"
+
+#: apps/buckets/static/buckets/bucket.js:1660
+msgid "无法上传一个空文件"
+msgstr "Unable to upload an empty file"
+
+#: apps/buckets/static/buckets/bucket.js:1665
+msgid "上传文件失败，无法获取当前存储桶下路径"
+msgstr "Failed to upload file, unable to get the path under the current bucket"
+
+#: apps/buckets/static/buckets/bucket.js:1703
+msgid "文件已成功上传"
+msgstr "File uploaded successfully"
+
+#: apps/buckets/static/buckets/bucket.js:1738
+msgid "上传文件发生错误,请重新上传"
+msgstr "Upload file error, please upload again"
+
+#: apps/buckets/static/buckets/bucket.js:1873
+msgid "请输入一个文件夹名称"
+msgstr "Please enter a directory name"
+
+#: apps/buckets/static/buckets/bucket.js:1886
+msgid "目录名不能包含‘/’"
+msgstr "Directory name cannot contain '/'"
+
+#: apps/buckets/static/buckets/bucket.js:1919
+#, javascript-format
+msgid "创建文件夹“%s”成功"
+msgstr "Directory '%s' created successfully"
+
+#: apps/buckets/static/buckets/bucket.js:1931
+msgid "创建失败"
+msgstr "Create failure"
+
+#: apps/buckets/static/buckets/bucket.js:1954
+#: apps/share/static/share/share.js:167
+msgid "打开"
+msgstr "Open"
+
+#: apps/share/static/share/share.js:206
+#, javascript-format
+msgid "共 %s 个项目"
+msgstr "Total %s items"
+
+#: docs/static/docs/js/docsify.min.js:1
+msgid "style"
+msgstr ""
+
+#: docs/static/docs/js/docsify.min.js:1
+msgid "div"
+msgstr ""
+
+#: docs/static/docs/js/docsify.min.js:1
+msgid "nav"
+msgstr ""
+
+#: docs/static/docs/js/docsify.min.js:1
+msgid "h1"
+msgstr ""
+
+msgid "请勿离开此页面，以防文件上传过程中断！"
+msgstr "Please do not leave this page in case of file upload interruption!"
+
+msgid "名称"
+msgstr "Name"
+
+msgid "大小"
+msgstr "Size"
+
+msgid "存储桶名称"
+msgstr "Bucket name"
+
+msgid "访问权限"
+msgstr "Permission"
+
+msgid "FTP读写密码"
+msgstr "FTP password(rw)"
+
+msgid "备注"
+msgstr "Remarks"
+
+msgid "对象数量"
+msgstr "Object count"

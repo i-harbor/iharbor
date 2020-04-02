@@ -1,15 +1,16 @@
 {% extends "form.html" %}
 {% load static %}
+{% load i18n %}
 {% block form_extend %}
-    <a class="btn text-warning" href="{% url 'users:forget' %}">忘记密码</a>
-    <a class="btn btn-success pull-right" href="{% url 'users:register' %}">注册</a>
+    <a class="btn text-warning" href="{% url 'users:forget' %}">{% trans '忘记密码' %}</a>
+    <a class="btn btn-success pull-right" href="{% url 'users:register' %}">{% trans '注册' %}</a>
     <div class="clearfix"></div>
     {% if kjy_url %}
         <hr>
         <div class="third-part">
-            <div class="text-center">第三方帐号登录:</div>
+            <div class="text-center">{% trans '第三方帐号登录' %}:</div>
             <div>
-                <h3 class="text-center"><a id="id-passport" href="{{ kjy_url }}" class="text-info">中国科技云通行证</a></h3>
+                <h3 class="text-center"><a id="id-passport" href="{{ kjy_url }}" class="text-info">{% trans '中国科技云通行证' %}</a></h3>
             </div>
         </div>
     {% endif %}

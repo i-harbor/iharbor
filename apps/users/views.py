@@ -1,9 +1,8 @@
 from django.shortcuts import render, redirect, reverse
-from django.contrib.auth.views import redirect_to_login
 from django.contrib.auth import logout, login, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.template.loader import get_template
+from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext as _
 from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool2
@@ -30,17 +29,17 @@ def register_user(request):
 
                 # 向邮箱发送激活连接
                 if send_active_url_email(request, user.email, user):
-                    return render(request, 'message.html', context={'message': '用户注册成功，请登录邮箱访问收到的连接以激活用户'})
+                    return render(request, 'message.html', context={'message': _('用户注册成功，请登录邮箱访问收到的连接以激活用户')})
 
-                form.add_error(None, '邮件发送失败，请检查邮箱输入是否有误')
+                form.add_error(None, _('邮件发送失败，请检查邮箱输入是否有误'))
             else:
-                form.add_error(None, '用户注册失败，保存用户数据是错误')
+                form.add_error(None, _('用户注册失败，保存用户数据是错误'))
     else:
         form = UserRegisterForm()
 
     content = {}
-    content['form_title'] = '用户注册'
-    content['submit_text'] = '注册'
+    content['form_title'] = _('用户注册')
+    content['submit_text'] = _('注册')
     content['action_url'] = reverse('users:register')
     content['form'] = form
     return render(request, 'form.html', content)
@@ -66,8 +65,8 @@ def login_user(request):
         form = LoginForm()
 
     content = {}
-    content['form_title'] = '用户登录'
-    content['submit_text'] = '登录'
+    content['form_title'] = _('用户登录')
+    content['submit_text'] = _('登录')
     content['action_url'] = reverse('users:login')
     content['form'] = form
     content['kjy_url'] = get_kjy_login_url()
@@ -82,8 +81,8 @@ def logout_user(request):
     next = request.GET.get('next', reverse('buckets:bucket_view')) # 登出后重定向url
     user = request.user
     # 科技云通行证用户登录
-    if user.third_app == user.THIRD_APP_KJY:
-        user.third_app = user.LOCAL_USER
+    if user.third_app == User.THIRD_APP_KJY:
+        user.third_app = User.LOCAL_USER
         user.save()
         logout(request)
         next_url = request.build_absolute_uri(location=next)
@@ -110,7 +109,7 @@ def change_password(request):
             #注销当前用户，重新登陆
             login_url = reverse('users:login')
 
-            if user.third_app == user.THIRD_APP_KJY: # 如果当前未第三方科技云通行证登录认证
+            if user.third_app == User.THIRD_APP_KJY: # 如果当前未第三方科技云通行证登录认证
                 logout(request)
                 next = request.build_absolute_uri(location=login_url)
                 return kjy_logout(next=next)
@@ -121,14 +120,14 @@ def change_password(request):
         form = PasswordChangeForm()
 
     content = {}
-    content['form_title'] = '修改密码'
-    content['submit_text'] = '修改'
+    content['form_title'] = _('修改密码')
+    content['submit_text'] = _('确定')
     content['action_url'] = reverse('users:change_password')
     content['form'] = form
 
     user = request.user
     # 当前用户为第三方应用登录认证
-    if (user.third_app != user.LOCAL_USER):
+    if (user.third_app != User.LOCAL_USER):
         if user.password:
             tips_msg = f'您当前是通过第三方应用"{user.get_third_app_display()}"登录认证，并且您曾经为此用户设置过本地密码，' \
                        f'若忘记密码，请通过登录页面找回密码。'
@@ -148,7 +147,7 @@ def forget_password(request):
         if form.is_valid():
             urls = []
             try:
-                urls.append({'url': reverse('users:login'), 'name': '登录'})
+                urls.append({'url': reverse('users:login'), 'name': _('登录')})
             except:
                 pass
 
@@ -159,20 +158,17 @@ def forget_password(request):
             # 是否是未激活的用户
             if not user.is_active:
                 if send_active_url_email(request, email, user):
-                    return render(request, 'message.html', context={'message': '用户未激活，请先登录邮箱访问收到的链接以激活用户', 'urls': urls})
-                form.add_error(None, '邮件发送失败，请检查用户名输入是否有误，稍后重试')
+                    return render(request, 'message.html', context={'message': _('用户未激活，请先登录邮箱访问收到的链接以激活用户'), 'urls': urls})
+                form.add_error(None, _('邮件发送失败，请检查用户名输入是否有误，稍后重试'))
             else:
                 if send_forget_password_email(request, email, user):
-                    return render(request, 'message.html', context={'message': '重置密码确认邮件已发送，请尽快登录邮箱访问收到的链接以完成密码重置，以防链接过期无效'})
-                form.add_error(None, '邮件发送失败，请检查用户名输入是否有误，稍后重试')
+                    return render(request, 'message.html', context={'message': _('重置密码确认邮件已发送，请尽快登录邮箱访问收到的链接以完成密码重置，以防链接过期无效')})
+                form.add_error(None, _('邮件发送失败，请检查用户名输入是否有误，稍后重试'))
 
     else:
         form = ForgetPasswordForm()
 
-    content = {}
-    content['form_title'] = '找回密码'
-    content['submit_text'] = '提交'
-    content['form'] = form
+    content = {'form_title': _('找回密码'), 'submit_text': _('确定'), 'form': form}
     return render(request, 'form.html', content)
 
 def forget_password_confirm(request):
@@ -183,8 +179,8 @@ def forget_password_confirm(request):
     '''
     urls = []
     try:
-        urls.append({'url': reverse('users:login'), 'name': '登录'})
-        urls.append({'url': reverse('users:register'), 'name': '注册'})
+        urls.append({'url': reverse('users:login'), 'name': _('登录')})
+        urls.append({'url': reverse('users:register'), 'name': _('注册')})
     except:
         pass
 
@@ -195,7 +191,7 @@ def forget_password_confirm(request):
             user = form.cleaned_data.get('user')
             user.set_password(password)
             user.save()
-            return render(request, 'message.html', context={'message': '用户重置密码成功，请尝试登录', 'urls': urls})
+            return render(request, 'message.html', context={'message': _('用户重置密码成功，请尝试登录'), 'urls': urls})
     else:
         jwtt = JWTokenTool2()
         try:
@@ -203,15 +199,12 @@ def forget_password_confirm(request):
         except:
             ret = None
         if not ret:
-            return render(request, 'message.html', context={'message': '链接无效或已过期，请重新找回密码获取新的链接', 'urls': urls})
+            return render(request, 'message.html', context={'message': _('链接无效或已过期，请重新找回密码获取新的链接'), 'urls': urls})
 
         jwt_value = ret[-1]
         form = PasswordResetForm(initial={'jwt': jwt_value})
 
-    content = {}
-    content['form_title'] = '重置密码'
-    content['submit_text'] = '确定'
-    content['form'] = form
+    content = {'form_title': _('重置密码'), 'submit_text': _('确定'), 'form': form}
     return render(request, 'form.html', context=content)
 
 
@@ -223,8 +216,8 @@ def active_user(request):
     '''
     urls = []
     try:
-        urls.append({'url': reverse('users:login'), 'name': '登录'})
-        urls.append({'url': reverse('users:register'), 'name': '注册'})
+        urls.append({'url': reverse('users:login'), 'name': _('登录')})
+        urls.append({'url': reverse('users:register'), 'name': _('注册')})
     except:
         pass
 
@@ -232,7 +225,7 @@ def active_user(request):
     try:
         token = Token.objects.select_related('user').get(key=key)
     except Token.DoesNotExist:
-        return render(request, 'message.html', context={'message': '用户激活失败，无待激活账户，或者账户已被激活，请直接尝试登录', 'urls': urls})
+        return render(request, 'message.html', context={'message': _('用户激活失败，无待激活账户，或者账户已被激活，请直接尝试登录'), 'urls': urls})
 
     user = token.user
     user.is_active = True
@@ -240,7 +233,7 @@ def active_user(request):
 
     reflesh_new_token(token)
 
-    return render(request, 'message.html', context={'message': '用户已激活', 'urls': urls})
+    return render(request, 'message.html', context={'message': _('用户已激活'), 'urls': urls})
 
 
 def get_active_link(request, user):

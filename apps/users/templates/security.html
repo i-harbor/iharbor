@@ -1,5 +1,6 @@
 {% extends "base_with_sidebar.html" %}
 {% load static %}
+{% load i18n %}
 
 {% block title %}
     安全凭证
@@ -7,8 +8,8 @@
 
 {% block content %}
     <div class="row col-xs-12">
-        <h3>您的安全凭证</h3>
-        <p>使用此页面管理 EVHarbor 账户安全凭证。</p>
+        <h3>{% trans '您的安全凭证' %}</h3>
+        <p>使用此页面管理 iHarbor 账户安全凭证。</p>
         <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
         <div class="nav-list" id="security-nav-list">
             <div class="panel panel-success nav-list-item" id="nav-list-token">
@@ -22,10 +23,9 @@
                             {% if token %}
                             <table class="table table-hover" id="token-table">
                                 <tr class="bg-info">
-                                    <th>创建时间</th>
+                                    <th>{% trans '创建时间' %}</th>
                                     <th>Token</th>
-                                    <th>操作</th>
-{#                                    <th></th>#}
+                                    <th>{% trans '操作' %}</th>
                                 </tr>
                                 <tr>
                                     <th>{{ token.created | date:'Y-m-d H:i:s' }}</th>
@@ -33,8 +33,7 @@
                                         <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
                                         <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
                                     </th>
-{#                                    <th><span class="btn btn-info" id="btn-copy"><span class="glyphicon glyphicon-copy"></span>复制</span></th>#}
-                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>创建新密钥</span></th>
+                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>{% trans '创建新Token' %}</span></th>
                                 </tr>
                             </table>
                         {% endif %}
@@ -44,7 +43,7 @@
             <hr>
             <div class="panel panel-danger nav-list-item" id="nav-list-auth-key">
                 <div class="panel-heading" data-toggle="collapse" data-target="#nav-list-auth-key-body">
-                    <span class="glyphicon glyphicon-record"></span><span>访问密钥(访问密钥和秘密访问密钥)</span></div>
+                    <span class="glyphicon glyphicon-record"></span><span>{% trans '访问密钥对' %}</span></div>
                 <div class="panel-body collapse in"  id="nav-list-auth-key-body">
                     <div class="">
                         <p>每个访问密钥包含access_key和secret_key密钥对，访问密钥不只是简单的身份认证，每次http请求前都需要根据请求的url的path和有效期时间戳重新计算auth_key字符串，此认证方式安全性高，使用稍微复杂一些(具体生成过程请参考帮助文档)。
@@ -53,11 +52,11 @@
                         </p>
                         <table class="table table-hover" id="auth-key-table">
                             <tr class="bg-info">
-                                <th>创建时间</th>
-                                <th>访问密钥(access_key)</th>
-                                <th>秘密访问密钥(secret_key)</th>
-                                <th>状态</th>
-                                <th>操作</th>
+                                <th>{% trans '创建时间' %}</th>
+                                <th>{% trans '访问密钥' %}(access_key)</th>
+                                <th>{% trans '秘密密钥' %}(secret_key)</th>
+                                <th>{% trans '状态' %}</th>
+                                <th>{% trans '操作' %}</th>
                             </tr>
                             {% if auth_keys %}
                             {% for key in auth_keys %}
@@ -85,7 +84,7 @@
                             {% endfor %}
                         {% endif %}
                         </table>
-                        <span class="btn btn-primary" id="btn-create-auth-key"><span class="glyphicon glyphicon-plus"></span>创建新访问密钥</span>
+                        <span class="btn btn-primary" id="btn-create-auth-key"><span class="glyphicon glyphicon-plus"></span>{% trans '创建新访问密钥' %}</span>
                     </div>
                 </div>
             </div>

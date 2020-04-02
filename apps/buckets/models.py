@@ -8,6 +8,7 @@ from django.db import models
 from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.utils.translation import gettext_lazy, gettext as _
 from ckeditor.fields import RichTextField
 
 from utils.storagers import PathParser
@@ -42,9 +43,9 @@ class Bucket(models.Model):
     PRIVATE = 2
     PUBLIC_READWRITE = 3
     ACCESS_PERMISSION_CHOICES = (
-        (PUBLIC, '公有'),
-        (PRIVATE, '私有'),
-        (PUBLIC_READWRITE, '公有（可读写）'),
+        (PUBLIC, gettext_lazy('公有')),
+        (PRIVATE, gettext_lazy('私有')),
+        (PUBLIC_READWRITE, gettext_lazy('公有（可读写）')),
     )
 
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
@@ -300,11 +301,11 @@ class Bucket(models.Model):
             (False, str)   # 设置失败
         '''
         if not (6 <= len(password) <= 20):
-            return False, '密码长度必须为6-20个字符'
+            return False, _('密码长度必须为6-20个字符')
         if self.ftp_ro_password == password:
-            return False, '可读写密码不得和只读密码一致'
+            return False, _('可读写密码不得和只读密码一致')
         self.ftp_password = password
-        return True, '修改成功'
+        return True, _('修改成功')
 
     def set_ftp_ro_password(self, password):
         '''
@@ -316,11 +317,11 @@ class Bucket(models.Model):
             (False, str)   # 设置失败
         '''
         if not (6 <= len(password) <= 20):
-            return False, '密码长度必须为6-20个字符'
+            return False, _('密码长度必须为6-20个字符')
         if self.ftp_password == password:
-            return False, '只读密码不得和可读写密码一致'
+            return False, _('只读密码不得和可读写密码一致')
         self.ftp_ro_password = password
-        return True, '修改成功'
+        return True, _('修改成功')
 
     def set_remarks(self, remarks: str):
         """

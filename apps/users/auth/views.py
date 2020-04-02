@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 
 from rest_framework.response import Response
 from rest_framework import viewsets, status
@@ -19,8 +20,9 @@ class ObtainAuthKey(viewsets.GenericViewSet):
     lookup_field = 'access_key'
 
     @swagger_auto_schema(
+        operation_summary=_('获取当前用户的所有访问密钥'),
         auto_schema=NoPagingAutoSchema,
-         responses={
+        responses={
              status.HTTP_200_OK:"""
                 {
                   "keys": [
@@ -42,8 +44,6 @@ class ObtainAuthKey(viewsets.GenericViewSet):
     )
     def list(self, request, *args, **kwargs):
         '''
-        获取当前用户的所有访问密钥
-
         获取当前用户的所有访问密钥，需要通过身份认证权限(如session认证)
         '''
         user = request.user
@@ -54,6 +54,7 @@ class ObtainAuthKey(viewsets.GenericViewSet):
         return Response({'code': 403, 'code_text': 'You do not have access permissions'}, status=status.HTTP_403_FORBIDDEN)
 
     @swagger_auto_schema(
+        operation_summary=_('停用或激活访问密钥'),
         request_body=no_body,
         manual_parameters=[
             openapi.Parameter(
@@ -86,8 +87,6 @@ class ObtainAuthKey(viewsets.GenericViewSet):
     )
     def partial_update(self, request, *args, **kwargs):
         '''
-        停用或激活访问密钥
-
         停用或激活访问密钥，需要通过身份认证权限
 
             参数,“active”，active=true用于激活启用访问密钥，active=false用于停用访问密钥；
@@ -116,6 +115,7 @@ class ObtainAuthKey(viewsets.GenericViewSet):
         return Response({'code': 200, 'code_text': 'The key has been successfully modified'}, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
+        operation_summary=_('创建一个新的访问密钥'),
         responses={
             status.HTTP_201_CREATED: """
                     {
@@ -135,8 +135,6 @@ class ObtainAuthKey(viewsets.GenericViewSet):
     )
     def create(self, request, *args, **kwargs):
         '''
-        创建一个新的访问密钥
-
         需要通过身份认证权限(如session，basic认证)，或直接提交用户名和密码
         '''
         user = request.user
@@ -161,10 +159,11 @@ class ObtainAuthKey(viewsets.GenericViewSet):
         return Response({'code': 201, 'code_text': 'Create key successfully',
                          'key': AuthKeyDumpSerializer(key).data}, status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(
+        operation_summary=_('删除一个访问密钥')
+    )
     def destroy(self, request, *args, **kwargs):
         '''
-        删除一个访问密钥
-
         需要通过身份认证权限(如session，basic认证)
         '''
         user = request.user

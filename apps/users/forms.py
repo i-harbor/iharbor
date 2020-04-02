@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext as _
 
 from utils.jwt_token import JWTokenTool2
 
@@ -13,49 +15,49 @@ class UserRegisterForm(forms.Form):
     '''
     用户注册表单
     '''
-    username = forms.EmailField( label='用户名(邮箱)',
-                                 required=True,
+    username = forms.EmailField(label=gettext_lazy('用户名(邮箱)'),
+                                required=True,
                                 max_length=100,
                                 widget=forms.EmailInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入邮箱作为用户名'
+                                                'placeholder': gettext_lazy('请输入邮箱作为用户名')
                                 }))
-    password = forms.CharField( label='密码',
+    password = forms.CharField( label=gettext_lazy('密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入一个8-20位的密码'
+                                                'placeholder': gettext_lazy('请输入一个8-20位的密码')
                                 }))
-    confirm_password = forms.CharField( label='确认密码',
+    confirm_password = forms.CharField( label=gettext_lazy('确认密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入确认密码'
+                                                'placeholder': gettext_lazy('请输入确认密码')
                                 }))
 
-    last_name = forms.CharField(label='姓氏', max_length=30,
+    last_name = forms.CharField(label=gettext_lazy('姓氏'), max_length=30,
                                 widget=forms.TextInput(attrs={
                                     'class': 'form-control',
-                                    'placeholder': '请如实填写'
+                                    'placeholder': gettext_lazy('请如实填写')
                                 }))
 
-    first_name = forms.CharField(label='名字', max_length=30,
+    first_name = forms.CharField(label=gettext_lazy('名字'), max_length=30,
                                  widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请如实填写'
+                                                'placeholder': gettext_lazy('请如实填写')
                                             }))
 
-    telephone = forms.CharField(label='电话', max_length=11,
+    telephone = forms.CharField(label=gettext_lazy('电话'), max_length=11,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请如实填写'
+                                                'placeholder': gettext_lazy('请如实填写')
                                             }))
-    company = forms.CharField(label='公司/单位', max_length=255,
+    company = forms.CharField(label=gettext_lazy('公司/单位'), max_length=255,
                               widget=forms.TextInput(attrs={
                                                   'class': 'form-control',
-                                                  'placeholder': '请如实填写'
+                                                  'placeholder': gettext_lazy('请如实填写')
                                                 }))
 
     def clean(self):
@@ -69,19 +71,19 @@ class UserRegisterForm(forms.Form):
         #用户名输入是否为空
         if not username:
             if not self.has_error('username'):
-                raise forms.ValidationError('用户名不能为空')
+                raise forms.ValidationError(_('用户名不能为空'))
 
         #检查用户名是否已存在
         user = User.objects.filter(username=username).first()
         if user:
             if user.is_active:
-                raise forms.ValidationError('用户名已存在，请重新输入')
+                raise forms.ValidationError(_('用户名已存在，请重新输入'))
             else:
                 self.cleaned_data['user'] = user # 未激活用户
 
         #密码是否一致
         if not password or password != confirm_password:
-            raise forms.ValidationError('密码输入不一致')
+            raise forms.ValidationError(_('密码输入不一致'))
 
         return self.cleaned_data
 
@@ -122,21 +124,20 @@ class LoginForm(forms.Form):
     '''
     用户登陆表单
     '''
-    username = forms.CharField( label='用户名(邮箱)',
+    username = forms.CharField( label=gettext_lazy('用户名(邮箱)'),
                                 required=True,
                                 max_length=100,
                                 widget=forms.TextInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入用户名'
+                                                'placeholder': gettext_lazy('请输入用户名')
                                 }))
-    password = forms.CharField( label='密码',
+    password = forms.CharField( label=gettext_lazy('密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入一个8-20位的密码'
+                                                'placeholder': gettext_lazy('请输入一个8-20位的密码')
                                 }))
-
 
     def clean(self):
         '''
@@ -148,7 +149,7 @@ class LoginForm(forms.Form):
         #验证用户
         user = authenticate(username=username, password=password)
         if not user:
-            raise forms.ValidationError('用户名或密码有误，请注意区分字母大小写')
+            raise forms.ValidationError(_('用户名或密码有误，请注意区分字母大小写'))
         else:
             if user.third_app != user.LOCAL_USER:
                 user.third_app = user.LOCAL_USER # 本地用户登录
@@ -162,26 +163,26 @@ class PasswordChangeForm(forms.Form):
     '''
     用户密码修改表单
     '''
-    old_password = forms.CharField( label='原密码',
+    old_password = forms.CharField( label=gettext_lazy('原密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入原密码'
+                                                'placeholder': gettext_lazy('请输入原密码')
                                 }))
-    new_password = forms.CharField( label='新密码',
+    new_password = forms.CharField( label=gettext_lazy('新密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入一个8-20位的新密码'
+                                                'placeholder': gettext_lazy('请输入一个8-20位的新密码')
                                 }))
-    confirm_new_password = forms.CharField( label='确认新密码',
+    confirm_new_password = forms.CharField( label=gettext_lazy('确认新密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请再次输入新密码'
+                                                'placeholder': gettext_lazy('请再次输入新密码')
                                 }))
 
     def __init__(self, *args, **kwargs):
@@ -196,7 +197,7 @@ class PasswordChangeForm(forms.Form):
         new_password = self.cleaned_data.get('new_password')
         confirm_new_password = self.cleaned_data.get('confirm_new_password')
         if new_password != confirm_new_password or not new_password:
-            raise forms.ValidationError('新密码输入不一致，请重新输入')
+            raise forms.ValidationError(_('密码输入不一致'))
         return self.cleaned_data
 
 
@@ -211,7 +212,7 @@ class PasswordChangeForm(forms.Form):
             return old_password
 
         if not self.user.check_password(old_password):
-            raise forms.ValidationError('原密码有误')
+            raise forms.ValidationError(_('原密码有误'))
         return old_password
 
 
@@ -219,11 +220,11 @@ class ForgetPasswordForm(forms.Form):
     '''
     忘记密码用户名表单
     '''
-    username = forms.EmailField(label='用户名（邮箱）',
+    username = forms.EmailField(label=gettext_lazy('用户名(邮箱)'),
                                max_length=100,
                                widget=forms.EmailInput(attrs={
                                    'class': 'form-control',
-                                   'placeholder': '请输入用户名'}))
+                                   'placeholder': gettext_lazy('请输入用户名')}))
 
     def clean(self):
         '''
@@ -234,13 +235,13 @@ class ForgetPasswordForm(forms.Form):
         #用户名输入是否为空
         if not username:
             if not self.has_error('username'):
-                raise forms.ValidationError('用户名不能为空')
+                raise forms.ValidationError(_('用户名不能为空'))
         if username:
             try:
                 user = User.objects.get(username=username)
                 self.cleaned_data['user'] = user
             except ObjectDoesNotExist:
-                raise forms.ValidationError('用户不存在')
+                raise forms.ValidationError(_('用户不存在'))
 
         return self.cleaned_data
 
@@ -254,19 +255,19 @@ class PasswordResetForm(forms.Form):
                                'class': 'form-control',
                                'placeholder': 'jwt-value',}))
 
-    new_password = forms.CharField( label='新密码',
+    new_password = forms.CharField( label=gettext_lazy('新密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请输入一个8-20位的新密码'
+                                                'placeholder': gettext_lazy('请输入一个8-20位的新密码')
                                 }))
-    confirm_new_password = forms.CharField( label='确认新密码',
+    confirm_new_password = forms.CharField( label=gettext_lazy('确认新密码'),
                                 min_length=8,
                                 max_length=20,
                                 widget=forms.PasswordInput(attrs={
                                                 'class': 'form-control',
-                                                'placeholder': '请再次输入新密码'
+                                                'placeholder': gettext_lazy('请再次输入新密码')
                                 }))
 
     def clean(self):
@@ -278,7 +279,7 @@ class PasswordResetForm(forms.Form):
         confirm_new_password = self.cleaned_data.get('confirm_new_password')
 
         if new_password != confirm_new_password or not new_password:
-            raise forms.ValidationError('新密码输入不一致，请重新输入')
+            raise forms.ValidationError(_('密码输入不一致'))
 
         jwtt = JWTokenTool2()
         try:
@@ -287,7 +288,7 @@ class PasswordResetForm(forms.Form):
             user = None
 
         if not user:
-            raise forms.ValidationError('重置密码失败，jwt无效或已过期，请重新找回密码获取新的链接')
+            raise forms.ValidationError(_('重置密码失败，jwt无效或已过期，请重新找回密码获取新的链接'))
 
         self.cleaned_data['user'] = user
 

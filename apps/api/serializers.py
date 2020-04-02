@@ -1,5 +1,6 @@
 import logging
 
+from django.utils.translation import gettext, gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.reverse import reverse, replace_query_param
 
@@ -29,7 +30,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     '''
     用户信息更新序列化器
     '''
-    password = serializers.CharField(label='密码', min_length=8, max_length=128, help_text='至少8位密码')
+    password = serializers.CharField(label=_('密码'), min_length=8, max_length=128, help_text=_('至少8位密码'))
 
     class Meta:
         model = User
@@ -55,19 +56,19 @@ class UserCreateSerializer(serializers.Serializer):
     '''
     用户创建序列化器
     '''
-    username = serializers.EmailField(label='用户名(邮箱)', required=True, max_length=150, help_text='邮箱')
-    password = serializers.CharField(label='密码', required=True, min_length=8, max_length=128, help_text='至少8位密码')
-    last_name = serializers.CharField(label='姓氏', max_length=30, default='')
-    first_name = serializers.CharField(label='名字', max_length=30, default='')
-    telephone = serializers.CharField(label='电话', max_length=11, default='')
-    company = serializers.CharField(label='公司/单位', max_length=255, default='')
+    username = serializers.EmailField(label=_('用户名(邮箱)'), required=True, max_length=150, help_text=_('邮箱'))
+    password = serializers.CharField(label=_('密码'), required=True, min_length=8, max_length=128, help_text=_('至少8位密码'))
+    last_name = serializers.CharField(label=_('姓氏'), max_length=30, default='')
+    first_name = serializers.CharField(label=_('名字'), max_length=30, default='')
+    telephone = serializers.CharField(label=_('电话'), max_length=11, default='')
+    company = serializers.CharField(label=_('公司/单位'), max_length=255, default='')
 
     def validate(self, data):
         username = data.get('username')
         password = data.get('password')
 
         if not username or not password:
-            raise serializers.ValidationError(detail={'code_text': '用户名或密码不能为空'})
+            raise serializers.ValidationError(detail={'code_text': gettext('用户名或密码不能为空')})
         return data
 
     def create(self, validated_data):
@@ -84,7 +85,7 @@ class UserCreateSerializer(serializers.Serializer):
         user = User.objects.filter(username=username).first()
         if user:
             if user.is_active:
-                raise serializers.ValidationError(detail={'code_text': '用户名已存在', 'existing': True})
+                raise serializers.ValidationError(detail={'code_text': gettext('用户名已存在'), 'existing': True})
             else:
                 user.email = email
                 user.set_password(password)
@@ -123,9 +124,8 @@ class BucketCreateSerializer(serializers.Serializer):
     '''
     创建存储桶序列化器
     '''
-    name = serializers.CharField(label='存储桶名称', min_length=3, max_length=63,
-                                 help_text='存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符')
-    # user = serializers.CharField(label='所属用户', help_text='所创建的存储桶的所属用户，可输入用户名或用户id')
+    name = serializers.CharField(label=_('存储桶名称'), min_length=3, max_length=63,
+                                 help_text=_('存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符'))
 
     def validate(self, data):
         """
@@ -136,10 +136,10 @@ class BucketCreateSerializer(serializers.Serializer):
         user = request.user
 
         if not bucket_name:
-            raise serializers.ValidationError('存储桶bucket名称不能为空')
+            raise serializers.ValidationError(gettext('存储桶bucket名称不能为空'))
 
         if bucket_name.startswith('-') or bucket_name.endswith('-'):
-            raise serializers.ValidationError('存储桶bucket名称不能以“-”开头或结尾')
+            raise serializers.ValidationError(gettext('存储桶bucket名称不能以“-”开头或结尾'))
 
         DNSStringValidator(bucket_name)
         bucket_name = bucket_name.lower()
@@ -149,7 +149,7 @@ class BucketCreateSerializer(serializers.Serializer):
         bucket_limit_validator(user=user)
 
         if Bucket.get_bucket_by_name(bucket_name):
-            raise serializers.ValidationError("存储桶名称已存在", code='existing')
+            raise serializers.ValidationError(gettext("存储桶名称已存在"), code='existing')
         return data
 
     def create(self, validated_data):
@@ -169,13 +169,11 @@ class ObjPutSerializer(serializers.Serializer):
     '''
     文件分块上传序列化器
     '''
-    chunk_offset = serializers.IntegerField(label='文件块偏移量', required=True, min_value=0, max_value=5*1024**4, # 5TB
-                                            help_text='上传文件块在整个文件中的起始位置（bytes偏移量)，类型int')
-    chunk = serializers.FileField(label='文件块', required=False, help_text='文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象')
-    chunk_size = serializers.IntegerField(label='文件块大小', required=True, min_value=0,
-                                          help_text='上传文件块的字节大小，类型int')
-    # overwrite = serializers.BooleanField(label='是否覆盖', required=False,
-    #                                      help_text='存在同名文件时是否覆盖(chunk_offset=0时有效)，True(覆盖)，其他默认False(不覆盖)')
+    chunk_offset = serializers.IntegerField(label=_('文件块偏移量'), required=True, min_value=0, max_value=5*1024**4, # 5TB
+                                            help_text=_('上传文件块在整个文件中的起始位置（bytes偏移量)，类型int'))
+    chunk = serializers.FileField(label=_('文件块'), required=False, help_text=_('文件分片的二进制数据块,文件或类文件对象，如JS的Blob对象'))
+    chunk_size = serializers.IntegerField(label=_('文件块大小'), required=True, min_value=0,
+                                          help_text=_('上传文件块的字节大小，类型int'))
 
     def validate(self, data):
         """
@@ -183,19 +181,11 @@ class ObjPutSerializer(serializers.Serializer):
         """
         chunk = data.get('chunk')
         chunk_size = data.get('chunk_size')
-        # overwrite = data.get('overwrite', None)
 
         if not chunk:
-            # chunk_size != 0时，此时却获得一个空文件块
-            if 0 != chunk_size:
-                raise serializers.ValidationError(detail={'chunk': 'chunk_size与空文件块大小(0)不一致'})
-            # 如果上传确实是一个空文件块不做处理
-            raise serializers.ValidationError(detail={'chunk': '无效的空文件块'})
+            raise serializers.ValidationError(detail={'chunk': gettext('无效的空文件块')})
         elif chunk.size != chunk_size:
-            raise serializers.ValidationError(detail={'chunk_size': 'chunk_size与文件块大小不一致'})
-
-        # if overwrite is not True :
-        #     overwrite = False
+            raise serializers.ValidationError(detail={'chunk_size': gettext('chunk_size与文件块大小不一致')})
 
         return data
 
@@ -255,18 +245,18 @@ class ObjInfoSerializer(serializers.Serializer):
         bucket = self._context.get('bucket')
         if bucket:
             if bucket.has_public_write_perms():
-                return '公有（读写）'
+                return gettext('公有（读写）')
             elif bucket.is_public_permission():
-                return '公有'
+                return gettext('公有')
 
         try:
             if obj.is_shared_and_in_shared_time():
                 if obj.is_dir() and obj.is_read_write_perms():
-                    return '公有（读写）'
-                return '公有'
+                    return gettext('公有（读写）')
+                return gettext('公有')
         except Exception as e:
             pass
-        return '私有'
+        return gettext('私有')
 
 
 class AuthTokenDumpSerializer(serializers.Serializer):
@@ -291,4 +281,4 @@ class VPNSerializer(serializers.Serializer):
 
 
 class VPNPostSerializer(serializers.Serializer):
-    password = serializers.CharField(max_length=20, min_length=6, help_text='新的VPN口令密码')
+    password = serializers.CharField(max_length=20, min_length=6, help_text=_('新的VPN口令密码'))

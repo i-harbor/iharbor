@@ -16,6 +16,8 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from django.conf.urls import i18n
+from django.views.i18n import JavaScriptCatalog
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -43,6 +45,8 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='redoc'),
     path('docs/', include('docs.urls', namespace='docs')),
     path('callback/', kjy_login_callback, name='callback'),
+    path('i18n/', include(i18n)),
+    path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
 ]
 
 
