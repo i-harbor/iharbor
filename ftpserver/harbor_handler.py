@@ -95,7 +95,7 @@ class HarborFTPHandler(FTPHandler):
         # this is implemented to assist with file synchronization
 
         line = self.fs.fs2ftp(path)
-        # print(lmt)
+        # print('its me')
         if len(timeval) != len("YYYYMMDDHHMMSS"):
             why = "Invalid time format; expected: YYYYMMDDHHMMSS"
             self.respond('550 %s.' % why)
