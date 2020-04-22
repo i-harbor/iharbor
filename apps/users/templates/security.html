@@ -68,15 +68,15 @@
                                         <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
                                     </td>
                                     {% if key.state %}
-                                        <td class="text-success">使用中</td>
+                                        <td class="text-success">{% trans '使用中' %}</td>
                                     {% else %}
-                                        <td class="text-warning">停用</td>
+                                        <td class="text-warning">{% trans '停用' %}</td>
                                     {% endif %}
                                     <td>
                                         {% if key.state %}
-                                            <span class="btn btn-info btn-stop-auth-key">停用</span>
+                                            <span class="btn btn-info btn-stop-auth-key">{% trans '停用' %}</span>
                                         {% else %}
-                                            <span class="btn btn-info btn-active-auth-key">启用</span>
+                                            <span class="btn btn-info btn-active-auth-key">{% trans '启用' %}</span>
                                         {% endif %}
                                         <span class="btn btn-danger btn-remove-auth-key"><i class="fa fa-trash-alt"></i></span>
                                     </td>

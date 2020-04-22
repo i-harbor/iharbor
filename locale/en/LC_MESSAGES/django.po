@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-03-31 18:05+0800\n"
+"POT-Creation-Date: 2020-04-22 10:22+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -659,25 +659,25 @@ msgstr "My host"
 
 #: apps/evcloud/templates/evcloud_add.html:21
 #: apps/evcloud/templates/evcloud_list.html:24
-#: templates/base_with_sidebar.html:29
+#: templates/base_with_sidebar.html:31
 msgid "创建云主机"
 msgstr "Create"
 
-#: apps/evcloud/templates/evcloud_add.html:30
+#: apps/evcloud/templates/evcloud_add.html:31
 #: apps/evcloud/templates/evcloud_list.html:42
 msgid "类型"
 msgstr "Type"
 
-#: apps/evcloud/templates/evcloud_add.html:42
+#: apps/evcloud/templates/evcloud_add.html:41
 #: apps/evcloud/templates/evcloud_list.html:37
 msgid "镜像"
 msgstr "Image"
 
-#: apps/evcloud/templates/evcloud_add.html:54
+#: apps/evcloud/templates/evcloud_add.html:51
 msgid "配置"
 msgstr "Configuration"
 
-#: apps/evcloud/templates/evcloud_add.html:67
+#: apps/evcloud/templates/evcloud_add.html:62
 msgid "创建"
 msgstr "Create"
 
@@ -687,7 +687,7 @@ msgstr "Memory"
 
 #: apps/evcloud/templates/evcloud_list.html:40
 #: apps/users/templates/security.html:26 apps/users/templates/security.html:55
-#: apps/vpn/templates/vpn.html:26
+#: apps/vpn/templates/vpn.html:25
 msgid "创建时间"
 msgstr "Creation time"
 
@@ -713,7 +713,7 @@ msgstr "Remark"
 msgid "操作"
 msgstr "Operations"
 
-#: apps/evcloud/templates/evcloud_list.html:67 apps/vpn/templates/vpn.html:34
+#: apps/evcloud/templates/evcloud_list.html:67 apps/vpn/templates/vpn.html:33
 msgid "双击修改"
 msgstr "Double-click to modify"
 
@@ -757,18 +757,18 @@ msgstr "Bad request, parameter 'vm_id' or 'remarks' not submitted"
 msgid "错误的请求，vm_id或者remarks参数有误"
 msgstr "Bad request, parameter 'vm_id' or 'remarks' is invalid"
 
-#: apps/share/templates/share_base.html:18 templates/base.html:25
+#: apps/share/templates/share_base.html:16 templates/base.html:16
 msgid "中国科技云对象存储服务"
 msgstr "China Science & Technology Cloud Object Storage"
 
-#: apps/share/templates/share_base.html:22
+#: apps/share/templates/share_base.html:25 templates/base.html:41
+msgid "语言"
+msgstr "Language"
+
+#: apps/share/templates/share_base.html:33
 #, python-format
 msgid "%(share_user)s 的分享"
 msgstr "Shared by %(share_user)s"
-
-#: apps/share/templates/share_base.html:30 templates/base.html:44
-msgid "语言"
-msgstr "Language"
 
 #: apps/share/views.py:88
 msgid "浏览器端下载文件对象"
@@ -1016,7 +1016,7 @@ msgid "忘记密码"
 msgstr "Forget password"
 
 #: apps/users/templates/login.html:6 apps/users/views.py:42
-#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:69
+#: apps/users/views.py:183 apps/users/views.py:220 templates/base.html:66
 msgid "注册"
 msgstr "Sign up"
 
@@ -1044,6 +1044,18 @@ msgstr "Access key"
 msgid "秘密密钥"
 msgstr "Secret key"
 
+#: apps/users/templates/security.html:71
+msgid "使用中"
+msgstr "Using"
+
+#: apps/users/templates/security.html:73 apps/users/templates/security.html:77
+msgid "停用"
+msgstr "Disabled"
+
+#: apps/users/templates/security.html:79
+msgid "启用"
+msgstr "Enable"
+
 #: apps/users/templates/security.html:87
 msgid "创建新访问密钥"
 msgstr "Create new key"
@@ -1066,11 +1078,11 @@ msgid "用户登录"
 msgstr "User log in"
 
 #: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
-#: apps/users/views.py:219 templates/base.html:68
+#: apps/users/views.py:219 templates/base.html:65
 msgid "登录"
 msgstr "Sign in"
 
-#: apps/users/views.py:123 templates/base.html:59
+#: apps/users/views.py:123 templates/base.html:56
 msgid "修改密码"
 msgstr "Change password"
 
@@ -1122,79 +1134,79 @@ msgstr ""
 msgid "用户已激活"
 msgstr "user already activated"
 
-#: apps/vpn/templates/vpn.html:19
+#: apps/vpn/templates/vpn.html:18
 msgid "我的VPN"
 msgstr "My VPN"
 
-#: apps/vpn/templates/vpn.html:24
+#: apps/vpn/templates/vpn.html:23
 msgid "用户名"
 msgstr "Username"
 
-#: apps/vpn/templates/vpn.html:25
+#: apps/vpn/templates/vpn.html:24
 msgid "VPN口令(双击修改)"
 msgstr "VPN password"
 
-#: apps/vpn/templates/vpn.html:27
+#: apps/vpn/templates/vpn.html:26
 msgid "修改时间"
 msgstr "Modification time"
 
-#: templates/base.html:31
+#: templates/base.html:28
 msgid "帮助"
 msgstr "Help"
 
-#: templates/base.html:33
+#: templates/base.html:30
 msgid "API文档"
 msgstr "API Doc"
 
-#: templates/base.html:35
+#: templates/base.html:32
 msgid "帮助文档"
 msgstr "Help Doc"
 
-#: templates/base.html:58
+#: templates/base.html:55
 msgid "登出"
 msgstr "Sign out"
 
-#: templates/base.html:60
+#: templates/base.html:57
 msgid "安全凭证"
 msgstr "Security credential"
 
-#: templates/base.html:63
+#: templates/base.html:60
 msgid "后台管理"
 msgstr "Admin"
 
-#: templates/base_with_sidebar.html:15
+#: templates/base_with_sidebar.html:17
 msgid "对象存储"
 msgstr "Object storage"
 
-#: templates/base_with_sidebar.html:18
+#: templates/base_with_sidebar.html:20
 msgid "存储桶"
 msgstr "Bucket"
 
-#: templates/base_with_sidebar.html:19
+#: templates/base_with_sidebar.html:21
 msgid "FTP访问说明"
 msgstr "FTP usage"
 
-#: templates/base_with_sidebar.html:20
+#: templates/base_with_sidebar.html:22
 msgid "API使用说明"
 msgstr "API usage"
 
-#: templates/base_with_sidebar.html:25
+#: templates/base_with_sidebar.html:27
 msgid "云主机"
 msgstr "Cloud host"
 
-#: templates/base_with_sidebar.html:28
+#: templates/base_with_sidebar.html:30
 msgid "云主机列表"
 msgstr "Host list"
 
-#: templates/base_with_sidebar.html:30
+#: templates/base_with_sidebar.html:32
 msgid "云主机使用说明"
 msgstr "Host usage"
 
-#: templates/base_with_sidebar.html:38
+#: templates/base_with_sidebar.html:40
 msgid "VPN口令管理"
 msgstr "VPN password"
 
-#: templates/base_with_sidebar.html:39
+#: templates/base_with_sidebar.html:41
 msgid "VPN安装配置说明"
 msgstr "VPN usage"
 
