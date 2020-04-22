@@ -52,10 +52,10 @@
         <tr>
             <th>{{ $imports.isoTimeToLocal(token.created) }}</th>
             <th>
-                <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
-                <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
+                <input type="password"  class="" value="{{ token.key }}" style="border: 0px;outline:none;">
+                <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
             </th>
-            <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>创建新密钥</span></th>
+            <th><span class="btn btn-danger" id="btn-new-token"><i class="fa fa-sync"></i>创建新密钥</span></th>
         </tr>
     `);
     
@@ -87,12 +87,12 @@
         let secret = $(this).siblings(":input");
         if (secret.attr("type") === "password"){
             secret.attr("type", "text");
-            $(this).removeClass("glyphicon glyphicon-eye-open");
-            $(this).addClass("glyphicon glyphicon-eye-close");
+            $(this).empty();
+            $(this).append('<i class="fa fa-eye-slash"></i>')
         }else{
             secret.attr("type", "password");
-            $(this).removeClass("glyphicon glyphicon-eye-close");
-            $(this).addClass("glyphicon glyphicon-eye-open");
+            $(this).empty();
+            $(this).append('<i class="fa fa-eye"></i>')
         }
     });
 
@@ -202,9 +202,9 @@
         <tr>
             <td>{{ $imports.isoTimeToLocal(key.create_time) }}</td>
             <td>{{ key.access_key }}</td>
-            <td class="col-sm-5">
-                <input title="secret_key" class="secret-key col-sm-10" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
-                <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"><span class=""></span></span>
+            <td>
+                <input title="{{ key.secret_key }}" class="secret-key" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
+                <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
             </td>
             {{ if key.state }}
                 <td class="text-success">使用中</td>
@@ -217,7 +217,7 @@
                 {{else if !key.state }}
                     <span class="btn btn-info btn-active-auth-key">启用</span>
                 {{/if}}
-                <span class="btn btn-danger btn-remove-auth-key"><span class="glyphicon glyphicon-remove"></span></span>
+                <span class="btn btn-danger btn-remove-auth-key"><i class="fa fa-trash-alt"></i></span>
             </td>
         </tr>
     `);

@@ -12,15 +12,14 @@
 
 {% block content %}
     <div class="container-fluid">
-{#        <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>#}
         <div class="row">
-            <div class="col-md-offset-1 col-md-10">
+            <div class="col-12">
                 <div>
                     <p class="panel-title">{% trans '我的VPN' %}</p>
                 </div>
                 <table class="table table-hover">
-                    <thead>
-                        <tr class="bg-info">
+                    <thead class="bg-light">
+                        <tr>
                             <th>{% trans '用户名' %}</th>
                             <th>{% trans 'VPN口令(双击修改)' %}</th>
                             <th>{% trans '创建时间' %}</th>

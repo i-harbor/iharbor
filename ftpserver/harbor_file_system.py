@@ -56,7 +56,7 @@ class HarborFileSystem(AbstractedFS):
             # print('赋值_cwd:', self._cwd)
         else:
             raise FilesystemError('Not a dir.')
-    
+
     def stat(self, path):
         pass
 

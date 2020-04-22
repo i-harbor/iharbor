@@ -5,7 +5,7 @@
 {% block boby %}
     <div class="container">
         <div class="row">
-            <div class="col-sm-offset-4 col-sm-4">
+            <div class="offset-sm-4 col-sm-4">
                 {% if tips_msg %}
                     <div>
                         <div class="alert alert-warning alert-dismissible" role="alert">
@@ -15,11 +15,11 @@
                         </div>
                     </div>
                 {% endif %}
-                <div class="panel panel-default panel-info">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">{{ form_title }}</h3>
+                <div class="card border-info">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ form_title }}</h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <form method="POST" action="{{ action_url }}" enctype="multipart/form-data">
                             {% csrf_token %}
                             {% for field in form %}

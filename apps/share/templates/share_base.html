@@ -9,31 +9,29 @@
 {% endblock %}
 
 {% block page-header %}
-    <nav class="navbar navbar-default navbar-fixed-top">
-        <div class="container-fluid">
-            <div class="navbar-header">
-{#                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">#}
-{#                    <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
-                <img class="navbar-brand" src="{% static 'images/icon/logo.png' %}">
-                <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '中国科技云对象存储服务' %}</a>
-            </div>
-            <ul class="nav navbar-nav pull-right">
-                {% if share_user %}
-                    <li><a>{% blocktrans %}{{ share_user }} 的分享{% endblocktrans %}</a></li>
-                {% endif %}
-                <li>
+    <nav class="navbar navbar-light bg-light navbar-expand-md">
+{#        <a class="navbar-brand" href="#"><img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}" height="30"></a>#}
+{#        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
+        <a class="navbar-brand" href="#"><img src="{% static 'images/icon/logo.png' %}" height="30"></a>
+        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '中国科技云对象存储服务' %}</a>
+        <ul class="navbar-nav mr-auto"></ul>
+            <ul class="nav navbar-nav">
+                <li class="nav-item dropdown">
                     {% get_available_languages as LANGUAGES %}
                     <form action="{% url 'set_language' %}" method="post" id="id-language-switcher" hidden>
                         {% csrf_token %}
                     </form>
-                    <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                    <a class="dropdown-toggle nav-link btn" data-toggle="dropdown" role="button" aria-haspopup="true"
                        aria-expanded="false">{% trans '语言' %}<span class="caret"></span></a>
                     <ul class="dropdown-menu" id="language-switcher">
                         {% for code, name in LANGUAGES %}
-                            <li class="language-switcher-item" value="{{ code }}"><a href="#">{{ name }}</a></li>
+                            <li class="dropdown-item language-switcher-item" value="{{ code }}"><a class="nav-link"  href="#">{{ name }}</a></li>
                         {% endfor %}
                     </ul>
                 </li>
+                {% if share_user %}
+                    <li class="nav-item"><a class="nav-link">{% blocktrans %}{{ share_user }} 的分享{% endblocktrans %}</a></li>
+                {% endif %}
             </ul>
         </div>
     </nav>

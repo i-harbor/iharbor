@@ -9,69 +9,63 @@
 {% endblock %}
 
 {% block page-header %}
-    <nav class="navbar navbar-default navbar-fixed-top">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
-                        data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
-                    <span class="sr-only">Toggle navigation</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-    {#                    <img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}">#}
-{#                        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
-                <img class="navbar-brand" src="{% static 'images/icon/logo.png' %}">
-                <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '中国科技云对象存储服务' %}</a>
-            </div>
-            <div class="collapse navbar-collapse navbar-right" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav">
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                           aria-expanded="false">{% trans '帮助' %}<span class="caret"></span></a>
-                        <ul class="dropdown-menu">
-                            <li><a href="{% url 'apidocs' %}" target="view_window" >{% trans 'API文档' %}</a></li>
-                            <li><a href="{% url 'redoc' %}" target="view_window" >API ReDoc</a></li>
-                            <li><a href="{% url 'docs:docs' %}">{% trans '帮助文档' %}</a></li>
-                        </ul>
-                    </li>
-                    <li>
-                        {% get_available_languages as LANGUAGES %}
-                        <form action="{% url 'set_language' %}" method="post" id="id-language-switcher" hidden>
-                            {% csrf_token %}
-                        </form>
-                        <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                           aria-expanded="false">{% trans '语言' %}<span class="caret"></span></a>
-                        <ul class="dropdown-menu" id="language-switcher">
-                            {% for code, name in LANGUAGES %}
-                                <li class="language-switcher-item" value="{{ code }}"><a href="#">{{ name }}</a></li>
-                            {% endfor %}
-                        </ul>
-                    </li>
-                    <li>
-                        <ul class="nav navbar-nav">
-                            {% if user.is_authenticated %}
-                                <li class="dropdown">
-                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                       aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>{{ user.username }} <span class="caret"></span></a>
-                                    <ul class="dropdown-menu">
-                                        <li><a href="{% url 'users:logout' %}">{% trans '登出' %}</a></li>
-                                        <li><a href="{% url 'users:change_password' %}">{% trans '修改密码' %}</a></li>
-                                        <li><a href="{% url 'users:security' %}">{% trans '安全凭证' %}</a></li>
-                                        <li role="separator" class="divider"></li>
-                                        {% if user.is_staff %}
-                                            <li><a href="{% url 'admin:index' %}">{% trans '后台管理' %}</a></li>
-                                        {% endif %}
-                                    </ul>
-                                </li>
-                            {% else %}
-                                <li><a href="{% url 'users:login' %}">{% trans '登录' %}</a></li>
-                                <li><a href="{% url 'users:register' %}">{% trans '注册' %}</a></li>
+    <nav class="navbar navbar-light bg-light navbar-expand-md">
+{#        <a class="navbar-brand" href="#"><img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}" height="30"></a>#}
+{#        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
+        <a class="navbar-brand" href="#"><img src="{% static 'images/icon/logo.png' %}" height="30"></a>
+        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '中国科技云对象存储服务' %}</a>
+
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto"></ul>
+            <ul class="navbar-nav">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">{% trans '帮助' %}<span class="caret"></span></a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="{% url 'apidocs' %}" target="view_window" >{% trans 'API文档' %}</a>
+                        <a class="dropdown-item" href="{% url 'redoc' %}" target="view_window" >API ReDoc</a>
+                        <a class="dropdown-item" href="{% url 'docs:docs' %}">{% trans '帮助文档' %}</a>
+                    </div>
+                </div>
+                <li class="nav-item dropdown">
+                    {% get_available_languages as LANGUAGES %}
+                    <form action="{% url 'set_language' %}" method="post" id="id-language-switcher" hidden>
+                        {% csrf_token %}
+                    </form>
+                    <a class="nav-link dropdown-toggle" href="#" id="navbar-dropdown-language" role="button" data-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">{% trans '语言' %}<span class="caret"></span></a>
+                    <div class="dropdown-menu" id="language-switcher" aria-labelledby="navbar-dropdown-language">
+                        {% for code, name in LANGUAGES %}
+                            <a class="dropdown-item language-switcher-item" href="#" value="{{ code }}">{{ name }}</a>
+                        {% endfor %}
+                    </div>
+                </li>
+                {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                           aria-haspopup="true" aria-expanded="false">
+                            <i class="fa fa-user"></i>{{ user.username }}
+                        </a>
+                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <a class="dropdown-item" href="{% url 'users:logout' %}">{% trans '登出' %}</a>
+                            <a class="dropdown-item" href="{% url 'users:change_password' %}">{% trans '修改密码' %}</a>
+                            <a class="dropdown-item" href="{% url 'users:security' %}">{% trans '安全凭证' %}</a>
+                            <div class="dropdown-divider"></div>
+                            {% if user.is_staff %}
+                                <a class="dropdown-item" href="{% url 'admin:index' %}">{% trans '后台管理' %}</a>
                             {% endif %}
-                        </ul>
+                        </div>
                     </li>
-                </ul>
-            </div>
+                {% else %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'users:login' %}">{% trans '登录' %}</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'users:register' %}">{% trans '注册' %}</a></li>
+                {% endif %}
+            </ul>
         </div>
     </nav>
 {% endblock %}

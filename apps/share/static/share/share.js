@@ -138,15 +138,15 @@
     let render_bucket_files_view = template.compile(`
         <div class="container-fluid">
             <div class="row">
-                <div class="col-xs-12 col-sm-12">
+                <div class="col-sm-12">
                     <!--{#目录导航栏#}-->
                     <div>
                         <ol class="breadcrumb">
-                            <li><a href="" id="id-share-home" data-bucketname="{{ $data['bucket_name']}}"  data-sharebase="{{ $data['share_base']}}" data-subpath="{{ $data['subpath']}}"><span class="glyphicon glyphicon-home"></a></li>
+                            <li class="breadcrumb-item"><a href="" id="id-share-home" data-bucketname="{{ $data['bucket_name']}}"  data-sharebase="{{ $data['share_base']}}" data-subpath="{{ $data['subpath']}}"><i class="fa fa-home"></i></a></li>
                             <span>></span>
                             {{set breadcrumbs = $imports.get_breadcrumb($data['subpath'])}}
                             {{ each breadcrumbs }}
-                                <li><a href=""  id="btn-path-item" data-subpath="{{$value[1]}}">{{ $value[0] }}</a></li>
+                                <li class="breadcrumb-item"><a href=""  id="btn-path-item" data-subpath="{{$value[1]}}">{{ $value[0] }}</a></li>
                             {{/each}}
                         </ol>
                     </div>
@@ -154,9 +154,9 @@
             </div>
             <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
             <div class="row">
-                <div class="col-xs-12 col-sm-12">
-                    <table class="table table-responsive" id="bucket-files-table">
-                        <tr class="bg-info">
+                <div class="col-12">
+                    <table class="table" id="bucket-files-table">
+                        <tr class="bg-light">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                             <th>{{$imports.getTransText('名称')}}</th>
                             <th>{{$imports.getTransText('上传时间')}}</th>
@@ -172,34 +172,34 @@
                                 <!--文件-->
                                 {{ if $value.fod }}
                                     <td class="bucket-files-table-item">
-                                        <span class="glyphicon glyphicon-file"></span>{{ $value.name }}
+                                        <i class="fa fa-file"></i> {{ $value.name }}
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>{{ $imports.sizeFormat($value.si, "B") }}</td>
                                 {{/if}}
                                 {{ if !$value.fod }}
                                     <td>
-                                        <span class="glyphicon glyphicon-folder-open"></span>
+                                        <i class="fa fa-folder"></i>
                                         <a href="#" id="bucket-files-item-enter-dir" data-dirname="{{$value.name}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>--</td>
                                 {{/if}}
                                 <td>
-                                    <li class="dropdown btn">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></a>
+                                    <div class="dropdown">
+                                        <button class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></button>
                                         <ul class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" data-subpath="{{ $data['share_base']}}" data-dirname="{{$value.name}}">{{str_open}}</a></li>
+                                                <a class="dropdown-item bg-info" href="" id="bucket-files-item-enter-dir" data-subpath="{{ $data['share_base']}}" data-dirname="{{$value.name}}">{{str_open}}</a>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
-                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a></li>
+                                                <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a>
                                         {{/if}}
                                         </ul>
-                                    </li>
+                                    </div>
                                 </td>
                             </tr>
                         {{/each}}
@@ -207,34 +207,40 @@
                     </table>
                 </div>
             </div>
-            
             {{if (previous || next)}}
-            <div class="row">
-                <div class="col-xs-12 col-sm-12">
-                   <nav aria-label="...">
-                      <ul class="pager">
-                        {{if previous}}
-                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
-                        {{/if}}
-                        {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
-                        {{/if}}                
-                        {{if page}}
-                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
-                        {{/if}}
-                        {{if next}}
-                            <li><a id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
-                        {{/if}}
-                        {{if !next}}
-                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
-                        {{/if}}
-                        {{if page.final > 2}}
-                            <li>{{$imports.getTransText('跳转到')}}<input type="text" name="page-skip-to" style="max-width: 60px;">{{$imports.getTransText('页')}}
-                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
-                            </li>
-                        {{/if}}
-                      </ul>
-                    </nav>
+            <div class="container-fluid">
+                <div class="row">
+                <nav aria-label="Page navigation col-6" style="margin:0;">
+                  <ul class="pagination">
+                    {{if previous}}
+                        <li class="page-item"><a class="page-link" id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
+                    {{/if}}
+                    {{if !previous}}
+                        <li class="page-item disabled"><a class="page-link"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
+                    {{/if}}                
+                    {{if page}}
+                        <li class="page-item disabled"><span class="page-link"><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></span></li>
+                    {{/if}}
+                    {{if next}}
+                        <li class="page-item"><a class="page-link" id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></a></li>
+                    {{/if}}
+                    {{if !next}}
+                        <li class="page-item disabled"><span class="page-link">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></span></li>
+                    {{/if}}
+                  </ul>
+                </nav>
+                {{if page.final > 2}}
+                    <div class="input-group mb-3 col-6">
+                      <div class="input-group-prepend">
+                        <span class="input-group-text">{{$imports.getTransText('跳转到')}}</span>
+                      </div>
+                      <input type="text" class="form-control" name="page-skip-to" style="max-width: 60px;">
+                      <div class="input-group-append">
+                        <span class="input-group-text">{{$imports.getTransText('页')}}</span>
+                        <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
+                      </div>
+                    </div>
+                {{/if}}
                 </div>
             </div>
             {{/if}}
@@ -266,7 +272,7 @@
     //
     // 文件夹、文件对象列表上一页Previous点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
+    $("#content-display-div").on("click", '#page_previous_bucket_files', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_bucket_files_and_render(url);
@@ -275,14 +281,14 @@
     //
     // 文件夹、文件对象列表下一页Next点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
+    $("#content-display-div").on("click", '#page_next_bucket_files', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_bucket_files_and_render(url);
     });
 
     // 文件夹、文件对象列表 跳转到页码点击事件
-    $("#content-display-div").on("click", '.pager #btn-skip-to-page', function (e) {
+    $("#content-display-div").on("click", '#btn-skip-to-page', function (e) {
         e.preventDefault();
         let page_num = $(":input[name='page-skip-to']").val();
         page_num = parseInt(page_num);
