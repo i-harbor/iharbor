@@ -6,11 +6,12 @@
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
 	<meta charset="UTF-8">
-    <link rel="stylesheet" type="text/css" href="{% static 'bootstrap-3.3.7/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'bootstrap-4.4.1/css/bootstrap.min.css' %}">
 	{% block page-head %}{% endblock %}
     <style>
         html{
             height: 100%;
+            font-size: 0.9rem;
         }
         body{
             display: flex;
@@ -22,11 +23,13 @@
         }
         .page-content {
             flex: 1 0 auto;
+            padding-top: 10px;
+            padding-bottom: 20px;
         }
         .page-footer{
             background: #ececec;
             flex: 0 0 auto;
-            height:60px;
+            {#height:60px;#}
         }
     </style>
 </head>
@@ -45,7 +48,8 @@
     </footer>
 
 </body>
-    <script type="text/javascript" src="{% static 'jquery2.2.4/dist/jquery-2.2.4.min.js' %}"></script>
-    <script type="text/javascript" src="{% static 'bootstrap-3.3.7/js/bootstrap.min.js' %}"></script>
-	{% block page-script %}{% endblock %}
+    <script type="text/javascript" src="{% static 'jquery/jquery-3.4.1.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'bootstrap-4.4.1/js/bootstrap.bundle.min.js' %}"></script>
+	<script type="text/javascript" src="{% static 'fontawesome-free/js/all.min.js' %}"></script>
+    {% block page-script %}{% endblock %}
 </html>

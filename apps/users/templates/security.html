@@ -7,22 +7,22 @@
 {% endblock %}
 
 {% block content %}
-    <div class="row col-xs-12">
+    <div class="container-fluid">
         <h3>{% trans '您的安全凭证' %}</h3>
         <p>使用此页面管理 iHarbor 账户安全凭证。</p>
         <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
         <div class="nav-list" id="security-nav-list">
-            <div class="panel panel-success nav-list-item" id="nav-list-token">
-                <div class="panel-heading" data-toggle="collapse" data-target="#nav-list-token-body">
-                    <span class="glyphicon glyphicon-record"></span><span>身份认证token</span></div>
-                <div class="panel-body collapse in"  id="nav-list-token-body">
+            <div class="card border-success nav-list-item" id="nav-list-token">
+                <div class="card-header" data-toggle="collapse" data-target="#nav-list-token-body">
+                    <i class="far fa-dot-circle"></i><span>身份认证token</span></div>
+                <div class="card-body collapse show"  id="nav-list-token-body">
                     <div class="">
                         <p>token密钥用于身份验证，token应包含在Authorization HTTP标头中，密钥应以字符串文字“Token”为前缀，空格分隔两个字符串。
                             <p class="text-info">例如：Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b</p></p>
                         <p>刷新创建新token，旧token会失效，如果token泄露，请及时创建新的token，以防数据泄露丢失。</p>
                             {% if token %}
-                            <table class="table table-hover" id="token-table">
-                                <tr class="bg-info">
+                            <table class="table" id="token-table">
+                                <tr class="bg-light">
                                     <th>{% trans '创建时间' %}</th>
                                     <th>Token</th>
                                     <th>{% trans '操作' %}</th>
@@ -31,9 +31,9 @@
                                     <th>{{ token.created | date:'Y-m-d H:i:s' }}</th>
                                     <th>
                                         <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
-                                        <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
+                                        <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
                                     </th>
-                                    <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>{% trans '创建新Token' %}</span></th>
+                                    <th><span class="btn btn-danger" id="btn-new-token"><i class="fa fa-sync"></i>{% trans '创建新Token' %}</span></th>
                                 </tr>
                             </table>
                         {% endif %}
@@ -41,17 +41,17 @@
                 </div>
             </div>
             <hr>
-            <div class="panel panel-danger nav-list-item" id="nav-list-auth-key">
-                <div class="panel-heading" data-toggle="collapse" data-target="#nav-list-auth-key-body">
-                    <span class="glyphicon glyphicon-record"></span><span>{% trans '访问密钥对' %}</span></div>
-                <div class="panel-body collapse in"  id="nav-list-auth-key-body">
+            <div class="card border-danger nav-list-item" id="nav-list-auth-key">
+                <div class="card-header" data-toggle="collapse" data-target="#nav-list-auth-key-body">
+                    <i class="far fa-dot-circle"></i><span>{% trans '访问密钥对' %}</span></div>
+                <div class="card-body collapse show"  id="nav-list-auth-key-body">
                     <div class="">
                         <p>每个访问密钥包含access_key和secret_key密钥对，访问密钥不只是简单的身份认证，每次http请求前都需要根据请求的url的path和有效期时间戳重新计算auth_key字符串，此认证方式安全性高，使用稍微复杂一些(具体生成过程请参考帮助文档)。
                             auth_key的格式为“evhb-auth {access_key}:{hmac_sha1}:{data_base64}”，应包含在Authorization HTTP标头中，密钥应以字符串文字“evhb-auth”为前缀，空格分隔两个字符串。
                             <p class="text-info">例如：Authorization: evhb-auth xxx:xxx:xxx</p>
                         </p>
                         <table class="table table-hover" id="auth-key-table">
-                            <tr class="bg-info">
+                            <tr class="bg-light">
                                 <th>{% trans '创建时间' %}</th>
                                 <th>{% trans '访问密钥' %}(access_key)</th>
                                 <th>{% trans '秘密密钥' %}(secret_key)</th>
@@ -63,28 +63,28 @@
                                 <tr>
                                     <td>{{ key.create_time | date:'Y-m-d H:i:s' }}</td>
                                     <td>{{ key.access_key }}</td>
-                                    <td class="col-sm-5">
-                                        <input title="secret_key" class="secret-key col-sm-10" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
-                                        <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"><span class=""></span></span>
+                                    <td>
+                                        <input title="{{ key.secret_key }}" class="secret-key" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
+                                        <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
                                     </td>
                                     {% if key.state %}
-                                        <td class="text-success">使用中</td>
+                                        <td class="text-success">{% trans '使用中' %}</td>
                                     {% else %}
-                                        <td class="text-warning">停用</td>
+                                        <td class="text-warning">{% trans '停用' %}</td>
                                     {% endif %}
                                     <td>
                                         {% if key.state %}
-                                            <span class="btn btn-info btn-stop-auth-key">停用</span>
+                                            <span class="btn btn-info btn-stop-auth-key">{% trans '停用' %}</span>
                                         {% else %}
-                                            <span class="btn btn-info btn-active-auth-key">启用</span>
+                                            <span class="btn btn-info btn-active-auth-key">{% trans '启用' %}</span>
                                         {% endif %}
-                                        <span class="btn btn-danger btn-remove-auth-key"><span class="glyphicon glyphicon-remove"></span></span>
+                                        <span class="btn btn-danger btn-remove-auth-key"><i class="fa fa-trash-alt"></i></span>
                                     </td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
                         </table>
-                        <span class="btn btn-primary" id="btn-create-auth-key"><span class="glyphicon glyphicon-plus"></span>{% trans '创建新访问密钥' %}</span>
+                        <span class="btn btn-primary" id="btn-create-auth-key"><i class="fa fa-plus"></i>{% trans '创建新访问密钥' %}</span>
                     </div>
                 </div>
             </div>

@@ -36,33 +36,29 @@
     //
     $("#btn-new-token").on("click", function () {
         show_confirm_dialog({
-            title: "确定刷新token吗？",
-            text: "此操作会重新创建一个token，旧token将失效！",
+            title: getTransText("确定刷新token吗？"),
+            text: getTransText("此操作会重新创建一个token，旧token将失效"),
             ok_todo: function () {
-                get_or_refresh_auth_token('put', render_auth_token_table);
+                get_or_refresh_auth_token('put');
             },
         });
     });
 
+    // 翻译字符串，包装django的gettext
+    function getTransText(str){
+        try{
+            return gettext(str);
+        }catch (e) {}
+        return str;
+    }
+
     template.defaults.imports.isoTimeToLocal = isoTimeToLocal;
-    //
-    // token渲染模板
-    //
-    let render_auth_token_table = template.compile(`       
-        <tr>
-            <th>{{ $imports.isoTimeToLocal(token.created) }}</th>
-            <th>
-                <input type="password"  class="col-sm-10" value="{{ token.key }}" style="border: 0px;outline:none;">
-                <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"></span>
-            </th>
-            <th><span class="btn btn-danger" id="btn-new-token"><span class="glyphicon glyphicon-refresh"></span>创建新密钥</span></th>
-        </tr>
-    `);
+    template.defaults.imports.getTransText = getTransText;
     
     //
     // 获取和新建auth token,并渲染
     //@type: 'get':获取； 'put':新建
-    function get_or_refresh_auth_token(type, render) {
+    function get_or_refresh_auth_token(type) {
         $.ajax({
                 url: build_url_with_domain_name('/api/v1/auth-token/'),
                 type: type,
@@ -75,7 +71,7 @@
                     $token_tr.prev(2).text(isoTimeToLocal(result.token.created));
                 },
                 error:function(xhr, status, errortext){
-                    show_warning_dialog('刷新token失败');
+                    show_warning_dialog(getTransText('刷新token失败'));
                 },
             });
     }
@@ -87,12 +83,12 @@
         let secret = $(this).siblings(":input");
         if (secret.attr("type") === "password"){
             secret.attr("type", "text");
-            $(this).removeClass("glyphicon glyphicon-eye-open");
-            $(this).addClass("glyphicon glyphicon-eye-close");
+            $(this).empty();
+            $(this).append('<i class="fa fa-eye-slash"></i>')
         }else{
             secret.attr("type", "password");
-            $(this).removeClass("glyphicon glyphicon-eye-close");
-            $(this).addClass("glyphicon glyphicon-eye-open");
+            $(this).empty();
+            $(this).append('<i class="fa fa-eye"></i>')
         }
     });
 
@@ -105,25 +101,25 @@
         let access_key = access_key_node.text();
         let url = get_api_domain_name() + get_auth_key_api_base() + access_key + '/?active=false';
         show_confirm_dialog({
-            title: '确认要停用此访问密钥吗？',
-            text: '请确认',
+            title: getTransText('确认要停用此访问密钥吗？'),
+            text: getTransText('请确认'),
             ok_todo: function () {
                 $.ajax({
                     url: url,
                     type: 'PATCH',
                     timeout: 200000,
                     success: function (result, status, xhr) {
-                        btn.text('启用');
+                        btn.text(getTransText('启用'));
                         btn.removeClass('btn-stop-auth-key');
                         btn.addClass('btn-active-auth-key');
                         let state = btn.parent().prev();
-                        state.text('停用');
+                        state.text(getTransText('已停用'));
                         state.removeClass('text-success');
                         state.addClass('text-warning');
-                        show_warning_dialog('已成功停用访问密钥', 'success');
+                        show_warning_dialog(getTransText('已成功停用访问密钥'), 'success');
                     },
                     error: function (xhr, status, errortext) {
-                        show_warning_dialog('起用访问密钥失败');
+                        show_warning_dialog(getTransText('起用访问密钥失败'));
                     },
                 });
             },
@@ -140,25 +136,25 @@
         let access_key = access_key_node.text();
         let url = get_api_domain_name() + get_auth_key_api_base() + access_key + '/?active=true';
         show_confirm_dialog({
-            title: '确认要启用此访问密钥吗？',
-            text: '请确认',
+            title: getTransText('确认要启用此访问密钥吗'),
+            text: getTransText('请确认'),
             ok_todo: function () {
                 $.ajax({
                     url: url,
                     type: 'PATCH',
                     timeout: 200000,
                     success: function (result, status, xhr) {
-                        btn.text('停用');
+                        btn.text(getTransText('停用'));
                         btn.removeClass('btn-active-auth-key');
                         btn.addClass('btn-stop-auth-key');
                         let state = btn.parent().prev();
-                        state.text('使用中');
+                        state.text(getTransText('使用中'));
                         state.removeClass('text-warning');
                         state.addClass('text-success');
-                        show_warning_dialog('已成功起用访问密钥', 'success');
+                        show_warning_dialog(getTransText('已成功起用访问密钥'), 'success');
                     },
                     error: function (xhr, status, errortext) {
-                        show_warning_dialog('起用访问密钥失败');
+                        show_warning_dialog(getTransText('起用访问密钥失败'));
                     },
                 });
             },
@@ -175,8 +171,8 @@
         let access_key = access_key_node.text();
         let url = get_api_domain_name() + get_auth_key_api_base() + access_key + '/';
         show_confirm_dialog({
-            title: '确认要删除此访问密钥吗？',
-            text: '请确认',
+            title: getTransText('确认要删除此访问密钥吗'),
+            text: getTransText('请确认'),
             ok_todo: function () {
                 $.ajax({
                     url: url,
@@ -184,10 +180,10 @@
                     timeout: 200000,
                     success: function (result, status, xhr) {
                         tr_key.remove();
-                        show_warning_dialog('已成功删除访问密钥', 'success');
+                        show_warning_dialog(getTransText('已成功删除访问密钥'), 'success');
                     },
                     error: function (xhr, status, errortext) {
-                        show_warning_dialog('删除访问密钥失败');
+                        show_warning_dialog(getTransText('删除访问密钥失败'));
                     },
                 });
             },
@@ -202,34 +198,32 @@
         <tr>
             <td>{{ $imports.isoTimeToLocal(key.create_time) }}</td>
             <td>{{ key.access_key }}</td>
-            <td class="col-sm-5">
-                <input title="secret_key" class="secret-key col-sm-10" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
-                <span class="btn btn-default secret-key-display glyphicon glyphicon-eye-open"><span class=""></span></span>
+            <td>
+                <input title="{{ key.secret_key }}" class="secret-key" readonly type="password" value="{{ key.secret_key }}" style="border: 0px;outline:none;">
+                <span class="btn btn-outline-info secret-key-display"><i class="fa fa-eye"></i></span>
             </td>
             {{ if key.state }}
-                <td class="text-success">使用中</td>
+                <td class="text-success">{{$imports.getTransText('使用中')}}</td>
             {{else if !key.state }}
-                <td class="text-warning">停用</td>
+                <td class="text-warning">{{$imports.getTransText('停用')}}</td>
             {{/if}}
             <td>
                 {{ if key.state }}
-                    <span class="btn btn-info btn-stop-auth-key">停用</span>
+                    <span class="btn btn-info btn-stop-auth-key">{{$imports.getTransText('停用')}}</span>
                 {{else if !key.state }}
-                    <span class="btn btn-info btn-active-auth-key">启用</span>
+                    <span class="btn btn-info btn-active-auth-key">{{$imports.getTransText('启用')}}</span>
                 {{/if}}
-                <span class="btn btn-danger btn-remove-auth-key"><span class="glyphicon glyphicon-remove"></span></span>
+                <span class="btn btn-danger btn-remove-auth-key"><i class="fa fa-trash-alt"></i></span>
             </td>
         </tr>
     `);
 
-    //
     // 创建访问密钥
-    //
     $("#btn-create-auth-key").on('click', function () {
         let url = get_api_domain_name() + get_auth_key_api_base();
         show_confirm_dialog({
-            title: '确认要创建新的访问密钥吗？',
-            text: '请确认',
+            title: getTransText('确认要创建新的访问密钥吗'),
+            text: getTransText('请确认'),
             ok_todo: function () {
                 $.ajax({
                     url: url,
@@ -238,7 +232,7 @@
                     success: function (data, status, xhr) {
                         let html_str = render_auth_key_table_item(data);
                         $('#auth-key-table').children('tbody').children().first().after(html_str);
-                        show_warning_dialog('已成功创建新的访问密钥', 'success');
+                        show_warning_dialog(getTransText('已成功创建新的访问密钥'), 'success');
                     },
                     error: function (error, status, errortext) {
                         let msg;
@@ -248,7 +242,7 @@
                         catch (e) {
                             msg = error.statusText;
                         }
-                        show_warning_dialog('创建访问密钥失败:' + msg);
+                        show_warning_dialog(getTransText('创建访问密钥失败') + ':' + msg);
                     },
                 });
             },

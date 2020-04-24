@@ -3,7 +3,7 @@
 {% load i18n %}
 {% block form_extend %}
     <a class="btn text-warning" href="{% url 'users:forget' %}">{% trans '忘记密码' %}</a>
-    <a class="btn btn-success pull-right" href="{% url 'users:register' %}">{% trans '注册' %}</a>
+    <a class="btn btn-success float-right" href="{% url 'users:register' %}">{% trans '注册' %}</a>
     <div class="clearfix"></div>
     {% if kjy_url %}
         <hr>

@@ -57,6 +57,12 @@ class HarborFileSystem(AbstractedFS):
         else:
             raise FilesystemError('Not a dir.')
 
+    def stat(self, path):
+        pass
+
+    def lstat(self, path):
+        pass
+
     def listdir(self, path):
         # print('functioin: listdir', 'path:' + path)
         dir_list = []
@@ -94,26 +100,41 @@ class HarborFileSystem(AbstractedFS):
         #               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 
         path = self.fs2ftp(basedir)
-        for filename, mtimestr, size in listing:
-            ftp_path = os.path.join(path, filename)
-            if filename.endswith('/'):
-                perm = "drwxrwxrwx"
-                # print(mtimestr, '-----------')
-                # mtimestr = 'Jan 01 00:00'
-                mtimestr = mtimestr.strftime('%b %d %X')[:-3]
-                filename = filename[:-1]
-            else:
-                mtimestr = mtimestr.strftime('%b %d %X')[:-3]
-                perm = "-r-xr-xr-x"
-            line = "%s %3s %-8s %-8s %8s %12s %s\r\n" % (
-                perm, 1, 'root', 'root', size, mtimestr, filename)
+        for tmp in listing:
+            if isinstance(tmp, tuple):
+                filename, mtimestr, size = tmp
+                ftp_path = os.path.join(path, filename)
+                if filename.endswith('/'):
+                    perm = "drwxrwxrwx"
+                    # print(mtimestr, '-----------')
+                    # mtimestr = 'Jan 01 00:00'
+                    mtimestr = mtimestr.strftime('%b %d %X')[:-3]
+                    filename = filename[:-1]
+                else:
+                    mtimestr = mtimestr.strftime('%b %d %X')[:-3]
+                    perm = "-r-xr-xr-x"
+                line = "%s %3s %-8s %-8s %8s %12s %s\r\n" % (
+                    perm, 1, 'root', 'root', size, mtimestr, filename)
 
-            if self.cmd_channel is not None:
-                # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("utf8", self.cmd_channel.unicode_errors)
+                if self.cmd_channel is not None:
+                    # print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                    yield line.encode("utf8", self.cmd_channel.unicode_errors)
+                else:
+                    # print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                    yield line.encode("utf8")
             else:
-                # print(line.encode("utf8", self.cmd_channel.unicode_errors))
-                yield line.encode("utf8")
+                # mtimestr = mtimestr.strftime('%b %d %X')[:-3]
+                perm = "-r-xr-xr-x"
+                line = "%s %3s %-8s %-8s %8s %12s %s\r\n" % (
+                    perm, 1, 'root', 'root', '', '', tmp)
+
+                if self.cmd_channel is not None:
+                    # print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                    yield line.encode("utf8", self.cmd_channel.unicode_errors)
+                else:
+                    # print(line.encode("utf8", self.cmd_channel.unicode_errors))
+                    yield line.encode("utf8")
+
 
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         assert isinstance(basedir, str), basedir
@@ -230,7 +251,7 @@ class HarborFileSystem(AbstractedFS):
 
 
     def lexists(self, path):
-        print('function: lexists', 'path: ' + path)
+        # print('function: lexists', 'path: ' + path)
         ftp_path = self.fs2ftp(path)
 
         if self.isdir(ftp_path) or self.isfile(ftp_path):

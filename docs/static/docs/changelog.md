@@ -1,3 +1,7 @@
+## v0.4.1
+* 升级到jquery3,bootstrap4
+* ftp服务解决ls文件报错bug
+
 ## v0.4.0
 * 国际化多语言   
 

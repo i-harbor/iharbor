@@ -354,10 +354,7 @@
     // 检测是否有选中项
     //
     function is_exists_checked() {
-        if ($(".item-checkbox:checked").size() === 0)
-            return false;
-        else
-            return true;
+        return $(".item-checkbox:checked").length !== 0;
     }
 
     //
@@ -414,11 +411,11 @@
     let render_bucket_item = template.compile(`
         <tr class="" id="bucket-list-item">
             <td><input type="checkbox" class="item-checkbox" value="{{ $data['id'] }}"></td>
-            <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
+            <td><i class="fa fa-database"></i><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $data['name'] }}">{{ $data['name'] }}</a>
             <td>{{ $imports.isoTimeToLocal($data['created_time']) }}</td>
             <td class="access-perms-enable">
                 <span>{{ $data['access_permission'] }}</span>
-                <span class="btn-share-bucket"><span class="glyphicon glyphicon-share"></span></span>
+                <span class="btn-share-bucket"><i class="fa fa-edit"></i></span>
             </td>
             <td class="ftp-enable">
                 {{if $data['ftp_enable']}}
@@ -427,17 +424,17 @@
                 {{if !$data['ftp_enable']}}
                     <span>{{$imports.getTransText('关闭')}}</span>
                 {{/if}}
-                <span class="ftp-enable-btn" data-bucket-name="{{ $data['name'] }}"><span class="glyphicon glyphicon-edit"></span></span>
+                <span class="ftp-enable-btn" data-bucket-name="{{ $data['name'] }}"><i class="fa fa-edit"></i></span>
             </td>
             <td class="mouse-hover" data-bucket-name="{{ $data['name'] }}">
                 <span class="mouse-hover-no-show">******</span>
                 <span class="ftp-password-value mouse-hover-show">{{ $data['ftp_password'] }}</span>
-                <span class="glyphicon glyphicon-edit mouse-hover-show ftp-password-edit"></span>
+                <i class="fa fa-edit mouse-hover-show ftp-password-edit"></i>
             </td>
             <td class="mouse-hover" data-bucket-name="{{ $data['name'] }}">
                 <span class="mouse-hover-no-show">******</span>
                 <span class="mouse-hover-show">{{ $data['ftp_ro_password'] }}</span>
-                <span class="glyphicon glyphicon-edit mouse-hover-show ftp-ro-password-edit"></span>
+                <i class="fa fa-edit mouse-hover-show ftp-ro-password-edit"></i>
             </td>
             <td class="bucket-remarks-edit" title="{{$imports.getTransText('双击修改备注')}}" data-bucket-id="{{ $data['id'] }}" style="max-width: 150px; word-wrap: break-word;">
                 <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
@@ -456,9 +453,9 @@
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
                     <div>
-                        <button class="btn btn-primary" id="btn-new-bucket"><span class="glyphicon glyphicon-plus"></span>{{$imports.getTransText('创建存储桶')}}
+                        <button class="btn btn-primary" id="btn-new-bucket"><i class="fa fa-plus"></i>{{$imports.getTransText('创建存储桶')}}
                         </button>
-                        <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><span class="glyphicon glyphicon-trash"></span>{{$imports.getTransText('删除存储桶')}}</button>
+                        <button class="btn btn-danger disabled" id="btn-del-bucket" disabled="disabled" ><i class="fa fa-trash"></i>{{$imports.getTransText('删除存储桶')}}</button>
                     </div>
                 </div>
             </div>
@@ -466,7 +463,7 @@
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
                     <table class="table table-hover" id="bucket-table">
-                        <tr class="bg-info">
+                        <tr class="bg-light">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                             <th>{{$imports.getTransText('存储桶名称')}}</th>
                             <th>{{$imports.getTransText('创建时间')}}</th>
@@ -486,12 +483,12 @@
                             {{ each buckets }}
                                 <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
-                                    <td><span class="glyphicon glyphicon-oil"></span><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
+                                    <td><i class="fa fa-database"></i><span>  </span><a href="#" id="bucket-list-item-enter" bucket_name="{{ $value.name }}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.created_time) }}</td>
                                     <td>
                                         <span>{{ $value.access_permission }}</span>
-                                        <span class="btn-share-bucket"><span class="glyphicon glyphicon-edit"></span></span>
+                                        <span class="btn-share-bucket"><i class="fa fa-edit"></i></span>
                                     </td>
                                     <td class="ftp-enable">
                                         {{if $value.ftp_enable}}
@@ -500,17 +497,17 @@
                                         {{if !$value.ftp_enable}}
                                             <span>{{str_close}}</span>
                                         {{/if}}
-                                        <span class=" ftp-enable-btn" data-bucket-name="{{ $value.name }}"><span class="glyphicon glyphicon-edit"></span></span>
+                                        <span class=" ftp-enable-btn" data-bucket-name="{{ $value.name }}"><i class="fa fa-edit"></i></span>
                                      </td>
                                     <td class="mouse-hover" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="ftp-password-value mouse-hover-show">{{ $value.ftp_password }}</span>
-                                        <span class="glyphicon glyphicon-edit mouse-hover-show ftp-password-edit"></span>
+                                        <i class="fa fa-edit mouse-hover-show ftp-password-edit"></i>
                                     </td>
                                     <td class="mouse-hover" data-bucket-name="{{ $value.name }}">
                                         <span class="mouse-hover-no-show">******</span>
                                         <span class="mouse-hover-show">{{ $value.ftp_ro_password }}</span>
-                                        <span class="glyphicon glyphicon-edit mouse-hover-show ftp-ro-password-edit"></span>
+                                        <i class="fa fa-edit mouse-hover-show ftp-ro-password-edit"></i>
                                     </td>
                                     <td class="bucket-remarks-edit" style="max-width: 150px; word-wrap: break-word;" title="{{str_db_remark}}" data-bucket-id="{{ $value.id }}">
                                         <span class="bucket-remarks-value">{{ $value.remarks }}</span>
@@ -530,22 +527,22 @@
             {{if (previous || next)}}
             <div class="row">
                 <div class="col-xs-12 col-sm-12">
-                   <nav aria-label="...">
-                      <ul class="pager">
+                   <nav aria-label="Page navigation">
+                      <ul class="pagination" style="margin:0;">
                         {{if previous}}
-                            <li><a id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
+                            <li class="page-item"><a class="page-link" id="page_previous_buckets" href="{{previous}}"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
                         {{/if}}
                         {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
+                            <li class="page-item disabled"><a class="page-link"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
                         {{/if}}                       
                         {{if page}}
-                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
+                            <li class="disabled page-item"><spam class="page-link"><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></spam></li>
                         {{/if}}                       
                         {{if next}}
-                            <li><a id="page_next_buckets" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
+                            <li class="page-item"><a class="page-link" id="page_next_buckets" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></a></li>
                         {{/if}}
                         {{if !next}}
-                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
+                            <li class="page-item disabled"><a class="page-link">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></a></li>
                         {{/if}}
                       </ul>
                     </nav>
@@ -679,7 +676,7 @@
     //
     // 存储桶列表上一页Previous点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_previous_buckets', function (e) {
+    $("#content-display-div").on("click", '#page_previous_buckets', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_buckets_and_render(url);
@@ -688,7 +685,7 @@
     //
     // 存储桶列表下一页Next点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_next_buckets', function (e) {
+    $("#content-display-div").on("click", '#page_next_buckets', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_buckets_and_render(url);
@@ -930,24 +927,23 @@
     let render_bucket_files_view = template.compile(`
         <div class="container-fluid">
             <div class="row">
-                <div class="col-xs-12 col-sm-12">
-                    <!--{#目录导航栏#}-->
-                    <div>
+                <div class="col-12">
+                    <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
                             <a href="#" id="btn-path-bucket">{{$imports.getTransText('存储桶')}}</a>
                             <span>></span>
-                            <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
+                            <li class="breadcrumb-item"><a href="#" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                             {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
                             {{ each breadcrumbs }}
-                                <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
+                                <li class="breadcrumb-item"><a href="#"  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                             {{/each}}
                         </ol>
-                    </div>
+                    </nav>
                     <hr>
                     <div>
-                        <button class="btn btn-info" id="btn-new-directory"><span class="glyphicon glyphicon-plus"></span>{{$imports.getTransText('创建文件夹')}}</button>
-                        <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-upload"></span>{{$imports.getTransText('上传文件')}}</button>
-                        <button class="btn btn-success" id="btn-path-item" bucket_name="{{ $data['bucket_name'] }}" dir_path="{{ $data['dir_path'] }}"><span class="glyphicon glyphicon-refresh"></span></button>
+                        <button class="btn btn-info" id="btn-new-directory"><i class="fa fa-plus"></i>{{$imports.getTransText('创建文件夹')}}</button>
+                        <button class="btn btn-primary" id="btn-upload-file" bucket_name="{{ $data['bucket_name'] }}" cur_dir_path="{{ $data['dir_path'] }}"><i class="fa fa-upload"></i>{{$imports.getTransText('上传文件')}}</button>
+                        <button class="btn btn-success" id="btn-path-item" bucket_name="{{ $data['bucket_name'] }}" dir_path="{{ $data['dir_path'] }}"><i class="fa fa-sync"></i></button>
                         <div  id="upload-progress-bar" style="display: none;">
                             <p class="text-warning">{{$imports.getTransText('请勿离开此页面，以防文件上传过程中断！')}}</p>
                             <div class="progress text-warning">             
@@ -962,9 +958,10 @@
             </div>
             <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
             <div class="row">
-                <div class="col-xs-12 col-sm-12">
-                    <table class="table table-responsive" id="bucket-files-table">
-                        <tr class="bg-info">
+                <div class="container-fluid">
+                    <table class="table table-hover" id="bucket-files-table">
+                        <thead class="thead-light">
+                        <tr class="bg-light">
                             <th><input type="checkbox" data-check-target=".item-checkbox" /></th>
                             <th>{{$imports.getTransText('名称')}}</th>
                             <th>{{$imports.getTransText('上传时间')}}</th>
@@ -972,6 +969,7 @@
                             <th>{{$imports.getTransText('权限')}}</th>
                             <th></th>
                         </tr>
+                        </thead>
                         {{set str_operation = $imports.getTransText('操作')}}
                         {{set str_open = $imports.getTransText('打开')}}
                         {{set str_delete = $imports.getTransText('删除')}}
@@ -979,12 +977,13 @@
                         {{set str_download = $imports.getTransText('下载')}}
                         {{set str_rename = $imports.getTransText('重命名')}}
                         {{each files}}
+                        <tbody>
                             <tr class="bucket-files-table-item">
                                 <td><input type="checkbox" class="item-checkbox" value=""></td>
                                 <!--文件-->
                                 {{ if $value.fod }}
                                     <td class="bucket-files-table-item">
-                                        <span class="glyphicon glyphicon-file"></span>
+                                        <i class="fa fa-file"></i>
                                         <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.name }}</a>
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
@@ -992,7 +991,7 @@
                                 {{/if}}
                                 {{ if !$value.fod }}
                                     <td>
-                                        <span class="glyphicon glyphicon-folder-open"></span>
+                                        <i class="fa fa-folder"></i>
                                         <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
@@ -1000,59 +999,67 @@
                                 {{/if}}
                                 <td id="id-access-perms">{{ $value.access_permission}}</td>
                                 <td>
-                                    <li class="dropdown btn">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></a>
-                                        <ul class="dropdown-menu">
+                                    <div class="dropdown">
+                                        <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                   aria-expanded="false">{{str_operation}}<span class="caret"></span></button>
+                                        <div class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a></li>
-                                                <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a></li>
-                                                <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">{{str_share}}</a></li>
+                                                <a class="dropdown-item bg-info" href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a>
+                                                <a class="dropdown-item bg-danger" href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-warning" href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">{{str_share}}</a>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
-                                                <li class="btn-success"><a id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a></li>
-                                                <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{$value.name}}">{{str_delete}}</a></li>
-                                                <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_share}}</a></li>
-                                                <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a></li>
+                                                <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a>
+                                                <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{$value.name}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_share}}</a>
+                                                <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a>
                                         {{/if}}
-                                        </ul>
-                                    </li>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
+                        </tbody>
                         {{/each}}
                         <tr><td colspan="6"><%= $imports.interpolate($imports.getTransText('共 %s 个项目'), [count]) %></td></tr>
                     </table>
                 </div>
             </div>
             {{if (previous || next)}}
-            <div class="row">
-                <div class="col-xs-12 col-sm-12">
-                   <nav aria-label="...">
-                      <ul class="pager">
-                        {{if previous}}
-                            <li><a id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
-                        {{/if}}
-                        {{if !previous}}
-                            <li class="disabled"><a><span aria-hidden="true">&larr;</span>{{$imports.getTransText('上页')}}</a></li>
-                        {{/if}}                
-                        {{if page}}
-                            <li><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></li>
-                        {{/if}}
-                        {{if next}}
-                            <li><a id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
-                        {{/if}}
-                        {{if !next}}
-                            <li class="disabled"><a>{{$imports.getTransText('下页')}}<span aria-hidden="true">&rarr;</span></a></li>
-                        {{/if}}
-                        {{if page.final > 2}}
-                            <li>{{$imports.getTransText('跳转到')}}<input type="text" name="page-skip-to" style="max-width: 60px;">{{$imports.getTransText('页')}}
-                                <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
-                            </li>
-                        {{/if}}
-                      </ul>
-                    </nav>
+            <div class="container-fluid">
+                <div class="row">
+                <nav aria-label="Page navigation col-6" style="margin:0;">
+                  <ul class="pagination">
+                    {{if previous}}
+                        <li class="page-item"><a class="page-link" id="page_previous_bucket_files" href="{{previous}}"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
+                    {{/if}}
+                    {{if !previous}}
+                        <li class="page-item disabled"><a class="page-link"><span aria-hidden="true">&laquo;</span>{{$imports.getTransText('上页')}}</a></li>
+                    {{/if}}                
+                    {{if page}}
+                        <li class="page-item disabled"><span class="page-link"><%= $imports.interpolate($imports.getTransText('第%s页 / 共%s页'), [page.current, page.final]) %></span></li>
+                    {{/if}}
+                    {{if next}}
+                        <li class="page-item"><a class="page-link" id="page_next_bucket_files" href="{{next}}">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></a></li>
+                    {{/if}}
+                    {{if !next}}
+                        <li class="page-item disabled"><span class="page-link">{{$imports.getTransText('下页')}}<span aria-hidden="true">&raquo;</span></span></li>
+                    {{/if}}
+                  </ul>
+                </nav>
+                {{if page.final > 2}}
+                    <div class="input-group mb-3 col-6">
+                      <div class="input-group-prepend">
+                        <span class="input-group-text">{{$imports.getTransText('跳转到')}}</span>
+                      </div>
+                      <input type="text" class="form-control" name="page-skip-to" style="max-width: 60px;">
+                      <div class="input-group-append">
+                        <span class="input-group-text">{{$imports.getTransText('页')}}</span>
+                        <button class="btn btn-sm btn-primary" id="btn-skip-to-page" data-bucket_name="{{ $data['bucket_name'] }}" data-dir_path="{{ $data['dir_path'] }}">{{$imports.getTransText('跳转')}}</button>
+                      </div>
+                    </div>
+                {{/if}}
                 </div>
             </div>
             {{/if}}
@@ -1067,23 +1074,23 @@
         <tr class="bucket-files-table-item">
             <td><input type="checkbox" class="item-checkbox" value=""></td>
             <td class="bucket-files-table-item">
-                <span class="glyphicon glyphicon-file"></span>
+                <i class="fa fa-file"></i>
                 <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.name }}</a>
             </td>
             <td>{{ $imports.isoTimeToLocal(obj.ult) }}</td>
             <td>{{ $imports.sizeFormat(obj.si, "B") }}</td>
             <td>{{ obj.access_permission }}</td>
             <td>
-                <li class="dropdown btn">
-                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></a>
-                    <ul class="dropdown-menu">
-                        <li class="btn-success"><a id="bucket-files-item-download" href="{{obj.download_url}}" >{{$imports.getTransText('下载')}}</a></li>
-                        <li class="btn-danger"><a id="bucket-files-item-delete" href="" filename="{{obj.name}}">{{$imports.getTransText('删除')}}</a></li>
-                        <li class="btn-info"><a id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('分享公开')}}</a></li>
-                        <li class="btn-warning"><a id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('重命名')}}</a></li>
-                    </ul>
-                </li>
+                <div class="dropdown">
+                    <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{obj.download_url}}" >{{$imports.getTransText('下载')}}</a>
+                        <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{obj.name}}">{{$imports.getTransText('删除')}}</a>
+                        <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('分享公开')}}</a>
+                        <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('重命名')}}</a>
+                    </div>
+                </div>
             </td>
         </tr>
     `);
@@ -1120,7 +1127,7 @@
     //
     // 文件夹、文件对象列表上一页Previous点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_previous_bucket_files', function (e) {
+    $("#content-display-div").on("click", '#page_previous_bucket_files', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_bucket_files_and_render(url);
@@ -1129,14 +1136,14 @@
     //
     // 文件夹、文件对象列表下一页Next点击事件
     //
-    $("#content-display-div").on("click", '.pager #page_next_bucket_files', function (e) {
+    $("#content-display-div").on("click", '#page_next_bucket_files', function (e) {
         e.preventDefault();
         let url = $(this).attr('href');
         get_bucket_files_and_render(url);
     });
 
     // 文件夹、文件对象列表 跳转到页码点击事件
-    $("#content-display-div").on("click", '.pager #btn-skip-to-page', function (e) {
+    $("#content-display-div").on("click", '#btn-skip-to-page', function (e) {
         e.preventDefault();
         let page_num = $(":input[name='page-skip-to']").val();
         page_num = parseInt(page_num);
@@ -1571,18 +1578,18 @@
         <div class="container-fluid">
         <div class="row">
             <div class="col-xs-12 col-sm-12">
-                <div>
+                <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <a href="#" id="btn-path-bucket">{{$imports.getTransText('存储桶')}}</a>
                         <span>></span>
-                        <li><a href="" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
+                        <li class="breadcrumb-item"><a href="#" id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="">{{ $data['bucket_name']}}</a></li>
                         {{set breadcrumbs = $imports.get_breadcrumb($data['dir_path'])}}
                         {{each breadcrumbs}}
-                            <li><a href=""  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
+                            <li class="breadcrumb-item"><a href="#"  id="btn-path-item" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$value[1]}}">{{ $value[0] }}</a></li>
                         {{/each}}
                     </ol>
                     <p><h3>{{ obj.name }}</h3></p>
-                </div>
+                </nav>
             </div>
             <div class="col-sm-12"><hr style=" height:1px;border:1px;border-top:1px solid #185598;" /></div>
             <div class="col-xs-12 col-sm-12">
@@ -1940,22 +1947,22 @@
         <tr class="bucket-files-table-item">
             <td><input type="checkbox" class="item-checkbox" value=""></td>
             <td>
-                <span class="glyphicon glyphicon-folder-open"></span>
+                <i class="fa fa-folder"></i>
                 <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong class="bucket-files-table-item">{{ dir.name }}</strong></a>
             </td>
             <td>{{ $imports.isoTimeToLocal(dir.ult) }}</td>
             <td>--</td>
             <td id="id-access-perms">{{ dir.access_permission}}</td>
             <td>
-                <li class="dropdown btn">
-                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
-               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></a>
-                    <ul class="dropdown-menu">
-                         <li class="btn-info"><a href="" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">{{$imports.getTransText('打开')}}</a></li>
-                         <li class="btn-danger"><a href="" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">{{$imports.getTransText('删除')}}</a></li>
-                         <li class="btn-warning"><a href="#" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">{{$imports.getTransText('分享公开')}}</a></li>
-                    </ul>
-                </li>
+                <div class="dropdown">
+                    <button class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+               aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></button>
+                    <div class="dropdown-menu">
+                         <a class="dropdown-item bg-info" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">{{$imports.getTransText('打开')}}</a>
+                         <a class="dropdown-item bg-danger" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">{{$imports.getTransText('删除')}}</a>
+                         <a class="dropdown-item bg-warning" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">{{$imports.getTransText('分享公开')}}</a>
+                    </div>
+                </div>
             </td>
         </tr>
     `);

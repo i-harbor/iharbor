@@ -14,7 +14,7 @@
 
 {% block boby %}
     <div id="id-share-base" data-sharebase="{{ share_base }}" data-sharecode="{{ share_code }}"></div>
-    <div class="col-xs-offset-1 col-xs-10" id="content-display-div"></div>
+    <div class="container-fluid" id="content-display-div"></div>
 {% endblock %}
 
 {% block script %}
@@ -22,5 +22,6 @@
 {#    <!-- Include a polyfill for ES6 Promises (optional) for IE11, UC Browser and Android browser support -->#}
     <script type="text/javascript" src="{% static 'promise-polyfill/dist/polyfill.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
+    <script type="text/javascript" src="{% static 'fontawesome-free/js/all.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'share/share.js' %}"></script>
 {% endblock %}

@@ -17,10 +17,10 @@
         <div class="row">
             <div class="col-xs-12 col-sm-12">
                 <div>
-                    <button class="btn btn-primary disabled" id="btn-evcloud-list"><span
-                            class="glyphicon glyphicon-th-list"></span>{% trans '我的云主机' %}
+                    <button class="btn btn-primary disabled" id="btn-evcloud-list"><i
+                            class="fa fa-list"></i> {% trans '我的云主机' %}
                     </button>
-                    <button class="btn btn-danger" id="btn-evcloud-add"><span class="glyphicon glyphicon-plus"></span>
+                    <button class="btn btn-success" id="btn-evcloud-add"><i class="fa fa-plus"></i>
                         {% trans '创建云主机' %}
                     </button>
                 </div>
@@ -31,7 +31,7 @@
             <div class="col-xs-12 col-sm-12">
                 <table class="table table-hover">
                     {% csrf_token %}
-                    <tr class="bg-info">
+                    <tr class="bg-light">
                         <!--<th><input type="checkbox" data-check-target=".item-checkbox" /></th> -->
                         <th>IP</th>
                         <th>{% trans '镜像' %}</th>
@@ -67,20 +67,21 @@
                             <td class="vm-remarks" title="{% trans '双击修改' %}" data-vm-id="{{ vm.vm_id }}">{{ vm.remarks }}</td>
                             <td name="operate">
                                 <div class="btn-group">
-                                    <button name="vnc" type="button" class="btn btn-danger vnc-btn" value="5">VNC
-                                    </button>
-                                    <button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown"
-                                            aria-haspopup="true" aria-expanded="false">
-                                        <span class="caret"></span>
-                                        <span class="sr-only">Toggle Dropdown</span>
-                                    </button>
-                                    <ul class="dropdown-menu vm-operate">
-                                        <li><a href="" value="0">{% trans '启动' %}</a></li>
-                                        <li><a href="" value="1">{% trans '关机' %}</a></li>
-                                        <li><a href="" value="2">{% trans '关闭电源' %}</a></li>
-                                        <li><a href="" value="3">{% trans '重启' %}</a></li>
-                                        <li><a href="" value="4">{% trans '删除' %}</a></li>
-                                    </ul>
+                                    <button name="vnc" type="button" class="btn btn-info vnc-btn" value="5">VNC</button>
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown"
+                                                aria-haspopup="true" aria-expanded="false">
+                                            <span class="caret"></span>
+                                            <span class="sr-only">Toggle Dropdown</span>
+                                        </button>
+                                        <ul class="dropdown-menu vm-operate">
+                                            <li class="dropdown-item bg-success"><a class="text-dark" href="#" value="0">{% trans '启动' %}</a></li>
+                                            <li class="dropdown-item bg-warning"><a class="text-dark" href="#" value="1">{% trans '关机' %}</a></li>
+                                            <li class="dropdown-item bg-info"><a class="text-dark" href="#" value="2">{% trans '关闭电源' %}</a></li>
+                                            <li class="dropdown-item bg-warning"><a class="text-dark" href="#" value="3">{% trans '重启' %}</a></li>
+                                            <li class="dropdown-item bg-danger"><a class="text-dark" href="#" value="4">{% trans '删除' %}</a></li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
