@@ -920,7 +920,7 @@ class HarborManager():
 
         return (chunk, obj)
 
-    def get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2, user=None):
+    def get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2, user=None, all_public=False):
         '''
         获取一个读取对象的生成器函数
 
@@ -929,7 +929,8 @@ class HarborManager():
         :param offset: 读起始偏移量；type: int
         :param end: 读结束偏移量(包含)；type: int；默认None表示对象结尾；
         :param per_size: 每次读取数据块长度；type: int， 默认10Mb
-        :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
+        :param user: 用户，默认为None，如果给定用户只查属于此用户的对象（只查找此用户的存储桶）
+        :param all_public: 默认False(忽略); True(查找所有公有权限存储桶);
         :return: (generator, object)
                 for data in generator:
                     do something
@@ -943,7 +944,7 @@ class HarborManager():
 
         # 存储桶验证和获取桶对象
         try:
-            bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+            bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user, all_public=all_public)
         except HarborError as e:
             raise e
 
@@ -1026,13 +1027,39 @@ class HarborManager():
 
         return generator()
 
-    def get_bucket_and_obj_or_dir(self,bucket_name:str, path:str, user=None):
+    @staticmethod
+    def check_public_or_user_bucket(bucket, user, all_public):
+        """
+        公有桶或用户的桶
+
+        :param bucket: 桶对象
+        :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :param all_public: 默认False(忽略); True(查找所有公有权限存储桶);
+        :return:
+                success: bucket
+                failed:   raise HarborError
+
+        :raise HarborError
+        """
+        if all_public:
+            if bucket.is_public_permission():   # 公有桶
+                return bucket
+
+        if user:
+            if bucket.check_user_own_bucket(user):
+                return bucket
+            else:
+                raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='无权限访问存储桶')
+        return bucket
+
+    def get_bucket_and_obj_or_dir(self,bucket_name:str, path:str, user=None, all_public=False):
         '''
         获取存储桶和对象或目录实例
 
         :param bucket_name: 桶名
         :param path: 对象全路径
         :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :param all_public: 默认False(忽略); True(查找所有公有权限存储桶);
         :return:
                 success: （bucket, object） # obj == None表示对象或目录不存在
                 failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
@@ -1045,9 +1072,10 @@ class HarborManager():
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
 
         # 存储桶验证和获取桶对象
-        bucket = self.get_bucket(bucket_name=bucket_name, user=user)
+        bucket = self.get_bucket_by_name(bucket_name)
         if not bucket:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+        self.check_public_or_user_bucket(bucket=bucket, user=user, all_public=all_public)
 
         table_name = bucket.get_bucket_table_name()
         try:
@@ -1062,20 +1090,21 @@ class HarborManager():
 
         return bucket, obj
 
-    def get_bucket_and_obj(self, bucket_name: str, obj_path: str, user=None):
+    def get_bucket_and_obj(self, bucket_name: str, obj_path: str, user=None, all_public=False):
         '''
         获取存储桶和对象实例
 
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
         :param user: 用户，默认为None，如果给定用户只查找此用户的存储桶
+        :param all_public: 默认False(忽略); True(查找所有公有权限存储桶);
         :return:
                 success: （bucket, obj）  # obj == None表示对象不存在
                 failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
 
         :raise HarborError
         '''
-        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_path, user=user)
+        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_path, user=user, all_public=all_public)
         if obj and obj.is_file():
             return bucket, obj
 
