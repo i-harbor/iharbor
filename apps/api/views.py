@@ -852,7 +852,7 @@ class ObjViewSet(CustomGenericViewSet):
 
     '''
     queryset = {}
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
     parser_classes = (parsers.MultiPartParser, parsers.FormParser)
@@ -969,7 +969,7 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             file_generator, obj = hManager.get_obj_generator(bucket_name=bucket_name, obj_path=objpath,
-                                                                  user=request.user)
+                                                                  user=request.user, all_public=True)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
@@ -1156,6 +1156,11 @@ class ObjViewSet(CustomGenericViewSet):
 
     def get_data(self, request):
         return request.data
+
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            return []
+        return super().get_permissions()
 
 
 class DirectoryViewSet(CustomGenericViewSet):
