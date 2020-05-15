@@ -674,9 +674,11 @@ class HarborObject:
         self._obj_size = obj_size
         self._rados = None
 
-    def reset_obj_id_and_size(self, obj_id, obj_size):
-        self._obj_id = obj_id
-        self._obj_size = obj_size
+    def reset_obj_id_and_size(self, obj_id=None, obj_size=None):
+        if obj_id is not None:
+            self._obj_id = obj_id
+        if obj_size is not None:
+            self._obj_size = obj_size
 
     def get_obj_size(self):
         '''获取对象大小'''
@@ -792,6 +794,7 @@ class HarborObject:
         except (RadosError, Exception) as e:
             return False, str(e)
 
+        self._obj_size = max(offset + file.size, self._obj_size)
         return True, 'success to write file'
 
     def delete(self, obj_size=None):
@@ -809,6 +812,7 @@ class HarborObject:
         except (RadosError, Exception) as e:
             return False, str(e)
 
+        self._obj_size = 0
         return True, 'delete success'
 
     def read_obj_generator(self, offset=0, end=None, block_size=10 * 1024 ** 2):
@@ -923,3 +927,66 @@ class HarborObject:
             return True, (0, None)
         except RadosError as e:
             return False, str(e)
+
+
+class FileWrapper:
+    def __init__(self, ho: HarborObject):
+        self._ho = ho
+        self.offset = 0
+        self.closed = True
+
+    def open(self):
+        try:
+            self._ho.get_rados_api().get_cluster()
+        except Exception as e:
+            raise ValueError("The file cannot be reopened.")
+
+        self.closed = False
+        return self
+
+    def close(self):
+        self.closed = True
+        self._ho.get_rados_api().clear_cluster()
+
+    @property
+    def size(self):
+        return self._ho.get_obj_size()
+
+    @size.setter
+    def size(self, value):
+        self._ho.reset_obj_id_and_size(obj_size=value)
+
+    def read(self, size):
+        ok, data = self._ho.read(offset=self.offset, size=size)
+        if not ok:
+            ok, data = self._ho.read(offset=self.offset, size=size)
+            if not ok:
+                raise IOError('failed to read from harbor object')
+
+        rl = len(data)
+        self.offset += rl
+        return data
+
+    def write(self, data, offset=None):
+        offset = offset if offset is not None else self.offset
+        ok, msg = self._ho.write(data, offset=offset)
+        if not ok:
+            ok, msg = self._ho.write(data, offset=offset)
+            if not ok:
+                raise IOError('failed write data to harbor object')
+
+        wl = len(data)
+        self.offset += wl
+        return wl
+
+    def seek(self, offset):
+        size = self.size
+        if size <= 0:
+            self.offset = 0
+
+        if 0 <= offset <= size:
+            self.offset = offset
+        elif offset < 0:
+            self.offset = 0
+        else:
+            self.offset = size

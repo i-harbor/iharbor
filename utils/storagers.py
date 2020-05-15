@@ -1,9 +1,16 @@
 import os
+import hashlib
 
 from django.conf import settings
+from django.core.files.uploadhandler import FileUploadHandler
+from django.core.files.uploadedfile import UploadedFile
+from django.core.exceptions import RequestDataTooBig
+from django.utils.translation import gettext
+
+from utils.oss.pyrados import HarborObject, FileWrapper
 
 
-class FileStorage():
+class FileStorage:
     '''
     基于文件系统的文件存储
     '''
@@ -84,7 +91,7 @@ class FileStorage():
             return file_generator
 
 
-class PathParser():
+class PathParser:
     '''
     路径字符串解析
     '''
@@ -162,3 +169,79 @@ class PathParser():
         for i, key in enumerate(dirs):
             breadcrumb.append([key, '/'.join(dirs[0:i+1])])
         return breadcrumb
+
+
+class CephUploadFile(UploadedFile):
+    """
+    上传存储到ceph的一个文件
+    """
+    DEFAULT_CHUNK_SIZE = 5 * 2**20     # default 5MB
+
+    def __init__(self, file, field_name, name, content_type, size, charset, file_md5='', content_type_extra=None):
+        super().__init__(file, name, content_type, size, charset, content_type_extra)
+        self.field_name = field_name
+        self.file_md5 = file_md5
+
+    def open(self, mode=None):
+        self.file.seek(0)
+        return self
+
+
+class FileUploadToCephHandler(FileUploadHandler):
+    """
+    直接存储到ceph的自定义文件上传处理器
+    """
+    chunk_size = 5 * 2 ** 20    # 5MB
+
+    def __init__(self, request=None, pool_name='', obj_key=''):
+        super().__init__(request=request)
+        self.pool_name = pool_name
+        self.obj_key = obj_key
+        self.file = None
+        self.file_md5_handler = None
+
+    def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
+        """
+        Handle the raw input from the client.
+        """
+        max_size = getattr(settings, 'CUSTOM_UPLOAD_MAX_FILE_SIZE', 10 * 2 ** 30)    # default 10GB
+        if max_size is None:
+            return
+        if content_length > max_size:
+            raise RequestDataTooBig(gettext('上传文件超过大小限制'))
+
+    def new_file(self, *args, **kwargs):
+        """
+        Create the file object to append to as data is coming in.
+        """
+        super().new_file(*args, **kwargs)
+        self.file = FileWrapper(HarborObject(pool_name=self.pool_name, obj_id=self.obj_key))
+        if self.request:
+            if self.request.headers.get('Content-MD5', ''):
+                self.file_md5_handler = hashlib.md5()
+
+    def receive_data_chunk(self, raw_data, start):
+        self.file.write(raw_data, offset=start)
+        if self.file_md5_handler:
+            self.file_md5_handler.update(raw_data)
+
+    def file_complete(self, file_size):
+        self.file.seek(0)
+        self.file.size = file_size
+        return CephUploadFile(
+            file=self.file,
+            field_name=self.field_name,
+            name=self.file_name,
+            content_type=self.content_type,
+            size=file_size,
+            charset=self.charset,
+            file_md5=self.file_md5(),
+            content_type_extra=self.content_type_extra
+        )
+
+    def file_md5(self):
+        fmh = self.file_md5_handler
+        if fmh:
+            return fmh.hexdigest()
+
+        return ''

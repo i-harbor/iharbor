@@ -423,6 +423,8 @@ SWAGGER_SETTINGS = {
     },
 }
 
+# 自定义文件上传处理文件大小限制, type: int
+CUSTOM_UPLOAD_MAX_FILE_SIZE = 10 * 2**30  # 10GB; None: 无限制
 
 # 导入安全相关的settings
 from .security_settings import *
@@ -443,7 +445,8 @@ from .security_settings import *
 #             'PASSWORD': 'xxx',     # 密码
 #             'HOST': '0.0.0.0',    # 主机
 #             'PORT': '3306',         # 数据库使用的端口
-#
+#         'CONN_MAX_AGE': 3600,   # 1h, None用于无限的持久连接
+#         'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
 #     },
 #     'metadata': {
 #         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
@@ -452,6 +455,8 @@ from .security_settings import *
 #         'PASSWORD': 'xxx',  # 密码
 #         'HOST': '0.0.0.0',  # 主机
 #         'PORT': '3306',  # 数据库使用的端口
+#         'CONN_MAX_AGE': 3600,   # 1h, None用于无限的持久连接
+#         'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
 #     },
 # }
 

@@ -189,9 +189,26 @@ class ObjPutSerializer(serializers.Serializer):
 
         return data
 
-    @log_used_time(debug_logger, mark_text='upload data is_valid')
     def is_valid(self, raise_exception=False):
         return super(ObjPutSerializer, self).is_valid(raise_exception)
+
+
+class ObjPutFileSerializer(serializers.Serializer):
+    '''
+    完整文件上传序列化器
+    '''
+    file = serializers.FileField(label=_('文件'), required=False, help_text=_('一个上传的完整的文件'))
+
+    def validate(self, data):
+        """
+        复杂验证
+        """
+        file = data.get('file')
+
+        if not file or file.size == 0:
+            raise serializers.ValidationError(detail={'file': gettext('无效的空文件')})
+
+        return data
 
 
 class ObjInfoSerializer(serializers.Serializer):

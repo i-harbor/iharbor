@@ -24,7 +24,7 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
-from utils.storagers import PathParser
+from utils.storagers import PathParser, FileUploadToCephHandler
 from utils.oss import HarborObject, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
@@ -922,6 +922,108 @@ class ObjViewSet(CustomGenericViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
+        operation_summary=gettext_lazy('上传一个完整对象'),
+        manual_parameters=[
+            openapi.Parameter(
+                name='objpath', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("文件对象绝对路径"),
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                {
+                    "code": 200,
+                    "created": true   # true: 上传创建一个新对象; false: 上传覆盖一个已存在的旧对象 
+                }
+                """,
+            status.HTTP_400_BAD_REQUEST: """
+                {
+                    "code": 400,
+                    "code_text": "xxxx"
+                }
+                """
+        }
+    )
+    def update(self, request, *args, **kwargs):
+        """
+        上传一个完整对象, 如果同名对象已存在，会覆盖旧对象；
+        上传对象大小限制10GB，超过限制的对象请使用分片上传方式；
+        如果担心上传过程中数据损坏不一致，可以使用标头Content-MD5，当您使用此标头时，将根据提供的MD5值检查对象，如果不匹配，则返回错误。
+        不提供对象锁定，如果同时对同一对象发起多个写请求，会造成数据混乱，损坏数据一致性；
+        """
+        objpath = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        hManager = HarborManager()
+        try:
+            bucket, obj, created = hManager.create_empty_obj(bucket_name=bucket_name, obj_path=objpath, user=request.user)
+        except HarborError as e:
+            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+
+        pool_name = bucket.get_pool_name()
+        obj_key = obj.get_obj_key(bucket.id)
+
+        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        if created is False:  # 对象已存在，不是新建的
+            try:
+                hManager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
+            except Exception as e:
+                return Response({'code': 400, 'code_text': f'reset object error, {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return self.update_handle(request=request, bucket=bucket, obj=obj, rados=rados, created=created)
+
+    def update_handle(self, request, bucket, obj, rados, created):
+        pool_name = bucket.get_pool_name()
+        obj_key = obj.get_obj_key(bucket.id)
+        uploader = FileUploadToCephHandler(request, pool_name=pool_name, obj_key=obj_key)
+        request.upload_handlers = [uploader]
+
+        def clean_put(uploader, obj, created):
+            # 删除数据和元数据
+            f = getattr(uploader, 'file', None)
+            s = f.size if f else 0
+            rados.delete(obj_size=s)
+            if created:
+                obj.delete()
+
+        # 数据验证
+        try:
+            put_data = self.get_data(request)
+        except Exception as e:
+            clean_put(uploader, obj, created)
+            return Response({
+                'code': 400, 'code_text': str(e),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(data=put_data)
+        if not serializer.is_valid(raise_exception=False):
+            # 删除数据和元数据
+            clean_put(uploader, obj, created)
+            msg = serializer_error_text(serializer.errors)
+            return Response({'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        file = serializer.validated_data.get('file')
+        content_md5 = self.request.headers.get('Content-MD5', '').lower()
+        if content_md5:
+            if content_md5 != file.file_md5.lower():
+                # 删除数据和元数据
+                clean_put(uploader, obj, created)
+                return Response({'code': 400, 'code_text': _('标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏')}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            obj.si = file.size
+            obj.save(update_fields=['si'])
+        except Exception as e:
+            # 删除数据和元数据
+            clean_put(uploader, obj, created)
+            return Response({'code': 400, 'code_text': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = {'code': 200, 'created': created}
+        return Response(data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
         operation_summary=gettext_lazy('下载文件对象，自定义读取对象数据块'),
         manual_parameters=[
             openapi.Parameter(
@@ -1087,8 +1189,10 @@ class ObjViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        if self.action in  ['update', 'create_detail']:
+        if self.action == 'create_detail':
             return serializers.ObjPutSerializer
+        elif self.action == 'update':
+            return serializers.ObjPutFileSerializer
         return Serializer
 
     def do_bucket_limit_validate(self, bfm:BucketFileManagement):
