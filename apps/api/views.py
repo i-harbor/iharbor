@@ -1014,7 +1014,8 @@ class ObjViewSet(CustomGenericViewSet):
 
         try:
             obj.si = file.size
-            obj.save(update_fields=['si'])
+            obj.md5 = content_md5
+            obj.save(update_fields=['si', 'md5'])
         except Exception as e:
             # 删除数据和元数据
             clean_put(uploader, obj, created)

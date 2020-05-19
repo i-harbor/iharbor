@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive)
-# Register your models here.
+
 
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
@@ -12,6 +12,7 @@ class BucketAdmin(admin.ModelAdmin):
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
     readonly_fields = ('collection_name', )
+    raw_id_fields = ('user',)
 
     def get_collection_name(self, obj):
         return obj.get_bucket_table_name()

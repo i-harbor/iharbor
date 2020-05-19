@@ -982,7 +982,7 @@
                                 <td><input type="checkbox" class="item-checkbox" value=""></td>
                                 <!--文件-->
                                 {{ if $value.fod }}
-                                    <td class="bucket-files-table-item">
+                                    <td>
                                         <i class="fa fa-file"></i>
                                         <a href="#" id="bucket-files-item-enter-file" download_url="{{$value.download_url}}">{{ $value.name }}</a>
                                     </td>
@@ -992,7 +992,7 @@
                                 {{ if !$value.fod }}
                                     <td>
                                         <i class="fa fa-folder"></i>
-                                        <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong class="bucket-files-table-item" >{{ $value.name }}</strong></a>
+                                        <a href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}"><strong>{{ $value.name }}</strong></a>
                                     </td>
                                     <td>{{ $imports.isoTimeToLocal($value.ult) }}</td>
                                     <td>--</td>
@@ -1073,7 +1073,7 @@
     let render_bucket_file_item = template.compile(`
         <tr class="bucket-files-table-item">
             <td><input type="checkbox" class="item-checkbox" value=""></td>
-            <td class="bucket-files-table-item">
+            <td>
                 <i class="fa fa-file"></i>
                 <a href="#" id="bucket-files-item-enter-file"  download_url="{{obj.download_url}}">{{ obj.name }}</a>
             </td>
@@ -1221,6 +1221,9 @@
                     return !value && getTransText('请输入一些内容, 前后空格会自动去除');
                 else if (value.length > 255)
                     return getTransText("对象名长度不能大于255字符");
+                else if(value === filename){
+                    return getTransText("对象名未修改");
+                }
                 return !(value.indexOf('/') === -1) && getTransText('对象名不能包含‘/’');
               },
             preConfirm: (input_name) => {
@@ -1667,6 +1670,10 @@
             show_warning_dialog(getTransText("无法上传一个空文件"));
             return;
         }
+        if(file.size >= 10*1024**3) {
+            show_warning_dialog(getTransText("文件太大"));
+            return;
+        }
         let obj = get_bucket_name_and_cur_path();
         if(!obj.bucket_name){
             show_warning_dialog(getTransText('上传文件失败，无法获取当前存储桶下路径'));
@@ -1678,80 +1685,56 @@
             dir_path: obj.dir_path,
             filename: file.name
         });
-        beforeFileUploading();
-        uploadFile(url, file, 0);
+        ajaxUploadOneFile(url, file);
     }
 
-
-    //
-    //文件上传
-    //
-    function uploadFile(put_url, file, offset = 0) {
-        // 断点续传记录检查
-
-        // 分片上传文件
-        uploadFileChunk(put_url, file, offset);
-    }
-
-    //
-    //分片上传文件
-    //
-    function uploadFileChunk(url, file, offset, overwrite=true, reset=true) {
-        let chunk_size = 5 * 1024 * 1024;//5MB
-        let end = get_file_chunk_end(offset, file.size, chunk_size);
-        //进度条
-        fileUploadProgressBar(offset, file.size);
-
-        //文件上传完成
-        if (end === -1){
-            //进度条
-            fileUploadProgressBar(0, 1, true);
-            endFileUploading();
-            show_auto_close_warning_dialog(getTransText('文件已成功上传'), 'success', 'top-end');
-            // 如果不是覆盖上传
-            if (overwrite === false){
-                // 如果上传的文件在当前页面的列表中，插入文件列表
-                success_upload_file_append_list_item(url, file.name);
-            }
-            return;
-        }
-        let chunk = file.slice(offset, end);
+    // 一次上传完整文件
+    function ajaxUploadOneFile(url, file) {
         let formData = new FormData();
-        formData.append("chunk_offset", offset);
-        formData.append("chunk", chunk);
-        formData.append("chunk_size", chunk.size);
-        // formData.append("overwrite", overwrite);
-
-        let put_url = url;
-        if (reset)
-            put_url = put_url + '?reset=true';
+        formData.append("file", file);
 
         $.ajax({
-            url: put_url,
-            type: "POST",
+            url: url,
+            type: "PUT",
             data: formData,
-            contentType: false,//必须false才会自动加上正确的Content-Type
-            processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
-            success: function (data, textStatus, request) {
-                // request.getResponseHeader('Server');
-                // 是否是新建对象
-                if (data.hasOwnProperty('created') && (data.created === true)){
-                    overwrite = false;
-                }
-                offset = end;
-                uploadFileChunk(url, file, offset, overwrite, false);
+            contentType: false,
+            processData: false,
+            xhr: function(){
+    　　　　　　let xhr = $.ajaxSettings.xhr();
+    　　　　　　if(xhr.upload) {
+    　　　　　　　　xhr.upload.addEventListener("progress" , function(e){
+                        fileUploadProgressBar(e.loaded, e.total);
+                    }, false);
+    　　　　　　　　return xhr;
+    　　　　　　}
+    　　　　},
+            beforeSend: function(xhr, contents){
+                let csrftoken = getCookie('csrftoken');
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                beforeFileUploading();
             },
-            error: function (err) {
+            success: function (data) {
+                show_auto_close_warning_dialog(getTransText('文件已成功上传'), 'success', 'top-end');
+                try{
+                    if (data.created === true){
+                        // 如果上传的文件在当前页面的列表中，插入文件列表
+                        success_upload_file_append_list_item(url, file.name);
+                    }
+                }catch (e) {}
+            },
+            error: function(xhr, textStatus, errorType){
                 let msg = getTransText('上传文件发生错误,请重新上传');
-                if (err.responseJSON && err.responseJSON.hasOwnProperty('code_text'))
-                    show_warning_dialog(msg + err.responseJSON.code_text);
+                if (xhr.responseJSON && xhr.responseJSON.hasOwnProperty('code_text'))
+                    show_warning_dialog(msg + xhr.responseJSON.code_text);
                 else
-                    show_warning_dialog(msg + err.statusText);
-
-                endFileUploading();
+                    show_warning_dialog(msg + xhr.statusText);
             },
+            complete: function () {
+                endFileUploading();
+            }
         })
     }
+
 
     //
     // 成功上传文件后，插入文件列表项
@@ -1773,24 +1756,6 @@
             get_file_info_and_list_item_render(info_url, render_bucket_file_item);
         }
     }
-
-    //
-    // 文件块结束字节偏移量
-    //-1: 文件上传完成
-    function get_file_chunk_end(offset, file_size, chunk_size) {
-        let end = null;
-        if (offset < file_size) {
-            if ((offset + chunk_size) > file_size) {
-                end = file_size;
-            } else {
-                end = offset + chunk_size;
-            }
-        } else if (offset >= file_size) {
-            end = -1;
-        }
-        return end
-    }
-
 
     //
     // 从当前路径url中获取存储桶名和目录路径
@@ -1948,7 +1913,7 @@
             <td><input type="checkbox" class="item-checkbox" value=""></td>
             <td>
                 <i class="fa fa-folder"></i>
-                <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong class="bucket-files-table-item">{{ dir.name }}</strong></a>
+                <a href="#" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}"><strong>{{ dir.name }}</strong></a>
             </td>
             <td>{{ $imports.isoTimeToLocal(dir.ult) }}</td>
             <td>--</td>
