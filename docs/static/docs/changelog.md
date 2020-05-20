@@ -1,3 +1,8 @@
+## v0.4.2
+* add put object api
+* 网页端上传改为使用put object api
+* get object api未认证可以下载公有桶对象
+
 ## v0.4.1
 * 升级到jquery3,bootstrap4
 * ftp服务解决ls文件报错bug

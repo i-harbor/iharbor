@@ -197,7 +197,7 @@ class ObjPutFileSerializer(serializers.Serializer):
     '''
     完整文件上传序列化器
     '''
-    file = serializers.FileField(label=_('文件'), required=False, help_text=_('一个上传的完整的文件'))
+    file = serializers.FileField(label=_('文件'), required=False, help_text=_('一个完整的文件'))
 
     def validate(self, data):
         """

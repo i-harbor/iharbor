@@ -143,7 +143,19 @@ msgstr "Invalid empty file block"
 msgid "chunk_size与文件块大小不一致"
 msgstr "chunk_size is not equal to file block size"
 
-#: apps/api/serializers.py:248 apps/api/serializers.py:255
+#: apps/api/serializers.py:200
+msgid "文件"
+msgstr "file"
+
+#: apps/api/serializers.py:200
+msgid "一个完整的文件"
+msgstr "a complete file"
+
+#: apps/api/serializers.py:209
+msgid "无效的空文件"
+msgstr "Invalid empty file"
+
+#: apps/api/serializers.py:265 apps/api/serializers.py:272
 msgid "公有（读写）"
 msgstr "public(rw)"
 
@@ -311,7 +323,8 @@ msgstr "ou do not have permission to operate this bucket"
 msgid "分片上传文件对象"
 msgstr "multipart upload an object"
 
-#: apps/api/views.py:866 apps/api/views.py:1737 apps/api/views.py:2800
+#: apps/api/views.py:866 apps/api/views.py:930 apps/api/views.py:1847
+#: apps/api/views.py:2910
 msgid "文件对象绝对路径"
 msgstr "absolute path of file object"
 
@@ -320,6 +333,14 @@ msgid "reset=true时，如果对象已存在，重置对象大小为0"
 msgstr "reset = true, reset the object size to 0 if the object already exists"
 
 #: apps/api/views.py:925
+msgid "上传一个完整对象"
+msgstr "Upload a complete object"
+
+#: apps/api/views.py:1013
+msgid "标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏"
+msgstr "The header content-md5 is inconsistent with the MD5 value of the uploaded data, and the data may be damaged during the upload process."
+
+#: apps/api/views.py:1028
 msgid "下载文件对象，自定义读取对象数据块"
 msgstr "Download file objects, custom read object data block"
 
@@ -1209,6 +1230,10 @@ msgstr "VPN password"
 #: templates/base_with_sidebar.html:41
 msgid "VPN安装配置说明"
 msgstr "VPN usage"
+
+#: utils/storagers.py:211
+msgid "上传文件超过大小限制"
+msgstr "Upload file exceeds allowed size limit"
 
 msgid "地球大数据科学工程对象云存储"
 msgstr "Big Earth Data Science Project Object storage"
