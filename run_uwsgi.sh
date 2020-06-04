@@ -1,1 +1,1 @@
-uwsgi --ini uwsgi.ini
+uwsgi --ini iharbor_uwsgi.ini

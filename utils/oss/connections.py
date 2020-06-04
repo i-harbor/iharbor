@@ -34,6 +34,7 @@ class ConnectionHandler:
 
 connection_pools = ConnectionHandler()
 
+
 def get_ceph_setting(alias:str='default'):
     d = {}
     d['cluster_name'] = settings.CEPH_RADOS.get('CLUSTER_NAME', 'ceph')
@@ -41,6 +42,7 @@ def get_ceph_setting(alias:str='default'):
     d['conf_file'] = settings.CEPH_RADOS.get('CONF_FILE_PATH', '')
     d['keyring_file'] = settings.CEPH_RADOS.get('KEYRING_FILE_PATH', '')
     return d
+
 
 def get_connection(alias:str='default'):
     '''
@@ -59,6 +61,7 @@ def get_connection(alias:str='default'):
     conn = new_connection(**s)
     connection_pools[alias] = conn
     return connection_pools[alias]
+
 
 def new_connection(cluster_name:str, username: str, conf_file:str, keyring_file:str, **kwargs):
     '''

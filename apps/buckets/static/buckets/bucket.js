@@ -1650,11 +1650,7 @@
                 }
             });
             if (file) {
-                const reader = new FileReader;
-                reader.onload = (e) => {
-                    uploadOneFile(file);//上传文件
-                };
-                reader.readAsDataURL(file);
+                uploadOneFile(file);//上传文件
             }
             else if(file === null){
                 show_warning_dialog(getTransText("没有选择文件，请先选择一个文件"));
@@ -1670,7 +1666,7 @@
             show_warning_dialog(getTransText("无法上传一个空文件"));
             return;
         }
-        if(file.size >= 10*1024**3) {
+        if(file.size >= 5*1024**3) {
             show_warning_dialog(getTransText("文件太大"));
             return;
         }

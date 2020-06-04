@@ -1,5 +1,6 @@
 import os
 
+
 def get_ceph_io_status():
     '''
     :return:
@@ -9,6 +10,7 @@ def get_ceph_io_status():
     io_str = get_io_string(res)
     data = parse_io_str(io_str)
     return data
+
 
 def parse_io_str(io_str):
     '''
@@ -64,6 +66,7 @@ def parse_io_str(io_str):
 
     return data
 
+
 def get_io_string(res):
     lines = res.splitlines()
     lines.reverse()
@@ -74,5 +77,3 @@ def get_io_string(res):
 
     return ''
 
-data = get_ceph_io_status()
-print(data)
