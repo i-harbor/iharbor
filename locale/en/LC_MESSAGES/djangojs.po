@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-04-22 11:11+0800\n"
+"POT-Creation-Date: 2020-05-20 14:03+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -31,9 +31,9 @@ msgstr "Please enter 3-63 characters"
 
 #: apps/buckets/static/buckets/bucket.js:274
 #: apps/buckets/static/buckets/bucket.js:737
-#: apps/buckets/static/buckets/bucket.js:1374
-#: apps/buckets/static/buckets/bucket.js:1642
-#: apps/buckets/static/buckets/bucket.js:1888
+#: apps/buckets/static/buckets/bucket.js:1377
+#: apps/buckets/static/buckets/bucket.js:1645
+#: apps/buckets/static/buckets/bucket.js:1853
 msgid "取消"
 msgstr "Cancel"
 
@@ -58,8 +58,8 @@ msgid "已成功删除存储桶"
 msgstr "Bucket deleted successfully"
 
 #: apps/buckets/static/buckets/bucket.js:402
-#: apps/buckets/static/buckets/bucket.js:1432
-#: apps/buckets/static/buckets/bucket.js:1477
+#: apps/buckets/static/buckets/bucket.js:1435
+#: apps/buckets/static/buckets/bucket.js:1480
 msgid "删除失败"
 msgstr "Delete failed"
 
@@ -90,7 +90,7 @@ msgstr "FTP password(ro)"
 
 #: apps/buckets/static/buckets/bucket.js:475
 #: apps/buckets/static/buckets/bucket.js:973
-#: apps/buckets/static/buckets/bucket.js:1959
+#: apps/buckets/static/buckets/bucket.js:1924
 msgid "操作"
 msgstr "operation"
 
@@ -160,9 +160,9 @@ msgstr "Password length 6-20 characters"
 
 #: apps/buckets/static/buckets/bucket.js:738
 #: apps/buckets/static/buckets/bucket.js:891
-#: apps/buckets/static/buckets/bucket.js:1378
-#: apps/buckets/static/buckets/bucket.js:1643
-#: apps/buckets/static/buckets/bucket.js:1887
+#: apps/buckets/static/buckets/bucket.js:1381
+#: apps/buckets/static/buckets/bucket.js:1646
+#: apps/buckets/static/buckets/bucket.js:1852
 msgid "确定"
 msgstr "Confirm"
 
@@ -208,13 +208,13 @@ msgid "公有"
 msgstr "Public"
 
 #: apps/buckets/static/buckets/bucket.js:916
-#: apps/buckets/static/buckets/bucket.js:1343
-#: apps/buckets/static/buckets/bucket.js:1405
+#: apps/buckets/static/buckets/bucket.js:1346
+#: apps/buckets/static/buckets/bucket.js:1408
 msgid "分享链接"
 msgstr "Share links"
 
 #: apps/buckets/static/buckets/bucket.js:933
-#: apps/buckets/static/buckets/bucket.js:1583
+#: apps/buckets/static/buckets/bucket.js:1586
 msgid "存储桶"
 msgstr "Bucket"
 
@@ -235,7 +235,7 @@ msgid "权限"
 msgstr "Permissions"
 
 #: apps/buckets/static/buckets/bucket.js:974
-#: apps/buckets/static/buckets/bucket.js:1961
+#: apps/buckets/static/buckets/bucket.js:1926
 msgid "打开"
 msgstr "Open"
 
@@ -245,12 +245,12 @@ msgid "删除"
 msgstr "Delete"
 
 #: apps/buckets/static/buckets/bucket.js:976
-#: apps/buckets/static/buckets/bucket.js:1963
+#: apps/buckets/static/buckets/bucket.js:1928
 msgid "分享公开"
 msgstr "Share"
 
 #: apps/buckets/static/buckets/bucket.js:977
-#: apps/buckets/static/buckets/bucket.js:1597
+#: apps/buckets/static/buckets/bucket.js:1600
 msgid "下载"
 msgstr "Download"
 
@@ -343,7 +343,11 @@ msgstr "No file selected, please select a file first"
 msgid "无法上传一个空文件"
 msgstr "Unable to upload an empty file"
 
-#: apps/buckets/static/buckets/bucket.js:1672
+#: apps/buckets/static/buckets/bucket.js:1674
+msgid "文件太大"
+msgstr "File is too large"
+
+#: apps/buckets/static/buckets/bucket.js:1679
 msgid "上传文件失败，无法获取当前存储桶下路径"
 msgstr "Failed to upload file, unable to get the path under the current bucket"
 
