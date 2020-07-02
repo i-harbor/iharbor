@@ -386,7 +386,7 @@ class BucketFileManagement():
         na_md5 = get_str_hexMD5(path)
         model_class = self.get_obj_model_class()
         try:
-            obj = model_class.objects.get(Q(na_md5=na_md5) | Q(na_md5__isnull=True), Q(fod=False) & Q(na=path))
+            obj = model_class.objects.get(Q(na_md5=na_md5) | Q(na_md5__isnull=True), na=path)
         except model_class.DoesNotExist as e:
             return None
         except MultipleObjectsReturned as e:

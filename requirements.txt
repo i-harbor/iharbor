@@ -1,9 +1,9 @@
-certifi==2020.4.5.2
+certifi==2020.6.20
 chardet==3.0.4
 concurrent-log-handler==0.9.16
 coreapi==2.3.3
 coreschema==0.0.4
-Django==2.2.13
+Django==2.2.14
 django-ckeditor==5.7.1
 django-cors-headers==3.1.0
 django-debug-toolbar==2.2

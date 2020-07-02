@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy, gettext as _
 from ckeditor.fields import RichTextField
 
 from utils.storagers import PathParser
+from utils.md5 import EMPTY_HEX_MD5
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
@@ -518,6 +519,13 @@ class BucketFileBase(models.Model):
     @property
     def obj_size(self):
         return self.si
+
+    @property
+    def hex_md5(self):
+        if self.obj_size == 0:
+            return EMPTY_HEX_MD5
+
+        return self.md5
 
     def do_soft_delete(self):
         '''
