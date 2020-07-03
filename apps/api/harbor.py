@@ -495,28 +495,26 @@ class HarborManager:
         # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
         try:
             if move_to is None: # 仅仅重命名对象，不移动
-                bfm = BucketFileManagement( collection_name=table_name)
-                target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
-            else: # 需要移动对象
+                path, _ = PathParser(filepath=obj.na).get_path_and_filename()
+                new_na = path + '/' + new_obj_name if path else new_obj_name
+                bfm = BucketFileManagement(path=path, collection_name=table_name)
+                target_obj = bfm.get_obj(path=new_na)
+            else:   # 需要移动对象
                 bfm = BucketFileManagement(path=move_to, collection_name=table_name)
                 target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
+                new_na = bfm.build_dir_full_name(new_obj_name)
         except Exception as e:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
 
         if target_obj:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录')
 
-        # 仅仅重命名对象，不移动
-        if move_to is None:
-            path, _ = PathParser(filepath=obj.na).get_path_and_filename()
-            obj.na = path + '/' + new_obj_name if path else  new_obj_name
-            obj.name = new_obj_name
-        else: # 移动对象或重命名
+        if move_to is not None:     # 移动对象或重命名
             _, did = bfm.get_cur_dir_id()
             obj.did = did
-            obj.na = bfm.build_dir_full_name(new_obj_name)
-            obj.name = new_obj_name
 
+        obj.na = new_na
+        obj.name = new_obj_name
         obj.reset_na_md5()
         if not obj.do_save():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')

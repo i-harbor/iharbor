@@ -505,10 +505,9 @@ class BucketFileBase(models.Model):
 
     class Meta:
         abstract = True
-        app_label = 'metadata' # 用于db路由指定此模型对应的数据库
+        app_label = 'metadata'      # 用于db路由指定此模型对应的数据库
         ordering = ['fod', '-id']
         indexes = [models.Index(fields=('na_md5',), name='na_md5_idx')]
-        index_together = ['fod', 'did']
         unique_together = ('did', 'name')
         verbose_name = '对象模型抽象基类'
         verbose_name_plural = verbose_name

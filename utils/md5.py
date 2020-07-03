@@ -1,4 +1,5 @@
 import hashlib
+import base64
 
 
 EMPTY_HEX_MD5 = 'd41d8cd98f00b204e9800998ecf8427e'
@@ -86,3 +87,17 @@ def calculate_md5(filename: str):
         _hash = md5obj.hexdigest()
 
     return _hash
+
+
+def to_b64(s: str):
+    """
+    base64编码字符串
+    """
+    bs = base64.b64encode(s.encode("utf-8"))
+    return bs.decode("utf-8")
+
+
+def from_b64(s: str):
+    bs = base64.b64decode(s.encode("utf-8"))
+    return bs.decode("utf-8")
+
