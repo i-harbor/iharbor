@@ -118,7 +118,7 @@ def get_bfmanager(path='', table_name=''):
     return BucketFileManagement(path=path, collection_name=table_name)
 
 
-class BucketFileManagement():
+class BucketFileManagement:
     '''
     存储桶相关的操作方法类
     '''
