@@ -118,7 +118,7 @@ def get_bfmanager(path='', table_name=''):
     return BucketFileManagement(path=path, collection_name=table_name)
 
 
-class BucketFileManagement():
+class BucketFileManagement:
     '''
     存储桶相关的操作方法类
     '''
@@ -249,37 +249,27 @@ class BucketFileManagement():
 
         return None
 
-    def get_dir_or_obj_exists(self, name, cur_dir_id=None):
+    def get_dir_or_obj_exists(self, name, check_path_exists: bool = True):
         '''
         通过名称获取当前路径下的子目录或对象
         :param name: 目录名或对象名称
-        :param cur_dir_id: 如果给定ID,基于此ID的目录查找；默认基于当前路径查找,
+        :param check_path_exists: 是否检查当前路径是否存在
         :return:
             文件目录对象 or None
             raises: Exception   # 发生错误，或当前目录参数有误，对应目录不存在
 
         :raises: Exception
         '''
-        if cur_dir_id is None:
+        if check_path_exists:
             ok, did = self.get_cur_dir_id()
             if not ok:
                 raise Exception(f'父路径（{self._path}）不存在，或路径有误')
-        else:
-            did = cur_dir_id
 
-        model_class = self.get_obj_model_class()
+        path = self.build_dir_full_name(name)
         try:
-            dir_or_obj = model_class.objects.filter(Q(did=did) & Q(name=name)).get()  # 查找目录或对象记录
-        except model_class.DoesNotExist as e:
-            return None
-        except MultipleObjectsReturned as e:
-            msg = f'数据库表{self.get_collection_name()}中存在多个相同的路径：{self._path}/{name}'
-            logger.error(msg)
-            raise Exception(msg)
+            dir_or_obj = self.get_obj(path=path)
         except Exception as e:
-            msg = f'select table={self.get_collection_name()}，path={self._path}/{name},err={str(e)}'
-            debug_logger.error(msg)
-            raise Exception(msg)
+            raise Exception(f'查询目录id错误，{str(e)}')
 
         return dir_or_obj
 
@@ -386,7 +376,7 @@ class BucketFileManagement():
         na_md5 = get_str_hexMD5(path)
         model_class = self.get_obj_model_class()
         try:
-            obj = model_class.objects.get(Q(na_md5=na_md5) | Q(na_md5__isnull=True), Q(fod=False) & Q(na=path))
+            obj = model_class.objects.get(Q(na_md5=na_md5) | Q(na_md5__isnull=True), na=path)
         except model_class.DoesNotExist as e:
             return None
         except MultipleObjectsReturned as e:

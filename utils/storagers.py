@@ -1,5 +1,4 @@
 import os
-import hashlib
 
 from django.conf import settings
 from django.core.files.uploadhandler import FileUploadHandler
@@ -8,6 +7,7 @@ from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
 
 from utils.oss.pyrados import HarborObject, FileWrapper
+from utils.md5 import FileMD5Handler
 
 
 class FileStorage:
@@ -218,12 +218,12 @@ class FileUploadToCephHandler(FileUploadHandler):
         self.file = FileWrapper(HarborObject(pool_name=self.pool_name, obj_id=self.obj_key))
         if self.request:
             if self.request.headers.get('Content-MD5', ''):
-                self.file_md5_handler = hashlib.md5()
+                self.file_md5_handler = FileMD5Handler()
 
     def receive_data_chunk(self, raw_data, start):
         self.file.write(raw_data, offset=start)
         if self.file_md5_handler:
-            self.file_md5_handler.update(raw_data)
+            self.file_md5_handler.update(offset=start, data=raw_data)
 
     def file_complete(self, file_size):
         self.file.seek(0)
@@ -242,6 +242,7 @@ class FileUploadToCephHandler(FileUploadHandler):
     def file_md5(self):
         fmh = self.file_md5_handler
         if fmh:
-            return fmh.hexdigest()
+            return fmh.hex_md5
 
         return ''
+

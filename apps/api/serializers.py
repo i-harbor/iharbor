@@ -235,7 +235,11 @@ class ObjInfoSerializer(serializers.Serializer):
     # sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
     download_url = serializers.SerializerMethodField()
     access_permission = serializers.SerializerMethodField() # 公共读权限
+    md5 = serializers.SerializerMethodField(method_name='get_md5')
 
+
+    def get_md5(self, obj):
+        return obj.hex_md5
 
     def get_dlc(self, obj):
         return obj.dlc if obj.dlc else 0

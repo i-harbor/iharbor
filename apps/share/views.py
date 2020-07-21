@@ -187,7 +187,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         start, end = self.parse_header_ranges(hRange)
         # 无法解析header ranges,返回整个对象
         if start is None and end is None:
-            InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
+            raise InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
 
         # 读最后end个字节
         if (start is None) and isinstance(end, int):

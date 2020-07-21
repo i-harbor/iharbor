@@ -9,10 +9,13 @@ from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
 from utils.storagers import PathParser
 from utils.oss import HarborObject, get_size
-from.paginations import BucketFileLimitOffsetPagination
+from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
+from utils.md5 import FileMD5Handler
+
 
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+
 
 def ftp_close_old_connections(func):
     def wrapper(*args, **kwargs):
@@ -20,6 +23,7 @@ def ftp_close_old_connections(func):
         return func(*args, **kwargs)
 
     return wrapper
+
 
 class HarborError(BaseException):
     def __init__(self, code:int, msg:str, **kwargs):
@@ -34,7 +38,7 @@ class HarborError(BaseException):
         return f'{self.code},{self.msg}'
 
 
-class HarborManager():
+class HarborManager:
     '''
     操作harbor对象数据和元数据管理接口封装
     '''
@@ -208,7 +212,6 @@ class HarborManager():
         obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
         return obj
 
-    @log_op_info(logger=debug_logger, mark_text='mkdir')
     def mkdir(self, bucket_name:str, path:str, user=None):
         '''
         创建一个目录
@@ -296,7 +299,6 @@ class HarborManager():
         data['dir_name'] = dir_name
         return data
 
-    @log_op_info(logger=debug_logger, mark_text='rmdir')
     def rmdir(self, bucket_name:str, dirpath:str, user=None):
         '''
         删除一个空目录
@@ -493,28 +495,26 @@ class HarborManager():
         # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
         try:
             if move_to is None: # 仅仅重命名对象，不移动
-                bfm = BucketFileManagement( collection_name=table_name)
-                target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name, cur_dir_id=obj.did)
-            else: # 需要移动对象
+                path, _ = PathParser(filepath=obj.na).get_path_and_filename()
+                new_na = path + '/' + new_obj_name if path else new_obj_name
+                bfm = BucketFileManagement(path=path, collection_name=table_name)
+                target_obj = bfm.get_obj(path=new_na)
+            else:   # 需要移动对象
                 bfm = BucketFileManagement(path=move_to, collection_name=table_name)
                 target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
+                new_na = bfm.build_dir_full_name(new_obj_name)
         except Exception as e:
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
 
         if target_obj:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录')
 
-        # 仅仅重命名对象，不移动
-        if move_to is None:
-            path, _ = PathParser(filepath=obj.na).get_path_and_filename()
-            obj.na = path + '/' + new_obj_name if path else  new_obj_name
-            obj.name = new_obj_name
-        else: # 移动对象或重命名
+        if move_to is not None:     # 移动对象或重命名
             _, did = bfm.get_cur_dir_id()
             obj.did = did
-            obj.na = bfm.build_dir_full_name(new_obj_name)
-            obj.name = new_obj_name
 
+        obj.na = new_na
+        obj.name = new_obj_name
         obj.reset_na_md5()
         if not obj.do_save():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')
@@ -719,10 +719,12 @@ class HarborManager():
         # 更新文件上传时间
         old_ult = obj.ult
         old_size = obj.si
+        old_md5 = obj.md5
 
         obj.ult = timezone.now()
         obj.si = 0
-        if not obj.do_save(update_fields=['ult', 'si']):
+        obj.md5 = ''
+        if not obj.do_save(update_fields=['ult', 'si', 'md5']):
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
 
         ok, _ = rados.delete()
@@ -730,12 +732,13 @@ class HarborManager():
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size
-            obj.do_save(update_fields=['ult', 'si'])
+            obj.md5 = old_md5
+            obj.do_save(update_fields=['ult', 'si', 'md5'])
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='rados文件对象删除失败')
 
         return True
 
-    def _save_one_chunk(self, obj, rados, offset:int, chunk:bytes):
+    def _save_one_chunk(self, obj, rados, offset:int, chunk:bytes, md5: str = ''):
         '''
         保存一个上传的分片
 
@@ -743,6 +746,7 @@ class HarborManager():
         :param rados: rados接口
         :param offset: 分片偏移量
         :param chunk: 分片数据
+        :param md5: 更新对象元数据MD5值，默认为空忽略
         :return:
             成功：True
             失败：raise HarborError
@@ -750,7 +754,7 @@ class HarborManager():
         # 先更新元数据，后写rados数据
         # 更新文件修改时间和对象大小
         new_size = offset + len(chunk) # 分片数据写入后 对象偏移量大小
-        if not self._update_obj_metadata(obj, size=new_size):
+        if not self._update_obj_metadata(obj, size=new_size, md5=md5):
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
 
         # 存储文件块
@@ -762,7 +766,7 @@ class HarborManager():
 
         if not ok:
             # 手动回滚对象元数据
-            self._update_obj_metadata(obj, obj.si, obj.upt)
+            self._update_obj_metadata(obj, obj.si, obj.upt, md5=obj.md5)
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块rados写入失败:' + msg)
 
         return True
@@ -804,12 +808,13 @@ class HarborManager():
 
         return True
 
-    def _update_obj_metadata(self, obj, size, upt=None):
+    def _update_obj_metadata(self, obj, size, upt=None, md5: str = ''):
         '''
         更新对象元数据
         :param obj: 对象, obj实例不会被修改
         :param size: 对象大小
         :param upt: 修改时间
+        :param md5: 更新对象元数据MD5值，默认为空忽略
         :return:
             success: True
             failed: False
@@ -822,10 +827,16 @@ class HarborManager():
         # 更新文件修改时间和对象大小
         old_size = obj.si if obj.si else 0
         new_size = max(size, old_size)  # 更新文件大小（只增不减）
+
+        kwargs = {
+            'si': Case(When(si__lt=new_size, then=Value(new_size)), default=F('si')),
+            'upt': upt
+        }
+        if md5 and len(md5) == 32:
+            kwargs['md5'] = md5
         try:
             # r = model.objects.filter(id=obj.id, si=obj.si).update(si=new_size, upt=timezone.now())  # 乐观锁方式
-            r = model.objects.filter(id=obj.id).update(si=Case(When(si__lt=new_size, then=Value(new_size)),
-                                                               default=F('si')), upt=upt)
+            r = model.objects.filter(id=obj.id).update(**kwargs)
         except Exception as e:
             return False
         if r > 0:  # 更新行数
@@ -1018,10 +1029,13 @@ class HarborManager():
             if created is False:  # 对象已存在，不是新建的,重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
 
+            md5_handler = FileMD5Handler()
             while True:
                 offset, data = yield ok
                 try:
-                    ok = self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data)
+                    md5_handler.update(offset=offset, data=data)
+                    hex_md5 = md5_handler.hex_md5
+                    ok = self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data, md5=hex_md5)
                 except HarborError:
                     ok = False
 

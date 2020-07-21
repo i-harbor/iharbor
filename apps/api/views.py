@@ -1938,6 +1938,17 @@ class MetadataViewSet(CustomGenericViewSet):
                     "dlc": 2,                           # 下载次数； 目录时此字段为0
                     "download_url": "http://10.0.86.213/obs/gggg/upload/Firefox-latest.exe", # 对象下载url; 目录此字段为空
                     "access_permission": "私有"          # 访问权限，‘私有’或‘公有’； 目录此字段为空
+                },
+                "info": {                               # 目录时为null
+                    "rados": [                          # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
+                        "iharbor:ceph/obs/217_12",      # 大小为 chunk_size
+                        "iharbor:ceph/obs/217_12_1",     # 大小为 chunk_size
+                        ...
+                        "iharbor:ceph/obs/217_12_N",     # 最后一个数据块大小=(size - chunk_size * N)；N = len(rados数组) - 1
+                     ],
+                    "chunk_size": 2147483648,                  # 对象分片（rados）的大小
+                    "size": 399336,                       # 对象大小Byte
+                    "filename": "Firefox-latest.exe"           # 对象名称
                 }
             }
         >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
@@ -1990,8 +2001,22 @@ class MetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('对象或目录不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
+
+        if obj.is_file():
+            obj_key = obj.get_obj_key(bucket.id)
+            pool_name = bucket.get_pool_name()
+            chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+            info = {
+                'rados': keys,
+                'chunk_size': chunk_size,
+                'size': obj.obj_size,
+                'filename': obj.name
+            }
+        else:
+            info = None
+
         return Response(data={'code': 200, 'code_text': _('获取元数据成功'), 'bucket_name': bucket_name,
-                              'dir_path': path, 'obj': serializer.data})
+                              'dir_path': path, 'obj': serializer.data, 'info': info})
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('创建一个空对象元数据'),

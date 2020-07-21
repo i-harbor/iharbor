@@ -10,6 +10,7 @@ class MetadataSerializer(serializers.Serializer):
     '''
     目录下文件列表序列化器
     '''
+    id = serializers.IntegerField()
     na = serializers.CharField()  # 全路径的文件名或目录名
     name = serializers.CharField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
