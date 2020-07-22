@@ -8,7 +8,7 @@ endpoint格式：http://BUCKET.s3.obs.cstcloud.cn
 对象存储iHarbor只支持标准（STANDARD）一种存储类型, 默认为STANDARD。
 
 #### 签名认证
-兼容AWS Signature Version 4，支持请求头签名，暂不支持参数签名方式。
+兼容AWS Signature Version 4，支持请求头签名和参数签名方式。
 
 #### 公共标头
 | 标头 | 说明 |

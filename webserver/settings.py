@@ -240,7 +240,7 @@ CEPH_RADOS = {
 }
 
 # 日志配置
-LOGGING_FILES_DIR = '/var/log/evharbor'
+LOGGING_FILES_DIR = '/var/log/iharbor'
 if not os.path.exists(LOGGING_FILES_DIR):
     os.makedirs(LOGGING_FILES_DIR, exist_ok=True)
 
@@ -271,7 +271,7 @@ LOGGING = {
         'file': {
             'level': 'WARNING',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
-            'filename': os.path.join(LOGGING_FILES_DIR, 'webserver.log'),
+            'filename': os.path.join(LOGGING_FILES_DIR, 'iharbor.log'),
             'formatter': 'verbose',
             'maxBytes': 1024*1024*200,  # 200MB
             'backupCount': 10           # 最多10个文件
