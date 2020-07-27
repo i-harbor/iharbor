@@ -49,6 +49,13 @@ class Bucket(models.Model):
         (PUBLIC_READWRITE, gettext_lazy('公有（可读写）')),
     )
 
+    TYPE_COMMON = 0
+    TYPE_S3 = 1
+    TYPE_CHOICES = (
+        (TYPE_COMMON, '普通'),
+        (TYPE_S3, 'S3')
+    )
+
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
@@ -63,6 +70,7 @@ class Bucket(models.Model):
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
     pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
     remarks = models.CharField(verbose_name='备注', max_length=255, default='')
+    type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
 
     class Meta:
         ordering = ['-id']
