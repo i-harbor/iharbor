@@ -433,13 +433,15 @@ class ApiUsageDescription(models.Model):
     '''
     DESC_API = 0
     DESC_FTP = 1
+    DESC_S3_API = 2
     DESC_FOR_CHOICES = (
-        (DESC_API, 'API说明'),
-        (DESC_FTP, 'FTP说明')
+        (DESC_API, '原生API说明'),
+        (DESC_FTP, 'FTP说明'),
+        (DESC_S3_API, 'S3兼容API说明')
     )
 
 
-    title = models.CharField(verbose_name='标题', default='EVHarbor API使用说明', max_length=255)
+    title = models.CharField(verbose_name='标题', default='使用说明', max_length=255)
     desc_for = models.SmallIntegerField(verbose_name='关于什么的说明', choices=DESC_FOR_CHOICES, default=DESC_API)
     content = RichTextField(verbose_name='说明内容', default='')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')

@@ -55,7 +55,7 @@ class Migration(migrations.Migration):
             name='ApiUsageDescription',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(default='EVHarbor API使用说明', max_length=255, verbose_name='标题')),
+                ('title', models.CharField(default='使用说明', max_length=255, verbose_name='标题')),
                 ('content', ckeditor.fields.RichTextField(default='', verbose_name='说明内容')),
                 ('created_time', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
                 ('modified_time', models.DateTimeField(auto_now=True, verbose_name='修改时间')),

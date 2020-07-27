@@ -19,7 +19,8 @@
                         <ul class="bg-light nav flex-column collapse show" id="oos-nav-list-group" role="tablist">
                             <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:bucket_view' %}" >{% trans '存储桶' %}</a></li>
                             <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:ftp-usage' %}" >{% trans 'FTP访问说明' %}</a></li>
-                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:api-usage' %}">{% trans 'API使用说明' %}</a></li>
+                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:api-usage' %}">{% trans '原生API使用说明' %}</a></li>
+                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:s3-api-usage' %}">{% trans 'S3兼容API使用说明' %}</a></li>
                         </ul>
                     </li>
                     <li role="presentation" class="nav-item">
