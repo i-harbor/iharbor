@@ -440,7 +440,6 @@ class ApiUsageDescription(models.Model):
         (DESC_S3_API, 'S3兼容API说明')
     )
 
-
     title = models.CharField(verbose_name='标题', default='使用说明', max_length=255)
     desc_for = models.SmallIntegerField(verbose_name='关于什么的说明', choices=DESC_FOR_CHOICES, default=DESC_API)
     content = RichTextField(verbose_name='说明内容', default='')
