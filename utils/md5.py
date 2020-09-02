@@ -78,6 +78,27 @@ def chunks(fd, chunk_size=10*1024**2):
         yield d
 
 
+def offset_chunks(fd, chunk_size=10*1024**2):
+    """
+    Read the file and yield offset and chunk of ``chunk_size`` bytes
+    :return:
+        (offset: int, chunk: bytes) or None
+    """
+    try:
+        fd.seek(0)
+    except AttributeError:
+        pass
+
+    offset = 0
+    while True:
+        d = fd.read(chunk_size)
+        if not d:
+            break
+
+        yield offset, d
+        offset += len(d)
+
+
 def calculate_md5(filename: str):
     with open(filename, 'rb') as fd:
         md5obj = hashlib.md5()

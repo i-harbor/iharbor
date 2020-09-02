@@ -37,3 +37,13 @@ class FTPUsageView(View):
     def get(self, request):
         article = ApiUsageDescription.objects.filter(desc_for=ApiUsageDescription.DESC_FTP).first()
         return render(request, 'base_usage_article.html', context={'article': article})
+
+
+class S3ApiUsageView(View):
+    """
+    FTP使用说明类视图
+    """
+    def get(self, request):
+        article = ApiUsageDescription.objects.filter(desc_for=ApiUsageDescription.DESC_S3_API).first()
+        return render(request, 'base_usage_article.html', context={'article': article})
+

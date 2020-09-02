@@ -11,7 +11,7 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-2">
-                <ul class="nav flex-column nav-tabs nav-fill">
+                <ul class="nav flex-column nav-fill">
                     <li role="presentation" class="nav-item">
                         <li class="nav-list-toggle" data-toggle="collapse" data-target="#oos-nav-list-group">
                             <i class="fa fa-list"></i> {% trans '对象存储' %} <i class="fa fa-chevron-down"></i>
@@ -19,7 +19,8 @@
                         <ul class="bg-light nav flex-column collapse show" id="oos-nav-list-group" role="tablist">
                             <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:bucket_view' %}" >{% trans '存储桶' %}</a></li>
                             <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:ftp-usage' %}" >{% trans 'FTP访问说明' %}</a></li>
-                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:api-usage' %}">{% trans 'API使用说明' %}</a></li>
+                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:api-usage' %}">{% trans '原生API使用说明' %}</a></li>
+                            <li class="nav-item text-left"><a class="nav-link" href="{% url 'buckets:s3-api-usage' %}">{% trans 'S3兼容API使用说明' %}</a></li>
                         </ul>
                     </li>
                     <li role="presentation" class="nav-item">

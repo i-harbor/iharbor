@@ -242,7 +242,30 @@ class RadosAPI:
             self._cluster.shutdown()
             self._cluster = None
 
-    def _io_write(self,ioctx, obj_id, offset, data: bytes):
+    def _open_ioctx(self, pool_name: str, try_times: int = 0):
+        """
+        open pool
+
+        :param pool_name: ceph pool名
+        :param try_times: 打开失败尝试的次数计数
+        :return:
+            rados.Ioctx()
+
+        :raises: class:`RadosError`
+        """
+        cluster = self.get_cluster()
+        try:
+            return cluster.open_ioctx(pool_name)
+        except rados.Error as e:
+            self.clear_cluster(cluster)
+            if try_times >= 2:
+                raise RadosError(f'Failed to open_ioctx, pool={pool_name},{str(e)}')
+        except Exception as e:
+            raise RadosError(f'Failed to open_ioctx, pool={pool_name},{str(e)}')
+
+        return self._open_ioctx(pool_name=pool_name, try_times=(try_times + 1))
+
+    def _io_write(self, ioctx, obj_id, offset, data: bytes):
         '''
         向对象写入数据
 
@@ -277,13 +300,12 @@ class RadosAPI:
             success: True
         :raises: class:`RadosError`
         '''
-        cluster = self.get_cluster()
-        try:
-            with cluster.open_ioctx(self._pool_name) as ioctx:
+        with self._open_ioctx(self._pool_name) as ioctx:
+            try:
                 self._io_write(ioctx=ioctx, obj_id=obj_id, offset=offset, data=data)
-        except rados.Error as e:
-            msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
-            raise RadosError(msg, errno=e.errno)
+            except rados.Error as e:
+                msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
+                raise RadosError(msg, errno=e.errno)
 
         return True
 
@@ -323,7 +345,7 @@ class RadosAPI:
             else:
                 raise RadosError('read error when write a file to rados')
 
-    def write_file(self, obj_id, offset, file, per_size=1024*20): #20 * 1024 ** 2):
+    def write_file(self, obj_id, offset, file, per_size=20 * 1024 ** 2):
         '''
         向对象写入一个类文件数据
 
@@ -335,14 +357,12 @@ class RadosAPI:
             success: True
         :raises: class:`RadosError`
         '''
-        cluster = self.get_cluster()
-        try:
-            with cluster.open_ioctx(self._pool_name) as ioctx:
+        with self._open_ioctx(self._pool_name) as ioctx:
+            try:
                 self._io_write_file(ioctx=ioctx, obj_id=obj_id, offset=offset, file=file, per_size=per_size)
-
-        except rados.Error as e:
-            msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
-            raise RadosError(msg, errno=e.errno)
+            except rados.Error as e:
+                msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
+                raise RadosError(msg, errno=e.errno)
 
         return True
 
@@ -387,10 +407,8 @@ class RadosAPI:
             return bytes()
 
         tasks = read_part_tasks(obj_id, offset=offset, bytes_len=read_size)
-        cluster = self.get_cluster()
-
-        try:
-            with cluster.open_ioctx(self._pool_name) as ioctx:
+        with self._open_ioctx(self._pool_name) as ioctx:
+            try:
                 # 要读取的数据在一个rados对象上
                 if len(tasks) == 1:
                     obj_key, off, size = tasks[0]
@@ -403,11 +421,11 @@ class RadosAPI:
 
                 return ret_data
 
-        except rados.Error as e:
-            msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
-            raise RadosError(msg, errno=e.errno)
-        except Exception as e:
-            raise RadosError(str(e))
+            except rados.Error as e:
+                msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
+                raise RadosError(msg, errno=e.errno)
+            except Exception as e:
+                raise RadosError(str(e))
 
     def delete(self, obj_id, obj_size):
         '''
@@ -419,10 +437,8 @@ class RadosAPI:
             success: True
         :raises: class:`RadosError`
         '''
-        cluster = self.get_cluster()
-
         try:
-            with cluster.open_ioctx(self._pool_name) as ioctx:
+            with self._open_ioctx(self._pool_name) as ioctx:
                 hos = HarborObjectStructure(obj_id=obj_id, obj_size=obj_size)
                 for part_id in hos.parts_id:
                     try:
@@ -452,9 +468,8 @@ class RadosAPI:
                 (int, datetime())   # size, mtime
         :raises: class:`RadosError`, `RadosNotFound`
         '''
-        cluster = self.get_cluster()
         try:
-            with cluster.open_ioctx(self._pool_name) as ioctx:
+            with self._open_ioctx(self._pool_name) as ioctx:
                 size, t = ioctx.stat(obj_id)
         except rados.ObjectNotFound:
             raise RadosNotFound('rados对象不存在')
@@ -600,7 +615,7 @@ class RadosAPI:
         return data
 
 
-class HarborObjectBase():
+class HarborObjectBase:
     '''
     HarborObject读写相关的封装类，要实现此基类的方法
     '''
@@ -794,7 +809,8 @@ class HarborObject:
         except (RadosError, Exception) as e:
             return False, str(e)
 
-        self._obj_size = max(offset + file.size, self._obj_size)
+        file_size = get_size(file)
+        self._obj_size = max(offset + file_size, self._obj_size)
         return True, 'success to write file'
 
     def delete(self, obj_size=None):

@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from django.db import migrations, models
+import django.utils.timezone
 import django.db.models.deletion
 
 
@@ -30,7 +31,7 @@ class Migration(migrations.Migration):
                 ('modified_time', models.DateTimeField(verbose_name='修改时间')),
                 ('objs_count', models.IntegerField(default=0, verbose_name='对象数量')),
                 ('size', models.BigIntegerField(default=0, verbose_name='桶大小')),
-                ('stats_time', models.DateTimeField(verbose_name='统计时间')),
+                ('stats_time', models.DateTimeField(default=django.utils.timezone.now, verbose_name='统计时间')),
                 ('ftp_enable', models.BooleanField(default=False, verbose_name='FTP可用状态')),
                 ('ftp_password', models.CharField(blank=True, max_length=20, verbose_name='FTP访问密码')),
                 ('ftp_ro_password', models.CharField(blank=True, max_length=20, verbose_name='FTP只读访问密码')),
