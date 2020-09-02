@@ -1,3 +1,15 @@
+## v0.4.4
+* 存储桶和桶归档model增加字段type，及clearbucket命令只清理原生桶；
+* 兼容s3 api使用说明网页视图实现；
+* ceph rados读写代码修改和单元测试代码；
+* 其他一些细节和代码优化；
+
+## v0.4.3
+* s3兼容api文档
+* obj元数据查询条件修改
+* ftp upload calculate md5
+* obj元数据api返回数据增加rados信息
+
 ## v0.4.2
 * add put object api
 * 网页端上传改为使用put object api
