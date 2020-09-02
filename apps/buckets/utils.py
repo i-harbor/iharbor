@@ -72,8 +72,10 @@ def delete_table_for_model_class(model):
         with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
             schema_editor.delete_model(model)
     except Exception as e:
-        msg = traceback.format_exc()
-        logger.error(msg)
+        logger.error(str(e))
+        if e.args[0] in [1051, 1146]:  # unknown table or table not exists
+            return True
+
         return False
 
     return True

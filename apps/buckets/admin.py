@@ -22,13 +22,13 @@ class BucketAdmin(admin.ModelAdmin):
 
 @admin.register(Archive)
 class BucketArchiveAdmin(admin.ModelAdmin):
-    list_display = ('id', 'original_id', 'name', 'table_name', 'archive_time', 'created_time', 'user', 'objs_count',
+    list_display = ('id', 'original_id', 'name', 'type', 'table_name', 'archive_time', 'created_time', 'user', 'objs_count',
                     'size', 'ftp_enable', 'ftp_password', 'modified_time')
     list_display_links = ('id', 'name')
 
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
-    readonly_fields = ('table_name',)
+    readonly_fields = ('table_name', 'original_id')
 
 
 @admin.register(BucketLimitConfig)

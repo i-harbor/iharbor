@@ -36,10 +36,10 @@ def get_str_hexMD5(s:str):
     return hashlib.md5(s.encode(encoding='utf-8')).hexdigest()
 
 
-class Bucket(models.Model):
-    '''
+class BucketBase(models.Model):
+    """
     存储桶bucket类，bucket名称必须唯一（不包括软删除记录）
-    '''
+    """
     PUBLIC = 1
     PRIVATE = 2
     PUBLIC_READWRITE = 3
@@ -56,21 +56,31 @@ class Bucket(models.Model):
         (TYPE_S3, 'S3')
     )
 
-    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
-    user = models.ForeignKey(to=User, on_delete=models.CASCADE, verbose_name='所属用户')
-    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
-    access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
-    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
-    objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
-    size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
+    access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE,
+                                                 verbose_name='访问权限')
+    user = models.ForeignKey(to=User, null=True, on_delete=models.SET_NULL, verbose_name='所属用户')
+    objs_count = models.IntegerField(verbose_name='对象数量', default=0)    # 桶内对象的数量
+    size = models.BigIntegerField(verbose_name='桶大小', default=0)    # 桶内对象的总大小
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
     pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
-    remarks = models.CharField(verbose_name='备注', max_length=255, default='')
     type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
+
+    class Meta:
+        abstract = True
+
+
+class Bucket(BucketBase):
+    '''
+    存储桶bucket类，bucket名称必须唯一（不包括软删除记录）
+    '''
+    name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
+    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
+    remarks = models.CharField(verbose_name='备注', max_length=255, default='')
 
     class Meta:
         ordering = ['-id']
@@ -131,6 +141,7 @@ class Bucket(models.Model):
             a.ftp_password = self.ftp_password
             a.ftp_ro_password = self.ftp_ro_password
             a.pool_name = self.pool_name
+            a.type = self.type
             a.save()
         except Exception as e:
             return False
@@ -178,7 +189,7 @@ class Bucket(models.Model):
         try:
             self.save(update_fields=['access_permission'])
         except:
-            return  False
+            return False
 
         return True
 
@@ -350,35 +361,17 @@ class Bucket(models.Model):
         return True
 
 
-class Archive(models.Model):
+class Archive(BucketBase):
     '''
     存储桶bucket删除归档类
     '''
-    PUBLIC = 1
-    PRIVATE = 2
-    PUBLIC_READWRITE = 3
-    ACCESS_PERMISSION_CHOICES = (
-        (PUBLIC, '公有'),
-        (PRIVATE, '私有'),
-        (PUBLIC_READWRITE, '公有（可读写）'),
-    )
-
     id = models.BigAutoField(primary_key=True)
     original_id = models.BigIntegerField(verbose_name='bucket id')
     archive_time = models.DateTimeField(auto_now_add=True, verbose_name='删除归档时间')
     name = models.CharField(max_length=63, db_index=True, verbose_name='bucket名称')
-    user = models.ForeignKey(to=User, null=True, on_delete=models.SET_NULL, verbose_name='所属用户')
     created_time = models.DateTimeField(verbose_name='创建时间')
     table_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
-    access_permission = models.SmallIntegerField(choices=ACCESS_PERMISSION_CHOICES, default=PRIVATE, verbose_name='访问权限')
     modified_time = models.DateTimeField(verbose_name='修改时间')
-    objs_count = models.IntegerField(verbose_name='对象数量', default=0) # 桶内对象的数量
-    size = models.BigIntegerField(verbose_name='桶大小', default=0) # 桶内对象的总大小
-    stats_time = models.DateTimeField(verbose_name='统计时间')
-    ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
-    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
-    ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
-    pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
 
     class Meta:
         ordering = ['-id']

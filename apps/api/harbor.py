@@ -494,7 +494,7 @@ class HarborManager:
 
         # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
         try:
-            if move_to is None: # 仅仅重命名对象，不移动
+            if move_to is None:     # 仅仅重命名对象，不移动
                 path, _ = PathParser(filepath=obj.na).get_path_and_filename()
                 new_na = path + '/' + new_obj_name if path else new_obj_name
                 bfm = BucketFileManagement(path=path, collection_name=table_name)

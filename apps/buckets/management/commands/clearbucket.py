@@ -64,19 +64,19 @@ class Command(BaseCommand):
         # 指定名字的桶
         if bucketname:
             self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
-            return Archive.objects.filter(name=bucketname, archive_time__lt=self._clear_datetime).all()
+            return Archive.objects.filter(name=bucketname, type=Archive.TYPE_COMMON, archive_time__lt=self._clear_datetime).all()
 
         # 全部已删除归档的桶
         if all_deleted:
             self.stdout.write(self.style.NOTICE('Will clear all buckets that have been softly deleted '))
-            return Archive.objects.filter(archive_time__lt=self._clear_datetime).all()
+            return Archive.objects.filter(type=Archive.TYPE_COMMON, archive_time__lt=self._clear_datetime).all()
 
         # 未给出参数
         if not bucketname:
             bucketname = input('Please input a bucket name:')
 
         self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
-        return Archive.objects.filter(name=bucketname).all()
+        return Archive.objects.filter(name=bucketname, type=Archive.TYPE_COMMON).all()
 
     def get_objs_and_dirs(self, modelclass, num=1000):
         '''
@@ -164,15 +164,15 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(self.style.ERROR(f'deleted bucket table error:{bucket.name}'))
 
-            self.stdout.write('Clearing bucket named {0} is completed'.format(bucket.name))
+            self.stdout.write(self.style.SUCCESS('Clearing bucket named {0} is completed'.format(bucket.name)))
         except (ProgrammingError, Exception) as e:
-            if e.args[0] == 1146: # table not exists
+            if e.args[0] == 1146:   # table not exists
                 bucket.delete()
                 self.stdout.write(self.style.WARNING(f"only deleted bucket({bucket.name}),{e}"))
             else:
-                self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}' ))
+                self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}'))
 
-        self.pool_sem.release() # 可用线程数+1
+        self.pool_sem.release()     # 可用线程数+1
 
     def clear_buckets(self, buckets):
         '''
