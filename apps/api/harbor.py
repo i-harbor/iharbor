@@ -965,7 +965,7 @@ class HarborManager:
         # 增加一次下载次数
         obj.download_cound_increase()
         generator = self._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end, per_size=per_size)
-        return  generator, obj
+        return generator, obj
 
     def _get_obj_generator(self, bucket, obj, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
         '''

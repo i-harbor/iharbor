@@ -494,8 +494,8 @@ class BucketFileBase(models.Model):
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
-    ult = models.DateTimeField(default=timezone.now) # 文件的上传时间，或目录的创建时间
-    upt = models.DateTimeField(blank=True, null=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
+    ult = models.DateTimeField(auto_now_add=True, default=timezone.now) # 文件的上传时间，或目录的创建时间
+    upt = models.DateTimeField(blank=True, null=True, auto_now=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
     dlc = models.IntegerField(default=0, verbose_name='下载次数')  # 该文件的下载次数，目录时dlc为0
     shp = models.CharField(default='', max_length=10, verbose_name='共享密码') # 该文件的共享密码，目录时为空
     stl = models.BooleanField(default=True, verbose_name='是否有共享时间限制') # True: 文件有共享时间限制; False: 则文件无共享时间限制

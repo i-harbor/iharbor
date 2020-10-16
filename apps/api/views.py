@@ -1011,6 +1011,8 @@ class ObjViewSet(CustomGenericViewSet):
                 # 删除数据和元数据
                 clean_put(uploader, obj, created)
                 return Response({'code': 400, 'code_text': _('标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏')}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            content_md5 = file.file_md5.lower()
 
         try:
             obj.si = file.size
