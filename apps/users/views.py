@@ -13,7 +13,6 @@ from webserver.views import get_kjy_login_url, kjy_logout
 #获取用户模型
 User = get_user_model()
 
-# Create your views here.
 
 def register_user(request):
     '''
@@ -45,6 +44,14 @@ def register_user(request):
     return render(request, 'form.html', content)
 
 
+def sign_in(request, *args, **kwargs):
+    """
+    登录
+    """
+    kjy_url = get_kjy_login_url()
+    return render(request, 'signin.html', context={'kjy_url': kjy_url})
+
+
 def login_user(request):
     '''
     用户登陆函数视图
@@ -67,9 +74,8 @@ def login_user(request):
     content = {}
     content['form_title'] = _('用户登录')
     content['submit_text'] = _('登录')
-    content['action_url'] = reverse('users:login')
+    content['action_url'] = reverse('users:local_login')
     content['form'] = form
-    content['kjy_url'] = get_kjy_login_url()
     return render(request, 'login.html', content)
 
 
@@ -129,14 +135,15 @@ def change_password(request):
     # 当前用户为第三方应用登录认证
     if (user.third_app != User.LOCAL_USER):
         if user.password:
-            tips_msg = f'您当前是通过第三方应用"{user.get_third_app_display()}"登录认证，并且您曾经为此用户设置过本地密码，' \
+            tips_msg = f'您当前是通过"{user.get_third_app_display()}"登录认证，并且您曾经为此用户设置过本地密码，' \
                        f'若忘记密码，请通过登录页面找回密码。'
         else:
-            tips_msg = f'您当前是通过第三方应用"{user.get_third_app_display()}"登录认证，您还未为此用户设置本地密码，' \
+            tips_msg = f'您当前是通过"{user.get_third_app_display()}"登录认证，您还未为此用户设置本地密码，' \
                        f'你可以通过此页面为此用户设置本地密码，以便以后直接本地登录；原密码输入框可以输入8-20个任意字符。'
         content['tips_msg'] = tips_msg
 
     return render(request, 'form.html', content)
+
 
 def forget_password(request):
     '''
@@ -170,6 +177,7 @@ def forget_password(request):
 
     content = {'form_title': _('找回密码'), 'submit_text': _('确定'), 'form': form}
     return render(request, 'form.html', content)
+
 
 def forget_password_confirm(request):
     '''
@@ -278,6 +286,7 @@ def send_active_url_email(request, to_email, user):
         '''
     return send_one_email(subject='iHarbor账户激活', receiver=to_email, message=message, log_message=active_link)
 
+
 def send_one_email(receiver, message, subject='iHarbor', log_message=''):
     '''
     发送一封邮件
@@ -308,6 +317,7 @@ def get_or_create_token(user):
 
     return token
 
+
 def reflesh_new_token(token):
     '''
     更新用户的token
@@ -318,6 +328,7 @@ def reflesh_new_token(token):
     token.delete()
     token.key = token.generate_key()
     token.save()
+
 
 def send_forget_password_email(request, to_email, user):
     '''
@@ -359,6 +370,7 @@ def get_find_password_link(request, user):
     url = request.build_absolute_uri(url)
     return url + '?jwt=' + token
 
+
 @login_required
 def security(request, *args, **kwargs):
     '''
@@ -368,6 +380,5 @@ def security(request, *args, **kwargs):
     token = get_or_create_token(user=user)
     auth_keys = AuthKey.objects.filter(user=user).all()
     return render(request, 'security.html', context={'token': token, 'auth_keys': auth_keys})
-
 
 

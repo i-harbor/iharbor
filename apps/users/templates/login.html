@@ -5,15 +5,12 @@
     <a class="btn text-warning" href="{% url 'users:forget' %}">{% trans '忘记密码' %}</a>
     <a class="btn btn-success float-right" href="{% url 'users:register' %}">{% trans '注册' %}</a>
     <div class="clearfix"></div>
-    {% if kjy_url %}
-        <hr>
-        <div class="third-part">
-            <div class="text-center">{% trans '第三方帐号登录' %}:</div>
-            <div>
-                <h3 class="text-center"><a id="id-passport" href="{{ kjy_url }}" class="text-info">{% trans '中国科技云通行证' %}</a></h3>
-            </div>
+    <hr>
+    <div class="third-part">
+        <div>
+            <a class="btn btn-sm p-2" href="{% url 'users:signin' %}"><i class="fa fa-share"></i> <i class="fa fa-user"></i> {% trans '中国科技云通行证账号登录' %}</a>
         </div>
-    {% endif %}
+    </div>
 {% endblock %}
 
 {% block script %}

@@ -1,0 +1,30 @@
+{% load i18n %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-hans">
+<head>
+    <meta charset="UTF-8">
+    <title>{% trans '登录' %}</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'bootstrap-4.4.1/css/bootstrap.min.css' %}">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="d-flex align-items-center justify-content-center" style="height: 80vh;">
+            <div class="card border-0" style="">
+                <div class="card-body">
+                    <div class="shadow">
+                        <div class="p-2 bg-light"><i class="fa fa-user-check"></i> {% trans '科技云通行证账户登录' %}</div>
+                        <div>
+                            <iframe height="300" width="280" frameborder="0" style="border:0 solid;" scrolling="no" src="{{ kjy_url }}"></iframe>
+                        </div>
+                        <div class="border-top">
+                            <a class="btn btn-sm" href="{% url 'users:local_login' %}"><i class="fa fa-share"></i> <i class="fa fa-user"></i> {% trans '本地账号登录' %}</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="text/javascript" src="{% static 'fontawesome-free/js/all.min.js' %}"></script>
+</body>
+</html>
