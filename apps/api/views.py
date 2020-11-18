@@ -37,6 +37,7 @@ from . import paginations
 from . import permissions
 from . import throttles
 from .harbor import HarborError, HarborManager
+from . import exceptions
 
 # Create your views here.
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -1133,7 +1134,8 @@ class ObjViewSet(CustomGenericViewSet):
                   "code_text": "对象共享权限设置成功",
                   "share": 1,
                   "days": 2,
-                  "share_uri": "xxx"    # 分享下载uri
+                  "share_uri": "xxx"    # 分享下载uri,
+                  "access_code": 1
                 }        
             """
         }
@@ -1166,7 +1168,7 @@ class ObjViewSet(CustomGenericViewSet):
 
         hManager = HarborManager()
         try:
-            ok = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
+            ok, access_code = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
@@ -1182,7 +1184,8 @@ class ObjViewSet(CustomGenericViewSet):
             'code_text': _('对象共享权限设置成功'),
             'share': share,
             'days': days,
-            'share_uri': share_uri
+            'share_uri': share_uri,
+            'access_code': access_code
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
@@ -1609,7 +1612,7 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         hManager = HarborManager()
         try:
-            ok = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, password=password, user=request.user)
+            ok, access_code = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, password=password, user=request.user)
         except HarborError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
@@ -1619,7 +1622,10 @@ class DirectoryViewSet(CustomGenericViewSet):
         share_base = f'{bucket_name}/{dirpath}'
         share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
         share_url = request.build_absolute_uri(share_url)
-        return Response(data={'code': 200, 'code_text': _('设置目录权限成功'), 'share': share_url, 'share_code': password}, status=status.HTTP_200_OK)
+        return Response(data={'code': 200, 'code_text': _('设置目录权限成功'),
+                              'share': share_url, 'share_code': password,
+                              'access_code': access_code
+                              }, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         """
@@ -2962,4 +2968,111 @@ class ObjKeyViewSet(CustomGenericViewSet):
             'filename': obj.name
         }
         return Response(data={'code': 200, 'code_text': 'ok', 'info': info}, status=status.HTTP_200_OK)
+
+
+class ShareViewSet(CustomGenericViewSet):
+    """
+    对象或目录分享视图
+
+    retrieve:
+        获取对象对应的ceph rados key信息
+
+    	>>Http Code: 状态码200：
+            {
+              "share_uri": "http://159.226.91.140:8000/share/s/ddd/ggg",
+              "is_obj": false,          # 对象或目录
+              "share_code": "c32b"      # 分享密码；is_obj为true或者未设置分享密码时此内容不存在
+            }
+
+        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
+            {
+              "code": "BadRequest",
+              "message": "参数有误"
+            }
+        >>Http Code: 403:
+            {
+              "code": "NotShared",      # 未设置分享或分享已过期
+              "message": "This resource has not been publicly shared."
+            }
+            or
+            {
+              "code": "AccessDenied",   # 没有访问权限
+              "message": "Access Denied."
+            }
+        >>Http Code: 状态码404
+            {
+              "code": "NoSuchBucket",
+              "message": "The specified bucket does not exist."
+            }
+            or
+            {
+              "code": "NoSuchKey",
+              "message": "对象或目录不存在"
+            }
+        >>Http Code: 状态码500：服务器内部错误;
+
+    """
+    queryset = {}
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'path'
+    lookup_value_regex = '.+'
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('获取对象或目录的分享连接'),
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='path', in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("对象或目录绝对路径"),
+                required=True
+            )
+        ]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        path = kwargs.get(self.lookup_field, '')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        hManager = HarborManager()
+        try:
+            bucket, obj = hManager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
+        except HarborError as e:
+            if e.code == 400:
+                exc = exceptions.BadRequest(message=e.msg)
+            elif e.code == 404:
+                exc = exceptions.NoSuchBucket()
+            elif e.code == 403:
+                exc = exceptions.AccessDenied(message=e.msg)
+            else:
+                exc = exceptions.Error(message=e.msg)
+
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if not obj:
+            exc = exceptions.NoSuchKey(message=_('对象或目录不存在'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if not obj.get_access_permission_code(bucket):
+            exc = exceptions.NotShared()
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if obj.is_file():
+            share_uri = django_reverse('share:obs-detail', kwargs={'objpath': f'{bucket_name}/{path}'})
+            # 是否设置了分享密码
+            if obj.has_share_password():
+                password = obj.get_share_password()
+                share_uri = f'{share_uri}?p={password}'
+
+            share_uri = request.build_absolute_uri(share_uri)
+            return Response(data={'share_uri': share_uri, 'is_obj': True}, status=status.HTTP_200_OK)
+        else:
+            share_base = f'{bucket_name}/{path}'
+            share_url = django_reverse('share:share-view', kwargs={'share_base': share_base})
+            share_uri = request.build_absolute_uri(share_url)
+            data = {'share_uri': share_uri, 'is_obj': False}
+            if obj.has_share_password():
+                password = obj.get_share_password()
+                data['share_code'] = password
+
+        return Response(data=data, status=status.HTTP_200_OK)
 

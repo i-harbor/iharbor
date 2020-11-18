@@ -1135,8 +1135,7 @@ class HarborManager:
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :param password: 共享密码
         :return:
-            success: True
-            failed: False
+            ok: bool, access_code: int      # ok == True: success; ok == False: failed
 
         :raise HarborError
         '''
@@ -1145,9 +1144,9 @@ class HarborManager:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
 
         if obj.set_shared(share=share, days=days, password=password):
-            return True
+            return True, obj.get_access_permission_code(bucket)
 
-        return False
+        return False, obj.get_access_permission_code(bucket)
 
     def share_dir(self, bucket_name:str, path:str, share:int, days:int=0, password:str='', user=None):
         '''
@@ -1160,8 +1159,7 @@ class HarborManager:
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :param password: 共享密码
         :return:
-            success: True
-            failed: False
+            ok: bool, access_code: int      # ok == True: success; ok == False: failed
 
         :raise HarborError
         '''
@@ -1170,9 +1168,9 @@ class HarborManager:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
 
         if obj.set_shared(share=share, days=days, password=password):
-            return True
+            return True, obj.get_access_permission_code(bucket)
 
-        return False
+        return False, obj.get_access_permission_code(bucket)
 
 
 class FtpHarborManager():

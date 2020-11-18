@@ -212,31 +212,21 @@ class ObjPutFileSerializer(serializers.Serializer):
 
 
 class ObjInfoSerializer(serializers.Serializer):
-    '''
+    """
     目录下文件列表序列化器
-    '''
-    na = serializers.CharField() # 全路径的文件名或目录名
+    """
+    na = serializers.CharField()    # 全路径的文件名或目录名
     name = serializers.CharField()  # 非全路径目录名
     fod = serializers.BooleanField(required=True)  # file_or_dir; True==文件，False==目录
     did = serializers.IntegerField()  # 父节点ID
     si = serializers.IntegerField()  # 文件大小,字节数
     ult = serializers.DateTimeField()  # 文件的上传时间，或目录的创建时间
-    # ult = serializers.SerializerMethodField()  # 自定义字段序列化方法
     upt = serializers.DateTimeField()  # 文件的最近修改时间，目录，则upt为空，format='%Y-%m-%d %H:%M:%S'
-    # upt = serializers.SerializerMethodField()  # 自定义字段序列化方法
-    dlc = serializers.SerializerMethodField() #IntegerField()  # 该文件的下载次数，目录时dlc为空
-    # bac = serializers.ListField(child = serializers.CharField(required=True))  # backup，该文件的备份地址，目录时为空
-    # arc = serializers.ListField(child = serializers.CharField(required=True))  # archive，该文件的归档地址，目录时arc为空
-    # sh = serializers.BooleanField()  # shared，若sh为True，则文件可共享，若sh为False，则文件不能共享
-    # shp = serializers.CharField()  # 该文件的共享密码，目录时为空
-    # stl = serializers.BooleanField()  # True: 文件有共享时间限制; False: 则文件无共享时间限制
-    # sst = serializers.DateTimeField()  # share_start_time, 该文件的共享起始时间
-    # set = serializers.SerializerMethodField()  # share_end_time,该文件的共享终止时间
-    # sds = serializers.SerializerMethodField() # 自定义“软删除”字段序列化方法
+    dlc = serializers.SerializerMethodField()   # 该文件的下载次数，目录时dlc为空
     download_url = serializers.SerializerMethodField()
-    access_permission = serializers.SerializerMethodField() # 公共读权限
+    access_permission = serializers.SerializerMethodField()     # 公共读权限
+    access_code = serializers.SerializerMethodField()  # 公共读权限
     md5 = serializers.SerializerMethodField(method_name='get_md5')
-
 
     def get_md5(self, obj):
         return obj.hex_md5
@@ -250,7 +240,7 @@ class ObjInfoSerializer(serializers.Serializer):
     def get_download_url(self, obj):
         # 目录
         if not obj.fod:
-            return  ''
+            return ''
         request = self.context.get('request', None)
         bucket_name = self._context.get('bucket_name', '')
         filepath = '/'.join((bucket_name, obj.na))
@@ -261,23 +251,23 @@ class ObjInfoSerializer(serializers.Serializer):
             download_url = request.build_absolute_uri(download_url)
         return download_url
 
-    def get_access_permission(self, obj):
-        # 桶公有权限，对象都为公有权限
-        bucket = self._context.get('bucket')
-        if bucket:
-            if bucket.has_public_write_perms():
-                return gettext('公有（读写）')
-            elif bucket.is_public_permission():
-                return gettext('公有')
+    def get_access_code(self, obj):
+        if hasattr(obj, 'access_permission_code'):
+            return obj.access_permission_code
 
-        try:
-            if obj.is_shared_and_in_shared_time():
-                if obj.is_dir() and obj.is_read_write_perms():
-                    return gettext('公有（读写）')
-                return gettext('公有')
-        except Exception as e:
-            pass
-        return gettext('私有')
+        bucket = self._context.get('bucket')
+        c = obj.get_access_permission_code(bucket)
+        obj.access_permission_code = c
+        return c
+
+    def get_access_permission(self, obj):
+        c = self.get_access_code(obj)
+        if c == obj.SHARE_ACCESS_READONLY:
+            return gettext('公有')
+        elif c == obj.SHARE_ACCESS_READWRITE:
+            return gettext('公有（读写）')
+        else:
+            return gettext('私有')
 
 
 class AuthTokenDumpSerializer(serializers.Serializer):

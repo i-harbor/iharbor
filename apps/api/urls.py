@@ -28,7 +28,6 @@ router.register(r'ftp', views.FtpViewSet, basename='ftp')
 router.register(r'vpn', views.VPNViewSet, basename='vpn')
 router.register(r'obj-rados/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ObjKeyViewSet, basename='obj-rados')
 
-
 dlp_router = DetailListPostRouter()
 dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryViewSet, basename='dir')
 
@@ -39,10 +38,14 @@ detail_router.register(r'metadata/(?P<bucket_name>[a-z0-9-_]{3,64})', views.Meta
 detail_router.register(r'refresh-meta/(?P<bucket_name>[a-z0-9-_]{3,64})', views.RefreshMetadataViewSet,
                        basename='refresh-meta')
 
+no_slash_detail_router = DetailPostRouter(trailing_slash=False)
+no_slash_detail_router.register(r'share/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ShareViewSet, basename='share')
+
 
 urlpatterns = [
     path('', include(router.urls)),
     path('', include(detail_router.urls)),
+    path('', include(no_slash_detail_router.urls)),
     path('', include(dlp_router.urls)),
     path('auth-token/', auth.obtain_auth_token),
     path('jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),

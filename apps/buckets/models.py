@@ -786,3 +786,26 @@ class BucketFileBase(models.Model):
         path, _ = PathParser(filepath=self.na).get_path_and_filename()
         return path
 
+    def get_access_permission_code(self, bucket):
+        """
+        判断并获取对象或目录的访问权限码
+
+        :return: int
+        """
+        # 桶公有权限，对象都为公有权限
+        if bucket:
+            if bucket.has_public_write_perms():
+                return self.SHARE_ACCESS_READWRITE
+            elif bucket.is_public_permission():
+                return self.SHARE_ACCESS_READONLY
+
+        try:
+            if self.is_shared_and_in_shared_time():
+                if self.is_dir() and self.is_read_write_perms():
+                    return self.SHARE_ACCESS_READWRITE
+
+                return self.SHARE_ACCESS_READONLY
+        except Exception as e:
+            pass
+
+        return self.SHARE_ACCESS_NO

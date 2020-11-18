@@ -13,9 +13,9 @@ function show_auto_close_warning_dialog(title, type='warning', position='center'
         timer = 0;
         showBtn = true;
     }
-    return swal({
+    return Swal.fire({
         position: position,
-        type: type,
+        icon: type,
         text: title,
         showConfirmButton: showBtn,
         timer: timer
@@ -101,15 +101,15 @@ String.prototype.leftStrip = function(searchValue){
 // @ok_todo：确定 回调函数
 // @cancel_todo：取消 回调函数
 function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:null}) {
-    Swal({
+    Swal.fire({
         title: obj.title || "你确定要这样做吗？",
         text: obj.text || "此操作是不可逆的！",
         type: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
         cancelButtonColor: '#d33',
-        confirmButtonText: 'Confirm',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: gettext('确认'),
+        cancelButtonText: gettext('取消')
     }).then((result) => {
         if (result.value) {
             if(typeof obj.ok_todo === "function")//是函数
