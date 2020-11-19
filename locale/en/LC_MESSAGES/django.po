@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-04-22 10:22+0800\n"
+"POT-Creation-Date: 2020-11-19 14:51+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -155,16 +155,15 @@ msgstr "a complete file"
 msgid "无效的空文件"
 msgstr "Invalid empty file"
 
-#: apps/api/serializers.py:265 apps/api/serializers.py:272
-msgid "公有（读写）"
-msgstr "public(rw)"
-
-#: apps/api/serializers.py:250 apps/api/serializers.py:256
-#: apps/buckets/models.py:46
+#: apps/api/serializers.py:266 apps/buckets/models.py:47
 msgid "公有"
 msgstr "public"
 
-#: apps/api/serializers.py:259 apps/buckets/models.py:47
+#: apps/api/serializers.py:268
+msgid "公有（读写）"
+msgstr "public(rw)"
+
+#: apps/api/serializers.py:270 apps/buckets/models.py:48
 msgid "私有"
 msgstr "private"
 
@@ -338,7 +337,9 @@ msgstr "Upload a complete object"
 
 #: apps/api/views.py:1013
 msgid "标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏"
-msgstr "The header content-md5 is inconsistent with the MD5 value of the uploaded data, and the data may be damaged during the upload process."
+msgstr ""
+"The header content-md5 is inconsistent with the MD5 value of the uploaded "
+"data, and the data may be damaged during the upload process."
 
 #: apps/api/views.py:1028
 msgid "下载文件对象，自定义读取对象数据块"
@@ -661,7 +662,11 @@ msgstr "failed to modify"
 msgid "获取对象对应的ceph rados key信息"
 msgstr "Get the CEPH Rados key information of the object"
 
-#: apps/buckets/models.py:48
+#: apps/api/views.py:3021
+msgid "获取对象或目录的分享连接"
+msgstr "Get object or directory metadata"
+
+#: apps/buckets/models.py:49
 msgid "公有（可读写）"
 msgstr "public(rw)"
 
@@ -1042,12 +1047,8 @@ msgid "注册"
 msgstr "Sign up"
 
 #: apps/users/templates/login.html:11
-msgid "第三方帐号登录"
-msgstr "Third party login"
-
-#: apps/users/templates/login.html:13
-msgid "中国科技云通行证"
-msgstr "CSTCloud passport"
+msgid "中国科技云通行证账号登录"
+msgstr "Sign in with CSTCloud passport"
 
 #: apps/users/templates/security.html:11
 msgid "您的安全凭证"
@@ -1081,7 +1082,17 @@ msgstr "Enable"
 msgid "创建新访问密钥"
 msgstr "Create new key"
 
-#: apps/users/views.py:34
+#: apps/users/templates/signin.html:4 apps/users/views.py:76
+#: apps/users/views.py:157 apps/users/views.py:190 apps/users/views.py:227
+#: templates/base.html:65
+msgid "登录"
+msgstr "Sign in"
+
+#: apps/users/templates/signin.html:17
+msgid "本地账号登录"
+msgstr "Local account login"
+
+#: apps/users/views.py:33
 msgid "邮件发送失败，请检查邮箱输入是否有误"
 msgstr ""
 "Failed to send the email. Please check whether the email input is wrong"
@@ -1097,11 +1108,6 @@ msgstr "Sign up user"
 #: apps/users/views.py:68
 msgid "用户登录"
 msgstr "User log in"
-
-#: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
-#: apps/users/views.py:219 templates/base.html:65
-msgid "登录"
-msgstr "Sign in"
 
 #: apps/users/views.py:123 templates/base.html:56
 msgid "修改密码"
@@ -1208,10 +1214,14 @@ msgid "FTP访问说明"
 msgstr "FTP usage"
 
 #: templates/base_with_sidebar.html:22
-msgid "API使用说明"
-msgstr "API usage"
+msgid "原生API使用说明"
+msgstr "Native API usage"
 
-#: templates/base_with_sidebar.html:27
+#: templates/base_with_sidebar.html:23
+msgid "S3兼容API使用说明"
+msgstr "S3 API usage"
+
+#: templates/base_with_sidebar.html:28
 msgid "云主机"
 msgstr "Cloud host"
 

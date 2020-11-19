@@ -374,7 +374,7 @@
 
         show_confirm_dialog({
             title: getTransText('确认删除选中的存储桶吗'),
-            text: getTransText('此操作是不可逆的'),
+            text: getTransText('此操作是不可逆的！'),
             ok_todo: delete_selected_buckets,
         })
     });

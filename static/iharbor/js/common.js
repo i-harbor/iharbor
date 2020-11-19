@@ -102,8 +102,8 @@ String.prototype.leftStrip = function(searchValue){
 // @cancel_todo：取消 回调函数
 function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:null}) {
     Swal.fire({
-        title: obj.title || "你确定要这样做吗？",
-        text: obj.text || "此操作是不可逆的！",
+        title: obj.title || gettext("你确定要这样做吗？"),
+        text: obj.text || gettext("此操作是不可逆的"),
         type: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',

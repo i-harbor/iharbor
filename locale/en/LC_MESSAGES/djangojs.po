@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-05-20 14:03+0800\n"
+"POT-Creation-Date: 2020-11-19 14:50+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -277,20 +277,65 @@ msgstr "Share password"
 msgid "分享公开设置失败"
 msgstr "Share public failure"
 
-#: apps/buckets/static/buckets/bucket.js:1371
-msgid "分享"
+#: apps/buckets/static/buckets/bucket.js:1379
+msgid ""
+"目录已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有"
+"的旧的分享连接。"
+msgstr "The directory is already publicly accessible or has been set up to share. Please choose to share from a new setting or query the existing old sharing connection."
+
+#: apps/buckets/static/buckets/bucket.js:1382
+#: apps/buckets/static/buckets/bucket.js:1545
+msgid "公开分享"
 msgstr "Share"
 
-#: apps/buckets/static/buckets/bucket.js:1380
+#: apps/buckets/static/buckets/bucket.js:1383
+#: apps/buckets/static/buckets/bucket.js:1546
+msgid "查询"
+msgstr "Query"
+
+#: apps/buckets/static/buckets/bucket.js:1385
+#: apps/buckets/static/buckets/bucket.js:1423
+#: apps/buckets/static/buckets/bucket.js:1548
 msgid "提示：创建新的带密码的分享，旧的分享链接会失效"
 msgstr "Tip: create a new share with password, the old share link will fail"
 
-#: apps/buckets/static/buckets/bucket.js:1410
+#: apps/buckets/static/buckets/bucket.js:1413
+msgid "分享"
+msgstr "Share"
+
+#: apps/buckets/static/buckets/bucket.js:1462
 msgid "分享公开设置失败！"
 msgstr "Share public failure"
 
-#: apps/buckets/static/buckets/bucket.js:1428
-#: apps/buckets/static/buckets/bucket.js:1473
+#: apps/buckets/static/buckets/bucket.js:1504
+#: apps/buckets/static/buckets/bucket.js:1712
+msgid "请求超时"
+msgstr "request timeout"
+
+#: apps/buckets/static/buckets/bucket.js:1510
+msgid "对象或目录未共享或者共享时间到期，请刷新后重试。"
+msgstr "The object or directory is not shared or the sharing time has expired. Please refresh and try again."
+
+#: apps/buckets/static/buckets/bucket.js:1512
+msgid "存储桶不存在，请刷新页面。"
+msgstr "The bucket does not exist. Please refresh the page."
+
+#: apps/buckets/static/buckets/bucket.js:1514
+msgid "对象或目录不存在，请刷新后重试。"
+msgstr "The object or directory does not exist. Please refresh and try again."
+
+#: apps/buckets/static/buckets/bucket.js:1519
+msgid "请求失败，请刷新后重试。"
+msgstr "The request failed. Please refresh and try again."
+
+#: apps/buckets/static/buckets/bucket.js:1542
+msgid ""
+"对象已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有"
+"的旧的分享连接。"
+msgstr "The object is already publicly accessible or has been set up to share. Please choose to share from a new setting or query the existing old sharing connection."
+
+#: apps/buckets/static/buckets/bucket.js:1574
+#: apps/buckets/static/buckets/bucket.js:1619
 msgid "删除成功"
 msgstr "Delete successful"
 
@@ -303,11 +348,7 @@ msgstr "Are you sure you want to delete?"
 msgid "好像出问题了，跑丢了"
 msgstr "Something's wrong. I'm lost"
 
-#: apps/buckets/static/buckets/bucket.js:1566
-msgid "请求超时"
-msgstr "request timeout"
-
-#: apps/buckets/static/buckets/bucket.js:1601
+#: apps/buckets/static/buckets/bucket.js:1747
 msgid "对象名称"
 msgstr "Object name"
 
@@ -461,6 +502,10 @@ msgstr "Access key deleted successfully"
 #: apps/users/static/users/users.js:186
 msgid "删除访问密钥失败"
 msgstr "Failed to delete access key"
+
+#: static/iharbor/js/common.js:111
+msgid "确认"
+msgstr "Confirm"
 
 msgid "下页"
 msgstr "Next"
