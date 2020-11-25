@@ -49,7 +49,7 @@ class evcloud_operations():
             # "host_id": 0,
             "remarks": remarks,
         }
-        vm = requests.post(f'{self.api_url}vms/', auth=(self.auth), data=data)
+        vm = requests.post(f'{self.api_url}vms/', auth=self.auth, data=data)
         if vm.status_code == 201:
             vm = vm.json()
         # return self.read_vm(vm_id)
@@ -75,14 +75,16 @@ class evcloud_operations():
                        10: 'miss',
                        }
         try:
-            result = requests.get(f'{self.api_url}vms/{vm_id}/status/', auth=(self.auth)).json()
-            if result['code'] == 200:
-                return (200, status_list[result['status']['status_code']])
+            r = requests.get(f'{self.api_url}vms/{vm_id}/status/', auth=self.auth)
+            result = r.json()
+            if r.status_code == 200:
+                return 200, status_list[result['status']['status_code']]
+            elif r.status_code == 404 and result.get('err_code', '') == 'VmNotExist':
+                return 200, '丢失'
             else:
-                return (400, result['code_text'])
+                return 400, result['code_text']
         except Exception as e:
-            return (400, str(e).encode('utf-8').decode('unicode_escape'))
-
+            return 400, str(e).encode('utf-8').decode('unicode_escape')
 
     def operations(self, vm_id, vm_operate):
         operate_list = ['start', 'shutdown', 'poweroff', 'reboot']
@@ -90,34 +92,35 @@ class evcloud_operations():
             "op": operate_list[vm_operate],
         }
         try:
-            result = requests.patch(f'{self.api_url}vms/{vm_id}/operations/', auth=(self.auth), data=params).json()
+            result = requests.patch(f'{self.api_url}vms/{vm_id}/operations/', auth=self.auth, data=params).json()
             if result['code'] == 200:
-                return (200, result['code_text'])
+                return 200, result['code_text']
             else:
-                return (400, result['code_text'])
+                return 400, result['code_text']
         except Exception as e:
-            return (400, str(e).encode('utf-8').decode('unicode_escape'))
+            return 400, str(e).encode('utf-8').decode('unicode_escape')
 
     def delete(self, vm_id):
         try:
-            result = requests.delete(f'{self.api_url}vms/{vm_id}/', auth=(self.auth))
-            # print(result.status_code)
+            result = requests.delete(f'{self.api_url}vms/{vm_id}/', auth=self.auth)
             if result.status_code == 204:
-                return (200, '删除成功')
+                return 200, '删除成功'
+            elif result.status_code == 404 and result.json().get('err_code', '') == 'VmNotExist':
+                return 200, '删除成功'
             else:
-                return (400, result.json()['code_text'])
+                return 400, result.json()['code_text']
         except Exception as e:
-            return (400, str(e).encode('utf-8').decode('unicode_escape'))
+            return 400, str(e).encode('utf-8').decode('unicode_escape')
 
     def create_vnc(self, vm_id):
         try:
-            result = requests.post(f'{self.api_url}vms/{vm_id}/vnc/', auth=(self.auth)).json()
+            result = requests.post(f'{self.api_url}vms/{vm_id}/vnc/', auth=self.auth).json()
             if result['code'] == 200:
-                return (200, result['vnc']['url'])
+                return 200, result['vnc']['url']
             else:
-                return (400, result['code_text'])
+                return 400, result['code_text']
         except Exception as e:
-            return (400, str(e).encode('utf-8').decode('unicode_escape'))
+            return 400, str(e).encode('utf-8').decode('unicode_escape')
 
 
 if __name__ == '__main__':
