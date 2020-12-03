@@ -34,7 +34,7 @@
                 } else {
                     click_element.children('[name="status"]').html('failed');
                     click_element.children('[name="operate"]').addClass('disabled');
-                    swal({
+                    Swal.fire({
                         type: 'error',
                         title: '查询状态失败',
                         text: data.e,
@@ -43,7 +43,7 @@
             },
             error: function () {
                 click_element.children('[name="status"]').html('暂停服务');
-                swal({
+                Swal.fire({
                         type: 'error',
                         title: '暂停服务',
                         text: '当前服务不可用',
@@ -90,7 +90,7 @@
                 } else {
                     get_status(vm_id, click_element.parents('tr'));
                     click_element.parents('td').siblings('[name="mission"]').html('');
-                    swal({
+                    Swal.fire({
                         type: 'error',
                         title: '操作失败',
                         text: data.e,
@@ -99,7 +99,7 @@
             },
             error: function () {
                 get_status(vm_id, click_element.parents('tr'));
-                swal({
+                Swal.fire({
                         type: 'error',
                         title: '暂停服务',
                         text: '当前服务不可用',
@@ -133,7 +133,7 @@
                 if (data.code === 200) {
                     window.open(data.e)
                 } else {
-                    swal({
+                    Swal.fire({
                         type: 'error',
                         title: '操作失败',
                         text: data.e,
@@ -141,7 +141,7 @@
                 }
             },
             error: function () {
-                swal({
+                Swal.fire({
                         type: 'error',
                         title: '暂停服务',
                         text: '当前服务不可用',

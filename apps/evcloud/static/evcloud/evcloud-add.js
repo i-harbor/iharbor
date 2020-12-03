@@ -26,7 +26,7 @@
 
     $form_create.submit(function (event) {
         event.preventDefault();
-        swal({
+        Swal.fire({
             title: '是否创建?',
             text: "你将会创建一台新的虚拟机",
             type: 'warning',
@@ -47,13 +47,13 @@
                         if (result.code === 200){
                             return result;
                         }else{
-                            swal.showValidationMessage(
+                            Swal.showValidationMessage(
                             `Request failed: ${result.error_text}`
                             );
                         }
                     },
                     error: (error) => {
-                        swal.showValidationMessage(
+                        Swal.showValidationMessage(
                             `Ajax request failed! `
                         );
                     },
@@ -65,7 +65,7 @@
         }).then(
             (result) => {
                 if (result.value) {
-                    swal({
+                    Swal.fire({
                         title: `创建成功`,
                     }).then(() => {
                         // location.reload(true);// 刷新当前页面
@@ -74,7 +74,7 @@
                 }
              },
             (error) => {
-                swal(`Request failed:发生错误，创建失败！`);
+                Swal.fire(`Request failed:发生错误，创建失败！`);
             }
         )
     })
@@ -111,7 +111,7 @@
                 // Swal.close()
             },
             error: function () {
-                swal({
+                Swal.fire({
                         type: 'error',
                         title: '暂停服务',
                         text: '当前服务不可用',
