@@ -276,21 +276,25 @@ class HarborManager:
         if not isinstance(bucket, Bucket):
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
 
         try:
-            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
+            _dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
         except HarborError as e:
             raise e
 
-        if dir:
+        if _dir:
             # 目录已存在
-            if dir.is_dir():
+            if _dir.is_dir():
                 raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"{dir_name}"目录已存在', existing=True)
 
             # 同名对象已存在
-            if dir.is_file():
+            if _dir.is_file():
                 raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
@@ -321,20 +325,24 @@ class HarborManager:
         if not isinstance(bucket, Bucket):
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
         table_name = bucket.get_bucket_table_name()
 
         try:
-            dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
+            _dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
         except HarborError as e:
             raise e
 
-        if not dir or dir.is_file():
+        if not _dir or _dir.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
 
-        if not bfm.dir_is_empty(dir):
+        if not bfm.dir_is_empty(_dir):
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法删除非空目录')
 
-        if not dir.do_delete():
+        if not _dir.do_delete():
             raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='删除目录失败，数据库错误')
 
         return True
@@ -355,6 +363,10 @@ class HarborManager:
         bucket = self.get_bucket(bucket_name, user)
         if not bucket:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
 
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
@@ -469,6 +481,10 @@ class HarborManager:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         except HarborError as e:
             raise e
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
 
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
@@ -644,6 +660,10 @@ class HarborManager:
         bucket = self.get_bucket(bucket_name, user=user)
         if not bucket:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
 
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
@@ -867,6 +887,10 @@ class HarborManager:
         except HarborError as e:
             raise e
 
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
         if fileobj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
 
@@ -910,6 +934,10 @@ class HarborManager:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         except HarborError as e:
             raise e
+
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
 
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
@@ -958,6 +986,10 @@ class HarborManager:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user, all_public=all_public)
         except HarborError as e:
             raise e
+
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
 
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
@@ -1017,6 +1049,10 @@ class HarborManager:
         bucket = self.get_bucket(bucket_name, user=user)
         if not bucket:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
 
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
@@ -1140,6 +1176,10 @@ class HarborManager:
         :raise HarborError
         '''
         bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
         if obj is None:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
 
@@ -1164,6 +1204,10 @@ class HarborManager:
         :raise HarborError
         '''
         bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=user)
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
         if not obj or obj.is_file():
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
 
@@ -1173,7 +1217,7 @@ class HarborManager:
         return False, obj.get_access_permission_code(bucket)
 
 
-class FtpHarborManager():
+class FtpHarborManager:
     '''
     ftp操作harbor对象数据元数据管理接口封装
     '''

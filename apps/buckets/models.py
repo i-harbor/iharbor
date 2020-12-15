@@ -73,14 +73,25 @@ class BucketBase(models.Model):
 
 
 class Bucket(BucketBase):
-    '''
+    """
     存储桶bucket类，bucket名称必须唯一（不包括软删除记录）
-    '''
+    """
+    LOCK_READWRITE = 0
+    LOCK_READONLY = 1
+    LOCK_NO_READWRITE = 2
+    CHOICES_LOCK = (
+        (LOCK_READWRITE, _("正常读写")),
+        (LOCK_READONLY, _("锁定写")),
+        (LOCK_NO_READWRITE, _("锁定读写")),
+    )
+
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
     remarks = models.CharField(verbose_name='备注', max_length=255, default='')
+    lock = models.SmallIntegerField(verbose_name=_('读写锁'), default=LOCK_READWRITE, choices=CHOICES_LOCK,
+                                    help_text=_('锁定存储桶，控制存储桶的读写。'))
 
     class Meta:
         ordering = ['-id']
@@ -359,6 +370,20 @@ class Bucket(BucketBase):
             return False
 
         return True
+
+    def lock_readable(self):
+        """桶是否允许读操作"""
+        if self.lock in [self.LOCK_READWRITE, self.LOCK_READONLY]:
+            return True
+
+        return False
+
+    def lock_writeable(self):
+        """桶是否允许写操作"""
+        if self.lock == self.LOCK_READWRITE:
+            return True
+
+        return False
 
 
 class Archive(BucketBase):

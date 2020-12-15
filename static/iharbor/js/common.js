@@ -104,7 +104,7 @@ function show_confirm_dialog(obj={title:"", text:"", ok_todo:null, cancel_todo:n
     Swal.fire({
         title: obj.title || gettext("你确定要这样做吗？"),
         text: obj.text || gettext("此操作是不可逆的"),
-        type: 'warning',
+        icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
         cancelButtonColor: '#d33',

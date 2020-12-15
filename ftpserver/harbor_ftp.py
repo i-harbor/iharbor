@@ -28,7 +28,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     # print(dir(logger))
     
-    file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
+    file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/iharbor/ftp.log',
                                                                         maxBytes = 1024 ** 2 * 128,
                                                                         backupCount = 10, use_gzip=True,)
     file_handler.setLevel(logging.INFO)

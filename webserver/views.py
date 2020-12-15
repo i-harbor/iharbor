@@ -20,7 +20,7 @@ def kjy_login_callback(request, *args, **kwargs):
     if not token:
         return kjy_logout()
 
-    user =  create_kjy_auth_user(request, token)
+    user = create_kjy_auth_user(request, token)
     if not user:
         return kjy_logout()
 
@@ -133,7 +133,7 @@ def get_kjy_login_url():
 
     return url
 
-def get_kjy_auth_token(code):
+def  get_kjy_auth_token(code):
     '''
     获取登录认证后的token
 
