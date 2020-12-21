@@ -32,9 +32,27 @@ class Error(Exception):
         }
 
 
+class AuthenticationFailed(Error):
+    status_code = 401
+    default_detail = 'Incorrect authentication credentials.'
+    default_code = 'AuthenticationFailed'
+
+
+class NotAuthenticated(Error):
+    status_code = 401
+    default_detail = 'Authentication credentials were not provided.'
+    default_code = 'NotAuthenticated'
+
+
 class BadRequest(Error):
     default_message = 'Bad Request'
     default_code = 'BadRequest'
+    default_status_code = 400
+
+
+class TooManyBucketTokens(Error):
+    default_message = "You have attempted to create more tokens than allowed."
+    default_code = 'TooManyBucketTokens'
     default_status_code = 400
 
 
@@ -61,6 +79,23 @@ class NoSuchKey(NotFound):
     default_code = 'NoSuchKey'
 
 
+class NoSuchToken(NotFound):
+    default_message = 'The specified token does not exist.'
+    default_code = 'NoSuchToken'
+
+
 class NoSuchBucket(NotFound):
     default_message = 'The specified bucket does not exist.'
     default_code = 'NoSuchBucket'
+
+
+class MethodNotAllowed(Error):
+    default_message = 'Method not allowed.'
+    default_code = 'MethodNotAllowed'
+    default_status_code = 405
+
+
+class Throttled(Error):
+    default_message = 'Request was throttled.'
+    default_code = 'Throttled'
+    default_status_code = 429

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive)
+from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive, BucketToken)
 
 
 @admin.register(Bucket)
@@ -48,3 +48,10 @@ class UsageDescAdmin(admin.ModelAdmin):
 
     def get_desc_for(self, obj):
         return obj.get_desc_for_display()
+
+
+@admin.register(BucketToken)
+class BucketTokenAdmin(admin.ModelAdmin):
+    list_display = ('key', 'permission', 'created', 'bucket')
+    list_display_links = ('key', )
+    search_fields = ('key', 'bucket__name')

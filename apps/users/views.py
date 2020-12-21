@@ -48,8 +48,12 @@ def sign_in(request, *args, **kwargs):
     """
     登录
     """
+    next_url = request.GET.get('next', None)
+    if next_url:
+        request.session['next'] = next_url
+
     kjy_url = get_kjy_login_url()
-    return render(request, 'signin.html', context={'kjy_url': kjy_url})
+    return render(request, 'signin.html', context={'kjy_url': kjy_url, 'next': next_url})
 
 
 def login_user(request):
@@ -57,25 +61,26 @@ def login_user(request):
     用户登陆函数视图
     '''
     if request.method == 'POST':
+        next_url = request.session.get('next', reverse('buckets:bucket_view'))
         form = LoginForm(request.POST)
         if form.is_valid():
             user = form.cleaned_data['user']
-            #登陆用户
-            login(request, user)
-            next = request.session.get('next', reverse('buckets:bucket_view'))
-            return redirect(to=next)
+            login(request, user)    # 登陆用户
+            return redirect(to=next_url)
     else:
-        #保存登陆后跳转地址，如果存在的话
-        next = request.GET.get('next', None)
-        if next:
-            request.session['next'] = next
+        # 保存登陆后跳转地址，如果存在的话
+        next_url = request.GET.get('next', None)
+        if next_url:
+            request.session['next'] = next_url
         form = LoginForm()
 
-    content = {}
-    content['form_title'] = _('用户登录')
-    content['submit_text'] = _('登录')
-    content['action_url'] = reverse('users:local_login')
-    content['form'] = form
+    content = {
+        'form_title': _('用户登录'),
+        'submit_text': _('登录'),
+        'action_url': reverse('users:local_login'),
+        'form': form,
+        'next': next_url
+    }
     return render(request, 'login.html', content)
 
 

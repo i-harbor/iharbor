@@ -4,8 +4,9 @@ from django.contrib.auth import get_user_model, login
 import requests
 import json
 
-#获取用户模型
-User = get_user_model()
+
+User = get_user_model()     # 获取用户模型
+
 
 def kjy_login_callback(request, *args, **kwargs):
     '''
@@ -30,7 +31,8 @@ def kjy_login_callback(request, *args, **kwargs):
         user.save()
     # 登录用户
     login(request, user)
-    return redirect(to='/')
+    next_url = request.session.get('next', '/')
+    return redirect(to=next_url)
 
 
 def create_kjy_auth_user(request, token):
@@ -107,6 +109,7 @@ def get_first_and_last_name(name:str):
 
     return (first_name, last_name)
 
+
 def get_kjy_login_url():
     '''
     获取 中国科技云通行证登录url
@@ -126,6 +129,7 @@ def get_kjy_login_url():
         'client_id': client_id,
         'redirect_uri': client_callback_url,
     }
+
     try:
         url = prepare_url(url=login_url, params=params)
     except:
@@ -133,7 +137,8 @@ def get_kjy_login_url():
 
     return url
 
-def  get_kjy_auth_token(code):
+
+def get_kjy_auth_token(code):
     '''
     获取登录认证后的token
 
@@ -186,6 +191,7 @@ def  get_kjy_auth_token(code):
 
     return token
 
+
 def get_user_info_from_token(token):
     '''
     从token中获取用户信息
@@ -229,6 +235,7 @@ def get_kjy_logout_url(redirect_uri=None):
 
     return url
 
+
 def kjy_logout(next=None):
     '''
     登出科技云账户
@@ -238,6 +245,7 @@ def kjy_logout(next=None):
     '''
     url = get_kjy_logout_url(next)
     return redirect(to=url)
+
 
 def prepare_url(url, params=None):
     '''

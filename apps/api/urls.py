@@ -27,6 +27,7 @@ router.register(r'test', views.TestViewSet, basename='test')
 router.register(r'ftp', views.FtpViewSet, basename='ftp')
 router.register(r'vpn', views.VPNViewSet, basename='vpn')
 router.register(r'obj-rados/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ObjKeyViewSet, basename='obj-rados')
+router.register(r'bucket-token', auth.BucketTokenView, basename='bucket-token')
 
 dlp_router = DetailListPostRouter()
 dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryViewSet, basename='dir')

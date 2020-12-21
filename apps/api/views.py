@@ -31,7 +31,7 @@ from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
 from utils.time import to_django_timezone
 from vpn.models import VPNAuth
-from .models import User, Bucket
+from .models import User, Bucket, BucketToken
 from . import serializers
 from . import paginations
 from . import permissions
@@ -103,6 +103,36 @@ def str_to_int_or_default(val, default):
         return int(val)
     except Exception:
         return default
+
+
+def check_authenticated_or_bucket_token(request, bucket_name, act='read', view=None):
+    """
+    检查是否认证，或者bucket token认证
+
+    :param act: 请求类型，读或写，用于桶token权限匹配; ['read', 'write']
+    :param bucket_name: 用于匹配和token所属的桶是否一致
+    :return:
+        None
+
+    :raises: Error
+    """
+    if IsAuthenticated().has_permission(request, view=view):
+        return
+
+    if isinstance(request.auth, BucketToken):
+        token = request.auth
+        if token.bucket.name == bucket_name:    # 桶名是否一致
+            if act == 'write' and token.permission != token.PERMISSION_READWRITE:
+                raise exceptions.AccessDenied(message=_('token没有写权限'))
+
+            user = token.bucket.user
+            if user.is_authenticated:
+                request.user = user
+                return
+        else:
+            raise exceptions.AccessDenied(message=_('token和存储桶不匹配'))
+
+    raise exceptions.NotAuthenticated()
 
 
 class UserViewSet(CustomGenericViewSet):
@@ -558,11 +588,12 @@ class BucketViewSet(CustomGenericViewSet):
         '''
         获取一个存储桶详细信息
         '''
-        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
-        if not ok:
-            return ret
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
 
-        serializer = self.get_serializer(ret)
+        serializer = self.get_serializer(bucket)
         return Response({'code': 200, 'bucket': serializer.data})
 
     @swagger_auto_schema(
@@ -586,10 +617,11 @@ class BucketViewSet(CustomGenericViewSet):
         except ValueError as e:
             return Response(data={'code': 400, 'code_text': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
-        if not ok:
-            return ret
-        bucket = ret
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+
         if not bucket.delete_and_archive():  # 删除归档
             return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -632,11 +664,11 @@ class BucketViewSet(CustomGenericViewSet):
         if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': _('public参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
-        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
-        if not ok:
-            return ret
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
 
-        bucket = ret
         share_urls = []
         url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
         url = request.build_absolute_uri(url)
@@ -681,10 +713,10 @@ class BucketViewSet(CustomGenericViewSet):
         if not remarks:
             return Response(data={'code': 400, 'code_text': _('备注信息不能为空')}, status=status.HTTP_400_BAD_REQUEST)
 
-        ok, ret = self.get_user_bucket(request=request, kwargs=kwargs)
-        if not ok:
-            return ret
-        bucket = ret
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
 
         if not bucket.set_remarks(remarks=remarks):
             return Response(data={'code': 500, 'code_text': _('设置备注信息失败，更新数据库数据时错误')},
@@ -696,11 +728,115 @@ class BucketViewSet(CustomGenericViewSet):
         }
         return Response(data=data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('创建一个存储桶token'),
+        request_body=no_body,
+        manual_parameters=DETAIL_BASE_PARAMS + [
+            openapi.Parameter(
+                name='permission', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("访问权限，[readwrite, readonly]"),
+                required=True
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: """
+                        
+                    """
+        }
+    )
+    @action(methods=['post'], detail=True, url_path='token/create', url_name='token-create')
+    def token_create(self, request, *args, **kwargs):
+        """
+        创建存储桶token
+
+            http 200:
+            {
+              "key": "365ad32dcfd3a6d2aa9f94673977d57b634a8339",
+              "bucket": {
+                "id": 3,
+                "name": "ddd"
+              },
+              "permission": "readwrite",
+              "created": "2020-12-21T11:13:07.022989+08:00"
+            }
+        """
+        perm = request.query_params.get('permission', '').lower()
+        if perm not in [BucketToken.PERMISSION_READWRITE, BucketToken.PERMISSION_READONLY]:
+            exc = exceptions.BadRequest(message=_('参数permission的值无效。'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        c = BucketToken.objects.filter(bucket=bucket).count()
+        if c >= 2:
+            exc = exceptions.TooManyBucketTokens()
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            token = BucketToken(bucket=bucket, permission=perm)
+            token.save()
+        except Exception as e:
+            exc = exceptions.Error(message=_('数据库错误，插入token数据失败。'), extend_msg=str(e))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        serializer = serializers.BucketTokenSerializer(instance=token)
+        return Response(data=serializer.data)
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('列举存储桶token'),
+        request_body=no_body,
+        manual_parameters=DETAIL_BASE_PARAMS,
+        responses={
+            status.HTTP_200_OK: """"""
+        }
+    )
+    @action(methods=['get'], detail=True, url_path='token/list', url_name='token-list')
+    def token_list(self, request, *args, **kwargs):
+        """
+        列举存储桶token
+
+            http 200:
+                {
+                  "count": 2,
+                  "tokens": [
+                    {
+                      "key": "4e7be5d14dc868b6dbf843fb1d11b45ab28f6326",
+                      "bucket": {
+                        "id": 3,
+                        "name": "ddd"
+                      },
+                      "permission": "readwrite",
+                      "created": "2020-12-16T15:49:03.180761+08:00"
+                    },
+                    ...
+                  ]
+                }
+        """
+        try:
+            bucket = self.get_user_bucket(request=request, kwargs=kwargs)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        tokens = list(bucket.token_set.all())
+        serializer = serializers.BucketTokenSerializer(instance=tokens, many=True)
+        data = {
+            'count': len(tokens),
+            'tokens': serializer.data
+        }
+        return Response(data=data)
+
     def get_user_bucket(self, request, kwargs):
         """
+        获取存储桶对象，并检测用户访问权限
+
         :return:
-            (True, Bucket())
-            (False, Response())
+            Bucket()
+
+        :raises: Error
         """
         id_or_name = kwargs.get(self.lookup_field, '')
         by_name = request.query_params.get('by-name', '').lower()
@@ -710,15 +846,17 @@ class BucketViewSet(CustomGenericViewSet):
             try:
                 bid = int(id_or_name)
             except Exception as e:
-                return False, Response({'code': 400, 'code_text': _('无效的存储桶ID')}, status=status.HTTP_400_BAD_REQUEST)
+                raise exceptions.BadRequest(message=_('无效的存储桶ID'))
+
             bucket = Bucket.objects.filter(id=bid).first()
 
         if not bucket:
-            return False, Response({'code': 404, 'code_text': _('存储桶不存在')})
+            raise exceptions.NoSuchBucket(message=_('存储桶不存在'))
 
         if not bucket.check_user_own_bucket(request.user):
-            return False, Response({'code': 403, 'code_text': _('您没有操作此存储桶的权限')}, status=status.HTTP_403_FORBIDDEN)
-        return True, bucket
+            raise exceptions.AccessDenied(message=_('您没有操作此存储桶的权限'))
+
+        return bucket
 
     def get_buckets_ids(self, request, **kwargs):
         '''
@@ -853,7 +991,7 @@ class ObjViewSet(CustomGenericViewSet):
 
     '''
     queryset = {}
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
     parser_classes = (parsers.MultiPartParser, parsers.FormParser)
@@ -888,6 +1026,12 @@ class ObjViewSet(CustomGenericViewSet):
     def create_detail(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
         reset = request.query_params.get('reset', '').lower()
         if reset == 'true':
             reset = True
@@ -956,6 +1100,11 @@ class ObjViewSet(CustomGenericViewSet):
         """
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
 
         hManager = HarborManager()
         try:
@@ -1050,9 +1199,13 @@ class ObjViewSet(CustomGenericViewSet):
         }
     )
     def retrieve(self, request, *args, **kwargs):
-
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name = kwargs.get('bucket_name','')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            pass
 
         validated_param, valid_response = self.custom_read_param_validate_or_response(request)
         if not validated_param and valid_response:
@@ -1093,7 +1246,13 @@ class ObjViewSet(CustomGenericViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name = kwargs.get('bucket_name','')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
         hManager = HarborManager()
         try:
             ok = hManager.delete_object(bucket_name=bucket_name, obj_path=objpath, user=request.user)
@@ -1144,6 +1303,11 @@ class ObjViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         objpath = kwargs.get(self.lookup_field, '')
         pw = request.query_params.get('password', None)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
 
         if pw:  # 指定密码
             if not (4 <= len(pw) <= 8):
@@ -1270,6 +1434,7 @@ class ObjViewSet(CustomGenericViewSet):
     def get_permissions(self):
         if self.action == 'retrieve':
             return []
+
         return super().get_permissions()
 
 
@@ -1341,7 +1506,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     '''
     queryset = []
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'dirpath'
     lookup_value_regex = '.+'
     pagination_class = paginations.BucketFileLimitOffsetPagination
@@ -1445,6 +1610,11 @@ class DirectoryViewSet(CustomGenericViewSet):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
 
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
         paginator = self.paginator
         paginator.request = request
         try:
@@ -1510,6 +1680,12 @@ class DirectoryViewSet(CustomGenericViewSet):
     def create_detail(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         path = kwargs.get(self.lookup_field, '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
+
         hManager = HarborManager()
         try:
             ok, dir = hManager.mkdir(bucket_name=bucket_name, path=path, user=request.user)
@@ -1542,6 +1718,11 @@ class DirectoryViewSet(CustomGenericViewSet):
     def destroy(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
         hManager = HarborManager()
         try:
@@ -1593,6 +1774,12 @@ class DirectoryViewSet(CustomGenericViewSet):
     )
     def partial_update(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
+
         dirpath = kwargs.get(self.lookup_field, '')
         days = str_to_int_or_default(request.query_params.get('days', 0), 0)
         share = str_to_int_or_default(request.query_params.get('share', ''), -1)
@@ -1970,10 +2157,9 @@ class MetadataViewSet(CustomGenericViewSet):
                 "code_text": 'xxxxx'        //错误信息，
     '''
     queryset = []
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'path'
     lookup_value_regex = '.+'
-
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取对象或目录元数据'),
@@ -1993,6 +2179,12 @@ class MetadataViewSet(CustomGenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         path_name = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
+
         path, name = PathParser(filepath=path_name).get_path_and_filename()
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
@@ -2069,6 +2261,11 @@ class MetadataViewSet(CustomGenericViewSet):
         path, name = PathParser(filepath=path_name).get_path_and_filename()
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
         hManager = HarborManager()
         try:
@@ -2929,7 +3126,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
 
     '''
     queryset = {}
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
@@ -2947,7 +3144,12 @@ class ObjKeyViewSet(CustomGenericViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         objpath = kwargs.get(self.lookup_field, '')
-        bucket_name = kwargs.get('bucket_name','')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
         hManager = HarborManager()
         try:
@@ -3013,7 +3215,7 @@ class ShareViewSet(CustomGenericViewSet):
 
     """
     queryset = {}
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'path'
     lookup_value_regex = '.+'
 
@@ -3032,6 +3234,11 @@ class ShareViewSet(CustomGenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         path = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
 
         hManager = HarborManager()
         try:

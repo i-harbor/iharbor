@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 
+from buckets.models import BucketToken
+
 
 class IsSuperUser(BasePermission):
     '''
@@ -56,5 +58,28 @@ class IsOwnBucket(IsOwnObject):
     message = '您没有操作此存储桶的权限。'
 
 
+class IsAuthenticatedOrBucketToken(BasePermission):
+    """
+    用户已认证，或已bucket token认证
+    """
+    def has_permission(self, request, view):
+        if bool(request.user and request.user.is_authenticated):
+            return True
+
+        if hasattr(request, 'auth'):
+            if isinstance(request.auth, BucketToken):
+                return True
+
+        return False
 
 
+class IsBucketTokenAuthenticated(BasePermission):
+    """
+    用户已认证，或已bucket token认证
+    """
+    def has_permission(self, request, view):
+        if hasattr(request, 'auth'):
+            if isinstance(request.auth, BucketToken):
+                return True
+
+        return False

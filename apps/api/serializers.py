@@ -4,9 +4,7 @@ from django.utils.translation import gettext, gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.reverse import reverse, replace_query_param
 
-from .models import User, Bucket
-from utils.time import to_localtime_string_naive_by_utc
-from utils.log.decorators import log_used_time
+from .models import User, Bucket, BucketToken
 from .validators import DNSStringValidator, bucket_limit_validator
 from buckets.utils import get_ceph_poolname_rand
 
@@ -293,3 +291,18 @@ class VPNSerializer(serializers.Serializer):
 
 class VPNPostSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=20, min_length=6, help_text=_('新的VPN口令密码'))
+
+
+class BucketTokenSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    bucket = serializers.SerializerMethodField(method_name='get_bucket')
+    permission = serializers.CharField()
+    created = serializers.DateTimeField()
+
+    def get_bucket(self, obj):
+        try:
+            return {'id': obj.bucket.id, 'name': obj.bucket.name}
+        except:
+            return {}
+
+

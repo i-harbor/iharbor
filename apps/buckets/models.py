@@ -834,3 +834,34 @@ class BucketFileBase(models.Model):
             pass
 
         return self.SHARE_ACCESS_NO
+
+
+class BucketToken(models.Model):
+    PERMISSION_READWRITE = 'readwrite'
+    PERMISSION_READONLY = 'readonly'
+    CHOICES_PERMISSION = (
+        (PERMISSION_READWRITE, _('可读写')),
+        (PERMISSION_READONLY, _('只读'))
+    )
+
+    key = models.CharField(verbose_name=_("Key"), max_length=40, primary_key=True)
+    bucket = models.ForeignKey(to=Bucket, related_name='token_set', on_delete=models.CASCADE, verbose_name=_("存储桶"))
+    permission = models.CharField(verbose_name=_('访问权限'), max_length=20, choices=CHOICES_PERMISSION, default=PERMISSION_READWRITE)
+    created = models.DateTimeField(_("创建时间"), auto_now_add=True)
+
+    class Meta:
+        db_table = 'bucket_token'
+        verbose_name = _("存储桶Token")
+        verbose_name_plural = _("存储桶Token")
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super().save(*args, **kwargs)
+
+    @staticmethod
+    def generate_key():
+        return binascii.hexlify(os.urandom(20)).decode()
+
+    def __str__(self):
+        return self.key

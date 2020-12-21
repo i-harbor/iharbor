@@ -1,11 +1,7 @@
 from django.shortcuts import render
 from django.views import View
-from django.db.models import Q as dQ
 
 from .models import Bucket, ApiUsageDescription
-
-
-# Create your views here.
 
 
 class BucketView(View):
@@ -20,6 +16,7 @@ class BucketView(View):
         content = {}
         content['buckets'] = Bucket.objects.filter(user=request.user).all()
         return content
+
 
 class UsageView(View):
     '''

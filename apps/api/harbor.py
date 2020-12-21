@@ -212,8 +212,8 @@ class HarborManager:
         obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
         return obj
 
-    def mkdir(self, bucket_name:str, path:str, user=None):
-        '''
+    def mkdir(self, bucket_name: str, path: str, user=None):
+        """
         创建一个目录
         :param bucket_name: 桶名
         :param path: 目录全路径
@@ -222,8 +222,32 @@ class HarborManager:
             True, dir: success
             raise HarborError: failed
         :raise HarborError
-        '''
-        validated_data = self.validate_mkdir_params(bucket_name, path, user)
+        """
+        if not bucket_name:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，要同时包含有效的存储桶和目录名称')
+
+        # bucket是否属于当前用户,检测存储桶名称是否存在
+        bucket = self.get_bucket(bucket_name, user=user)
+        if not isinstance(bucket, Bucket):
+            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+
+        return self._mkdir(bucket=bucket, path=path)
+
+    def _mkdir(self, bucket, path: str):
+        """
+        :param bucket: bucket instance
+        :param path: 目录路径
+        :return:
+            True, dir: success
+            raise HarborError: failed
+
+        :raise HarborError
+        """
+        validated_data = self.validate_mkdir_params(bucket, path)
 
         dir_path = validated_data.get('dir_path', '')
         dir_name = validated_data.get('dir_name', '')
@@ -232,11 +256,11 @@ class HarborManager:
 
         bfm = BucketFileManagement(dir_path, collection_name=collection_name)
         dir_path_name = bfm.build_dir_full_name(dir_name)
-        BucketFileClass = bfm.get_obj_model_class()
-        bfinfo = BucketFileClass(na=dir_path_name,  # 全路经目录名
-                                 name=dir_name,  # 目录名
-                                 fod=False,  # 目录
-                                 )
+        model_class = bfm.get_obj_model_class()
+        bfinfo = model_class(na=dir_path_name,  # 全路经目录名
+                             name=dir_name,     # 目录名
+                             fod=False,         # 目录
+                             )
         # 有父节点
         if did:
             bfinfo.did = did
@@ -247,22 +271,22 @@ class HarborManager:
 
         return True, bfinfo
 
-    def validate_mkdir_params(self, bucket_name:str, dirpath:str, user=None):
-        '''
+    def validate_mkdir_params(self, bucket, dirpath: str):
+        """
         post_detail参数验证
 
-        :param request:
-        :param kwargs:
+        :param bucket: bucket instance
+        :param dirpath: 目录路径
         :return:
                 success: {data}
                 failure: raise HarborError
 
         :raise HarborError
-        '''
+        """
         data = {}
         dir_path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
-        if not bucket_name or not dir_name:
+        if not dir_name:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，要同时包含有效的存储桶和目录名称')
 
         if '/' in dir_name:
@@ -270,15 +294,6 @@ class HarborManager:
 
         if len(dir_name) > 255:
             raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录名称长度最大为255字符')
-
-        # bucket是否属于当前用户,检测存储桶名称是否存在
-        bucket = self.get_bucket(bucket_name, user=user)
-        if not isinstance(bucket, Bucket):
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
-
-        # 桶锁操作检查
-        if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
 
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
@@ -298,7 +313,7 @@ class HarborManager:
                 raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
-        data['bucket_name'] = bucket_name
+        data['bucket_name'] = bucket.name
         data['dir_path'] = dir_path
         data['dir_name'] = dir_name
         return data
@@ -315,15 +330,29 @@ class HarborManager:
 
         :raise HarborError()
         '''
-        path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
-
-        if not bucket_name or not dir_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数无效')
+        if not bucket_name:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='bucket name参数无效')
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         bucket = self.get_bucket(bucket_name, user=user)
         if not isinstance(bucket, Bucket):
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        return self._rmdir(bucket=bucket, dirpath=dirpath)
+
+    def _rmdir(self, bucket, dirpath: str):
+        """
+        删除目录，不检测bucket用户权限
+
+        :param bucket: bucket实例
+        :return:
+            True
+
+        :raises: HarborError
+        """
+        path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
+        if not dir_name:
+            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数无效')
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
@@ -347,8 +376,8 @@ class HarborManager:
 
         return True
 
-    def _list_dir_queryset(self, bucket_name:str, path:str, user=None):
-        '''
+    def _list_dir_queryset(self, bucket_name: str, path: str, user=None):
+        """
         获取目录下的文件列表信息
 
         :param bucket_name: 桶名
@@ -359,11 +388,25 @@ class HarborManager:
                 failed:      raise HarborError
 
         :raise HarborError
-        '''
+        """
         bucket = self.get_bucket(bucket_name, user)
         if not bucket:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
 
+        qs = self._list_bucket_dir_queryset(bucket=bucket, path=path)
+        return qs, bucket
+
+    @staticmethod
+    def _list_bucket_dir_queryset(bucket, path: str):
+        """
+        :param bucket: bucket instance
+        :param path: 目录路径
+        :return:
+                success:    QuerySet()
+                failed:      raise HarborError
+
+        :raise HarborError
+        """
         # 桶锁操作检查
         if not bucket.lock_readable():
             raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
@@ -373,7 +416,8 @@ class HarborManager:
         ok, qs = bfm.get_cur_dir_files()
         if not ok:
             raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
-        return qs, bucket
+
+        return qs
 
     def list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000, user=None, paginator=None):
         '''
@@ -1488,5 +1532,5 @@ class FtpHarborManager:
 
         :raise HarborError
         '''
-        return  self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path)
+        return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path)
 
