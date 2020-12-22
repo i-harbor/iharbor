@@ -1063,12 +1063,13 @@ class HarborManager:
         rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
-    def get_write_generator(self, bucket_name:str, obj_path:str, user=None):
+    def get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool = False, user=None):
         '''
         获取一个写入对象的生成器函数
 
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
+        :param is_break_point: True(断点续传)，False(非断点续传)
         :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
         :return:
                 generator           # success
@@ -1106,15 +1107,17 @@ class HarborManager:
         def generator():
             ok = True
             rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
-            if created is False:  # 对象已存在，不是新建的,重置对象大小
+            if (created is False) and (not is_break_point):  # 对象已存在，不是新建的,非断点续传，重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
 
             md5_handler = FileMD5Handler()
+            hex_md5 = ''
             while True:
                 offset, data = yield ok
                 try:
-                    md5_handler.update(offset=offset, data=data)
-                    hex_md5 = md5_handler.hex_md5
+                    if not is_break_point:      # 非断点续传计算MD5
+                        md5_handler.update(offset=offset, data=data)
+                        hex_md5 = md5_handler.hex_md5
                     ok = self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data, md5=hex_md5)
                 except HarborError:
                     ok = False
@@ -1500,28 +1503,45 @@ class FtpHarborManager:
         return self.__hbManager.is_file(bucket_name=bucket_name, path_name=path_name)
 
     @ftp_close_old_connections
-    def ftp_get_obj(self, buckest_name:str, path_name:str):
+    def ftp_get_obj(self, bucket_name: str, path_name: str):
         '''
         获取对象或目录实例
 
         :param bucket_name: 桶名
         :param path_name: 文件路径
-        :param user: 用户，默认为None，如果给定用户只获取属于此用户的对象（只查找此用户的存储桶）
         :return:
             success: 对象实例
 
         :raise HarborError
         '''
-        return self.__hbManager.get_object(bucket_name=buckest_name, path_name=path_name)
+        return self.__hbManager.get_object(bucket_name=bucket_name, path_name=path_name)
 
     @ftp_close_old_connections
-    def ftp_get_write_generator(self, bucket_name: str, obj_path: str):
+    def ftp_get_obj_size(self, bucket_name: str, path_name: str):
+        '''
+        获取对象大小
+
+        :param bucket_name: 桶名
+        :param path_name: 文件路径
+        :return:
+            success: 对象实例
+
+        :raise HarborError  # 对象不存在, 不是文件是名目录
+        '''
+        obj = self.__hbManager.get_object(bucket_name=bucket_name, path_name=path_name)
+        if obj.is_file():
+            return obj.obj_size
+
+        raise HarborError(code=400, msg='目标是一个目录')
+
+    @ftp_close_old_connections
+    def ftp_get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool):
         '''
         获取一个写入对象的生成器函数
 
         :param bucket_name: 桶名
         :param obj_path: 对象全路径
-        :param user: 用户，默认为None，如果给定用户只删除属于此用户的对象（只查找此用户的存储桶）
+        :param is_break_point: True(断点续传)，False(非断点续传)
         :return:
                 generator           # success
                 :raise HarborError  # failed
@@ -1532,5 +1552,5 @@ class FtpHarborManager:
 
         :raise HarborError
         '''
-        return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path)
+        return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path, is_break_point=is_break_point)
 
