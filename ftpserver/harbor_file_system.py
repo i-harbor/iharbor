@@ -223,14 +223,18 @@ class HarborFileSystem(AbstractedFS):
         assert isinstance(filename, str), filename
         # print('function: open', filename, mode)
         ftp_path = self.fs2ftp(filename)
-        if mode.startswith('r') or mode.startswith('R'):
-            return DownLoader(self.bucket_name, ftp_path, self.client)
-        else:
-            return Uploader(self.bucket_name, ftp_path, self.client)
+        # mode = mode.lower()
+        # if mode == 'r+w':
+        #     return Uploader(self.bucket_name, ftp_path, self.client)
+        # if mode.startswith('r'):
+        #     return DownLoader(self.bucket_name, ftp_path, self.client)
+        # else:
+        #     return Uploader(self.bucket_name, ftp_path, self.client)
+        return FileHandler(self.bucket_name, ftp_path, self.client)
 
 
     def mkdir(self, path):
-        # print('function:mkdir', 'path: '+ path)
+        print('function:mkdir', 'path: '+ path)
 
         ftp_path = self.fs2ftp(path)
         try:
@@ -277,8 +281,14 @@ class HarborFileSystem(AbstractedFS):
         except (HarborError, Exception) as error:
             raise FilesystemError(str(error.msg))
 
+    def getsize(self, path):
+        ftp_path = self.fs2ftp(path)
+        try:
+            return self.client.ftp_get_obj_size(self.bucket_name, ftp_path[1:])
+        except (HarborError, Exception) as error:
+            raise FilesystemError(str(error.msg))
 
-class Uploader(object):
+class FileHandler(object):
     def __init__(self, bucket_name, ftp_path, client):
         self.bucket_name = bucket_name
         self.name = os.path.basename(ftp_path)
@@ -288,14 +298,33 @@ class Uploader(object):
         self.file = BytesIO()
         # self.file_list = []
         self.id = 0
-        # self.count = 0
+        self.breakpoint = 0
+        self.write_generator = None
+        self.read_generator = None
+
+    def get_write_generator(self, is_break_point = False):
         try:
-            self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:])
+            self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:], is_break_point)
             next(self.write_generator)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
+    def get_read_generator(self):
+        try:
+            self.read_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:],
+                                                                       per_size=4 * 1024 ** 2)
+            # print(self.obj_generator, ob)
+        except HarborError as error:
+            raise FilesystemError(error.msg)
+
     def write(self, data):
+        if not self.write_generator:
+            if self.breakpoint:
+                self.id += self.breakpoint
+                self.breakpoint = 0
+                self.get_write_generator(is_break_point=True)
+            else:
+                self.get_write_generator()
         self.file.write(data)
         if self.file.tell() >= 1024 ** 2 * 64:
             try:
@@ -330,6 +359,24 @@ class Uploader(object):
         # self.count += len(data)
         # return len(data)
 
+    def read(self, size=None):
+        if not self.read_generator:
+            self.get_read_generator()
+        # print(size, '--------------')
+        # try:
+        #     data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
+        #     self.id += size
+        #
+        # except HarborError as error:
+        #     raise FilesystemError(error.msg)
+        try:
+            data = next(self.read_generator)
+            # print(data)
+        # except StopIteration as error:
+        except Exception as error:
+            return b''
+        return data
+
     def close(self):
         if self.file.tell():
             try:
@@ -339,6 +386,9 @@ class Uploader(object):
             except HarborError as error:
                 raise FilesystemError(error.msg)
         self.closed = True
+
+    def seek(self, rest_pos):
+        self.breakpoint = rest_pos
 
 
 class DownLoader(object):
