@@ -1524,9 +1524,9 @@ class FtpHarborManager:
         :param bucket_name: 桶名
         :param path_name: 文件路径
         :return:
-            success: 对象实例
+            int: 对象大小
 
-        :raise HarborError  # 对象不存在, 不是文件是名目录
+        :raise HarborError  # 对象不存在, 不是文件是目录
         '''
         obj = self.__hbManager.get_object(bucket_name=bucket_name, path_name=path_name)
         if obj.is_file():

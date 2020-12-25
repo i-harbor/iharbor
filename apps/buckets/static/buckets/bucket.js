@@ -486,6 +486,8 @@
                             {{set str_db_passwd = $imports.getTransText('双击修改密码')}}
                             {{set str_db_remark = $imports.getTransText('双击修改备注')}}
                             {{set str_stat = $imports.getTransText('资源统计')}}
+                            {{set str_detail = $imports.getTransText('详情')}}
+                            {{set str_operation = $imports.getTransText('操作')}}
                             {{ each buckets }}
                                 <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
@@ -519,8 +521,15 @@
                                         <span class="bucket-remarks-value">{{ $value.remarks }}</span>
                                     </td>
                                     <td>
-                                        <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">{{str_stat}}</bucket>
-                                    </td>
+                                        <div class="dropdown">
+                                            <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                                    aria-expanded="false">{{str_operation}}<span class="caret"></span></button>
+                                            <div class="dropdown-menu">
+                                                <bucket class="dropdown-item bg-info btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">{{str_stat}}</bucket>
+                                                <a class="dropdown-item bg-success btn btn-sm btn-info" href="/bucket/detail/{{ $value.name }}/" data-bucket-name="{{ $value.name }}">{{str_detail}}</a>
+                                            </div>
+                                        </div>
+                                     </td>
                                 </tr>
                             {{/each}}
                         {{/if}}
@@ -1007,16 +1016,16 @@
                                         <div class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <a class="dropdown-item bg-info" href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a>
-                                                <a class="dropdown-item bg-danger" href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-info" href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a>
+                                                <a class="dropdown-item bg-danger" href="#" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a>
                                                 <a class="dropdown-item bg-warning" href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}" data-access-code="{{$value.access_code}}">{{str_share}}</a>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
                                                 <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a>
-                                                <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{$value.name}}">{{str_delete}}</a>
-                                                <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}" data-access-code="{{$value.access_code}}">{{str_share}}</a>
-                                                <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a>
+                                                <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="#" filename="{{$value.name}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="#" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}" data-access-code="{{$value.access_code}}">{{str_share}}</a>
+                                                <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="#" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a>
                                         {{/if}}
                                         </div>
                                     </div>

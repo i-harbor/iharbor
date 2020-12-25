@@ -167,8 +167,9 @@ class Bucket(BucketBase):
 
     def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
-        if not user.id:
+        if not user or not user.id:
             return False
+
         return user.id == self.user_id
 
     def get_bucket_table_name(self):

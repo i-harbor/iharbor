@@ -31,16 +31,22 @@ class Error(Exception):
             'message': self.message
         }
 
+    def err_data_old(self):
+        return {
+            'code': self.code,
+            'code_text': self.message
+        }
+
 
 class AuthenticationFailed(Error):
-    status_code = 401
-    default_detail = 'Incorrect authentication credentials.'
+    default_status_code = 401
+    default_message = 'Incorrect authentication credentials.'
     default_code = 'AuthenticationFailed'
 
 
 class NotAuthenticated(Error):
-    status_code = 401
-    default_detail = 'Authentication credentials were not provided.'
+    default_status_code = 401
+    default_message = 'Authentication credentials were not provided.'
     default_code = 'NotAuthenticated'
 
 

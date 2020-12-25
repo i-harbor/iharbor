@@ -27,9 +27,9 @@ def exception_handler(exc, context):
             headers['Retry-After'] = '%d' % exc.wait
 
         if isinstance(exc, rf_exceptions.AuthenticationFailed):
-            exc = exceptions.AuthenticationFailed()
+            exc = exceptions.AuthenticationFailed(message=str(exc))
         elif isinstance(exc, rf_exceptions.NotAuthenticated):
-            exc = exceptions.NotAuthenticated()
+            exc = exceptions.NotAuthenticated(message=str(exc))
         elif isinstance(exc, rf_exceptions.PermissionDenied):
             exc = exceptions.AccessDenied(message=str(exc))
         elif isinstance(exc, rf_exceptions.MethodNotAllowed):

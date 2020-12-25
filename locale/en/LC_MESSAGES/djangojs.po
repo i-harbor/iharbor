@@ -41,7 +41,13 @@ msgstr "Cancel"
 msgid "创建"
 msgstr "Create"
 
-#: apps/buckets/static/buckets/bucket.js:365
+#: apps/buckets/static/buckets/bucket.js:301
+#: apps/buckets/static/buckets/bucket.js:2022
+#: apps/buckets/static/buckets/bucket_detail.js:112
+msgid "创建失败"
+msgstr "Create failure"
+
+#: apps/buckets/static/buckets/bucket.js:371
 msgid "请先选择要删除的存储桶"
 msgstr "Please select the bucket to delete first"
 
@@ -49,8 +55,8 @@ msgstr "Please select the bucket to delete first"
 msgid "确认删除选中的存储桶吗"
 msgstr "Are you sure to delete the selected bucket"
 
-#: apps/buckets/static/buckets/bucket.js:371
-msgid "此操作是不可逆的"
+#: apps/buckets/static/buckets/bucket.js:377
+msgid "此操作是不可逆的！"
 msgstr "This operation cannot be undone"
 
 #: apps/buckets/static/buckets/bucket.js:399
@@ -92,7 +98,7 @@ msgstr "FTP password(ro)"
 #: apps/buckets/static/buckets/bucket.js:973
 #: apps/buckets/static/buckets/bucket.js:1924
 msgid "操作"
-msgstr "operation"
+msgstr "Operation"
 
 #: apps/buckets/static/buckets/bucket.js:478
 #: apps/buckets/static/buckets/bucket.js:833
@@ -114,10 +120,18 @@ msgstr "Double click to change password"
 msgid "双击修改备注"
 msgstr "Double click to modify remarks"
 
-#: apps/buckets/static/buckets/bucket.js:533
-#: apps/buckets/static/buckets/bucket.js:536
-#: apps/buckets/static/buckets/bucket.js:1035
-#: apps/buckets/static/buckets/bucket.js:1038
+#: apps/buckets/static/buckets/bucket.js:489
+msgid "详情"
+msgstr "Detail"
+
+#: apps/buckets/static/buckets/bucket.js:538
+msgid "肚子空空如也哦"
+msgstr "My stomach is empty"
+
+#: apps/buckets/static/buckets/bucket.js:548
+#: apps/buckets/static/buckets/bucket.js:551
+#: apps/buckets/static/buckets/bucket.js:1046
+#: apps/buckets/static/buckets/bucket.js:1049
 msgid "上页"
 msgstr "Previous"
 
@@ -166,15 +180,15 @@ msgstr "Password length 6-20 characters"
 msgid "确定"
 msgstr "Confirm"
 
-#: apps/buckets/static/buckets/bucket.js:762
-msgid "修改密码成功"
-msgstr "Password changed successfully"
-
-#: apps/buckets/static/buckets/bucket.js:769
+#: apps/buckets/static/buckets/bucket.js:770
 msgid "修改密码失败"
 msgstr "Failed to change password"
 
-#: apps/buckets/static/buckets/bucket.js:809
+#: apps/buckets/static/buckets/bucket.js:781
+msgid "修改密码成功"
+msgstr "Password changed successfully"
+
+#: apps/buckets/static/buckets/bucket.js:820
 msgid "请求失败"
 msgstr "Request failed"
 
@@ -273,23 +287,22 @@ msgstr "Jump"
 msgid "分享密码"
 msgstr "Share password"
 
-#: apps/buckets/static/buckets/bucket.js:1348
-msgid "分享公开设置失败"
-msgstr "Share public failure"
-
-#: apps/buckets/static/buckets/bucket.js:1379
+#: apps/buckets/static/buckets/bucket.js:1378
 msgid ""
 "目录已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有"
 "的旧的分享连接。"
-msgstr "The directory is already publicly accessible or has been set up to share. Please choose to share from a new setting or query the existing old sharing connection."
+msgstr ""
+"The directory is already publicly accessible or has been set up to share. "
+"Please choose to share from a new setting or query the existing old sharing "
+"connection."
 
-#: apps/buckets/static/buckets/bucket.js:1382
-#: apps/buckets/static/buckets/bucket.js:1545
+#: apps/buckets/static/buckets/bucket.js:1381
+#: apps/buckets/static/buckets/bucket.js:1544
 msgid "公开分享"
 msgstr "Share"
 
-#: apps/buckets/static/buckets/bucket.js:1383
-#: apps/buckets/static/buckets/bucket.js:1546
+#: apps/buckets/static/buckets/bucket.js:1382
+#: apps/buckets/static/buckets/bucket.js:1545
 msgid "查询"
 msgstr "Query"
 
@@ -314,7 +327,9 @@ msgstr "request timeout"
 
 #: apps/buckets/static/buckets/bucket.js:1510
 msgid "对象或目录未共享或者共享时间到期，请刷新后重试。"
-msgstr "The object or directory is not shared or the sharing time has expired. Please refresh and try again."
+msgstr ""
+"The object or directory is not shared or the sharing time has expired. "
+"Please refresh and try again."
 
 #: apps/buckets/static/buckets/bucket.js:1512
 msgid "存储桶不存在，请刷新页面。"
@@ -332,7 +347,10 @@ msgstr "The request failed. Please refresh and try again."
 msgid ""
 "对象已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有"
 "的旧的分享连接。"
-msgstr "The object is already publicly accessible or has been set up to share. Please choose to share from a new setting or query the existing old sharing connection."
+msgstr ""
+"The object is already publicly accessible or has been set up to share. "
+"Please choose to share from a new setting or query the existing old sharing "
+"connection."
 
 #: apps/buckets/static/buckets/bucket.js:1574
 #: apps/buckets/static/buckets/bucket.js:1619
@@ -419,9 +437,36 @@ msgstr "Directory name cannot contain '/'"
 msgid "创建文件夹“%s”成功"
 msgstr "Directory '%s' created successfully"
 
-#: apps/buckets/static/buckets/bucket.js:1938
-msgid "创建失败"
-msgstr "Create failure"
+#: apps/buckets/static/buckets/bucket_detail.js:58
+msgid "是否创建新的token？"
+msgstr "Do you want to create a new token?"
+
+#: apps/buckets/static/buckets/bucket_detail.js:59
+msgid "每个存储桶只能创建2个token"
+msgstr "Only 2 tokens can be created per bucket"
+
+#: apps/buckets/static/buckets/bucket_detail.js:69
+msgid "创建存储桶Token"
+msgstr "Create bucket token"
+
+#: apps/buckets/static/buckets/bucket_detail.js:72
+msgid "只读"
+msgstr "ReadOnly"
+
+#: apps/buckets/static/buckets/bucket_detail.js:73
+msgid "读写"
+msgstr "ReadWrite"
+
+#: apps/buckets/static/buckets/bucket_detail.js:75
+msgid "选择访问权限"
+msgstr "Select permission"
+
+#: apps/buckets/static/buckets/bucket_detail.js:82
+msgid "请选择一个选项"
+msgstr "Please select an option"
+
+msgid "请确认是否删除？"
+msgstr "Are you sure you want to delete it?"
 
 #: apps/share/static/share/share.js:161
 msgid "名称"
@@ -502,6 +547,14 @@ msgstr "Access key deleted successfully"
 #: apps/users/static/users/users.js:186
 msgid "删除访问密钥失败"
 msgstr "Failed to delete access key"
+
+#: static/iharbor/js/common.js:105
+msgid "你确定要这样做吗？"
+msgstr "Are you sure you want to do this?"
+
+#: static/iharbor/js/common.js:106
+msgid "此操作是不可逆的"
+msgstr "This operation cannot be undone"
 
 #: static/iharbor/js/common.js:111
 msgid "确认"
