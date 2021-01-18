@@ -21,10 +21,9 @@ packaging==20.8
 Pillow==6.1.0
 portalocker==2.0.0
 pyftpdlib==1.5.6
-PyJWT==2.0.0
+PyJWT==1.7.1
 pyparsing==2.4.7
 pytz==2020.5
-rados==2.0.0
 requests==2.22.0
 ruamel.yaml==0.16.12
 ruamel.yaml.clib==0.2.2
