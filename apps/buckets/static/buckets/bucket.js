@@ -446,7 +446,14 @@
                 <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
             </td>
             <td>
-                <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('资源统计')}}</bucket>
+                <div class="dropdown">
+                    <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></button>
+                    <div class="dropdown-menu">
+                        <bucket class="dropdown-item bg-info btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('资源统计')}}</bucket>
+                        <a class="dropdown-item bg-success btn btn-sm btn-info" href="/bucket/detail/{{ $data['name'] }}/" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('详情')}}</a>
+                    </div>
+                </div>
             </td>
         </tr>
     `);
