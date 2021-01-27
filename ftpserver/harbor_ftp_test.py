@@ -6,7 +6,8 @@ import os
 import socket
 import threading
 
-class HarborFTP():
+
+class HarborFTP:
     def __init__(self, host, username, password):
         self.client = ftplib.FTP(host, timeout=7200)
         self.client.login(username, password)
@@ -23,6 +24,7 @@ class HarborFTP():
     def mkdir(self, dir='test'):
         self.client.mkd(dir)
 
+
 def work(bucket_name):
     harborftp = HarborFTP('159.226.91.141', bucket_name, '123456')
     try:
@@ -31,6 +33,7 @@ def work(bucket_name):
         pass
     harborftp.change_dir()
     harborftp.upload(1000000)
+
 
 def multi_upload():
     works = []
@@ -41,9 +44,11 @@ def multi_upload():
     for w in works:
         w.join()
 
+
 def create_bucket(bucket_name):
     cmd = 'curl -X POST "http://159.226.91.141/api/v1/buckets/" -H "Content-Type: application/json" -H "Authorization: token e1d7b5301280bc9760d4435e64f7cae643239955" -d "{  \\"name\\": \\"' + bucket_name + '\\"}" >/dev/null 2>&1'
     os.system(cmd)
+
 
 def get_bucket_names(num=33):
     hostname = socket.gethostname()

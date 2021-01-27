@@ -581,10 +581,11 @@ class HarborManager:
 
         return obj, bucket
 
-    def _validate_move_rename_params(self, move_to, rename):
+    @staticmethod
+    def _validate_move_rename_params(move_to, rename):
         '''
         校验移动或重命名参数
-        :param request:
+
         :return:
                 (move_to, rename)
                 move_to # None 或 string

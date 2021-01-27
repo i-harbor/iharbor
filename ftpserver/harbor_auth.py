@@ -1,5 +1,4 @@
 from pyftpdlib.authorizers import DummyAuthorizer, AuthenticationFailed
-from pyftpdlib.filesystems import FilesystemError
 import os
 import sys
 import django
@@ -10,10 +9,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
 django.setup()  # 加载项目配置
 
-from django.contrib.auth import authenticate
-from users.models import AuthKey, UserProfile
-from buckets.models import Bucket
+
 from api.harbor import FtpHarborManager, ftp_close_old_connections
+
 
 class HarborAuthorizer(DummyAuthorizer):
     '''

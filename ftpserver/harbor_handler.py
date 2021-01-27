@@ -6,25 +6,28 @@ from pyftpdlib.handlers import DTPHandler, FileProducer, FTPHandler
 from pyftpdlib.filesystems import FilesystemError
 from pyftpdlib.log import logger
 
+
 class HarborDTPHandler(DTPHandler):
-    '''
+    """
     继承DTPHandler，修改上传数据块的大小
-    '''
+    """
     # ac_in_buffer_size = 8 * 1024 * 1024 * 5
     # ac_out_buffer_size = 8 * 1024 * 1024 * 5
     ac_in_buffer_size = 256 * 1024
     ac_out_buffer_size = 256 * 1024
 
+
 class HarborFileProducer(FileProducer):
-    '''
+    """
     继承FileProducer，修改下载数据块的大小
-    '''
+    """
     buffer_size = 32 * 1024 * 1024
 
+
 class HarborFTPHandler(FTPHandler):
-    '''
+    """
     继承FTPHandler，主要为了处理编码问题。
-    '''
+    """
     def ftp_RETR(self, file):
         """Retrieve the specified file (transfer from the server to the
         client).  On success return the file path else None.
@@ -46,21 +49,17 @@ class HarborFTPHandler(FTPHandler):
                 # According to RFC-1123 a 554 reply may result in case that
                 # the existing file cannot be repositioned as specified in
                 # the REST.
-                ok = 0
                 try:
                     if rest_pos > self.fs.getsize(file):
-                        raise ValueError
+                        raise ValueError("Invalid REST parameter")
                     fd.seek(rest_pos)
-                    ok = 1
-                except ValueError:
-                    why = "Invalid REST parameter"
-                except (EnvironmentError, FilesystemError) as err:
+                except (ValueError, EnvironmentError, FilesystemError) as err:
                     # why = _strerror(err)
                     why = str(err)
-                if not ok:
                     fd.close()
                     self.respond('554 %s' % why)
                     return
+
             producer = HarborFileProducer(fd, self._current_type)
             self.push_dtp_data(producer, isproducer=True, file=fd, cmd="RETR")
             return file
@@ -68,8 +67,8 @@ class HarborFTPHandler(FTPHandler):
             fd.close()
             raise
     
-    def decode(self, bytes):
-        '''
+    def decode(self, data: bytes):
+        """
         这里主要为了解码。
             客户端传送过来的内容需要解码的。解码主要是文件信息，比如文件名，不是指文件内容
         chardet库的使用
@@ -78,11 +77,11 @@ class HarborFTPHandler(FTPHandler):
         问题来源：
             windows默认编码是gbk，而linux以及harbor_ftp服务端默认编码是utf8
             此步主要为了兼容windows的网络映射功能
-        '''
+        """
         # print(chardet.detect(bytes)['encoding'])
-        if chardet.detect(bytes)['encoding'] not in ('utf-8', 'ascii'):
-            return bytes.decode('gbk', self.unicode_errors)
-        return bytes.decode('utf8', self.unicode_errors)
+        if chardet.detect(data)['encoding'] not in ('utf-8', 'ascii'):
+            return data.decode('gbk', self.unicode_errors)
+        return data.decode('utf8', self.unicode_errors)
 
     def ftp_MFMT(self, path, timeval):
         """ Sets the last modification time of file to timeval
@@ -133,10 +132,10 @@ class HarborFTPHandler(FTPHandler):
             # self.respond('550 %s.' % why)
             lmt = timeval
             self.respond("213 Modify=%s; %s." % (lmt, line))
-            return (lmt, path)
+            return lmt, path
         else:
             self.respond("213 Modify=%s; %s." % (lmt, line))
-            return (lmt, path)
+            return lmt, path
 
     def ftp_SITE_CHMOD(self, path, mode):
         """Change file mode.
@@ -158,17 +157,17 @@ class HarborFTPHandler(FTPHandler):
                 # why = _strerror(err)
                 # self.respond('550 %s.' % why)
                 self.respond('200 SITE CHMOD successful.')
-                return (path, mode)
+                return path, mode
             else:
                 self.respond('200 SITE CHMOD successful.')
-                return (path, mode)
+                return path, mode
 
     def log(self, msg, logfun=logger.info):
         """Log a message, including additional identifying session data."""
         prefix = self.log_prefix % self.__dict__
         # print(self.__dict__)
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        logfun("[%s] %s %s" % (time, prefix, msg))
+        _time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+        logfun("[%s] %s %s" % (_time, prefix, msg))
 
     def logline(self, msg, logfun=logger.debug):
         """Log a line including additional indentifying session data.
@@ -176,14 +175,14 @@ class HarborFTPHandler(FTPHandler):
         """
         if self._log_debug:
             prefix = self.log_prefix % self.__dict__
-            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-            logfun("[%s] %s %s" % (time, prefix, msg))
+            _time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+            logfun("[%s] %s %s" % (_time, prefix, msg))
 
     def logerror(self, msg):
         """Log an error including additional indentifying session data."""
         prefix = self.log_prefix % self.__dict__
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        logger.error("[%s] %s %s" % (time, prefix, msg))
+        _time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+        logger.error("[%s] %s %s" % (_time, prefix, msg))
 
 
     # def push(self, s):

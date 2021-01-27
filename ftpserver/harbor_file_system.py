@@ -3,8 +3,6 @@ from io import BytesIO
 import django
 import sys
 import os
-import datetime
-import time
 
 # 将项目路径添加到系统搜寻路径当中，查找方式为从当前脚本开始，找到要调用的django项目的路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -65,7 +63,7 @@ class HarborFileSystem(AbstractedFS):
                 files.append(data)
             for fi in files:
                 for file in fi: 
-                    if file.fod == True:
+                    if file.fod is True:
                         if file.upt:
                             dir_list.append((file.name, file.upt, file.si))
                         else:
@@ -75,7 +73,6 @@ class HarborFileSystem(AbstractedFS):
         except HarborError as error:
             raise FilesystemError(error.msg)
         return dir_list
-
 
     def format_list(self, basedir, listing, ignore_err=True):
         assert isinstance(basedir, str), basedir
@@ -109,7 +106,6 @@ class HarborFileSystem(AbstractedFS):
                 else:
                     yield line.encode("utf8")
 
-
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         assert isinstance(basedir, str), basedir
 
@@ -117,14 +113,14 @@ class HarborFileSystem(AbstractedFS):
         if len(listing) == 1:
             if isinstance(listing[0], tuple):
                 if listing[0][0].endswith('/'):
-                    type = "dir"
+                    _type = "dir"
                     perm = 'r'
                     filename = listing[0][0][:-1]
                     mtimestr = listing[0][1]
                     mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = listing[0][2]
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
-                        type, size, perm, mtimestr, '', filename)
+                        _type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
@@ -135,9 +131,9 @@ class HarborFileSystem(AbstractedFS):
                     mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = listing[0][2]
                     perm = 'el'
-                    type = "file"
+                    _type = "file"
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
-                        type, size, perm, mtimestr, '', filename)
+                        _type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
@@ -151,9 +147,9 @@ class HarborFileSystem(AbstractedFS):
                     mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = data.si
                     perm = 'el'
-                    type = "file"
+                    _type = "file"
                     line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
-                        type, size, perm, mtimestr, '', filename)
+                        _type, size, perm, mtimestr, '', filename)
                     if self.cmd_channel is not None:
                         yield line.encode("utf8", self.cmd_channel.unicode_errors)
                     else:
@@ -163,15 +159,15 @@ class HarborFileSystem(AbstractedFS):
         else:
             for filename, mtimestr, size in listing:
                 if filename.endswith('/'):
-                    type = "dir"
+                    _type = "dir"
                     perm = 'r'
                     filename = filename[:-1]
                 else:
                     perm = 'el'
-                    type = "file"
+                    _type = "file"
                 mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                 line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
-                    type, size, perm, mtimestr, '', filename)
+                    _type, size, perm, mtimestr, '', filename)
 
                 if self.cmd_channel is not None:
                     yield line.encode("utf8", self.cmd_channel.unicode_errors)
@@ -192,16 +188,14 @@ class HarborFileSystem(AbstractedFS):
         #     return Uploader(self.bucket_name, ftp_path, self.client)
         return FileHandler(self.bucket_name, ftp_path, self.client)
 
-
     def mkdir(self, path):
-        print('function:mkdir', 'path: '+ path)
+        print('function:mkdir', 'path: ' + path)
 
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_mkdir(self.bucket_name, ftp_path[1:])
         except (HarborError, Exception) as error:
             raise FilesystemError(str(error))
-
 
     def rename(self, src, dst):
         new_name = os.path.basename(dst)
@@ -213,7 +207,6 @@ class HarborFileSystem(AbstractedFS):
         except Exception as error:
             raise FilesystemError(str(error))
 
-
     def lexists(self, path):
         ftp_path = self.fs2ftp(path)
 
@@ -221,7 +214,6 @@ class HarborFileSystem(AbstractedFS):
             return True
         else:
             return False
-
 
     def rmdir(self, path):
         ftp_path = self.fs2ftp(path)
@@ -244,6 +236,7 @@ class HarborFileSystem(AbstractedFS):
         except (HarborError, Exception) as error:
             raise FilesystemError(str(error.msg))
 
+
 class FileHandler(object):
     def __init__(self, bucket_name, ftp_path, client):
         self.bucket_name = bucket_name
@@ -258,7 +251,7 @@ class FileHandler(object):
         self.write_generator = None
         self.read_generator = None
 
-    def get_write_generator(self, is_break_point = False):
+    def get_write_generator(self, is_break_point=False):
         try:
             self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:], is_break_point)
             next(self.write_generator)
@@ -267,8 +260,8 @@ class FileHandler(object):
 
     def get_read_generator(self):
         try:
-            self.read_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:],
-                                                                       per_size=4 * 1024 ** 2)
+            self.read_generator, ob = self.client.ftp_get_obj_generator(
+                self.bucket_name, self.ftp_path[1:], per_size=4 * 1024 ** 2)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
