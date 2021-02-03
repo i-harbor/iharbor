@@ -1,0 +1,92 @@
+{% extends "base_with_sidebar.html" %}
+{% load static %}
+{% load i18n %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+    存储桶详情
+{%endblock%}
+
+
+{% block head_extends %}
+	<link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        {% if bucket %}
+            <p><i class="fa fa-database"></i> {% trans '存储桶' %}: <span id="id-bucket-name">{{ bucket.name }}</span></p>
+            <hr style=" height:1px;border:1px;border-top:1px solid #185598;"/>
+            <div>
+              <div>
+                <dl class="row">
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans '创建时间' %}:</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10">{{ bucket.created_time|date:'Y-m-d H:i:s' }}</dd>
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans '访问权限' %}:</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10">{{ bucket.get_access_permission_display }}</dd>
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans 'FTP状态' %}:</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10">
+                    {% if bucket.ftp_enable %}{% trans '开启' %}{% else %}{% trans '关闭' %}{% endif %}</dd>
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans 'FTP读写密码' %}</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10 mouse-hover">
+                    <span class="mouse-hover-show">{{ bucket.ftp_password }}</span>
+                    <span class="mouse-hover-no-show">******</span>
+                  </dd>
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans 'FTP只读密码' %}:</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10 mouse-hover">
+                    <span class="mouse-hover-show">{{ bucket.ftp_ro_password }}</span>
+                    <span class="mouse-hover-no-show">******</span>
+                  </dd>
+                  <dt class="col-4 col-sm-4 col-md-3 col-lg-2 text-right">{% trans '备注' %}:</dt>
+                  <dd class="col-8 col-sm-8 col-md-9 col-lg-10">{{ bucket.remarks }}</dd>
+                </dl>
+              </div>
+                <div>
+                    <div class="card">
+                        <div class="card-body">
+                            <p class="font-weight-bold">{% trans '存储桶Token' %}</p>
+                            <table class="table table-borderless text-center" id="table-bucket-token">
+                                <thead class="bg-light">
+                                <tr>
+                                    <th scope="col">Token</th>
+                                    <th scope="col">{% trans '权限' %}</th>
+                                    <th scope="col">{% trans '创建时间' %}</th>
+                                    <th scope="col">{% trans '操作' %}</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                    {% for t in tokens %}
+                                        <tr>
+                                            <td class="mouse-hover">
+                                              <span class="mouse-hover-show">{{ t.key }}</span>
+                                              <span class="mouse-hover-no-show">******</span>
+                                            </td>
+                                            <td>{{ t.permission }}</td>
+                                            <td>{{ t.created|date:'Y-m-d H:i:s' }}</td>
+                                            <td>
+                                                <button class="btn btn-danger btn-sm bucket-token-delete">{% trans '删除' %}</button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            <div>
+                                <button class="btn btn-sm btn-outline-success bucket-token-create">{% trans '创建' %}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="border">
+                <p class="text-danger text-center">{% trans "存储桶不存在" %}</p>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block script_extends %}
+    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
+    <script type="text/javascript" src="{% static 'buckets/bucket_detail.js' %}"></script>
+{% endblock %}

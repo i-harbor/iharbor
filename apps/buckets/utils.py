@@ -4,7 +4,7 @@ import random
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Model
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
@@ -51,12 +51,21 @@ def create_table_for_model_class(model):
         using = router.db_for_write(model)
         with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
             schema_editor.create_model(model)
+            try:
+                table_name = schema_editor.quote_name(model.Meta.db_table)
+                sql = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT NULL COLLATE 'utf8_bin' AFTER " \
+                      f"`id`, CHANGE COLUMN `name` `name` VARCHAR(255) NOT NULL COLLATE 'utf8_bin' AFTER `na_md5`;"
+                schema_editor.execute(sql=sql)
+            except Exception as exc:
+                if delete_table_for_model_class(model):
+                    raise exc       # model table 删除成功，抛出错误
     except Exception as e:
         msg = traceback.format_exc()
         logger.error(msg)
         return False
 
     return True
+
 
 def delete_table_for_model_class(model):
     '''
@@ -80,6 +89,7 @@ def delete_table_for_model_class(model):
 
     return True
 
+
 def is_model_table_exists(model):
     '''
     检查模型类Model的数据库表是否已存在
@@ -89,6 +99,7 @@ def is_model_table_exists(model):
     using = router.db_for_write(model)
     connection = connections[using]
     return model.Meta.db_table in connection.introspection.table_names()
+
 
 def get_obj_model_class(table_name):
     '''

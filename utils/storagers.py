@@ -216,9 +216,7 @@ class FileUploadToCephHandler(FileUploadHandler):
         """
         super().new_file(*args, **kwargs)
         self.file = FileWrapper(HarborObject(pool_name=self.pool_name, obj_id=self.obj_key))
-        if self.request:
-            if self.request.headers.get('Content-MD5', ''):
-                self.file_md5_handler = FileMD5Handler()
+        self.file_md5_handler = FileMD5Handler()
 
     def receive_data_chunk(self, raw_data, start):
         self.file.write(raw_data, offset=start)

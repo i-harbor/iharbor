@@ -22,6 +22,7 @@ from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
 from utils.jwt_token import JWTokenTool2, InvalidToken
 from utils.view import CustomGenericViewSet
+from utils.time import time_to_gmt, datetime_from_gmt
 from . import serializers
 from api.harbor import HarborError, HarborManager
 from .forms import SharePasswordForm
@@ -126,6 +127,13 @@ class ObsViewSet(viewsets.GenericViewSet):
         except InvalidError as e:
             return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
+        try:
+            r = self.if_modified_304(request, obj=fileobj)
+            if r is not None:
+                return r
+        except Exception as e:
+            pass
+
         filesize = fileobj.si
         filename = fileobj.name
         # 是否是断点续传部分读取
@@ -152,6 +160,14 @@ class ObsViewSet(viewsets.GenericViewSet):
         response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
         response['Content-Disposition'] = f"attachment;filename*=utf-8''{filename}"  # 注意filename 这个是下载后的名字
+        response['Cache-Control'] = 'max-age=20'
+        last_modified = time_to_gmt(fileobj.upt)
+        if last_modified:
+            response['Last-Modified'] = last_modified
+
+        if fileobj.md5:
+            response['ETag'] = fileobj.md5
+
         return response
 
     def get_serializer(self, *args, **kwargs):
@@ -172,6 +188,43 @@ class ObsViewSet(viewsets.GenericViewSet):
         Custom serializer_class
         """
         return Serializer
+
+    @staticmethod
+    def if_modified_304(request, obj):
+        """
+        检测对象数据是否修改，if*标头条件是否满足
+
+        :return:
+            Response(304)   # 满足if*标头条件，304 not modified
+            None            # 数据有修改或请求未携带if*标头
+        """
+        if_none_match = False
+        if_not_modified_since = False
+
+        etag = request.headers.get('If-None-Match', None)
+        if etag is None:
+            if_none_match = None
+        elif etag == obj.md5:
+            if_none_match = True
+
+        last_modified = obj.upt
+        modified_since = request.headers.get('If-Modified-Since')
+        if modified_since:
+            modified_since = datetime_from_gmt(modified_since)
+            last_modified = last_modified.replace(microsecond=0)
+            if last_modified <= modified_since:
+                if_not_modified_since = True
+
+        if if_none_match is not False and if_not_modified_since:
+            r = Response(status=status.HTTP_304_NOT_MODIFIED)
+            r['ETag'] = obj.md5
+            last_modified = time_to_gmt(obj.upt)
+            if last_modified:
+                r['Last-Modified'] = last_modified
+
+            return r
+
+        return None
 
     def get_offset_and_end(self, hRange:str, filesize:int):
         '''

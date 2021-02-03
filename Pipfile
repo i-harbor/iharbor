@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "==2.2.14"
+django = "==2.2.*"
 pillow = "==6.1.0"
 coreapi = "==2.3.3"
 requests = "==2.22.0"
@@ -17,7 +17,8 @@ pyftpdlib = "*"
 djangorestframework = "==3.10.2"
 concurrent-log-handler = "*"
 drf-yasg = "==1.17.*"
-djangorestframework-simplejwt = "==4.4.*"
+djangorestframework-simplejwt = "==4.4.0"
+pyjwt = "==1.7.1"
 
 [dev-packages]
 

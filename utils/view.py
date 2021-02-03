@@ -1,6 +1,49 @@
 from django.utils import timezone
+from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from rest_framework.schemas import AutoSchema
-from rest_framework import viewsets
+from rest_framework import viewsets, exceptions as rf_exceptions
+from rest_framework.views import set_rollback
+from rest_framework.exceptions import APIException
+from rest_framework.response import Response
+
+from api import exceptions
+
+
+def exception_handler(exc, context):
+    """
+    Returns the response that should be used for any given exception.
+    """
+    headers = {}
+
+    if isinstance(exc, Http404):
+        exc = exceptions.NotFound()
+    elif isinstance(exc, PermissionDenied):
+        exc = exceptions.AccessDenied()
+    elif isinstance(exc, APIException):
+        if getattr(exc, 'auth_header', None):
+            headers['WWW-Authenticate'] = exc.auth_header
+        if getattr(exc, 'wait', None):
+            headers['Retry-After'] = '%d' % exc.wait
+
+        if isinstance(exc, rf_exceptions.AuthenticationFailed):
+            exc = exceptions.AuthenticationFailed(message=str(exc))
+        elif isinstance(exc, rf_exceptions.NotAuthenticated):
+            exc = exceptions.NotAuthenticated(message=str(exc))
+        elif isinstance(exc, rf_exceptions.PermissionDenied):
+            exc = exceptions.AccessDenied(message=str(exc))
+        elif isinstance(exc, rf_exceptions.MethodNotAllowed):
+            exc = exceptions.MethodNotAllowed()
+        elif isinstance(exc, rf_exceptions.Throttled):
+            exc = exceptions.Throttled(message=str(exc))
+        else:
+            exc = exceptions.Error(message=str(exc), status_code=exc.status_code)
+
+    if isinstance(exc, exceptions.Error):
+        set_rollback()
+        return Response(data=exc.err_data(), status=exc.status_code, headers=headers)
+
+    return None
 
 
 class CustomAutoSchema(AutoSchema):

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-04-22 10:22+0800\n"
+"POT-Creation-Date: 2020-11-19 14:51+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -42,7 +42,15 @@ msgstr "Refresh to get new access JWT"
 msgid "校验JWT是否有效"
 msgstr "Verify whether JWT is valid"
 
-#: apps/api/serializers.py:33 apps/api/serializers.py:60 apps/users/forms.py:25
+#: apps/api/auth.py:233
+msgid "获取存储桶的token的信息"
+msgstr "Get the information of the bucket token."
+
+#: apps/api/auth.py:267
+msgid "删除一个存储桶token"
+msgstr "Delete a bucket token"
+
+#: apps/api/serializers.py:31 apps/api/serializers.py:58 apps/users/forms.py:25
 #: apps/users/forms.py:134
 msgid "密码"
 msgstr "Password"
@@ -155,16 +163,15 @@ msgstr "a complete file"
 msgid "无效的空文件"
 msgstr "Invalid empty file"
 
-#: apps/api/serializers.py:265 apps/api/serializers.py:272
-msgid "公有（读写）"
-msgstr "public(rw)"
-
-#: apps/api/serializers.py:250 apps/api/serializers.py:256
-#: apps/buckets/models.py:46
+#: apps/api/serializers.py:266 apps/buckets/models.py:47
 msgid "公有"
 msgstr "public"
 
-#: apps/api/serializers.py:259 apps/buckets/models.py:47
+#: apps/api/serializers.py:268
+msgid "公有（读写）"
+msgstr "public(rw)"
+
+#: apps/api/serializers.py:270 apps/buckets/models.py:48
 msgid "私有"
 msgstr "private"
 
@@ -180,7 +187,15 @@ msgstr "String does not conform to DNS standards"
 msgid "您可以拥有的存储桶数量已达上限"
 msgstr "The number of your buckets reached maximum limit"
 
-#: apps/api/views.py:202
+#: apps/api/views.py:126
+msgid "token没有写权限"
+msgstr "This token does not have write permission"
+
+#: apps/api/views.py:133
+msgid "token和存储桶不匹配"
+msgstr "Token and bucket do not match"
+
+#: apps/api/views.py:233
 msgid "获取用户列表"
 msgstr "Get user list"
 
@@ -306,7 +321,27 @@ msgstr "Failed to set remark information, error updating database data"
 msgid "存储桶备注信息设置成功"
 msgstr "bucket remarks information set successfully"
 
-#: apps/api/views.py:712 apps/api/views.py:741
+#: apps/api/views.py:732
+msgid "创建一个存储桶token"
+msgstr "Create a token of bucket"
+
+#: apps/api/views.py:738
+msgid "访问权限，[readwrite, readonly]"
+msgstr "Access permission，[readwrite, readonly]"
+
+#: apps/api/views.py:766
+msgid "参数permission的值无效。"
+msgstr "The value of parameter permission is not valid."
+
+#: apps/api/views.py:783
+msgid "数据库错误，插入token数据失败。"
+msgstr "Database error, failed to insert token data."
+
+#: apps/api/views.py:790
+msgid "列举存储桶token"
+msgstr "List bucket token"
+
+#: apps/api/views.py:849 apps/api/views.py:880
 msgid "无效的存储桶ID"
 msgstr "invalid bucket ID"
 
@@ -338,7 +373,9 @@ msgstr "Upload a complete object"
 
 #: apps/api/views.py:1013
 msgid "标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏"
-msgstr "The header content-md5 is inconsistent with the MD5 value of the uploaded data, and the data may be damaged during the upload process."
+msgstr ""
+"The header content-md5 is inconsistent with the MD5 value of the uploaded "
+"data, and the data may be damaged during the upload process."
 
 #: apps/api/views.py:1028
 msgid "下载文件对象，自定义读取对象数据块"
@@ -661,17 +698,118 @@ msgstr "failed to modify"
 msgid "获取对象对应的ceph rados key信息"
 msgstr "Get the CEPH Rados key information of the object"
 
-#: apps/buckets/models.py:48
+#: apps/api/views.py:3021
+msgid "获取对象或目录的分享连接"
+msgstr "Get object or directory metadata"
+
+#: apps/buckets/models.py:49
 msgid "公有（可读写）"
 msgstr "public(rw)"
 
-#: apps/buckets/models.py:306
+#: apps/buckets/models.py:83
+msgid "正常读写"
+msgstr "read-write"
+
+#: apps/buckets/models.py:84
+msgid "锁定写"
+msgstr "Lock write"
+
+#: apps/buckets/models.py:85
+msgid "锁定读写"
+msgstr "Lock read-write"
+
+#: apps/buckets/models.py:93
+msgid "读写锁"
+msgstr "Lock"
+
+#: apps/buckets/models.py:94
+msgid "锁定存储桶，控制存储桶的读写。"
+msgstr "Lock the bucket to control the read and write of the bucket."
+
+#: apps/buckets/models.py:337
 msgid "可读写密码不得和只读密码一致"
 msgstr "Read write password cannot be the same as read-only password"
 
 #: apps/buckets/models.py:322
 msgid "只读密码不得和可读写密码一致"
 msgstr "Read only password must not be the same as read-write password"
+
+#: apps/buckets/models.py:843
+msgid "可读写"
+msgstr "ReadWrite"
+
+#: apps/buckets/models.py:844
+msgid "只读"
+msgstr "ReadOnly"
+
+#: apps/buckets/models.py:847
+msgid "Key"
+msgstr "Key"
+
+#: apps/buckets/models.py:848 apps/buckets/templates/bucket_detail.html:19
+#: templates/base_with_sidebar.html:20
+msgid "存储桶"
+msgstr "Bucket"
+
+#: apps/buckets/models.py:849 apps/buckets/templates/bucket_detail.html:24
+msgid "访问权限"
+msgstr "Access permission"
+
+#: apps/buckets/models.py:850 apps/buckets/templates/bucket_detail.html:23
+#: apps/buckets/templates/bucket_detail.html:45
+#: apps/evcloud/templates/evcloud_list.html:40
+#: apps/users/templates/security.html:26 apps/users/templates/security.html:55
+#: apps/vpn/templates/vpn.html:25
+msgid "创建时间"
+msgstr "Creation time"
+
+#: apps/buckets/models.py:854 apps/buckets/models.py:855
+msgid "存储桶Token"
+msgstr "Bucket Token"
+
+#: apps/buckets/templates/bucket_detail.html:25
+msgid "FTP状态"
+msgstr "FTP status"
+
+#: apps/buckets/templates/bucket_detail.html:25
+msgid "开启"
+msgstr "Opened"
+
+#: apps/buckets/templates/bucket_detail.html:25
+msgid "关闭"
+msgstr "Closed"
+
+#: apps/buckets/templates/bucket_detail.html:26
+msgid "FTP读写密码"
+msgstr "FTP password read and write"
+
+#: apps/buckets/templates/bucket_detail.html:30
+msgid "FTP只读密码"
+msgstr "FTP read only password"
+
+#: apps/buckets/templates/bucket_detail.html:34
+msgid "备注"
+msgstr "Remark"
+
+#: apps/buckets/templates/bucket_detail.html:44
+msgid "权限"
+msgstr "Permission"
+
+#: apps/buckets/templates/bucket_detail.html:46
+#: apps/evcloud/templates/evcloud_list.html:46
+#: apps/users/templates/security.html:28 apps/users/templates/security.html:59
+msgid "操作"
+msgstr "Operations"
+
+#: apps/buckets/templates/bucket_detail.html:59
+#: apps/evcloud/templates/evcloud_list.html:82
+msgid "删除"
+msgstr "Delete"
+
+#: apps/buckets/templates/bucket_detail.html:66
+#: apps/evcloud/templates/evcloud_add.html:62
+msgid "创建"
+msgstr "Create"
 
 #: apps/evcloud/templates/evcloud_add.html:20
 #: apps/evcloud/templates/evcloud_list.html:21
@@ -698,19 +836,9 @@ msgstr "Image"
 msgid "配置"
 msgstr "Configuration"
 
-#: apps/evcloud/templates/evcloud_add.html:62
-msgid "创建"
-msgstr "Create"
-
 #: apps/evcloud/templates/evcloud_list.html:39
 msgid "内存"
 msgstr "Memory"
-
-#: apps/evcloud/templates/evcloud_list.html:40
-#: apps/users/templates/security.html:26 apps/users/templates/security.html:55
-#: apps/vpn/templates/vpn.html:25
-msgid "创建时间"
-msgstr "Creation time"
 
 #: apps/evcloud/templates/evcloud_list.html:41
 msgid "到期时间"
@@ -728,11 +856,6 @@ msgstr "Task"
 #: apps/evcloud/templates/evcloud_list.html:45
 msgid "备注(双击修改)"
 msgstr "Remark"
-
-#: apps/evcloud/templates/evcloud_list.html:46
-#: apps/users/templates/security.html:28 apps/users/templates/security.html:59
-msgid "操作"
-msgstr "Operations"
 
 #: apps/evcloud/templates/evcloud_list.html:67 apps/vpn/templates/vpn.html:33
 msgid "双击修改"
@@ -753,10 +876,6 @@ msgstr "Power off"
 #: apps/evcloud/templates/evcloud_list.html:81
 msgid "重启"
 msgstr "Restart"
-
-#: apps/evcloud/templates/evcloud_list.html:82
-msgid "删除"
-msgstr "Delete"
 
 #: apps/evcloud/views.py:146
 msgid "虚拟机不存在"
@@ -1042,12 +1161,8 @@ msgid "注册"
 msgstr "Sign up"
 
 #: apps/users/templates/login.html:11
-msgid "第三方帐号登录"
-msgstr "Third party login"
-
-#: apps/users/templates/login.html:13
-msgid "中国科技云通行证"
-msgstr "CSTCloud passport"
+msgid "中国科技云通行证账号登录"
+msgstr "Sign in with CSTCloud passport"
 
 #: apps/users/templates/security.html:11
 msgid "您的安全凭证"
@@ -1081,7 +1196,21 @@ msgstr "Enable"
 msgid "创建新访问密钥"
 msgstr "Create new key"
 
-#: apps/users/views.py:34
+#: apps/users/templates/signin.html:4 apps/users/views.py:76
+#: apps/users/views.py:157 apps/users/views.py:190 apps/users/views.py:227
+#: templates/base.html:65
+msgid "登录"
+msgstr "Sign in"
+
+#: apps/users/templates/signin.html:12
+msgid "中国科技云通行证账户登录"
+msgstr "Sign in with CSTCloud passport"
+
+#: apps/users/templates/signin.html:17
+msgid "本地账号登录"
+msgstr "Local account login"
+
+#: apps/users/views.py:33
 msgid "邮件发送失败，请检查邮箱输入是否有误"
 msgstr ""
 "Failed to send the email. Please check whether the email input is wrong"
@@ -1097,11 +1226,6 @@ msgstr "Sign up user"
 #: apps/users/views.py:68
 msgid "用户登录"
 msgstr "User log in"
-
-#: apps/users/views.py:69 apps/users/views.py:150 apps/users/views.py:182
-#: apps/users/views.py:219 templates/base.html:65
-msgid "登录"
-msgstr "Sign in"
 
 #: apps/users/views.py:123 templates/base.html:56
 msgid "修改密码"
@@ -1199,19 +1323,19 @@ msgstr "Admin"
 msgid "对象存储"
 msgstr "Object storage"
 
-#: templates/base_with_sidebar.html:20
-msgid "存储桶"
-msgstr "Bucket"
-
 #: templates/base_with_sidebar.html:21
 msgid "FTP访问说明"
 msgstr "FTP usage"
 
 #: templates/base_with_sidebar.html:22
-msgid "API使用说明"
-msgstr "API usage"
+msgid "原生API使用说明"
+msgstr "Native API usage"
 
-#: templates/base_with_sidebar.html:27
+#: templates/base_with_sidebar.html:23
+msgid "S3兼容API使用说明"
+msgstr "S3 API usage"
+
+#: templates/base_with_sidebar.html:28
 msgid "云主机"
 msgstr "Cloud host"
 

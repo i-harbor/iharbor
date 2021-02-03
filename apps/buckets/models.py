@@ -73,14 +73,25 @@ class BucketBase(models.Model):
 
 
 class Bucket(BucketBase):
-    '''
+    """
     存储桶bucket类，bucket名称必须唯一（不包括软删除记录）
-    '''
+    """
+    LOCK_READWRITE = 0
+    LOCK_READONLY = 1
+    LOCK_NO_READWRITE = 2
+    CHOICES_LOCK = (
+        (LOCK_READWRITE, _("正常读写")),
+        (LOCK_READONLY, _("锁定写")),
+        (LOCK_NO_READWRITE, _("锁定读写")),
+    )
+
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
     remarks = models.CharField(verbose_name='备注', max_length=255, default='')
+    lock = models.SmallIntegerField(verbose_name=_('读写锁'), default=LOCK_READWRITE, choices=CHOICES_LOCK,
+                                    help_text=_('锁定存储桶，控制存储桶的读写。'))
 
     class Meta:
         ordering = ['-id']
@@ -156,8 +167,9 @@ class Bucket(BucketBase):
 
     def check_user_own_bucket(self, user):
         # bucket是否属于当前用户
-        if not user.id:
+        if not user or not user.id:
             return False
+
         return user.id == self.user_id
 
     def get_bucket_table_name(self):
@@ -360,6 +372,20 @@ class Bucket(BucketBase):
 
         return True
 
+    def lock_readable(self):
+        """桶是否允许读操作"""
+        if self.lock in [self.LOCK_READWRITE, self.LOCK_READONLY]:
+            return True
+
+        return False
+
+    def lock_writeable(self):
+        """桶是否允许写操作"""
+        if self.lock == self.LOCK_READWRITE:
+            return True
+
+        return False
+
 
 class Archive(BucketBase):
     '''
@@ -494,8 +520,8 @@ class BucketFileBase(models.Model):
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
-    ult = models.DateTimeField(default=timezone.now) # 文件的上传时间，或目录的创建时间
-    upt = models.DateTimeField(blank=True, null=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
+    ult = models.DateTimeField(auto_now_add=True, default=timezone.now) # 文件的上传时间，或目录的创建时间
+    upt = models.DateTimeField(blank=True, null=True, auto_now=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
     dlc = models.IntegerField(default=0, verbose_name='下载次数')  # 该文件的下载次数，目录时dlc为0
     shp = models.CharField(default='', max_length=10, verbose_name='共享密码') # 该文件的共享密码，目录时为空
     stl = models.BooleanField(default=True, verbose_name='是否有共享时间限制') # True: 文件有共享时间限制; False: 则文件无共享时间限制
@@ -786,3 +812,57 @@ class BucketFileBase(models.Model):
         path, _ = PathParser(filepath=self.na).get_path_and_filename()
         return path
 
+    def get_access_permission_code(self, bucket):
+        """
+        判断并获取对象或目录的访问权限码
+
+        :return: int
+        """
+        # 桶公有权限，对象都为公有权限
+        if bucket:
+            if bucket.has_public_write_perms():
+                return self.SHARE_ACCESS_READWRITE
+            elif bucket.is_public_permission():
+                return self.SHARE_ACCESS_READONLY
+
+        try:
+            if self.is_shared_and_in_shared_time():
+                if self.is_dir() and self.is_read_write_perms():
+                    return self.SHARE_ACCESS_READWRITE
+
+                return self.SHARE_ACCESS_READONLY
+        except Exception as e:
+            pass
+
+        return self.SHARE_ACCESS_NO
+
+
+class BucketToken(models.Model):
+    PERMISSION_READWRITE = 'readwrite'
+    PERMISSION_READONLY = 'readonly'
+    CHOICES_PERMISSION = (
+        (PERMISSION_READWRITE, _('可读写')),
+        (PERMISSION_READONLY, _('只读'))
+    )
+
+    key = models.CharField(verbose_name=_("Key"), max_length=40, primary_key=True)
+    bucket = models.ForeignKey(to=Bucket, related_name='token_set', on_delete=models.CASCADE, verbose_name=_("存储桶"))
+    permission = models.CharField(verbose_name=_('访问权限'), max_length=20, choices=CHOICES_PERMISSION, default=PERMISSION_READWRITE)
+    created = models.DateTimeField(_("创建时间"), auto_now_add=True)
+
+    class Meta:
+        db_table = 'bucket_token'
+        verbose_name = _("存储桶Token")
+        verbose_name_plural = _("存储桶Token")
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super().save(*args, **kwargs)
+
+    @staticmethod
+    def generate_key():
+        return binascii.hexlify(os.urandom(20)).decode()
+
+    def __str__(self):
+        return self.key

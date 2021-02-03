@@ -169,7 +169,7 @@ AUTH_USER_MODEL = 'users.UserProfile'
 APPEND_SLASH=False
 
 #登陆url
-LOGIN_URL = '/users/login/'
+LOGIN_URL = '/users/signin/'
 LOGOUT_URL = '/users/logout/'
 
 
@@ -185,6 +185,7 @@ REST_FRAMEWORK = {
         'users.auth.authentication.AuthKeyAuthentication',
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'buckets.authentication.BucketTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
@@ -212,6 +213,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100,
 
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'utils.view.exception_handler',
 }
 
 
@@ -396,7 +398,7 @@ THIRD_PARTY_APP_AUTH = {
         # 'client_secret': 'xxx',
         'client_home_url': 'http://obs.cstcloud.cn',
         'client_callback_url': 'http://obs.cstcloud.cn/callback/', # 认证回调地址
-        'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=simple',
+        'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=embed',
         'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'
     },

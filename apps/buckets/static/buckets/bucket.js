@@ -1,18 +1,18 @@
-;(function() {
+;(function () {
 
     //API域名
     let DOMAIN_NAME = get_domain_url(); //'http://10.0.86.213:8000/';
 
     // 获取API域名
-    function get_api_domain_name(){
+    function get_api_domain_name() {
         return DOMAIN_NAME;
     }
 
     // 构建带域名url
-    function build_url_with_domain_name(url){
+    function build_url_with_domain_name(url) {
         let domain = get_api_domain_name();
         domain = domain.rightStrip('/');
-        if(!url.startsWith('/'))
+        if (!url.startsWith('/'))
             url = '/' + url;
         return domain + url;
     }
@@ -20,14 +20,14 @@
     //
     // 文件对象base api
     //
-    function get_obj_base_api(){
+    function get_obj_base_api() {
         return 'api/v1/obj/';
     }
 
     //
     //构建对象api
     //错误返回空字符串
-    function build_obj_detail_api(params={bucket_name: '', dir_path: '', filename: ''}){
+    function build_obj_detail_api(params = {bucket_name: '', dir_path: '', filename: ''}) {
         if (!params.hasOwnProperty('bucket_name') || !params.hasOwnProperty('dir_path') || !params.hasOwnProperty('filename'))
             return '';
 
@@ -37,7 +37,7 @@
 
     //
     //构造文件对象上传url
-    function build_obj_detail_url(params={bucket_name:'', dir_path: '', filename:''}) {
+    function build_obj_detail_url(params = {bucket_name: '', dir_path: '', filename: ''}) {
         let api = build_obj_detail_api(params);
         return build_url_with_domain_name(api);
     }
@@ -49,7 +49,7 @@
     //@ param days:公开时间天数，<0(不公开); 0(永久公开);
     // @returns url(string)
     //
-    function build_obj_share_url(params={detail_url:'', share: '', days:''}) {
+    function build_obj_share_url(params = {detail_url: '', share: '', days: ''}) {
         return params.detail_url + '?share=' + params.share + '&days=' + params.days;
 
     }
@@ -57,19 +57,19 @@
     //
     // 目录base api
     //
-    function get_dir_base_api(){
+    function get_dir_base_api() {
         return 'api/v1/dir/';
     }
 
     //构建目录detail api
-    function build_dir_detail_api(params={bucket_name: '', dir_path: ''}){
+    function build_dir_detail_api(params = {bucket_name: '', dir_path: ''}) {
         let path = encode_paths([params.bucket_name, params.dir_path]);
         return get_dir_base_api() + path + '/';
     }
 
     //构建目录detail url
-    function build_dir_detail_url(params={bucket_name: '', dir_path: '', dir_name: ''}){
-        if (params.hasOwnProperty('dir_name')){
+    function build_dir_detail_url(params = {bucket_name: '', dir_path: '', dir_name: ''}) {
+        if (params.hasOwnProperty('dir_name')) {
             let dir_path = params.dir_path;
             let dir_name = params.dir_name;
             delete params.dir_name;
@@ -85,14 +85,14 @@
     //
     // 存储桶base api
     //
-    function get_buckets_base_api(){
+    function get_buckets_base_api() {
         return '/api/v1/buckets/';
     }
 
     //
     // 存储桶detail api
     //@param id:存储桶id, type:int
-    function build_buckets_detail_api(id){
+    function build_buckets_detail_api(id) {
         return get_buckets_base_api() + id + '/';
     }
 
@@ -100,7 +100,7 @@
     // 存储桶权限设置url
     //@param id:存储桶id, type:int
     //@param public: 1(公有)，2(私有)，3（公有可读可写）
-    function build_buckets_permission_url(params={id: 0, public: 2, ids:[]}){
+    function build_buckets_permission_url(params = {id: 0, public: 2, ids: []}) {
         let bid = params.id;
         delete params.id;
         let api = build_buckets_detail_api(bid) + '?' + $.param(params, true);
@@ -117,7 +117,7 @@
     //
     // 构建移动和重命名url
     //
-    function build_move_rename_url(paths=[], params={ move_to: '', rename: ''}) {
+    function build_move_rename_url(paths = [], params = {move_to: '', rename: ''}) {
         let obj_path = encode_paths(paths);
         let param_str = encode_params(params);
         let api = get_move_base_api() + obj_path + '/?' + param_str;
@@ -134,7 +134,7 @@
     //
     //构建对象元数据api
     //错误返回空字符串
-    function build_metadata_api(params={bucket_name: '', dir_path: '', filename: ''}){
+    function build_metadata_api(params = {bucket_name: '', dir_path: '', filename: ''}) {
         if (!params.hasOwnProperty('bucket_name') || !params.hasOwnProperty('dir_path') || !params.hasOwnProperty('filename'))
             return '';
 
@@ -151,12 +151,18 @@
 
     //
     //构建bucket ftp api
-    function build_ftp_patch_url(params={bucket_name:'', enable: '', password: ''}) {
+    function build_ftp_patch_url(params = {bucket_name: '', enable: '', password: ''}) {
 
         let name = params.bucket_name;
         delete params.bucket_name;
         let param_str = encode_params(params);
-        let api = get_ftp_base_api() + name +  '/?' + param_str;
+        let api = get_ftp_base_api() + name + '/?' + param_str;
+        return build_url_with_domain_name(api);
+    }
+
+    //构建查询分享链接url
+    function build_share_detail_url(params = {bucket_name: '', path: ''}) {
+        let api = 'api/v1/share/' + encode_paths([params.bucket_name, params.path]);
         return build_url_with_domain_name(api);
     }
 
@@ -170,7 +176,7 @@
         arr.forEach((value) => {
             if (value !== '')
                 newArr.push(encodeURIComponent(value));
-        }) ;
+        });
 
         return newArr.join('/');
     }
@@ -178,7 +184,7 @@
     //
     //所有ajax的请求的全局设置
     //
-    $.ajaxSettings.beforeSend = function(xhr, settings){
+    $.ajaxSettings.beforeSend = function (xhr, settings) {
         var csrftoken = getCookie('csrftoken');
         if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
             xhr.setRequestHeader("X-CSRFToken", csrftoken);
@@ -187,7 +193,7 @@
 
     //
     // 页面刷新时执行
-    window.onload = function() {
+    window.onload = function () {
         get_buckets_and_render();
     };
 
@@ -216,7 +222,7 @@
         try {
             let data = xhr.responseJSON;
             if (data.hasOwnProperty('code_text')) {
-                msg = default_msg + data.code_text;
+                msg = default_msg + ';' + data.code_text;
             }
         } catch (e) {
 
@@ -225,16 +231,19 @@
     }
 
     // 翻译字符串，包装django的gettext
-    function getTransText(str){
-        try{
+    function getTransText(str) {
+        try {
             return gettext(str);
-        }catch (e) {}
+        } catch (e) {
+        }
         return str;
     }
-    function transInterpolate(fmt, obj, named){
+
+    function transInterpolate(fmt, obj, named) {
         try {
             return interpolate(fmt, obj, named)
-        }catch (e) {}
+        } catch (e) {
+        }
 
         if (named) {
             return fmt.replace(/%\(\w+\)s/g, function (match) {
@@ -262,12 +271,12 @@
     //
     // 创建新的存储桶点击事件处理（对话框方式）
     //
-    function on_create_bucket(){
-        swal({
+    function on_create_bucket() {
+        Swal.fire({
             title: getTransText('请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-'),
             input: 'text',
             inputValidator: (value) => {
-                return (value.length<3 || value.length>63) && getTransText('请输入3-63个字符');
+                return (value.length < 3 || value.length > 63) && getTransText('请输入3-63个字符');
             },
             showCloseButton: true,
             showCancelButton: true,
@@ -281,16 +290,20 @@
                     data: {'name': input_name},
                     timeout: 200000,
                 }).done((result) => {
-                    if (result.code === 201){
+                    if (result.code === 201) {
                         return result;
-                    }else{
-                        swal.showValidationMessage(
-                        `Request failed: ${result.code_text}`
+                    } else {
+                        Swal.showValidationMessage(
+                            `Request failed: ${result.code_text}`
                         );
                     }
-                })
+                }).catch((xhr) => {
+                    let msg = getTransText('创建失败') + xhr.statusText;
+                    msg = get_err_msg_or_default(xhr, msg);
+                    Swal.showValidationMessage(msg);
+                });
             },
-            allowOutsideClick: () => !swal.isLoading()
+            allowOutsideClick: () => !Swal.isLoading()
         }).then(
             (result) => {
                 if (result.value) {
@@ -298,13 +311,6 @@
                     $("#content-display-div #bucket-table tr:eq(0)").after(item_html);
                     show_warning_dialog(getTransText(`创建存储桶成功`), 'success');
                 }
-             },
-            (error) => {
-                let msg = getTransText(`创建失败`) + ";";
-                if(error.status<500)
-                    show_warning_dialog(msg + error.responseJSON.code_text);
-                else
-                    show_warning_dialog(msg + error.statusText);
             }
         )
     }
@@ -319,7 +325,7 @@
         if ($(this).prop('checked')) {
             $(target).prop('checked', true); // 全选
             $(target).parents('tr').addClass('danger'); // 选中时添加 背景色类
-            if (is_exists_checked()){
+            if (is_exists_checked()) {
                 btn_del_bucket.removeClass('disabled');   //鼠标悬停时，使按钮表现为可点击状态
                 btn_del_bucket.attr('disabled', false); //激活对应按钮
             }
@@ -336,13 +342,13 @@
     //
     $("#content-display-div").on('click', '.item-checkbox', function () {
         let btn_del_bucket = $('#btn-del-bucket');
-        if ($(this).prop('checked')){
+        if ($(this).prop('checked')) {
             $(this).parents('tr').addClass('danger');
             btn_del_bucket.removeClass('disabled');
             btn_del_bucket.attr('disabled', false); //激活对应按钮
-        }else{
+        } else {
             $(this).parents('tr').removeClass('danger');
-            if (!is_exists_checked()){
+            if (!is_exists_checked()) {
                 btn_del_bucket.addClass('disabled');
                 btn_del_bucket.attr('disabled', true); //失能对应按钮
             }
@@ -361,14 +367,14 @@
     // 删除存储桶按钮
     //
     $("#content-display-div").on('click', '#btn-del-bucket', function () {
-        if(!is_exists_checked()){
+        if (!is_exists_checked()) {
             show_warning_dialog(getTransText('请先选择要删除的存储桶'));
             return;
         }
 
         show_confirm_dialog({
             title: getTransText('确认删除选中的存储桶吗'),
-            text: getTransText('此操作是不可逆的'),
+            text: getTransText('此操作是不可逆的！'),
             ok_todo: delete_selected_buckets,
         })
     });
@@ -377,7 +383,7 @@
     //
     // 删除选中的存储桶
     //
-    function delete_selected_buckets(){
+    function delete_selected_buckets() {
         //获取选中的存储桶的id
         let arr = [];
         let bucket_list_checked = $("#content-display-div #bucket-table #bucket-list-item :checkbox:checked");
@@ -386,7 +392,7 @@
         });
         if (arr.length > 0) {
             let b_id = arr[0];
-            arr.splice(0,1);
+            arr.splice(0, 1);
             let url = '/api/v1/buckets/' + b_id + '/';
             if (arr.length > 0) {
                 url = url + '?' + $.param({"ids": arr}, true);
@@ -440,7 +446,14 @@
                 <span class="bucket-remarks-value">{{ $data['remarks'] }}</span>
             </td>
             <td>
-                <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('资源统计')}}</bucket>
+                <div class="dropdown">
+                    <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">{{$imports.getTransText('操作')}}<span class="caret"></span></button>
+                    <div class="dropdown-menu">
+                        <bucket class="dropdown-item bg-info btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('资源统计')}}</bucket>
+                        <a class="dropdown-item bg-success btn btn-sm btn-info" href="/bucket/detail/{{ $data['name'] }}/" data-bucket-name="{{ $data['name'] }}">{{$imports.getTransText('详情')}}</a>
+                    </div>
+                </div>
             </td>
         </tr>
     `);
@@ -480,6 +493,8 @@
                             {{set str_db_passwd = $imports.getTransText('双击修改密码')}}
                             {{set str_db_remark = $imports.getTransText('双击修改备注')}}
                             {{set str_stat = $imports.getTransText('资源统计')}}
+                            {{set str_detail = $imports.getTransText('详情')}}
+                            {{set str_operation = $imports.getTransText('操作')}}
                             {{ each buckets }}
                                 <tr class="" id="bucket-list-item">
                                     <td><input type="checkbox" class="item-checkbox" value="{{ $value.id }}"></td>
@@ -513,8 +528,15 @@
                                         <span class="bucket-remarks-value">{{ $value.remarks }}</span>
                                     </td>
                                     <td>
-                                        <bucket class="btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">{{str_stat}}</bucket>
-                                    </td>
+                                        <div class="dropdown">
+                                            <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                                    aria-expanded="false">{{str_operation}}<span class="caret"></span></button>
+                                            <div class="dropdown-menu">
+                                                <bucket class="dropdown-item bg-info btn btn-sm btn-success btn-bucket-stats" data-bucket-name="{{ $value.name }}">{{str_stat}}</bucket>
+                                                <a class="dropdown-item bg-success btn btn-sm btn-info" href="/bucket/detail/{{ $value.name }}/" data-bucket-name="{{ $value.name }}">{{str_detail}}</a>
+                                            </div>
+                                        </div>
+                                     </td>
                                 </tr>
                             {{/each}}
                         {{/if}}
@@ -583,10 +605,10 @@
         let bucket_id = $(this).attr('data-bucket-id');
         let remarks = $(this).children('.bucket-remarks-value');
         let old_html = remarks.text();
-        old_html = old_html.replace(/(^\s*) | (\s*$)/g,'');
+        old_html = old_html.replace(/(^\s*) | (\s*$)/g, '');
 
         //如果已经双击过，正在编辑中
-        if(remarks.attr('data-in-edit') === 'true'){
+        if (remarks.attr('data-in-edit') === 'true') {
             return;
         }
         // 标记正在编辑中
@@ -607,8 +629,8 @@
             remarks.empty();
             let input_text = this.value;
             // 如果输入内容修改了
-            if (input_text && (input_text !== old_html)){
-                if (input_text.length > 255){
+            if (input_text && (input_text !== old_html)) {
+                if (input_text.length > 255) {
                     show_warning_dialog(getTransText('备注长度不得大于255个字符'), 'warning');
                     remarks.append(old_html);
                     return;
@@ -629,14 +651,14 @@
                     error: function (xhr, status) {
                         if (status === 'timeout') {
                             alert("timeout");
-                        }else{
+                        } else {
                             let msg = get_err_msg_or_default(xhr, 'request failed');
                             show_warning_dialog(getTransText('修改备注失败') + msg, 'error');
                         }
                         remarks.append(old_html);
                     }
                 });
-            }else{
+            } else {
                 remarks.append(old_html);
             }
         };
@@ -647,13 +669,13 @@
     $("#content-display-div").on("click", '.btn-bucket-stats', function (e) {
         e.preventDefault();
         let bucket = $(this).attr("data-bucket-name");
-        swal.showLoading();
+        Swal.showLoading();
         $.ajax({
             url: build_url_with_domain_name("api/v1/stats/bucket/" + bucket + "/"),
             type: "get",
             timeout: 30000,
-            success: function(data,status,xhr){
-                swal.close();
+            success: function (data, status, xhr) {
+                Swal.close();
                 let html = render_bucket_stats(data);
                 Swal.fire({
                     title: getTransText('存储桶资源统计'),
@@ -662,10 +684,10 @@
                 })
             },
             error: function (xhr, errtype, error) {
-                swal.close();
-                if (errtype === 'timeout'){
+                Swal.close();
+                if (errtype === 'timeout') {
                     show_warning_dialog('timeout', 'error');
-                }else{
+                } else {
                     let msg = get_err_msg_or_default(xhr, "request failed，" + xhr.statusText);
                     show_warning_dialog(msg, 'error');
                 }
@@ -695,8 +717,8 @@
     //
     // 获取存储桶列表并渲染
     //
-    function get_buckets_and_render(url=""){
-        if(url !== "")
+    function get_buckets_and_render(url = "") {
+        if (url !== "")
             get_content_and_render(url, render_bucket_view);
         else
             get_content_and_render(build_url_with_domain_name('api/v1/buckets/'), render_bucket_view);
@@ -722,15 +744,15 @@
     // 修改FTP读写和只读密码
     // @param dom_pw: 密码dom节点
     // @param pw_query_name: API中密码对应的query参数名称
-    function changeFtpPassword(dom_pw, pw_query_name){
+    function changeFtpPassword(dom_pw, pw_query_name) {
         let old_password = dom_pw.text();
 
-        swal({
+        Swal.fire({
             title: getTransText('修改FTP密码'),
             input: 'text',
             inputValue: old_password,
             inputValidator: (value) => {
-                return (value.length<6 || value.length>20) && getTransText('密码长度6-20个字符');
+                return (value.length < 6 || value.length > 20) && getTransText('密码长度6-20个字符');
             },
             showCloseButton: true,
             showCancelButton: true,
@@ -738,7 +760,7 @@
             confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
             preConfirm: (value) => {
-                if (value && (value !== old_password)){
+                if (value && (value !== old_password)) {
                     let data = {};
                     data.bucket_name = dom_pw.parent().attr('data-bucket-name');
                     data[pw_query_name] = value;
@@ -751,23 +773,19 @@
                         success: function (xhr) {
                             dom_pw.text(value);
                         }
+                    }).catch((xhr) => {
+                        let msg = getTransText('修改密码失败') + xhr.statusText;
+                        msg = get_err_msg_or_default(xhr, msg);
+                        Swal.showValidationMessage(msg);
                     });
                 }
             },
-            allowOutsideClick: () => !swal.isLoading()
+            allowOutsideClick: () => !Swal.isLoading()
         }).then(
             (result) => {
                 let res = result.value;
-                if (res && res.code === 200){
+                if (res && res.code === 200) {
                     show_warning_dialog(getTransText("修改密码成功"), "success");
-                }
-            },
-            (error) => {
-                if(error.statusText === "timeout"){
-                    show_warning_dialog("timeout");
-                }else{
-                    let msg = get_err_msg_or_default(error, getTransText("修改密码失败") + ';');
-                    show_warning_dialog(msg, "error");
                 }
             }
         )
@@ -792,7 +810,7 @@
     //      success: true
     //      failed : false
     function ftp_enable_password_ajax(url) {
-        let ret = {ok:false, msg:''};
+        let ret = {ok: false, msg: ''};
 
         $.ajax({
             url: url,
@@ -801,14 +819,14 @@
             timeout: 5000,
             async: false,
             success: function (res) {
-                if(res.code === 200){
+                if (res.code === 200) {
                     ret.ok = true;
                 }
             },
-            error: function(xhr){
+            error: function (xhr) {
                 ret.msg = get_err_msg_or_default(xhr, getTransText('请求失败') + '!');
             },
-            complete : function(xhr,status){
+            complete: function (xhr, status) {
                 if (status === 'timeout') {// 判断超时后 执行
                     alert("timeout");
                 }
@@ -825,8 +843,8 @@
         let data = {};
         data.bucket_name = $(this).attr('data-bucket-name');
         let status_node = $(this).prev();
-        (async function() {
-            const {value: result} = await Swal({
+        (async function () {
+            const {value: result} = await Swal.fire({
                 title: getTransText('开启或关闭FTP'),
                 input: 'radio',
                 inputOptions: {
@@ -840,24 +858,24 @@
             });
 
             let enable = false;
-            if (result === 'true'){
+            if (result === 'true') {
                 enable = true;
-            }else if (result === 'false'){
+            } else if (result === 'false') {
                 enable = false;
-            }else{
+            } else {
                 return;
             }
             data.enable = enable;
             let url = build_ftp_patch_url(data);
             let ret = ftp_enable_password_ajax(url);
-            if(ret.ok){
-                if (enable){
+            if (ret.ok) {
+                if (enable) {
                     status_node.html(getTransText("开启"));
-                }else{
+                } else {
                     status_node.html(getTransText("关闭"));
                 }
                 show_warning_dialog(getTransText("配置存储桶FTP成功"), "success");
-            }else{
+            } else {
                 show_warning_dialog(getTransText('配置存储桶FTP失败') + ret.msg, 'error');
             }
         })();
@@ -1005,16 +1023,16 @@
                                         <div class="dropdown-menu">
                                             <!--目录-->
                                             {{ if !$value.fod }}
-                                                <a class="dropdown-item bg-info" href="" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a>
-                                                <a class="dropdown-item bg-danger" href="" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a>
-                                                <a class="dropdown-item bg-warning" href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}">{{str_share}}</a>
+                                                <a class="dropdown-item bg-info" href="#" id="bucket-files-item-enter-dir" dir_path="{{$value.na}}">{{str_open}}</a>
+                                                <a class="dropdown-item bg-danger" href="#" id="bucket-files-item-delete-dir" dir_path="{{$value.na}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-warning" href="#" id="bucket-files-item-dir-share" dir_path="{{$value.na}}" data-access-code="{{$value.access_code}}">{{str_share}}</a>
                                             {{/if}}
                                             <!--文件-->
                                             {{ if $value.fod }}
                                                 <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{$value.download_url}}" >{{str_download}}</a>
-                                                <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{$value.name}}">{{str_delete}}</a>
-                                                <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_share}}</a>
-                                                <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a>
+                                                <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="#" filename="{{$value.name}}">{{str_delete}}</a>
+                                                <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="#" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}" data-access-code="{{$value.access_code}}">{{str_share}}</a>
+                                                <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="#" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{$value.name}}">{{str_rename}}</a>
                                         {{/if}}
                                         </div>
                                     </div>
@@ -1079,7 +1097,7 @@
             </td>
             <td>{{ $imports.isoTimeToLocal(obj.ult) }}</td>
             <td>{{ $imports.sizeFormat(obj.si, "B") }}</td>
-            <td>{{ obj.access_permission }}</td>
+            <td id="id-access-perms">{{ obj.access_permission }}</td>
             <td>
                 <div class="dropdown">
                     <button type="button" class="dropdown-toggle btn btn-outline-info" data-toggle="dropdown" role="button" aria-haspopup="true"
@@ -1087,7 +1105,7 @@
                     <div class="dropdown-menu">
                         <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{obj.download_url}}" >{{$imports.getTransText('下载')}}</a>
                         <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{obj.name}}">{{$imports.getTransText('删除')}}</a>
-                        <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('分享公开')}}</a>
+                        <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}"  data-access-code="{{obj.access_code}}">{{$imports.getTransText('分享公开')}}</a>
                         <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('重命名')}}</a>
                     </div>
                 </div>
@@ -1096,12 +1114,12 @@
     `);
 
     // 获取文件对象信息，并渲染文件对象列表项
-    function get_file_info_and_list_item_render(url, render_bucket_file_item){
+    function get_file_info_and_list_item_render(url, render_bucket_file_item) {
         $.ajax({
             type: 'get',
             url: url,
             // async: false,
-            success: function(data,status,xhr){
+            success: function (data, status, xhr) {
                 let html = render_bucket_file_item(data);
                 $('#bucket-files-table tr:first').after(html);
             }
@@ -1147,7 +1165,7 @@
         e.preventDefault();
         let page_num = $(":input[name='page-skip-to']").val();
         page_num = parseInt(page_num);
-        if (isNaN(page_num) || page_num <= 0){
+        if (isNaN(page_num) || page_num <= 0) {
             show_auto_close_warning_dialog(getTransText("请输入一个有效的正整数页码"));
             return;
         }
@@ -1182,7 +1200,7 @@
 
         show_confirm_dialog({
             title: getTransText('确定要删除吗？'),
-            ok_todo: function() {
+            ok_todo: function () {
                 delete_one_file(url, function () {
                     list_item_dom.remove();
                 })
@@ -1202,9 +1220,9 @@
         let filename = btn_dom.attr("filename");
         let bucket_name = btn_dom.attr('bucket_name');
         let dir_path = btn_dom.attr('dir_path');
-        let paths=[bucket_name, dir_path, filename];
+        let paths = [bucket_name, dir_path, filename];
 
-        swal({
+        Swal.fire({
             title: getTransText('请修改对象名称'),
             input: 'text',
             inputValue: filename,
@@ -1217,35 +1235,39 @@
             cancelButtonText: getTransText('取消'),
             showLoaderOnConfirm: true,
             inputValidator: (value) => {
-                if (value==='')
+                if (value === '')
                     return !value && getTransText('请输入一些内容, 前后空格会自动去除');
                 else if (value.length > 255)
                     return getTransText("对象名长度不能大于255字符");
-                else if(value === filename){
+                else if (value === filename) {
                     return getTransText("对象名未修改");
                 }
                 return !(value.indexOf('/') === -1) && getTransText('对象名不能包含‘/’');
-              },
+            },
             preConfirm: (input_name) => {
-                let url = build_move_rename_url(paths=[bucket_name, dir_path, filename], {rename: input_name});
+                let url = build_move_rename_url(paths = [bucket_name, dir_path, filename], {rename: input_name});
                 return $.ajax({
                     url: url,
                     type: 'post',
                     data: {},
                     timeout: 20000,
                     success: (result) => {
-                        if (result.code === 201){
+                        if (result.code === 201) {
                             return result;
-                        }else{
-                            swal.showValidationMessage(
-                            `Request failed: ${result.code_text}`
+                        } else {
+                            Swal.showValidationMessage(
+                                `Request failed: ${result.code_text}`
                             );
                         }
                     },
                     headers: {'X-Requested-With': 'XMLHttpRequest'},//判断是否是异步请求时需要此响应头
+                }).catch((xhr) => {
+                    let msg = getTransText('重命名失败') + xhr.statusText;
+                    msg = get_err_msg_or_default(xhr, msg);
+                    Swal.showValidationMessage(msg);
                 });
             },
-            allowOutsideClick: () => !swal.isLoading()
+            allowOutsideClick: () => !Swal.isLoading()
         }).then(
             (result) => {
                 if (result.value) {
@@ -1254,16 +1276,6 @@
                     list_item_dom.remove();
                     show_warning_dialog(getTransText('重命名成功'), 'success');
                 }
-             },
-            (error) => {
-                let msg;
-                try{
-                    msg = error.responseJSON.code_text;
-                }
-                catch (e) {
-                    msg = error.statusText;
-                }
-                show_warning_dialog(getTransText('重命名失败')+ msg);
             }
         )
     });
@@ -1281,19 +1293,14 @@
             <input type="checkbox" id="swal-password" class="swal2-checkbox" ><span>{{$imports.getTransText('有分享密码保护')}}</span>
         </div> `);
     //
-    // 目录文件夹分享公开点击事件处理
     //
-    $("#content-display-div").on("click", '#bucket-files-item-dir-share', function (e) {
-        e.preventDefault();
-
-        let status_node = $(this).parents("tr.bucket-files-table-item").find("td#id-access-perms");
-        let bucket_name = get_bucket_name_and_cur_path().bucket_name;
-        let dir_path = $(this).attr('dir_path');
-        let url = build_dir_detail_url({
-            bucket_name: bucket_name,
-            dir_path: dir_path
-        });
-
+    //@param obj: {
+    //             bucket_name: "xxx",
+    //             dir_path: "xxx"
+    //         }
+    function bucket_dir_share(obj, click_dom) {
+        let url = build_dir_detail_url(obj);
+        let status_node = click_dom.parents("tr.bucket-files-table-item").find("td#id-access-perms");
         let select_html = render_share_dialog_select({});
         let share = 1;
         Swal.fire({
@@ -1306,11 +1313,12 @@
             },
             confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
+            showCloseButton: true,
             footer: getTransText('提示：创建新的带密码的分享，旧的分享密码会失效'),
             preConfirm: () => {
                 let value = document.getElementById('swal-select').value;
                 let is_pw = document.getElementById('swal-password').checked;
-                if (value === '-1'){
+                if (value === '-1') {
                     share = 0;
                 }
 
@@ -1324,15 +1332,21 @@
                     type: 'patch',
                     async: true,
                     success: function (data, status_text, xhr) {
-                        if (share === 1) {
+                        if (data.hasOwnProperty('access_code') && data.access_code !== 0) {
                             let s = getTransText('公有');
+                            click_dom.attr('data-access-code', data.access_code);
                             status_node.html(s);
                         } else {
                             let s = getTransText('私有');
+                            click_dom.attr('data-access-code', data.access_code);
                             status_node.html(s);
                         }
                         return data;
                     }
+                }).catch((xhr) => {
+                    let msg = getTransText('分享公开设置失败') + xhr.statusText;
+                    msg = get_err_msg_or_default(xhr, msg);
+                    Swal.showValidationMessage(msg);
                 });
             },
             allowOutsideClick: () => !Swal.isLoading()
@@ -1347,27 +1361,58 @@
                     html: text
                 });
             }
-        }).catch((xhr) => {
-            let msg = getTransText('分享公开设置失败')+ xhr.statusText;
-            msg = get_err_msg_or_default(xhr, msg);
-            show_warning_dialog(msg,'error');
         })
-    });
+    }
 
-    //
-    // 文件对象分享公开点击事件处理
-    //
-    $("#content-display-div").on("click", '#bucket-files-obj-share', function (e) {
+    // 目录文件夹分享公开点击事件处理
+    $("#content-display-div").on("click", '#bucket-files-item-dir-share', function (e) {
         e.preventDefault();
 
+        let bucket_name = get_bucket_name_and_cur_path().bucket_name;
+        let dir_path = $(this).attr('dir_path');
         let obj = {
-            bucket_name: $(this).attr("bucket_name"),
-            dir_path: $(this).attr("dir_path"),
-            filename: $(this).attr("filename")
+            bucket_name: bucket_name,
+            dir_path: dir_path
         };
 
-        let detail_url = build_obj_detail_url(obj);
+        let aCode = $(this).attr("data-access-code");
+        if (aCode === '0') {
+            bucket_dir_share(obj, $(this));
+            return;
+        }
 
+        Swal.fire({
+            title: getTransText("目录已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有的旧的分享连接。"),
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: getTransText("公开分享"),
+            denyButtonText: getTransText("查询"),
+            cancelButtonText: getTransText("取消"),
+            footer: getTransText('提示：创建新的带密码的分享，旧的分享链接会失效')
+        }).then((result) => {
+            if (result.isConfirmed) {
+                bucket_dir_share(obj, $(this));
+            } else if (result.isDenied) {
+                let params = {
+                    bucket_name: obj.bucket_name,
+                    path: obj.dir_path
+                };
+                get_share_uri(params);
+            }
+        });
+
+    });
+
+
+    //
+    //@param obj: {
+    //             bucket_name: "xxx",
+    //             dir_path: "xxx",
+    //             filename: "xxx"
+    //         }
+    function bucket_object_share(obj, click_dom) {
+        let status_node = click_dom.parents("tr.bucket-files-table-item").find("td#id-access-perms");
+        let detail_url = build_obj_detail_url(obj);
         let select_html = render_share_dialog_select({});
         let share = 1;
         Swal.fire({
@@ -1380,11 +1425,12 @@
             },
             confirmButtonText: getTransText('确定'),
             showLoaderOnConfirm: true,
+            showCloseButton: true,
             footer: getTransText('提示：创建新的带密码的分享，旧的分享链接会失效'),
             preConfirm: () => {
                 let value = document.getElementById('swal-select').value;
                 let is_pw = document.getElementById('swal-password').checked;
-                if (value === '-1'){
+                if (value === '-1') {
                     share = 0;
                 }
 
@@ -1397,8 +1443,21 @@
                     type: 'patch',
                     async: true,
                     success: function (data, status_text, xhr) {
+                        if (data.hasOwnProperty('access_code') && data.access_code !== 0) {
+                            let s = getTransText('公有');
+                            click_dom.attr('data-access-code', data.access_code);
+                            status_node.html(s);
+                        } else {
+                            let s = getTransText('私有');
+                            click_dom.attr('data-access-code', data.access_code);
+                            status_node.html(s);
+                        }
                         return data;
                     }
+                }).catch((xhr) => {
+                    let msg = getTransText('分享公开设置失败！') + xhr.statusText;
+                    msg = get_err_msg_or_default(xhr, msg);
+                    Swal.showValidationMessage(msg);
                 });
             },
             allowOutsideClick: () => !Swal.isLoading()
@@ -1409,30 +1468,121 @@
                     text: result.value.share_uri
                 });
             }
-        }).catch((xhr) => {
-            let msg = getTransText('分享公开设置失败！')+ xhr.statusText;
-            msg = get_err_msg_or_default(xhr, msg);
-            show_warning_dialog(msg, 'error');
         })
+    }
+
+    //查询分享连接
+    //@param obj: {
+    //             bucket_name: "xxx",
+    //             path: "xxx"
+    //         }
+    function get_share_uri(obj) {
+        let url = build_share_detail_url(obj);
+        Swal.showLoading();
+        $.ajax({
+            url: url,
+            timeout: 20000,
+            success: function (data, status, xhr) {
+                Swal.close();
+                if (xhr.hasOwnProperty('responseJSON') && xhr.responseJSON.hasOwnProperty('share_uri')) {
+                    let share_uri = xhr.responseJSON.share_uri;
+                    if (xhr.responseJSON.is_obj) {
+                        Swal.fire({
+                            title: getTransText("分享链接"),
+                            text: share_uri
+                        });
+                        return;
+                    }
+                    let text = '<p>' + share_uri + '</p>';
+                    if (xhr.responseJSON.hasOwnProperty('share_code')) {
+                        let share_code = xhr.responseJSON.share_code;
+                        text = text + '<p>' + getTransText('分享密码') + ':' + share_code + '</p>';
+                    }
+                    Swal.fire({
+                        title: getTransText("分享链接"),
+                        html: text
+                    });
+                }
+            },
+            error: function (xhr, errtype, error) {
+                Swal.close();
+                if (errtype === 'timeout') {
+                    show_warning_dialog(getTransText('请求超时'), 'error');
+                    return;
+                }
+                if (xhr.hasOwnProperty('responseJSON') && xhr.responseJSON.hasOwnProperty('code')) {
+                    let code = xhr.responseJSON.code;
+                    if (code === 'NotShared') {
+                        show_warning_dialog(getTransText('对象或目录未共享或者共享时间到期，请刷新后重试。'), 'error');
+                    } else if (code === 'NoSuchBucket') {
+                        show_warning_dialog(getTransText('存储桶不存在，请刷新页面。'), 'error');
+                    } else if (code === 'NoSuchKey') {
+                        show_warning_dialog(getTransText('对象或目录不存在，请刷新后重试。'), 'error');
+                    } else {
+                        show_warning_dialog(getTransText(xhr.responseJSON.message), 'error');
+                    }
+                } else {
+                    show_warning_dialog(getTransText('请求失败，请刷新后重试。'), 'error');
+                }
+            }
+        });
+    }
+
+    //
+    // 文件对象分享公开点击事件处理
+    //
+    $("#content-display-div").on("click", '#bucket-files-obj-share', function (e) {
+        e.preventDefault();
+        let obj = {
+            bucket_name: $(this).attr("bucket_name"),
+            dir_path: $(this).attr("dir_path"),
+            filename: $(this).attr("filename")
+        };
+
+        let aCode = $(this).attr("data-access-code");
+        if (aCode === '0') {
+            bucket_object_share(obj, $(this));
+            return;
+        }
+        Swal.fire({
+            title: getTransText("对象已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有的旧的分享连接。"),
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: getTransText("公开分享"),
+            denyButtonText: getTransText("查询"),
+            cancelButtonText: getTransText("取消"),
+            footer: getTransText('提示：创建新的带密码的分享，旧的分享链接会失效')
+        }).then((result) => {
+            if (result.isConfirmed) {
+                bucket_object_share(obj, $(this));
+            } else if (result.isDenied) {
+                let params = {
+                    bucket_name: obj.bucket_name,
+                    path: obj.dir_path + '/' + obj.filename
+                };
+                get_share_uri(params);
+            }
+        });
     });
 
 
     //
     // 删除一个文件
     //
-    function delete_one_file(url, success_do){
-        swal.showLoading();
+    function delete_one_file(url, success_do) {
+        Swal.showLoading();
         $.ajax({
             type: 'delete',
             url: url,
-            success: function(data,status,xhr){
-                swal.close();
+            success: function (data, status, xhr) {
+                Swal.hideLoading();
                 success_do();
-                show_auto_close_warning_dialog(getTransText('删除成功'), type='success');
+                show_auto_close_warning_dialog(getTransText('删除成功'), 'success');
             },
             error: function (error) {
-                swal.close();
-                show_warning_dialog(getTransText('删除失败'), type='error');
+                Swal.hideLoading();
+                let msg = get_err_msg_or_default(error, getTransText('删除失败'));
+                show_warning_dialog(msg, 'error');
             }
         });
     }
@@ -1454,7 +1604,7 @@
 
         show_confirm_dialog({
             title: getTransText('确定要删除吗？'),
-            ok_todo: function() {
+            ok_todo: function () {
                 delete_one_directory(url, function () {
                     list_item_dom.remove();
                 });
@@ -1465,19 +1615,19 @@
     //
     // 删除一个文件夹
     //
-    function delete_one_directory(url, success_do){
-        swal.showLoading();
+    function delete_one_directory(url, success_do) {
+        Swal.showLoading();
         $.ajax({
             type: 'delete',
             url: url,
-            success: function(data,status,xhr){
-                swal.close();
+            success: function (data, status, xhr) {
+                Swal.hideLoading();
                 success_do();
                 show_auto_close_warning_dialog(getTransText('删除成功'), 'success');
             },
-            error: function (error,status) {
-                swal.close();
-                let msg = getTransText('删除失败')+ error.statusText;
+            error: function (error, status) {
+                Swal.hideLoading();
+                let msg = getTransText('删除失败') + error.statusText;
                 msg = get_err_msg_or_default(error, msg);
                 show_warning_dialog(msg, 'error');
             }
@@ -1532,7 +1682,7 @@
     //
     // 获取存储桶文件列表并渲染
     //
-    function get_bucket_files_and_render(url){
+    function get_bucket_files_and_render(url) {
         get_content_and_render(url, render_bucket_files_view);
     }
 
@@ -1540,35 +1690,35 @@
     //
     // 获取文件对象信息并渲染
     //
-    function get_file_obj_info_and_render(url){
+    function get_file_obj_info_and_render(url) {
         get_content_and_render(url, render_file_obj_info_view);
     }
 
     //
     // GET请求数据并渲染接口封装
     //
-    function get_content_and_render(url, render, data={}){
-        swal.showLoading();
+    function get_content_and_render(url, render, data = {}) {
+        Swal.showLoading();
         $.ajax({
             url: url,
             data: data,
             timeout: 20000,
-            success: function(data,status,xhr){
-                swal.close();
-                if (status === 'success'){
+            success: function (data, status, xhr) {
+                Swal.close();
+                if (status === 'success') {
                     let html = render(data);
                     $content_display_div.empty();
                     $content_display_div.append(html);
-                }else{
+                } else {
                     show_warning_dialog(getTransText('好像出问题了，跑丢了') + '( T__T ) …', 'error');
                 }
             },
             error: function (xhr, errtype, error) {
-                swal.close();
-                if (errtype === 'timeout'){
+                Swal.close();
+                if (errtype === 'timeout') {
                     show_warning_dialog(getTransText('请求超时'), 'error');
-                }else{
-                    show_warning_dialog(getTransText('好像出问题了，跑丢了') + '( T__T ) …', 'error');
+                } else {
+                    show_warning_dialog(get_err_msg_or_default(xhr, getTransText('好像出问题了，跑丢了')) + '( T__T ) …', 'error');
                 }
             }
         });
@@ -1638,7 +1788,7 @@
         async function () {
             // $("#div-upload-file").show();
 
-            const {value: file} = await swal({
+            const {value: file} = await Swal.fire({
                 title: getTransText('选择文件'),
                 input: 'file',
                 showCancelButton: true,
@@ -1651,8 +1801,7 @@
             });
             if (file) {
                 uploadOneFile(file);//上传文件
-            }
-            else if(file === null){
+            } else if (file === null) {
                 show_warning_dialog(getTransText("没有选择文件，请先选择一个文件"));
             }
         }
@@ -1662,16 +1811,16 @@
     // 上传一个文件
     //
     function uploadOneFile(file) {
-        if(file.size === 0) {
+        if (file.size === 0) {
             show_warning_dialog(getTransText("无法上传一个空文件"));
             return;
         }
-        if(file.size >= 5*1024**3) {
+        if (file.size >= 5 * 1024 ** 3) {
             show_warning_dialog(getTransText("文件太大"));
             return;
         }
         let obj = get_bucket_name_and_cur_path();
-        if(!obj.bucket_name){
+        if (!obj.bucket_name) {
             show_warning_dialog(getTransText('上传文件失败，无法获取当前存储桶下路径'));
             return;
         }
@@ -1695,35 +1844,34 @@
             data: formData,
             contentType: false,
             processData: false,
-            xhr: function(){
-    　　　　　　let xhr = $.ajaxSettings.xhr();
-    　　　　　　if(xhr.upload) {
-    　　　　　　　　xhr.upload.addEventListener("progress" , function(e){
+            xhr: function () {
+                let xhr = $.ajaxSettings.xhr();
+                if (xhr.upload) {
+                    xhr.upload.addEventListener("progress", function (e) {
                         fileUploadProgressBar(e.loaded, e.total);
                     }, false);
-    　　　　　　　　return xhr;
-    　　　　　　}
-    　　　　},
-            beforeSend: function(xhr, contents){
+                    return xhr;
+                }
+            },
+            beforeSend: function (xhr, contents) {
                 let csrftoken = getCookie('csrftoken');
                 xhr.setRequestHeader("X-CSRFToken", csrftoken);
                 beforeFileUploading();
             },
             success: function (data) {
                 show_auto_close_warning_dialog(getTransText('文件已成功上传'), 'success', 'top-end');
-                try{
-                    if (data.created === true){
+                try {
+                    if (data.created === true) {
                         // 如果上传的文件在当前页面的列表中，插入文件列表
                         success_upload_file_append_list_item(url, file.name);
                     }
-                }catch (e) {}
+                } catch (e) {
+                }
             },
-            error: function(xhr, textStatus, errorType){
+            error: function (xhr, textStatus, errorType) {
                 let msg = getTransText('上传文件发生错误,请重新上传');
-                if (xhr.responseJSON && xhr.responseJSON.hasOwnProperty('code_text'))
-                    show_warning_dialog(msg + xhr.responseJSON.code_text);
-                else
-                    show_warning_dialog(msg + xhr.statusText);
+                msg = get_err_msg_or_default(xhr, msg);
+                show_warning_dialog(msg);
             },
             complete: function () {
                 endFileUploading();
@@ -1736,7 +1884,7 @@
     // 成功上传文件后，插入文件列表项
     function success_upload_file_append_list_item(obj_url, filename) {
         let obj = get_bucket_name_and_cur_path();
-        if(!obj.bucket_name){
+        if (!obj.bucket_name) {
             return;
         }
 
@@ -1747,7 +1895,7 @@
         };
         let cur_url = build_obj_detail_url(params);
 
-        if (cur_url === obj_url){
+        if (cur_url === obj_url) {
             let info_url = build_url_with_domain_name(build_metadata_api(params));
             get_file_info_and_list_item_render(info_url, render_bucket_file_item);
         }
@@ -1756,9 +1904,9 @@
     //
     // 从当前路径url中获取存储桶名和目录路径
     //
-    function get_bucket_name_and_cur_path(){
+    function get_bucket_name_and_cur_path() {
         let $btn = $('#btn-upload-file');
-        if(!$btn)
+        if (!$btn)
             return {
                 'bucket_name': '',
                 'dir_path': ''
@@ -1775,9 +1923,9 @@
     //
     // 进度条设置
     //
-    function setProgressBar(obj_bar, width, hide=false){
+    function setProgressBar(obj_bar, width, hide = false) {
         width = Math.floor(width);
-        var $bar = $(obj_bar);
+        let $bar = $(obj_bar);
         let percent = width + '%';
         $bar.find("div.progress-bar").attr({"style": "min-width: 2em;width: " + percent + ";"});
         $bar.find("div.progress-bar").text(percent);
@@ -1791,8 +1939,8 @@
     //
     // 文件上传进度条
     //
-    function fileUploadProgressBar(now, total, hide=false) {
-        var percent = 100 * now / total;
+    function fileUploadProgressBar(now, total, hide = false) {
+        let percent = 100 * now / total;
         if (percent > 100) {
             percent = 100;
         }
@@ -1803,25 +1951,25 @@
     //
     // 开始上传文件前设置
     //
-    function beforeFileUploading(){
+    function beforeFileUploading() {
         // 进度条
         fileUploadProgressBar(0, 100, false);
         // 失能上传文件按钮
         let $btn = get_btn_file_upload();
         $btn.addClass('disabled');
-        $btn.attr('disabled',true);
+        $btn.attr('disabled', true);
     }
 
     //
     // 上传文件完成或失败后设置
     //
-    function endFileUploading(){
-         // 进度条
+    function endFileUploading() {
+        // 进度条
         fileUploadProgressBar(0, 100, true);
         // 失能上传文件按钮
         let $btn = get_btn_file_upload();
         $btn.removeClass('disabled');
-        $btn.attr('disabled',false);
+        $btn.attr('disabled', false);
     }
 
     //
@@ -1836,8 +1984,9 @@
     // 创建文件夹点击事件处理（对话框方式）
     //
     $("#content-display-div").on('click', '#btn-new-directory', on_create_directory);
-    function on_create_directory(){
-        swal({
+
+    function on_create_directory() {
+        Swal.fire({
             title: getTransText('请输入一个文件夹名称'),
             input: 'text',
             inputAutoTrim: true,
@@ -1849,10 +1998,10 @@
             cancelButtonText: getTransText('取消'),
             showLoaderOnConfirm: true,
             inputValidator: (value) => {
-                if (value==='')
+                if (value === '')
                     return !value && getTransText('请输入一些内容, 前后空格会自动去除');
                 return !(value.indexOf('/') === -1) && getTransText('目录名不能包含‘/’')
-              },
+            },
             preConfirm: (input_name) => {
                 let obj = get_bucket_name_and_cur_path();
                 obj.dir_name = input_name;
@@ -1865,20 +2014,24 @@
                     // contentType: false,//必须false才会自动加上正确的Content-Type
                     // processData: false,//必须false才会避开jQuery对 formdata 的默认处理,XMLHttpRequest会对 formdata 进行正确的处理
                     success: (result) => {
-                        if (result.code === 201){
+                        if (result.code === 201) {
                             return result;
-                        }else{
-                            swal.showValidationMessage(
-                            `Request failed: ${result.code_text}`
+                        } else {
+                            Swal.showValidationMessage(
+                                `Request failed: ${result.code_text}`
                             );
                         }
                     },
                     headers: {'X-Requested-With': 'XMLHttpRequest'},//django判断是否是异步请求时需要此响应头
                     clearForm: false,//禁止清除表单
                     resetForm: false //禁止重置表单
+                }).catch((xhr) => {
+                    let msg = getTransText('创建失败') + xhr.statusText;
+                    msg = get_err_msg_or_default(xhr, msg);
+                    Swal.showValidationMessage(msg);
                 });
             },
-            allowOutsideClick: () => !swal.isLoading()
+            allowOutsideClick: () => !Swal.isLoading()
         }).then(
             (result) => {
                 if (result.value) {
@@ -1886,17 +2039,6 @@
                     $("#bucket-files-table tr:eq(0)").after(html);
                     show_warning_dialog(transInterpolate(getTransText('创建文件夹“%s”成功'), result.value.data.dir_name), 'success');
                 }
-             },
-            (error) => {
-                let msg;
-                try{
-                    msg = error.responseJSON.code_text;
-                }
-                catch (e) {
-                    msg = error.statusText;
-                }
-
-                show_warning_dialog(getTransText('创建失败') + msg);
             }
         )
     }
@@ -1921,7 +2063,7 @@
                     <div class="dropdown-menu">
                          <a class="dropdown-item bg-info" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">{{$imports.getTransText('打开')}}</a>
                          <a class="dropdown-item bg-danger" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">{{$imports.getTransText('删除')}}</a>
-                         <a class="dropdown-item bg-warning" id="bucket-files-item-dir-share" dir_path="{{dir.na}}">{{$imports.getTransText('分享公开')}}</a>
+                         <a class="dropdown-item bg-warning" id="bucket-files-item-dir-share" dir_path="{{dir.na}}" data-access-code="{{dir.access_code}}">{{$imports.getTransText('分享公开')}}</a>
                     </div>
                 </div>
             </td>

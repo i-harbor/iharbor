@@ -5,11 +5,16 @@ from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
-from .serializers import AuthTokenDumpSerializer
+from buckets.models import BucketToken
+from .views import CustomGenericViewSet
+from .serializers import AuthTokenDumpSerializer, BucketTokenSerializer
+from . import exceptions
+
 
 class CustomAuthToken(ObtainAuthToken):
     '''
@@ -215,3 +220,85 @@ class JWTVerifyView(TokenVerifyView):
         '''
         return super().post(request, args, kwargs)
 
+
+class BucketTokenView(CustomGenericViewSet):
+    """
+    存储桶token视图
+    """
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'token'
+    lookup_value_regex = '.+'
+
+    @swagger_auto_schema(
+        operation_summary=_('获取存储桶的token的信息'),
+        responses={
+            200: """
+                {
+                  "key": "59a5bef8902cc5e64a9040fdd84583013032aa34",
+                  "bucket": {
+                    "id": 3,
+                    "name": "ddd"
+                  },
+                  "permission": "readonly",
+                  "created": "2020-12-16T15:50:33.894990+08:00"
+                }
+                """,
+            404: """
+                {
+                  "code": "NoSuchToken",
+                  "message": "The specified token does not exist."
+                }
+            """
+        }
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """
+        获取存储桶的token的信息
+        """
+        try:
+            token = self.get_bucket_token(request, kwargs)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        data = BucketTokenSerializer(instance=token).data
+        return Response(data=data, status=200)
+
+    @swagger_auto_schema(
+        operation_summary=_('删除一个存储桶token'),
+        responses={
+            status.HTTP_204_NO_CONTENT: 'NO_CONTENT'
+        }
+    )
+    def destroy(self, request, *args, **kwargs):
+        """
+        删除一个存储桶token
+        """
+        try:
+            token = self.get_bucket_token(request, kwargs)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            token.delete()
+        except Exception as exc:
+            exc = exceptions.Error(message='数据库错误，删除token记录失败')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_bucket_token(self, request, kwargs):
+        """
+        获取用户有访问权限的token
+
+        :raises: Error
+        """
+        key = kwargs.get(self.lookup_field, '')
+        token = BucketToken.objects.select_related('bucket').filter(key=key).first()
+        if not token:
+            raise exceptions.NoSuchToken()
+
+        # 权限检查
+        if not token.bucket.check_user_own_bucket(request.user):
+            raise exceptions.AccessDenied(message='你没有权限访问此token')
+
+        return token

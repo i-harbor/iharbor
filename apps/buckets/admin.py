@@ -1,14 +1,14 @@
 from django.contrib import admin
 
-from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive)
+from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive, BucketToken)
 
 
 @admin.register(Bucket)
 class BucketAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'get_collection_name', 'type', 'created_time', 'user', 'objs_count',
+    list_display = ('id', 'name', 'get_collection_name', 'type', 'created_time', 'lock', 'user', 'objs_count',
                     'size', 'ftp_enable', 'ftp_password', 'ftp_ro_password', 'modified_time')
     list_display_links = ('id', 'name')
-
+    list_editable = ('lock',)
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
     readonly_fields = ('collection_name', )
@@ -48,3 +48,10 @@ class UsageDescAdmin(admin.ModelAdmin):
 
     def get_desc_for(self, obj):
         return obj.get_desc_for_display()
+
+
+@admin.register(BucketToken)
+class BucketTokenAdmin(admin.ModelAdmin):
+    list_display = ('key', 'permission', 'created', 'bucket')
+    list_display_links = ('key', )
+    search_fields = ('key', 'bucket__name')

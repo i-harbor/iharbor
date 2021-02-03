@@ -1,7 +1,11 @@
 import logging
 
 import concurrent_log_handler
-from pyftpdlib.servers import FTPServer, ThreadedFTPServer, MultiprocessFTPServer
+from pyftpdlib.servers import (
+    # FTPServer,
+    # ThreadedFTPServer,
+    MultiprocessFTPServer
+)
 from pyftpdlib.log import logger
 
 from harbor_file_system import HarborFileSystem
@@ -15,7 +19,7 @@ def main():
     authorizer = HarborAuthorizer()
     # authorizer = DummyAuthorizer()
 
-    #authorizer.add_user('root', 'root', '/home/ftp', perm='elradfmwM')
+    # authorizer.add_user('root', 'root', '/home/ftp', perm='elradfmwM')
     # authorizer.add_anonymous('/root/ftp/')
  
     # Instantiate FTP handler class
@@ -28,9 +32,9 @@ def main():
     logging.basicConfig(level=logging.INFO)
     # print(dir(logger))
     
-    file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/harbor/ftp.log',
-                                                                        maxBytes = 1024 ** 2 * 128,
-                                                                        backupCount = 10, use_gzip=True,)
+    file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/iharbor/ftp.log',
+                                                                        maxBytes=1024 ** 2 * 128,
+                                                                        backupCount=10, use_gzip=True)
     file_handler.setLevel(logging.INFO)
     logger.addHandler(file_handler)
     # print(logger.name)
@@ -41,7 +45,7 @@ def main():
  
     # Specify a masquerade address and the range of ports to use for
     # passive connections.  Decomment in case you're behind a NAT.
-    #handler.masquerade_address = '151.25.42.11'
+    # handler.masquerade_address = '151.25.42.11'
     handler.passive_ports = range(2000, 3001)
  
     # Instantiate FTP server class and listen on 0.0.0.0:2121
@@ -56,6 +60,7 @@ def main():
 
     # start ftp server
     server.serve_forever()
+
  
 if __name__ == '__main__':
     main()
