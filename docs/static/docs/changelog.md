@@ -1,3 +1,14 @@
+## v0.5.0
+* share下载api浏览器缓存有关支持，增加ETag、Last_Modified、Cache-Control标头
+* sweetalert2升级，增加分享url查询api,前端分享设置修改
+* 默认中国科技云通行证登录
+* bucket lock功能
+* bucket token功能实现，copydir命令
+* ftp写接口断点续传修改，新增ftp_get_obj_size函数
+* 桶详情视图，listobjects命令
+* 创建桶时，对象元数据表na和name字段校验规则为utf8_bin,区分字母大小写
+* ftp支持文件的move操作
+
 ## v0.4.4
 * 存储桶和桶归档model增加字段type，及clearbucket命令只清理原生桶；
 * 兼容s3 api使用说明网页视图实现；

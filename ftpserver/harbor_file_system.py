@@ -179,14 +179,8 @@ class HarborFileSystem(AbstractedFS):
         assert isinstance(filename, str), filename
         # print('function: open', filename, mode)
         ftp_path = self.fs2ftp(filename)
-        # mode = mode.lower()
-        # if mode == 'r+w':
-        #     return Uploader(self.bucket_name, ftp_path, self.client)
-        # if mode.startswith('r'):
-        #     return DownLoader(self.bucket_name, ftp_path, self.client)
-        # else:
-        #     return Uploader(self.bucket_name, ftp_path, self.client)
-        return FileHandler(self.bucket_name, ftp_path, self.client)
+        mode = mode.lower()
+        return FileHandler(self.bucket_name, ftp_path, self.client, mode)
 
     def mkdir(self, path):
         print('function:mkdir', 'path: ' + path)
@@ -203,7 +197,7 @@ class HarborFileSystem(AbstractedFS):
         try:
             self.client.ftp_move_rename(self.bucket_name, src[1:], new_name, new_dir)
         except HarborError as error:
-            raise FilesystemError('rename dir is not supported')
+            raise FilesystemError(f'rename dir is not supported, {str(error)}')
         except Exception as error:
             raise FilesystemError(str(error))
 
@@ -238,105 +232,102 @@ class HarborFileSystem(AbstractedFS):
 
 
 class FileHandler(object):
-    def __init__(self, bucket_name, ftp_path, client):
+    def __init__(self, bucket_name, ftp_path, client, mode):
         self.bucket_name = bucket_name
         self.name = os.path.basename(ftp_path)
         self.ftp_path = ftp_path
         self.client = client
         self.closed = False
         self.file = BytesIO()
-        # self.file_list = []
-        self.id = 0
-        self.breakpoint = 0
+        self.offset = 0             # file pointer position
+        self.is_breakpoint = False  # 标记是否断点续传
         self.write_generator = None
         self.read_generator = None
+        self.mode = mode
 
-    def get_write_generator(self, is_break_point=False):
+    def ensure_init_write_generator(self, is_break_point=None):
+        """
+        确保已初始化 写生成器
+        """
+        if self.write_generator:
+            return
+
+        is_break_point = self.is_breakpoint if is_break_point is None else is_break_point
         try:
-            self.write_generator = self.client.ftp_get_write_generator(self.bucket_name, self.ftp_path[1:], is_break_point)
+            self.write_generator = self.client.ftp_get_write_generator(
+                self.bucket_name, self.ftp_path[1:], is_break_point)
             next(self.write_generator)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
-    def get_read_generator(self):
+    def ensure_init_read_generator(self):
+        if self.read_generator:
+            return
+
         try:
             self.read_generator, ob = self.client.ftp_get_obj_generator(
-                self.bucket_name, self.ftp_path[1:], per_size=4 * 1024 ** 2)
+                self.bucket_name, self.ftp_path[1:], offset=self.offset, per_size=4 * 1024 ** 2)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
     def write(self, data):
-        if not self.write_generator:
-            if self.breakpoint:
-                self.id += self.breakpoint
-                self.breakpoint = 0
-                self.get_write_generator(is_break_point=True)
-            else:
-                self.get_write_generator()
+        self.ensure_init_write_generator()
         self.file.write(data)
         if self.file.tell() >= 1024 ** 2 * 64:
-            try:
-                self.write_generator.send((self.id, self.file.getvalue()))
-                # pass
-            except HarborError as error:
-                raise FilesystemError(error.msg)
-            self.id += self.file.tell()
-            self.file = BytesIO()
+            self._sync_cache()
+
         return len(data)
 
-        # self.file = b''.join((self.file, data))
-        # if len(self.file) >= 1024 * 1024 * 4:
-        #     try:
-        #         self.write_generator.send((self.id, self.file))
-        #         pass
-        #     except HarborError as error:
-        #         raise FilesystemError(error.msg)
-        #     self.id += len(self.file)
-        #     self.file = bytes()
-        # return len(data)
-
-        # self.file_list.append(data)  # 利用列表，效果不佳
-        # if len(self.file_list) >= 30:
-        #     self.file_list = b''.join(self.file_list)
-        #     try:
-        #         self.write_generator.send((self.id, self.file_list))
-        #     except HarborError as error:
-        #         raise FilesystemError(error.msg)
-        #     self.file_list = []
-        #     self.id = self.count
-        # self.count += len(data)
-        # return len(data)
-
     def read(self, size=None):
-        if not self.read_generator:
-            self.get_read_generator()
-        # print(size, '--------------')
-        # try:
-        #     data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
-        #     self.id += size
-        #
-        # except HarborError as error:
-        #     raise FilesystemError(error.msg)
+        self.ensure_init_read_generator()
         try:
             data = next(self.read_generator)
-            # print(data)
-        # except StopIteration as error:
         except Exception as error:
             return b''
+
         return data
 
     def close(self):
-        if self.file.tell():
-            try:
-                self.write_generator.send((self.id, self.file.getvalue()))
-                # self.client.ftp_write_chunk(self.bucket_name, self.ftp_path[1:], self.id, self.file)
-                # print(self.id + len(self.file.getvalue()), '---------')
-            except HarborError as error:
-                raise FilesystemError(error.msg)
+        # 写模式时，确认init写生成器创建对象，防止ftp上传空文件时没有创建对象的问题
+        if 'w' in self.mode:
+            self.ensure_init_write_generator()
+
+        self._sync_cache()
         self.closed = True
 
-    def seek(self, rest_pos):
-        self.breakpoint = rest_pos
+    def seek(self, offset):
+        self._sync_cache()      # seek前，同步可能缓存的数据
+        if self.offset == offset:
+            return
+
+        self.offset = offset
+        if self.offset == 0:
+            self.is_breakpoint = False
+        else:
+            self.is_breakpoint = True
+
+        # 当前文件指针变offset了，读、写生成器都需要根据offset从新init
+        self.write_generator = None
+        self.read_generator = None
+
+    def _sync_cache(self):
+        """
+        缓存的文件数据同步到存储桶
+        """
+        lenght = self.file.tell()
+        if lenght == 0:
+            return
+
+        self.ensure_init_write_generator()
+
+        try:
+            self.write_generator.send((self.offset, self.file.getvalue()))
+        except HarborError as error:
+            raise FilesystemError(error.msg)
+
+        self.offset += lenght
+        self.file.truncate(0)       # 清缓存
+        self.file.seek(0)           # 重置缓存指针
 
 
 class DownLoader(object):
