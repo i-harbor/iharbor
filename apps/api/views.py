@@ -405,8 +405,13 @@ class BucketViewSet(CustomGenericViewSet):
             {
                 'code': 400,
                 'code_text': 'xxx',      //错误码表述信息
-                'data': serializer.data, //请求时提交数据
+                'data': {}, //请求时提交数据
                 'existing': true or  false  // true表示资源已存在
+            }
+        >>Http Code: 状态码409, 存储桶已存在：
+            {
+                'code': 'BucketAlreadyExists',    # or BucketAlreadyOwnedByYou
+                'code_text': 'xxx',      //错误码表述信息
             }
 
     delete:
@@ -523,31 +528,36 @@ class BucketViewSet(CustomGenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
-            code_text = '参数验证有误'
-            existing = False
-            try:
-                for key, err_list in serializer.errors.items():
-                    for err in err_list:
-                        code_text = err
-                        if err.code == 'existing':
-                            existing = True
-            except:
-                pass
-
+            code_text = serializer_error_text(serializer.errors, default='参数验证有误')
             data = {
                 'code': 400,
                 'code_text': code_text,
-                'existing': existing,
+                'existing': False,
                 'data': serializer.data,
             }
 
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
-        # 创建bucket,创建bucket的shard集合
+        # 检测桶是否存在
+        validated_data = serializer.validated_data
+        bucket_name = validated_data.get('name')
+        user = request.user
+        bucket = Bucket.get_bucket_by_name(bucket_name)
+        if bucket:
+            if bucket.user_id == user.id:
+                exc = exceptions.BucketAlreadyOwnedByYou()
+            else:
+                exc = exceptions.BucketAlreadyExists()
+
+            data = exc.err_data_old()
+            return Response(data=data, status=409)
+
+        # 创建bucket,创建bucket的对象元数据表
         try:
             bucket = serializer.save()
         except Exception as e:
             return Response(data={'code': 500, 'code_text': _('创建桶失败') + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         col_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=col_name)
         model_class = bfm.get_obj_model_class()

@@ -101,6 +101,18 @@ class MethodNotAllowed(Error):
     default_status_code = 405
 
 
+class BucketAlreadyOwnedByYou(Error):
+    default_message = 'The bucket you tried to create already exists, and you own it.'
+    default_code = 'BucketAlreadyOwnedByYou'
+    default_status_code = 409
+
+
+class BucketAlreadyExists(Error):
+    default_message = 'The requested bucket name is already exists. Please select a different name and try again.'
+    default_code = 'BucketAlreadyExists'
+    default_status_code = 409
+
+
 class Throttled(Error):
     default_message = 'Request was throttled.'
     default_code = 'Throttled'
