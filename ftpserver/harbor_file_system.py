@@ -16,8 +16,8 @@ from api.harbor import FtpHarborManager, HarborError
 class HarborFileSystem(AbstractedFS):
     def __init__(self, *args, **kwargs):
         super(HarborFileSystem, self).__init__(*args, **kwargs)
-        self.bucket_name = self._root
-        self._root = '/'
+        self.bucket_name = self.root
+        self.root = '/'
         self.client = FtpHarborManager()
 
     def realpath(self, path):
@@ -77,11 +77,10 @@ class HarborFileSystem(AbstractedFS):
     def format_list(self, basedir, listing, ignore_err=True):
         assert isinstance(basedir, str), basedir
 
-        path = self.fs2ftp(basedir)
+        # path = self.fs2ftp(basedir)
         for tmp in listing:
             if isinstance(tmp, tuple):
                 filename, mtimestr, size = tmp
-                ftp_path = os.path.join(path, filename)
                 if filename.endswith('/'):
                     perm = "drwxrwxrwx"
                     mtimestr = mtimestr.strftime('%b %d %X')[:-3]
@@ -144,7 +143,7 @@ class HarborFileSystem(AbstractedFS):
                     data = self.client.ftp_get_obj(self.bucket_name, ftp_path[1:])
                     filename = data.name
                     mtimestr = data.upt
-                    mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
+                    mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                     size = data.si
                     perm = 'el'
                     _type = "file"
@@ -165,7 +164,7 @@ class HarborFileSystem(AbstractedFS):
                 else:
                     perm = 'el'
                     _type = "file"
-                mtimestr = mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
+                mtimestr = str(mtimestr).split('.')[0].replace('-', '').replace(':', '').replace(' ', '')
                 line = "type=%s;size=%d;perm=%s;modify=%s;unique=%s; %s\r\n" % (
                     _type, size, perm, mtimestr, '', filename)
 
@@ -183,8 +182,6 @@ class HarborFileSystem(AbstractedFS):
         return FileHandler(self.bucket_name, ftp_path, self.client, mode)
 
     def mkdir(self, path):
-        print('function:mkdir', 'path: ' + path)
-
         ftp_path = self.fs2ftp(path)
         try:
             self.client.ftp_mkdir(self.bucket_name, ftp_path[1:])
@@ -293,6 +290,7 @@ class FileHandler(object):
             self.ensure_init_write_generator()
 
         self._sync_cache()
+        self.file.close()
         self.closed = True
 
     def seek(self, offset):
@@ -340,30 +338,21 @@ class DownLoader(object):
         self.closed = False
         self.id = 0
         try:
-            self.obj_generator, ob = self.client.ftp_get_obj_generator(self.bucket_name, self.ftp_path[1:], per_size= 4 * 1024 ** 2)
-            # print(self.obj_generator, ob)
+            self.obj_generator, ob = self.client.ftp_get_obj_generator(
+                self.bucket_name, self.ftp_path[1:], per_size=4 * 1024 ** 2)
         except HarborError as error:
             raise FilesystemError(error.msg)
 
     def read(self, size=None):
-        # print(size, '--------------')
-        # try:
-        #     data, obj = self.client.ftp_read_chunk(self.bucket_name, self.ftp_path[1:], self.id, size)
-        #     self.id += size
-        #
-        # except HarborError as error:
-        #     raise FilesystemError(error.msg)
         try:
             data = next(self.obj_generator)
-            # print(data)
-        # except StopIteration as error:
         except Exception as error:
             return b''
+
         return data
 
     def close(self):
         self.closed = True
-        # pass
 
 
 if __name__ == '__main__':

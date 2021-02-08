@@ -47,19 +47,26 @@ def main():
     # passive connections.  Decomment in case you're behind a NAT.
     # handler.masquerade_address = '151.25.42.11'
     handler.passive_ports = range(2000, 3001)
- 
-    # Instantiate FTP server class and listen on 0.0.0.0:2121
-    address = ('0.0.0.0', 21)
+
     # server = FTPServer(address, handler)
     # server = ThreadedFTPServer(address, handler)
+    while True:
+        try:
+            init_server_and_run(handler)
+        except Exception:
+            pass
+
+
+def init_server_and_run(handler):
+    address = ('0.0.0.0', 21)
     server = MultiprocessFTPServer(address, handler)
- 
     # set a limit for connections
     server.max_cons = 2048
     server.max_cons_per_ip = 2048
 
     # start ftp server
     server.serve_forever()
+    server.close_all()
 
  
 if __name__ == '__main__':
