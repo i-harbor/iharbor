@@ -53,6 +53,8 @@ def main():
     while True:
         try:
             init_server_and_run(handler)
+        except InterruptedError:
+            break
         except Exception:
             pass
 
