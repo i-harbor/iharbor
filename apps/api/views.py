@@ -3364,3 +3364,83 @@ class ShareViewSet(CustomGenericViewSet):
 
         return Response(data=data, status=status.HTTP_200_OK)
 
+
+class SearchObjectViewSet(CustomGenericViewSet):
+    """
+    检索对象视图
+
+    retrieve:
+        获取对象对应的ceph rados key信息
+
+    	>>Http Code: 状态码200：
+                """
+    queryset = {}
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
+    # lookup_field = 'path'
+    # lookup_value_regex = '.+'
+    pagination_class = paginations.SearchBucketFileLimitOffsetPagination
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('检索对象'),
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='bucket', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("检索的存储桶"),
+                required=True
+            ),
+            openapi.Parameter(
+                name='search', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("检索的对象关键字"),
+                required=True
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        search = request.query_params.get('search', '')
+        bucket_name = request.query_params.get('bucket', '')
+        if not search:
+            exc = exceptions.BadRequest('invalid param "search"')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if not bucket_name:
+            exc = exceptions.BadRequest('invalid param "bucket"')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        h_manager = HarborManager()
+        try:
+            bucket, queryset = h_manager.search_object_queryset(bucket=bucket_name, search=search, user=request.user)
+        except HarborError as e:
+            if e.code == 400:
+                exc = exceptions.BadRequest(message=e.msg)
+            elif e.code == 404:
+                exc = exceptions.NoSuchBucket()
+            elif e.code == 403:
+                exc = exceptions.AccessDenied(message=e.msg)
+            else:
+                exc = exceptions.Error(message=e.msg)
+
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            paginator = paginations.BucketFileLimitOffsetPagination()
+            files = paginator.paginate_queryset(queryset, request=request)
+            serializer = serializers.ObjInfoSerializer(files, many=True,
+                                                       context={'bucket_name': bucket_name, 'bucket': bucket})
+            files = serializer.data
+        except Exception as exc:
+            exc = exceptions.Error(message=str(exc))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        data_dict = OrderedDict([
+            ('bucket', bucket_name),
+            ('files', files)
+        ])
+        return paginator.get_paginated_response(data_dict)

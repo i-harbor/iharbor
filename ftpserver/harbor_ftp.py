@@ -53,10 +53,12 @@ def main():
     while True:
         try:
             init_server_and_run(handler)
-        except InterruptedError:
+        except (KeyboardInterrupt, SystemExit):
             break
         except Exception:
-            pass
+            continue
+        else:       # 正常退出
+            break
 
 
 def init_server_and_run(handler):

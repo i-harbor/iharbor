@@ -26,7 +26,7 @@ def ftp_close_old_connections(func):
 
 
 class HarborError(BaseException):
-    def __init__(self, code:int, msg:str, **kwargs):
+    def __init__(self, code: int, msg: str, **kwargs):
         self.code = code if code else 500   # 错误码
         self.msg = msg      # 错误描述
         self.data = kwargs  # 一些希望传递的数据
@@ -1263,6 +1263,34 @@ class HarborManager:
             return True, obj.get_access_permission_code(bucket)
 
         return False, obj.get_access_permission_code(bucket)
+
+    def search_object_queryset(self, bucket, search: str, user):
+        """
+        检索对象查询集
+
+        :param bucket: bucket名称或对象
+        :param search: 搜索关键字
+        :param user: 用户对象
+        :return:
+            Bucket(), Queryset()
+
+        :raises: HarborError
+        """
+        if isinstance(bucket, str):
+            # 存储桶验证和获取桶对象
+            bucket = self.get_bucket_by_name(bucket)
+            if not bucket:
+                raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+
+        self.check_public_or_user_bucket(bucket=bucket, user=user, all_public=False)
+        table_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path='', collection_name=table_name)
+        try:
+            queryset = bfm.get_search_object_queryset(search=search, contain_dir=False)
+        except Exception as e:
+            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+
+        return bucket, queryset
 
 
 class FtpHarborManager:

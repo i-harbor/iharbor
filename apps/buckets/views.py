@@ -14,7 +14,7 @@ class BucketView(View):
 
     def get_content(self, request):
         content = {}
-        content['buckets'] = Bucket.objects.filter(user=request.user).all()
+        # content['buckets'] = Bucket.objects.filter(user=request.user).all()
         return content
 
 
@@ -59,3 +59,11 @@ class S3ApiUsageView(View):
         article = ApiUsageDescription.objects.filter(desc_for=ApiUsageDescription.DESC_S3_API).first()
         return render(request, 'base_usage_article.html', context={'article': article})
 
+
+class SearchObjectView(View):
+    """
+    搜索对象类视图
+    """
+    def get(self, request):
+        buckets = Bucket.objects.filter(user=request.user).all()
+        return render(request, 'search_object.html', context={'buckets': buckets})
