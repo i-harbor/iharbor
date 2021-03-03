@@ -141,7 +141,7 @@
             show_warning_dialog(getTransText('请输入要搜索的对象名称'))
             return
         }
-        let params = encode_params({bucket: bucket, search: search, limit: 2})
+        let params = encode_params({bucket: bucket, search: search})
         let url = build_url_with_domain_name('api/v1/search/object/?' + params)
         get_search_objects_and_render(url, render_search_objects_table)
     })

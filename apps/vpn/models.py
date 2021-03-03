@@ -5,11 +5,12 @@ from django.contrib.auth import get_user_model
 from ckeditor.fields import RichTextField
 
 
-#获取用户模型
 User = get_user_model()
 
-def rand_hex_string(len=10):
-    return binascii.hexlify(os.urandom(len//2)).decode()
+
+def rand_hex_string(length=10):
+    return binascii.hexlify(os.urandom(length//2)).decode()
+
 
 class VPNUsageDescription(models.Model):
     '''

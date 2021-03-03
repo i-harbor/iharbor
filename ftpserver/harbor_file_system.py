@@ -10,7 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
 django.setup()  # 加载项目配置
 
-from api.harbor import FtpHarborManager, HarborError
+from api.harbor import FtpHarborManager
+from api.exceptions import HarborError
 
 
 class HarborFileSystem(AbstractedFS):

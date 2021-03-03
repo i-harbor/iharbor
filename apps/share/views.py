@@ -14,7 +14,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.serializers import Serializer
 from rest_framework.utils.urls import replace_query_param
-from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from buckets.utils import BucketFileManagement
@@ -24,7 +24,8 @@ from utils.jwt_token import JWTokenTool2, InvalidToken
 from utils.view import CustomGenericViewSet
 from utils.time import time_to_gmt, datetime_from_gmt
 from . import serializers
-from api.harbor import HarborError, HarborManager
+from api.harbor import HarborManager
+from api.exceptions import HarborError
 from .forms import SharePasswordForm
 
 
@@ -33,6 +34,7 @@ class InvalidError(Exception):
     def __init__(self, code:int, msg:str='invalid'):
         self.code = code
         self.msg = msg
+
 
 class ObsViewSet(viewsets.GenericViewSet):
     '''
@@ -84,7 +86,6 @@ class ObsViewSet(viewsets.GenericViewSet):
     lookup_field = 'objpath'
     lookup_value_regex = '.+'
 
-
     @swagger_auto_schema(
         operation_summary=gettext_lazy('浏览器端下载文件对象'),
         manual_parameters=[
@@ -112,11 +113,11 @@ class ObsViewSet(viewsets.GenericViewSet):
         bucket_name, obj_path = pp.get_bucket_and_dirpath()
 
         # 存储桶验证和获取桶对象
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
+            bucket, fileobj = h_manager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
         except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if fileobj is None:
             return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
@@ -144,12 +145,12 @@ class ObsViewSet(viewsets.GenericViewSet):
             except InvalidError as e:
                 return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
+            generator = h_manager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
             response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
             response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
             response['Content-Length'] = end - offset + 1
         else:
-            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj)
+            generator = h_manager._get_obj_generator(bucket=bucket, obj=fileobj)
             response = FileResponse(generator)
             response['Content-Length'] = filesize
 
@@ -448,11 +449,11 @@ class ShareDownloadViewSet(CustomGenericViewSet):
 
         obj_path = f'{dir_base}/{subpath}' if dir_base else subpath
         # 存储桶验证和获取桶对象
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, fileobj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
+            bucket, fileobj = h_manager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path)
         except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if fileobj is None:
             return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
@@ -474,12 +475,12 @@ class ShareDownloadViewSet(CustomGenericViewSet):
             except InvalidError as e:
                 return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
 
-            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
+            generator = h_manager._get_obj_generator(bucket=bucket, obj=fileobj, offset=offset, end=end)
             response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
             response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
             response['Content-Length'] = end - offset + 1
         else:
-            generator = hManager._get_obj_generator(bucket=bucket, obj=fileobj)
+            generator = h_manager._get_obj_generator(bucket=bucket, obj=fileobj)
             response = FileResponse(generator)
             response['Content-Length'] = filesize
 
@@ -671,14 +672,14 @@ class ShareDirViewSet(CustomGenericViewSet):
             return Response(data={'code': 400, 'code_text': _('分享路径无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         # 存储桶验证和获取桶对象
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket = hManager.get_bucket(bucket_name=bucket_name)
+            bucket = h_manager.get_bucket(bucket_name=bucket_name)
             if not bucket:
                 return Response(data={'code': 404, 'code_text': _('存储桶不存在')}, status=status.HTTP_404_NOT_FOUND)
 
             if dir_base:
-                base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
+                base_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
                     return Response(data={'code': 404, 'code_text': _('分享根目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
@@ -693,18 +694,18 @@ class ShareDirViewSet(CustomGenericViewSet):
                 if (share_code is None) or (not base_obj.check_share_password(password=share_code)):
                     return Response(data={'code': 401, 'code_text': _('共享密码无效')}, status=status.HTTP_401_UNAUTHORIZED)
 
-            if subpath: # 是否list子目录
+            if subpath:     # 是否list子目录
                 if dir_base:
                     sub_path = f'{dir_base}/{subpath}'
                 else:
                     sub_path = subpath
-                sub_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=sub_path)
+                sub_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=sub_path)
                 if not sub_obj or (sub_obj and sub_obj.is_file()):
                     return Response(data={'code': 404, 'msg': _('子目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
                 sub_obj = None
         except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if sub_obj:
             list_dir_id = sub_obj.id
@@ -784,14 +785,14 @@ class ShareView(View):
             return render(request, 'info.html', context={'code': 400, 'code_text': _('分享路径无效')})
 
         # 存储桶验证和获取桶对象
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket = hManager.get_bucket(bucket_name=bucket_name)
+            bucket = h_manager.get_bucket(bucket_name=bucket_name)
             if not bucket:
                 return render(request, 'info.html', context={'code': 404, 'code_text': _('存储桶不存在')})
 
             if dir_base:
-                base_obj = hManager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
+                base_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
                     return render(request, 'info.html', context={'code': 404, 'code_text': _('分享根目录不存在')})
             else:
@@ -801,7 +802,7 @@ class ShareView(View):
             if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
                 return render(request, 'info.html', context={'code': 403, 'code_text': _('您没有访问权限')})
         except HarborError as e:
-            return render(request, 'info.html', context={'code': e.code, 'code_text': e.msg})
+            return render(request, 'info.html', context=e.err_data_old())
 
         # 无分享密码
         if (not base_obj) or (not base_obj.has_share_password()):
