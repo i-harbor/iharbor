@@ -1,3 +1,11 @@
+## v0.5.1
+* 搜索桶内对象功能
+* ftp支持上传空文件和下载续传
+* CreateBucket api桶已存在返回409
+* python环境依赖更新
+* 准备废弃vpn和evcloud app
+* 一些代码优化整理修改
+
 ## v0.5.0
 * share下载api浏览器缓存有关支持，增加ETag、Last_Modified、Cache-Control标头
 * sweetalert2升级，增加分享url查询api,前端分享设置修改

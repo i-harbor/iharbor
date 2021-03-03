@@ -1,5 +1,6 @@
 {% extends "base_with_sidebar.html" %}
 {% load static %}
+{% load i18n %}
 {# 加载自定义过滤器 #}
 {% load custom_filters %}
 
@@ -18,7 +19,7 @@
             <div class="row">
                 <div class="col-6 input-group mb-3">
                     <div class="input-group-prepend">
-                        <label class="input-group-text" for="id-search-bucket">存储桶</label>
+                        <label class="input-group-text" for="id-search-bucket">{% trans '存储桶' %}</label>
                     </div>
                     <select class="custom-select" id="id-search-bucket">
                         {% for b in buckets %}
@@ -28,12 +29,12 @@
                 </div>
                 <div class="col-6 input-group mb-3">
                     <div class="input-group-prepend">
-                        <span class="input-group-text" id="inputGroupFileAddon01">对象名称</span>
+                        <span class="input-group-text" id="inputGroupFileAddon01">{% trans '对象名称' %}</span>
                     </div>
                     <input id="id-search-keyword" type="text" class="form-control" placeholder=""
                            aria-label="" aria-describedby="button-search-objects">
                     <div class="input-group-append">
-                        <button class="btn btn-outline-secondary" type="button" id="button-search-objects">搜索</button>
+                        <button class="btn btn-outline-secondary" type="button" id="button-search-objects">{% trans '搜索' %}</button>
                     </div>
                 </div>
             </div>

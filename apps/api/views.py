@@ -3108,6 +3108,7 @@ class VPNViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取VPN口令'),
+        deprecated=True,
         responses={
             status.HTTP_200_OK: ''
         }
@@ -3137,6 +3138,7 @@ class VPNViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('修改vpn口令'),
+        deprecated=True,
         responses={
             status.HTTP_201_CREATED: """
                 {
