@@ -7,7 +7,8 @@ from django.db import close_old_connections
 
 from buckets.utils import BucketFileManagement
 from buckets.models import Bucket
-from api.harbor import HarborManager, HarborError
+from api.harbor import HarborManager
+from api.exceptions import HarborError
 
 
 logger = logging.getLogger('error')

@@ -5,6 +5,7 @@ import random
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
 from django.db.models import Sum, Count, Model
+from django.db.models.functions import Lower
 from django.db.models.query import Q
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.apps import apps
@@ -176,16 +177,16 @@ class BucketFileManagement:
         :raises: Exception
         '''
         if self.cur_dir_id:
-            return (True, self.cur_dir_id)
+            return True, self.cur_dir_id
 
         path = dir_path if dir_path else self._path
         # path为空，根目录为存储桶
         if path == '' or path == '/':
-            return (True, self.ROOT_DIR_ID)
+            return True, self.ROOT_DIR_ID
 
         path = self._hand_path(path)
         if not path:
-            return (False, None) # path参数有误
+            return False, None       # path参数有误
 
         try:
             obj = self.get_obj(path=path)
@@ -193,9 +194,9 @@ class BucketFileManagement:
             raise Exception(f'查询目录id错误，{str(e)}')
         if obj and obj.is_dir():
             self.cur_dir_id = obj.id
-            return (True, self.cur_dir_id)
+            return True, self.cur_dir_id
 
-        return (False, None)  # path参数有误,未找到对应目录信息
+        return False, None    # path参数有误,未找到对应目录信息
 
     def get_cur_dir_files(self, cur_dir_id=None):
         '''
@@ -403,3 +404,15 @@ class BucketFileManagement:
 
         return obj
 
+    def get_search_object_queryset(self, search: str, contain_dir: bool = False):
+        """
+        检索对象
+
+        """
+        if contain_dir:
+            lookup = {'lower_name__icontains': search}
+        else:
+            lookup = {'fod': True, 'lower_name__icontains': search}
+
+        model_class = self.get_obj_model_class()
+        return model_class.objects.annotate(lower_name=Lower('name')).filter(**lookup)

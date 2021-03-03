@@ -1,0 +1,52 @@
+{% extends "base_with_sidebar.html" %}
+{% load static %}
+{% load i18n %}
+{# 加载自定义过滤器 #}
+{% load custom_filters %}
+
+{% block title %}
+    搜索对象
+{%endblock%}
+
+
+{% block head_extends %}
+	<link rel="stylesheet" type="text/css" href="{% static 'buckets/bucket.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        <div>
+            <div class="row">
+                <div class="col-6 input-group mb-3">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="id-search-bucket">{% trans '存储桶' %}</label>
+                    </div>
+                    <select class="custom-select" id="id-search-bucket">
+                        {% for b in buckets %}
+                            <option value="{{ b.name }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="inputGroupFileAddon01">{% trans '对象名称' %}</span>
+                    </div>
+                    <input id="id-search-keyword" type="text" class="form-control" placeholder=""
+                           aria-label="" aria-describedby="button-search-objects">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="button-search-objects">{% trans '搜索' %}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr style="height:1px;border:1px;border-top:1px solid #185598;"/>
+        <div id="search-object-display">
+
+        </div>
+    </div>
+{% endblock %}
+
+{% block script_extends %}
+    <script type="text/javascript" src="{% static 'art-template/template-web.js' %}"></script>
+    <script type="text/javascript" src="{% static 'buckets/search_object.js' %}"></script>
+{% endblock %}

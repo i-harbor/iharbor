@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-11-19 14:50+0800\n"
+"POT-Creation-Date: 2021-03-03 10:05+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -480,6 +480,14 @@ msgstr "Size"
 #, javascript-format
 msgid "第%s页 / 共%s页"
 msgstr "Page %s of %s"
+
+#: apps/buckets/static/buckets/search_object.js:136
+msgid "请选择要搜索的存储桶"
+msgstr "Please select the bucket to search first"
+
+#: apps/buckets/static/buckets/search_object.js:141
+msgid "请输入要搜索的对象名称"
+msgstr "Please input the name of object to search first"
 
 #: apps/users/static/users/users.js:39
 msgid "确定刷新token吗？"

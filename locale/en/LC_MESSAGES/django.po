@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-11-19 14:51+0800\n"
+"POT-Creation-Date: 2021-03-03 10:18+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -702,6 +702,36 @@ msgstr "Get the CEPH Rados key information of the object"
 msgid "获取对象或目录的分享连接"
 msgstr "Get object or directory metadata"
 
+#: apps/api/views.py:3382
+msgid "检索存储桶内对象"
+msgstr "Search objects in the bucket"
+
+#: apps/api/views.py:3388
+msgid "检索的存储桶"
+msgstr "The bucket to be searched"
+
+#: apps/api/views.py:3394
+msgid "检索的对象关键字"
+msgstr "The keyword to search"
+
+#: apps/buckets/authentication.py:28
+msgid "Invalid bucket token header. No credentials provided."
+msgstr ""
+
+#: apps/buckets/authentication.py:31
+msgid "Invalid bucket token header. Token string should not contain spaces."
+msgstr ""
+
+#: apps/buckets/authentication.py:37
+msgid ""
+"Invalid bucket token header. Token string should not contain invalid "
+"characters."
+msgstr ""
+
+#: apps/buckets/authentication.py:47
+msgid "Invalid bucket token."
+msgstr ""
+
 #: apps/buckets/models.py:49
 msgid "公有（可读写）"
 msgstr "public(rw)"
@@ -810,6 +840,14 @@ msgstr "Delete"
 #: apps/evcloud/templates/evcloud_add.html:62
 msgid "创建"
 msgstr "Create"
+
+#: apps/buckets/templates/search_object.html:32
+msgid "对象名称"
+msgstr "Object name"
+
+#: apps/buckets/templates/search_object.html:37
+msgid "搜索"
+msgstr "Search"
 
 #: apps/evcloud/templates/evcloud_add.html:20
 #: apps/evcloud/templates/evcloud_list.html:21
@@ -1320,10 +1358,14 @@ msgid "后台管理"
 msgstr "Admin"
 
 #: templates/base_with_sidebar.html:17
-msgid "对象存储"
-msgstr "Object storage"
+msgid "对象存储桶管理"
+msgstr "Bucket management"
 
-#: templates/base_with_sidebar.html:21
+#: templates/base_with_sidebar.html:25
+msgid "数据访问说明"
+msgstr "Data access usage"
+
+#: templates/base_with_sidebar.html:28
 msgid "FTP访问说明"
 msgstr "FTP usage"
 
@@ -1335,25 +1377,33 @@ msgstr "Native API usage"
 msgid "S3兼容API使用说明"
 msgstr "S3 API usage"
 
-#: templates/base_with_sidebar.html:28
-msgid "云主机"
-msgstr "Cloud host"
+#: templates/base_with_sidebar.html:35
+msgid "数据检索"
+msgstr "Data retrieval"
 
-#: templates/base_with_sidebar.html:30
-msgid "云主机列表"
-msgstr "Host list"
+#: templates/base_with_sidebar.html:38
+msgid "桶内文件名检索"
+msgstr "In bucket search"
 
-#: templates/base_with_sidebar.html:32
-msgid "云主机使用说明"
-msgstr "Host usage"
+#: templates/base_with_sidebar.html:39
+msgid "全站检索（建设中）"
+msgstr "Full site search (under construction)"
 
-#: templates/base_with_sidebar.html:40
-msgid "VPN口令管理"
-msgstr "VPN password"
+#: templates/base_with_sidebar.html:44
+msgid "数据在线处理"
+msgstr "Data online processing"
 
-#: templates/base_with_sidebar.html:41
-msgid "VPN安装配置说明"
-msgstr "VPN usage"
+#: templates/base_with_sidebar.html:47
+msgid "文档处理（建设中）"
+msgstr "Document processing (under construction)"
+
+#: templates/base_with_sidebar.html:48
+msgid "图片处理（建设中）"
+msgstr "Picture processing (under construction)"
+
+#: templates/base_with_sidebar.html:49
+msgid "遥感图片处理（建设中）"
+msgstr "Remote sensing image processing (under construction)"
 
 #: utils/storagers.py:211
 msgid "上传文件超过大小限制"

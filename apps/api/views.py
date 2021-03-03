@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy, gettext as _
 from django.core.validators import validate_email
 from django.core import exceptions
 from django.urls import reverse as django_reverse
-from rest_framework import status, mixins
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.serializers import Serializer, ValidationError
@@ -36,16 +36,16 @@ from . import serializers
 from . import paginations
 from . import permissions
 from . import throttles
-from .harbor import HarborError, HarborManager
+from .harbor import HarborManager
 from . import exceptions
 
-# Create your views here.
-logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
-debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+
+logger = logging.getLogger('django.request')    # 这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+debug_logger = logging.getLogger('debug')       # 这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
-def rand_hex_string(len=10):
-    return binascii.hexlify(os.urandom(len//2)).decode()
+def rand_hex_string(length=10):
+    return binascii.hexlify(os.urandom(length//2)).decode()
 
 
 def rand_share_code():
@@ -72,7 +72,7 @@ def serializer_error_text(errors, default: str = ''):
 
 
 def get_user_own_bucket(bucket_name, request):
-    '''
+    """
     获取当前用户的存储桶
 
     :param bucket_name: 存储通名称
@@ -80,7 +80,7 @@ def get_user_own_bucket(bucket_name, request):
     :return:
         success: bucket
         failure: None
-    '''
+    """
     bucket = Bucket.get_bucket_by_name(bucket_name)
     if not bucket:
         return None
@@ -90,7 +90,7 @@ def get_user_own_bucket(bucket_name, request):
 
 
 def str_to_int_or_default(val, default):
-    '''
+    """
     字符串转int，转换失败返回设置的默认值
 
     :param val: 待转化的字符串
@@ -98,7 +98,7 @@ def str_to_int_or_default(val, default):
     :return:
         int     # success
         default # failed
-    '''
+    """
     try:
         return int(val)
     except Exception:
@@ -142,7 +142,7 @@ def check_authenticated_or_bucket_token(request, bucket_name: str = None, bucket
 
 
 class UserViewSet(CustomGenericViewSet):
-    '''
+    """
     用户类视图
     list:
         获取用户列表,需要超级用户权限
@@ -230,7 +230,7 @@ class UserViewSet(CustomGenericViewSet):
             {
                 'detail': 'xxx'
             }
-    '''
+    """
     queryset = User.objects.all()
     lookup_field = 'username'
     lookup_value_regex = '.+'
@@ -299,20 +299,21 @@ class UserViewSet(CustomGenericViewSet):
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
 
-        return Response({'code': 200, 'code_text': '修改成功', 'data':serializer.validated_data})
+        return Response({'code': 200, 'code_text': '修改成功', 'data': serializer.validated_data})
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('删除一个用户'),
     )
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
-        if user.is_active != False:
+        if user.is_active is not False:
             user.is_active = False
             user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def has_update_user_permission(self, request, instance):
-        '''
+    @staticmethod
+    def has_update_user_permission(request, instance):
+        """
         当前用户是否有修改给定用户信息的权限
         1、超级职员用户拥有所有权限；
         2、用户拥有修改自己信息的权限；
@@ -323,9 +324,9 @@ class UserViewSet(CustomGenericViewSet):
         :return:
             True: has permission
             False: has not permission
-        '''
+        """
         user = request.user
-        if not user.id: # 未认证用户
+        if not user.id:     # 未认证用户
             return False
 
         # 当前用户是超级职员用户，有超级权限
@@ -347,9 +348,9 @@ class UserViewSet(CustomGenericViewSet):
         return False
 
     def get_serializer_class(self):
-        '''
+        """
         动态加载序列化器
-        '''
+        """
         if self.action == 'create':
             return serializers.UserCreateSerializer
         elif self.action == 'partial_update':
@@ -361,7 +362,7 @@ class UserViewSet(CustomGenericViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action =='list':
+        if self.action == 'list':
             return [permissions.IsSuperUser()]
         elif self.action == 'create':
             return []
@@ -373,7 +374,7 @@ class UserViewSet(CustomGenericViewSet):
 
 
 class BucketViewSet(CustomGenericViewSet):
-    '''
+    """
     存储桶视图
 
     create:
@@ -405,8 +406,13 @@ class BucketViewSet(CustomGenericViewSet):
             {
                 'code': 400,
                 'code_text': 'xxx',      //错误码表述信息
-                'data': serializer.data, //请求时提交数据
+                'data': {}, //请求时提交数据
                 'existing': true or  false  // true表示资源已存在
+            }
+        >>Http Code: 状态码409, 存储桶已存在：
+            {
+                'code': 'BucketAlreadyExists',    # or BucketAlreadyOwnedByYou
+                'code_text': 'xxx',      //错误码表述信息
             }
 
     delete:
@@ -443,7 +449,7 @@ class BucketViewSet(CustomGenericViewSet):
             "code_text": "保存到数据库时错误"
         }
 
-    '''
+    """
     queryset = Bucket.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
     pagination_class = paginations.BucketsLimitOffsetPagination
@@ -499,9 +505,9 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def list(self, request, *args, **kwargs):
-        '''
+        """
         获取存储桶列表
-        '''
+        """
         self.queryset = Bucket.objects.select_related('user').filter(user=request.user).all() # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -523,31 +529,37 @@ class BucketViewSet(CustomGenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
-            code_text = '参数验证有误'
-            existing = False
-            try:
-                for key, err_list in serializer.errors.items():
-                    for err in err_list:
-                        code_text = err
-                        if err.code == 'existing':
-                            existing = True
-            except:
-                pass
-
+            code_text = serializer_error_text(serializer.errors, default='参数验证有误')
             data = {
                 'code': 400,
                 'code_text': code_text,
-                'existing': existing,
+                'existing': False,
                 'data': serializer.data,
             }
 
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
-        # 创建bucket,创建bucket的shard集合
+        # 检测桶是否存在
+        validated_data = serializer.validated_data
+        bucket_name = validated_data.get('name')
+        user = request.user
+        bucket = Bucket.get_bucket_by_name(bucket_name)
+        if bucket:
+            if bucket.user_id == user.id:
+                exc = exceptions.BucketAlreadyOwnedByYou()
+            else:
+                exc = exceptions.BucketAlreadyExists()
+
+            data = exc.err_data_old()
+            return Response(data=data, status=409)
+
+        # 创建bucket,创建bucket的对象元数据表
         try:
             bucket = serializer.save()
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': _('创建桶失败') + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            exc = exceptions.Error(message=_('创建桶失败') + str(e))
+            return Response(data=exc.err_data_old(), status=exc.status_code)
+
         col_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=col_name)
         model_class = bfm.get_obj_model_class()
@@ -591,9 +603,9 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def retrieve(self, request, *args, **kwargs):
-        '''
+        """
         获取一个存储桶详细信息
-        '''
+        """
         id_or_name, by_name = self.get_id_or_name_params(request, kwargs)
         if by_name:
             params = {'bucket_name': id_or_name}
@@ -914,13 +926,13 @@ class BucketViewSet(CustomGenericViewSet):
 
     @staticmethod
     def get_buckets_ids(request, **kwargs):
-        '''
+        """
         获取存储桶id列表
         :param request:
         :return:
             ids: list
         :raises: ValueError
-        '''
+        """
         if isinstance(request.query_params, QueryDict):
             ids = request.query_params.getlist('ids')
         else:
@@ -959,7 +971,7 @@ class BucketViewSet(CustomGenericViewSet):
 
 
 class ObjViewSet(CustomGenericViewSet):
-    '''
+    """
     文件对象视图集
 
     create_detail:
@@ -1006,7 +1018,7 @@ class ObjViewSet(CustomGenericViewSet):
         1. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
         2. 不带参数时，返回整个文件对象；
 
-    	>>Http Code: 状态码200：
+        >>Http Code: 状态码200：
              evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
             其他,返回整个文件对象bytes数据流
 
@@ -1045,7 +1057,7 @@ class ObjViewSet(CustomGenericViewSet):
             对应参数错误信息;
         Http Code: 状态码404;
 
-    '''
+    """
     queryset = {}
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'objpath'
@@ -1115,9 +1127,9 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             created = hManager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
-                                           reset=reset, user=request.user)
-        except HarborError as e:
-            return Response(data={'code':e.code, 'code_text': e.msg}, status=e.code)
+                                          reset=reset, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         data['created'] = created
         return Response(data, status=status.HTTP_200_OK)
@@ -1165,8 +1177,8 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             bucket, obj, created = hManager.create_empty_obj(bucket_name=bucket_name, obj_path=objpath, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
@@ -1274,9 +1286,9 @@ class ObjViewSet(CustomGenericViewSet):
             hManager = HarborManager()
             try:
                 chunk, obj = hManager.read_chunk(bucket_name=bucket_name, obj_path=objpath,
-                                                      offset=offset, size=size, user = request.user)
-            except HarborError as e:
-                return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+                                                 offset=offset, size=size, user=request.user)
+            except exceptions.HarborError as e:
+                return Response(data=e.err_data_old(), status=e.status_code)
 
             return self.wrap_chunk_response(chunk=chunk, obj_size=obj.si)
 
@@ -1284,9 +1296,9 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             file_generator, obj = hManager.get_obj_generator(bucket_name=bucket_name, obj_path=objpath,
-                                                                  user=request.user, all_public=True)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+                                                             user=request.user, all_public=True)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         filename = obj.name
         filename = urlquote(filename)  # 中文文件名需要
@@ -1312,8 +1324,8 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             ok = hManager.delete_object(bucket_name=bucket_name, obj_path=objpath, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if not ok:
             return Response(data={'code': 500, 'code_text': _('删除失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1389,8 +1401,8 @@ class ObjViewSet(CustomGenericViewSet):
         hManager = HarborManager()
         try:
             ok, access_code = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if not ok:
             return Response(data={'code': 500, 'code_text': _('对象共享权限设置失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1421,19 +1433,21 @@ class ObjViewSet(CustomGenericViewSet):
             return serializers.ObjPutFileSerializer
         return Serializer
 
-    def do_bucket_limit_validate(self, bfm:BucketFileManagement):
-        '''
+    @staticmethod
+    def do_bucket_limit_validate(bfm: BucketFileManagement):
+        """
         存储桶的限制验证
         :return: True(验证通过); False(未通过)
-        '''
+        """
         # 存储桶对象和文件夹数量上限验证
         if bfm.get_count() >= 10**7:
             return False
 
         return True
 
-    def custom_read_param_validate_or_response(self, request):
-        '''
+    @staticmethod
+    def custom_read_param_validate_or_response(request):
+        """
         自定义读取文件对象参数验证
         :param request:
         :return:
@@ -1441,7 +1455,7 @@ class ObjViewSet(CustomGenericViewSet):
                 (None, response) -> 参数有误
                 ({data}, None) -> 参数验证通过
 
-        '''
+        """
         chunk_offset = request.query_params.get('offset', None)
         chunk_size = request.query_params.get('size', None)
 
@@ -1456,7 +1470,7 @@ class ObjViewSet(CustomGenericViewSet):
                 validated_data['size'] = size
             except:
                 response = Response(data={'code': 400, 'code_text': _('offset或size参数有误')},
-                                status=status.HTTP_400_BAD_REQUEST)
+                                    status=status.HTTP_400_BAD_REQUEST)
                 return None, response
         # 未提交参数
         elif chunk_offset is None and chunk_size is None:
@@ -1468,14 +1482,15 @@ class ObjViewSet(CustomGenericViewSet):
             return None, response
         return validated_data, None
 
-    def wrap_chunk_response(self, chunk:bytes, obj_size:int):
-        '''
+    @staticmethod
+    def wrap_chunk_response(chunk: bytes, obj_size: int):
+        """
         文件对象自定义读取response
 
         :param chunk: 数据块
-        :param size: 文件对象总大小
+        :param obj_size: 文件对象总大小
         :return: HttpResponse
-        '''
+        """
         c_len = len(chunk)
         response = StreamingHttpResponse(BytesIO(chunk), status=status.HTTP_200_OK)
         response['Content-Type'] = 'application/octet-stream'  # 注意格式
@@ -1484,7 +1499,8 @@ class ObjViewSet(CustomGenericViewSet):
         response['evob_obj_size'] = obj_size
         return response
 
-    def get_data(self, request):
+    @staticmethod
+    def get_data(request):
         return request.data
 
     def get_permissions(self):
@@ -1495,7 +1511,7 @@ class ObjViewSet(CustomGenericViewSet):
 
 
 class DirectoryViewSet(CustomGenericViewSet):
-    '''
+    """
     目录视图集
 
     list:
@@ -1526,7 +1542,6 @@ class DirectoryViewSet(CustomGenericViewSet):
             {
                 "code": 400,
                 "code_text": 'xxxxx'        //错误信息
-                "existing": true or  false  // true表示资源已存在
             }
         >>Http Code: 状态码201,创建文件夹成功：
             {
@@ -1560,7 +1575,7 @@ class DirectoryViewSet(CustomGenericViewSet):
           "code_text": "设置目录权限成功",
           "share": "http://xxx/share/s/xx/xx" # 分享链接
         }
-    '''
+    """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'dirpath'
@@ -1657,9 +1672,9 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def list_detail(self, request, *args, **kwargs):
-        '''
+        """
          获取一个目录下的文件和文件夹信息
-        '''
+        """
         return self.list_v1(request, *args, **kwargs)
 
     def list_v1(self, request, *args, **kwargs):
@@ -1679,12 +1694,12 @@ class DirectoryViewSet(CustomGenericViewSet):
         except Exception as e:
             return Response(data={'code': 400, 'code_text': _('offset或limit参数无效')}, status=status.HTTP_400_BAD_REQUEST)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            files, bucket = hManager.list_dir(bucket_name=bucket_name, path=dir_path, offset=offset, limit=limit,
-                                              user=request.user, paginator=paginator)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            files, bucket = h_manager.list_dir(bucket_name=bucket_name, path=dir_path, offset=offset, limit=limit,
+                                               user=request.user, paginator=paginator)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         data_dict = OrderedDict([
             ('code', 200),
@@ -1742,17 +1757,17 @@ class DirectoryViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            ok, dir = hManager.mkdir(bucket_name=bucket_name, path=path, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            ok, dir_obj = h_manager.mkdir(bucket_name=bucket_name, path=path, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         data = {
             'code': 201,
             'code_text': _('创建文件夹成功'),
-            'data': {'dir_name': dir.name, 'bucket_name': bucket_name, 'dir_path': dir.get_parent_path()},
-            'dir': serializers.ObjInfoSerializer(dir).data
+            'data': {'dir_name': dir_obj.name, 'bucket_name': bucket_name, 'dir_path': dir_obj.get_parent_path()},
+            'dir': serializers.ObjInfoSerializer(dir_obj).data
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -1780,11 +1795,11 @@ class DirectoryViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            ok = hManager.rmdir(bucket_name=bucket_name, dirpath=dirpath, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            h_manager.rmdir(bucket_name=bucket_name, dirpath=dirpath, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1853,11 +1868,12 @@ class DirectoryViewSet(CustomGenericViewSet):
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': _('share参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            ok, access_code = hManager.share_dir(bucket_name=bucket_name, path=dirpath, share=share,days=days, password=password, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            ok, access_code = h_manager.share_dir(bucket_name=bucket_name, path=dirpath,
+                                                  share=share, days=days, password=password, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if not ok:
             return Response(data={'code': 400, 'code_text': _('设置目录权限失败')}, status=status.HTTP_400_BAD_REQUEST)
@@ -1886,7 +1902,7 @@ class DirectoryViewSet(CustomGenericViewSet):
 
 
 class BucketStatsViewSet(CustomGenericViewSet):
-    '''
+    """
         retrieve:
             存储桶资源统计
 
@@ -1908,7 +1924,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': xxx  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'bucket_name'
@@ -1944,7 +1960,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
 
 
 class SecurityViewSet(CustomGenericViewSet):
-    '''
+    """
     安全凭证视图集
 
     retrieve:
@@ -1981,9 +1997,9 @@ class SecurityViewSet(CustomGenericViewSet):
                 {
                     "detail":"您没有执行该操作的权限。"
                 }
-        '''
+        """
     queryset = []
-    permission_classes = [ permissions.IsSuperOrAppSuperUser]
+    permission_classes = [permissions.IsSuperOrAppSuperUser]
     lookup_field = 'username'
     lookup_value_regex = '.+'
 
@@ -2031,12 +2047,13 @@ class SecurityViewSet(CustomGenericViewSet):
 
         return Response(data)
 
-    def get_user_or_create(self, username):
-        '''
+    @staticmethod
+    def get_user_or_create(username):
+        """
         通过用户名获取用户，或创建用户
         :param username:  用户名
         :return:
-        '''
+        """
         try:
             user = User.objects.get(username=username)
         except exceptions.ObjectDoesNotExist:
@@ -2050,17 +2067,18 @@ class SecurityViewSet(CustomGenericViewSet):
 
         return user
 
-    def validate_username(self, username):
-        '''
+    @staticmethod
+    def validate_username(username):
+        """
         验证用户名是否是邮箱
 
         failed: raise ValidationError
-        '''
+        """
         validate_email(username)
 
 
 class MoveViewSet(CustomGenericViewSet):
-    '''
+    """
     对象移动或重命名
 
     create_detail:
@@ -2085,7 +2103,7 @@ class MoveViewSet(CustomGenericViewSet):
                 "code": 500,
                 "code_text": 'xxxxx'        //错误信息
             }
-    '''
+    """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'objpath'
@@ -2150,11 +2168,12 @@ class MoveViewSet(CustomGenericViewSet):
         move_to = request.query_params.get('move_to', None)
         rename = request.query_params.get('rename', None)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            obj, bucket = hManager.move_rename(bucket_name=bucket_name, obj_path=objpath, rename=rename, move=move_to, user=request.user)
-        except HarborError as e:
-            return Response(data={'code':e.code, 'code_text': e.msg}, status=e.code)
+            obj, bucket = h_manager.move_rename(bucket_name=bucket_name, obj_path=objpath,
+                                                rename=rename, move=move_to, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         context = self.get_serializer_context()
         context.update({'bucket_name': bucket.name, 'bucket': bucket})
@@ -2176,7 +2195,7 @@ class MoveViewSet(CustomGenericViewSet):
 
 
 class MetadataViewSet(CustomGenericViewSet):
-    '''
+    """
     对象或目录元数据视图集
 
     retrieve:
@@ -2221,7 +2240,7 @@ class MetadataViewSet(CustomGenericViewSet):
             {
                 "code": 404,
                 "code_text": 'xxxxx'        //错误信息，
-    '''
+    """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'path'
@@ -2255,11 +2274,11 @@ class MetadataViewSet(CustomGenericViewSet):
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, obj = hManager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            bucket, obj = h_manager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -2271,7 +2290,8 @@ class MetadataViewSet(CustomGenericViewSet):
         if obj.is_file():
             obj_key = obj.get_obj_key(bucket.id)
             pool_name = bucket.get_pool_name()
-            chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+            chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key,
+                                            obj_size=obj.obj_size).get_rados_key_info()
             info = {
                 'rados': keys,
                 'chunk_size': chunk_size,
@@ -2333,11 +2353,11 @@ class MetadataViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, obj, created = hManager.create_empty_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            bucket, obj, created = h_manager.create_empty_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2422,11 +2442,11 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
         if not bucket_name or not name:
             return Response(data={'code': 400, 'code_text': _('path参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, obj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            bucket, obj = h_manager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2465,7 +2485,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
 
 
 class CephStatsViewSet(CustomGenericViewSet):
-    '''
+    """
         ceph集群视图集
 
         list:
@@ -2496,7 +2516,7 @@ class CephStatsViewSet(CustomGenericViewSet):
                     'code': 500,
                     'code_text': xxx  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2519,7 +2539,7 @@ class CephStatsViewSet(CustomGenericViewSet):
 
 
 class UserStatsViewSet(CustomGenericViewSet):
-    '''
+    """
         用户资源统计视图集
 
         retrieve:
@@ -2584,7 +2604,7 @@ class UserStatsViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': xxx  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [IsAuthenticated]
     lookup_field = 'username'
@@ -2617,8 +2637,9 @@ class UserStatsViewSet(CustomGenericViewSet):
         data['username'] = user.username
         return Response(data)
 
-    def get_user_stats(self, user):
-        '''获取用户的资源统计信息'''
+    @staticmethod
+    def get_user_stats(user):
+        """获取用户的资源统计信息"""
         all_count = 0
         all_space = 0
         li = []
@@ -2642,14 +2663,14 @@ class UserStatsViewSet(CustomGenericViewSet):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action =='retrieve':
+        if self.action == 'retrieve':
             return [permissions.IsSuperUser()]
 
         return super(UserStatsViewSet, self).get_permissions()
 
 
 class CephComponentsViewSet(CustomGenericViewSet):
-    '''
+    """
         ceph集群组件信息视图集
 
         list:
@@ -2671,7 +2692,7 @@ class CephComponentsViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2690,7 +2711,7 @@ class CephComponentsViewSet(CustomGenericViewSet):
 
 
 class CephErrorViewSet(CustomGenericViewSet):
-    '''
+    """
         ceph集群当前故障信息查询
 
         list:
@@ -2710,7 +2731,7 @@ class CephErrorViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2728,7 +2749,7 @@ class CephErrorViewSet(CustomGenericViewSet):
 
 
 class CephPerformanceViewSet(CustomGenericViewSet):
-    '''
+    """
         ceph集群性能，需要超级用户权限
 
         list:
@@ -2751,7 +2772,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2767,7 +2788,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
 
 
 class UserCountViewSet(CustomGenericViewSet):
-    '''
+    """
         系统用户总数查询
 
         list:
@@ -2784,7 +2805,7 @@ class UserCountViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2801,7 +2822,7 @@ class UserCountViewSet(CustomGenericViewSet):
 
 
 class AvailabilityViewSet(CustomGenericViewSet):
-    '''
+    """
         系统可用性
 
         list:
@@ -2812,7 +2833,7 @@ class AvailabilityViewSet(CustomGenericViewSet):
                     "code": 200,
                     'availability': '100%'
                 }
-        '''
+        """
     queryset = None
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2828,7 +2849,7 @@ class AvailabilityViewSet(CustomGenericViewSet):
 
 
 class VisitStatsViewSet(CustomGenericViewSet):
-    '''
+    """
         访问统计
 
         list:
@@ -2851,7 +2872,7 @@ class VisitStatsViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = [permissions.IsSuperUser]
     pagination_class = None
@@ -2873,7 +2894,7 @@ class VisitStatsViewSet(CustomGenericViewSet):
 
 
 class TestViewSet(CustomGenericViewSet):
-    '''
+    """
         系统是否可用查询
 
         list:
@@ -2891,7 +2912,7 @@ class TestViewSet(CustomGenericViewSet):
                     'code': 404,
                     'code_text': URL中包含无效的版本  //错误码描述
                 }
-        '''
+        """
     queryset = []
     permission_classes = []
     throttle_classes = (throttles.TestRateThrottle,)
@@ -2909,7 +2930,7 @@ class TestViewSet(CustomGenericViewSet):
 
 
 class FtpViewSet(CustomGenericViewSet):
-    '''
+    """
     存储桶FTP服务配置相关API
 
     partial_update:
@@ -2929,7 +2950,7 @@ class FtpViewSet(CustomGenericViewSet):
             对应参数错误信息;
         Http Code: 状态码404;
         Http Code: 500
-    '''
+    """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'bucket_name'
@@ -3022,15 +3043,16 @@ class FtpViewSet(CustomGenericViewSet):
             'data': data     # 请求提交的参数
         })
 
-    def validate_patch_params(self, request):
-        '''
+    @staticmethod
+    def validate_patch_params(request):
+        """
         patch请求方法参数验证
         :return:
             {
                 'enable': xxx, # None(未提交此参数) 或 bool
                 'password': xxx   # None(未提交此参数) 或 string
             }
-        '''
+        """
         validated_data = {'enable': None, 'password': None, 'ro_password': None}
         enable = request.query_params.get('enable', None)
         password = request.query_params.get('password', None)
@@ -3077,21 +3099,22 @@ class FtpViewSet(CustomGenericViewSet):
 
 
 class VPNViewSet(CustomGenericViewSet):
-    '''
+    """
     VPN相关API
-    '''
+    """
     queryset = []
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取VPN口令'),
+        deprecated=True,
         responses={
             status.HTTP_200_OK: ''
         }
     )
     def list(self, request, *args, **kwargs):
-        '''
+        """
         获取VPN口令信息
 
             Http Code: 状态码200，返回数据：
@@ -3109,12 +3132,13 @@ class VPNViewSet(CustomGenericViewSet):
                     }
                 }
             }
-        '''
+        """
         vpn, created = VPNAuth.objects.get_or_create(user=request.user)
         return Response(data={'code': 200, 'code_text': _('获取成功'), 'vpn': serializers.VPNSerializer(vpn).data})
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('修改vpn口令'),
+        deprecated=True,
         responses={
             status.HTTP_201_CREATED: """
                 {
@@ -3131,9 +3155,9 @@ class VPNViewSet(CustomGenericViewSet):
         }
     )
     def create(self, request, *args, **kwargs):
-        '''
+        """
         修改vpn口令
-        '''
+        """
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid(raise_exception=False):
             code_text = 'password error'
@@ -3164,7 +3188,7 @@ class VPNViewSet(CustomGenericViewSet):
 
 
 class ObjKeyViewSet(CustomGenericViewSet):
-    '''
+    """
     对象CEPH RADOS KEY视图集
 
     retrieve:
@@ -3195,7 +3219,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
-    '''
+    """
     queryset = {}
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
     lookup_field = 'objpath'
@@ -3222,11 +3246,11 @@ class ObjKeyViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data={'code': exc.code, 'code_text': exc.message}, status=exc.status_code)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, obj = hManager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=objpath, user = request.user)
-        except HarborError as e:
-            return Response(data={'code': e.code, 'code_text': e.msg}, status=e.code)
+            bucket, obj = h_manager.get_bucket_and_obj(bucket_name=bucket_name, obj_path=objpath, user=request.user)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
 
         if not obj:
             return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
@@ -3250,7 +3274,7 @@ class ShareViewSet(CustomGenericViewSet):
     retrieve:
         获取对象对应的ceph rados key信息
 
-    	>>Http Code: 状态码200：
+        >>Http Code: 状态码200：
             {
               "share_uri": "http://159.226.91.140:8000/share/s/ddd/ggg",
               "is_obj": false,          # 对象或目录
@@ -3311,19 +3335,10 @@ class ShareViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            bucket, obj = hManager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
-        except HarborError as e:
-            if e.code == 400:
-                exc = exceptions.BadRequest(message=e.msg)
-            elif e.code == 404:
-                exc = exceptions.NoSuchBucket()
-            elif e.code == 403:
-                exc = exceptions.AccessDenied(message=e.msg)
-            else:
-                exc = exceptions.Error(message=e.msg)
-
+            bucket, obj = h_manager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
+        except exceptions.HarborError as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
         if not obj:
@@ -3354,3 +3369,106 @@ class ShareViewSet(CustomGenericViewSet):
 
         return Response(data=data, status=status.HTTP_200_OK)
 
+
+class SearchObjectViewSet(CustomGenericViewSet):
+    """
+    检索对象视图
+    """
+    queryset = {}
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
+    # lookup_field = 'path'
+    # lookup_value_regex = '.+'
+    pagination_class = paginations.SearchBucketFileLimitOffsetPagination
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('检索存储桶内对象'),
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='bucket', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("检索的存储桶"),
+                required=True
+            ),
+            openapi.Parameter(
+                name='search', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("检索的对象关键字"),
+                required=True
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        检索存储桶内对象
+
+            >>Http Code: 状态码200：
+            {
+              "bucket": "testcopy",
+              "files": [
+                {
+                  "na": "abc.py",
+                  "name": "abc.py",
+                  "fod": true,
+                  "did": 0,
+                  "si": 35,
+                  "ult": "2020-12-18T18:02:45.715877+08:00",
+                  "upt": "2021-03-01T16:56:10.524571+08:00",
+                  "dlc": 0,
+                  "download_url": "http://xxx/share/obs/testcopy/abc.py",
+                  "access_permission": "私有",
+                  "access_code": 0,
+                  "md5": "585e699b26602e7dd6054798d8c22d9b"
+                }
+              ],
+              "count": 2,
+              "next": null,
+              "page": {
+                "current": 1,
+                "final": 1
+              },
+              "previous": null
+            }
+
+            >>Http Code 400, 401, 403, 404, 500:
+            {
+              "code": "xxx",    # 错误码， BadRequest、AccessDenied等
+              "message": "xxx"  # 错误描述
+            }
+        """
+        search = request.query_params.get('search', '')
+        bucket_name = request.query_params.get('bucket', '')
+        if not search:
+            exc = exceptions.BadRequest('invalid param "search"')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if not bucket_name:
+            exc = exceptions.BadRequest('invalid param "bucket"')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        h_manager = HarborManager()
+        try:
+            bucket, queryset = h_manager.search_object_queryset(bucket=bucket_name, search=search, user=request.user)
+        except exceptions.HarborError as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            paginator = paginations.BucketFileLimitOffsetPagination()
+            files = paginator.paginate_queryset(queryset, request=request)
+            serializer = serializers.ObjInfoSerializer(files, many=True, context={
+                'bucket_name': bucket_name, 'bucket': bucket, 'request': request})
+            files = serializer.data
+        except Exception as exc:
+            exc = exceptions.Error(message=str(exc))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        data_dict = OrderedDict([
+            ('bucket', bucket_name),
+            ('files', files)
+        ])
+        return paginator.get_paginated_response(data_dict)

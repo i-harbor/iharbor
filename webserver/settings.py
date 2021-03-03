@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'buckets.apps.BucketsConfig',
     'users.apps.UsersConfig',
     'api',
-    'evcloud',
+    # 'evcloud',
     'docs',
     'vpn',
     'share',
@@ -220,12 +220,12 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': datetime.timedelta(hours=8),
     'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=2),
-    'ROTATE_REFRESH_TOKENS': False, # True时，refresh API会返回内容中会包含一个新的refresh JWT
+    'ROTATE_REFRESH_TOKENS': False,     # True时，refresh API会返回内容中会包含一个新的refresh JWT
     'BLACKLIST_AFTER_ROTATION': True,
 
     # 'SIGNING_KEY': 'xxxxx',   # 默认SECRET_KEY
 
-    'AUTH_HEADER_TYPES': ('Bearer',), # Header "Authorization:{AUTH_HEADER_TYPES} xxx"
+    'AUTH_HEADER_TYPES': ('Bearer',),   # Header "Authorization:{AUTH_HEADER_TYPES} xxx"
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 

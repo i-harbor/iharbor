@@ -131,6 +131,10 @@ class BucketFileLimitOffsetPagination(LimitOffsetPagination):
         return current, final
 
 
+class SearchBucketFileLimitOffsetPagination(BucketFileLimitOffsetPagination):
+    pass
+
+
 class BucketsLimitOffsetPagination(LimitOffsetPagination):
     '''
     存储桶分页器

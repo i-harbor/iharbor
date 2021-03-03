@@ -25,8 +25,8 @@ def get_uuid1_hex_string():
     return uuid.uuid1().hex
 
 
-def rand_hex_string(len=10):
-    return binascii.hexlify(os.urandom(len//2)).decode()
+def rand_hex_string(length=10):
+    return binascii.hexlify(os.urandom(length//2)).decode()
 
 
 def get_str_hexMD5(s:str):

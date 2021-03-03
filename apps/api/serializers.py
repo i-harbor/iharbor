@@ -7,6 +7,7 @@ from rest_framework.reverse import reverse, replace_query_param
 from .models import User, Bucket, BucketToken
 from .validators import DNSStringValidator, bucket_limit_validator
 from buckets.utils import get_ceph_poolname_rand
+from . import exceptions
 
 
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -111,10 +112,12 @@ class BucketSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password', 'ftp_ro_password', 'remarks')
         # depth = 1
 
-    def get_user(self, obj):
+    @staticmethod
+    def get_user(obj):
         return {'id': obj.user.id, 'username': obj.user.username}
 
-    def get_access_permission(self, obj):
+    @staticmethod
+    def get_access_permission(obj):
         return obj.get_access_permission_display()
 
 
@@ -145,9 +148,6 @@ class BucketCreateSerializer(serializers.Serializer):
 
         # 用户存储桶限制数量检测
         bucket_limit_validator(user=user)
-
-        if Bucket.get_bucket_by_name(bucket_name):
-            raise serializers.ValidationError(gettext("存储桶名称已存在"), code='existing')
         return data
 
     def create(self, validated_data):

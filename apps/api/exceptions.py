@@ -16,6 +16,8 @@ class Error(Exception):
         if extend_msg:
             self.message += '&&' + extend_msg
 
+        # self.data = kwargs  # 一些希望传递的数据
+
     def __repr__(self):
         return f'{type(self)}(message={self.message}, code={self.code}, status_code={self.status_code})'
 
@@ -36,6 +38,13 @@ class Error(Exception):
             'code': self.code,
             'code_text': self.message
         }
+
+    @classmethod
+    def from_error(cls, err):
+        if isinstance(err, Error):
+            return cls(message=err.message, code=err.code, status_code=err.status_code)
+
+        return cls(message=str(err))
 
 
 class AuthenticationFailed(Error):
@@ -101,7 +110,35 @@ class MethodNotAllowed(Error):
     default_status_code = 405
 
 
+class BucketAlreadyOwnedByYou(Error):
+    default_message = 'The bucket you tried to create already exists, and you own it.'
+    default_code = 'BucketAlreadyOwnedByYou'
+    default_status_code = 409
+
+
+class BucketAlreadyExists(Error):
+    default_message = 'The requested bucket name is already exists. Please select a different name and try again.'
+    default_code = 'BucketAlreadyExists'
+    default_status_code = 409
+
+
 class Throttled(Error):
     default_message = 'Request was throttled.'
     default_code = 'Throttled'
     default_status_code = 429
+
+
+class HarborError(Error):
+    @property
+    def msg(self):
+        return self.message
+
+    @msg.setter
+    def msg(self, value):
+        self.message = value
+
+
+class BucketLockWrite(HarborError):
+    default_message = '存储桶已锁定写操作.'
+    default_code = 'BucketLockWrite'
+    default_status_code = 403

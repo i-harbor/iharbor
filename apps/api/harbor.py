@@ -3,7 +3,6 @@ import logging
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db import close_old_connections
-from rest_framework import status
 
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
@@ -12,6 +11,7 @@ from utils.oss import HarborObject, get_size
 from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
 from utils.md5 import FileMD5Handler
+from . import exceptions
 
 
 debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -25,25 +25,12 @@ def ftp_close_old_connections(func):
     return wrapper
 
 
-class HarborError(BaseException):
-    def __init__(self, code:int, msg:str, **kwargs):
-        self.code = code if code else 500   # 错误码
-        self.msg = msg      # 错误描述
-        self.data = kwargs  # 一些希望传递的数据
-
-    def __str__(self):
-        return self.detail()
-
-    def detail(self):
-        return f'{self.code},{self.msg}'
-
-
 class HarborManager:
-    '''
+    """
     操作harbor对象数据和元数据管理接口封装
-    '''
+    """
     def get_bucket(self, bucket_name:str, user=None):
-        '''
+        """
         获取存储桶
 
         :param bucket_name: 桶名
@@ -51,28 +38,29 @@ class HarborManager:
         :return:
             Bucket() # 成功时
             None     # 桶不存在，或不属于给定用户时
-        '''
+        """
         if user:
             return self.get_user_own_bucket(bucket_name, user)
 
         return self.get_bucket_by_name(bucket_name)
 
-    def get_bucket_by_name(self, name:str):
-        '''
+    @staticmethod
+    def get_bucket_by_name(name: str):
+        """
         通过桶名获取Bucket实例
         :param name: 桶名
         :return:
             Bucket() # success
             None     # not exist
-        '''
+        """
         bucket = Bucket.get_bucket_by_name(name)
         if not bucket:
             return None
 
         return bucket
 
-    def get_user_own_bucket(self, name:str, user):
-        '''
+    def get_user_own_bucket(self, name: str, user):
+        """
         获取用户的存储桶
 
         :param name: 存储通名称
@@ -80,7 +68,7 @@ class HarborManager:
         :return:
             success: bucket
             failure: None
-        '''
+        """
         bucket = self.get_bucket_by_name(name)
         if bucket and bucket.check_user_own_bucket(user):
             return bucket
@@ -88,8 +76,8 @@ class HarborManager:
         return None
 
     @log_op_info(logger=debug_logger, mark_text='is_dir')
-    def is_dir(self, bucket_name:str, path_name:str):
-        '''
+    def is_dir(self, bucket_name: str, path_name: str):
+        """
         是否时一个目录
 
         :param bucket_name: 桶名
@@ -99,7 +87,7 @@ class HarborManager:
             false: is file
 
         :raise HarborError  # 桶或路径不存在，发生错误
-        '''
+        """
         # path为空或根目录时
         if not path_name or path_name == '/':
             return True
@@ -111,7 +99,7 @@ class HarborManager:
         return False
 
     def is_file(self, bucket_name:str, path_name:str):
-        '''
+        """
         是否时一个文件
         :param bucket_name: 桶名
         :param path_name: 文件路径
@@ -120,7 +108,7 @@ class HarborManager:
             false: is dir
 
         :raise HarborError  # 桶或路径不存在，发生错误
-        '''
+        """
         # path为空或根目录时
         if not path_name or path_name == '/':
             return False
@@ -132,7 +120,7 @@ class HarborManager:
         return False
 
     def get_object(self, bucket_name:str, path_name:str, user=None):
-        '''
+        """
         获取对象或目录实例
 
         :param bucket_name: 桶名
@@ -142,15 +130,17 @@ class HarborManager:
             obj or dir    # 对象或目录实例
 
         :raise HarborError
-        '''
+        """
         bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=user)
         if obj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='指定对象或目录不存在')
+            err = exceptions.NoSuchKey(message='指定对象或目录不存在')
+            raise exceptions.HarborError.from_error(err)
 
         return obj
 
-    def get_metadata_obj(self, table_name:str, path:str):
-        '''
+    @staticmethod
+    def get_metadata_obj(table_name:str, path:str):
+        """
         直接获取目录或对象元数据对象，不检查父节点是否存在
 
         :param table_name: 数据库表名
@@ -159,18 +149,20 @@ class HarborManager:
             obj     #
             None    #
         :raises: HarborError
-        '''
+        """
         bfm = BucketFileManagement(collection_name=table_name)
         try:
             obj = bfm.get_obj(path=path)
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+            raise exceptions.HarborError(message=str(e))
         if obj:
             return obj
+
         return None
 
-    def _get_obj_or_dir_and_bfm(self, table_name, path, name):
-        '''
+    @staticmethod
+    def _get_obj_or_dir_and_bfm(table_name, path, name):
+        """
         获取文件对象或目录,和BucketFileManagement对象
 
         :param table_name: 数据库表名
@@ -184,12 +176,12 @@ class HarborManager:
             raise Exception    # 父目录路径错误，不存在
 
         :raises: HarborError
-        '''
+        """
         bfm = BucketFileManagement(path=path, collection_name=table_name)
         try:
             obj = bfm.get_dir_or_obj_exists(name=name)
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+            raise exceptions.HarborError(message=str(e))
 
         if obj:
             return obj, bfm   # 目录或对象存在
@@ -197,7 +189,7 @@ class HarborManager:
         return None, bfm  # 目录或对象不存在
 
     def _get_obj_or_dir(self, table_name, path, name):
-        '''
+        """
         获取文件对象或目录
 
         :param table_name: 数据库表名
@@ -208,7 +200,7 @@ class HarborManager:
             obj or None: 目录或对象不存在
 
         :raises: HarborError
-        '''
+        """
         obj, _ = self._get_obj_or_dir_and_bfm(table_name, path, name)
         return obj
 
@@ -224,16 +216,18 @@ class HarborManager:
         :raise HarborError
         """
         if not bucket_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，要同时包含有效的存储桶和目录名称')
+            err = exceptions.BadRequest(message='目录路径参数无效，要同时包含有效的存储桶和目录名称')
+            raise exceptions.HarborError.from_error(err)
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         bucket = self.get_bucket(bucket_name, user=user)
         if not isinstance(bucket, Bucket):
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            err = exceptions.NoSuchBucket(message='存储桶不存在')
+            raise exceptions.HarborError.from_error(err)
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         return self._mkdir(bucket=bucket, path=path)
 
@@ -267,7 +261,7 @@ class HarborManager:
         try:
             bfinfo.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='创建失败，数据库错误')
+            raise exceptions.HarborError(message='创建失败，数据库错误')
 
         return True, bfinfo
 
@@ -287,30 +281,35 @@ class HarborManager:
         dir_path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
 
         if not dir_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录路径参数无效，要同时包含有效的存储桶和目录名称')
+            err = exceptions.BadRequest(message='目录路径参数无效，要同时包含有效的存储桶和目录名称')
+            raise exceptions.HarborError.from_error(err)
 
         if '/' in dir_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录名称不能包含‘/’')
+            err = exceptions.BadRequest(message='目录名称不能包含‘/’')
+            raise exceptions.HarborError.from_error(err)
 
         if len(dir_name) > 255:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='目录名称长度最大为255字符')
+            err = exceptions.BadRequest(message='目录名称长度最大为255字符')
+            raise exceptions.HarborError.from_error(err)
 
         _collection_name = bucket.get_bucket_table_name()
         data['collection_name'] = _collection_name
 
         try:
             _dir, bfm = self._get_obj_or_dir_and_bfm(table_name=_collection_name, path=dir_path, name=dir_name)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         if _dir:
             # 目录已存在
             if _dir.is_dir():
-                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"{dir_name}"目录已存在', existing=True)
+                err = exceptions.BadRequest(message=f'"{dir_name}"目录已存在')
+                raise exceptions.HarborError.from_error(err)
 
             # 同名对象已存在
             if _dir.is_file():
-                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
+                err = exceptions.BadRequest(message=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
+                raise exceptions.HarborError.from_error(err)
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
         data['bucket_name'] = bucket.name
@@ -319,7 +318,7 @@ class HarborManager:
         return data
 
     def rmdir(self, bucket_name:str, dirpath:str, user=None):
-        '''
+        """
         删除一个空目录
         :param bucket_name:桶名
         :param dirpath: 目录全路径
@@ -329,14 +328,16 @@ class HarborManager:
             raise HarborError(): failed
 
         :raise HarborError()
-        '''
+        """
         if not bucket_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='bucket name参数无效')
+            err = exceptions.BadRequest(message='bucket name参数无效')
+            raise exceptions.HarborError.from_error(err)
 
         # bucket是否属于当前用户,检测存储桶名称是否存在
         bucket = self.get_bucket(bucket_name, user=user)
         if not isinstance(bucket, Bucket):
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket(message='存储桶不存在'))
 
         return self._rmdir(bucket=bucket, dirpath=dirpath)
 
@@ -352,27 +353,30 @@ class HarborManager:
         """
         path, dir_name = PathParser(filepath=dirpath).get_path_and_filename()
         if not dir_name:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数无效')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数无效'))
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         table_name = bucket.get_bucket_table_name()
 
         try:
             _dir, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         if not _dir or _dir.is_file():
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='目录不存在'))
 
         if not bfm.dir_is_empty(_dir):
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法删除非空目录')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='无法删除非空目录'))
 
         if not _dir.do_delete():
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='删除目录失败，数据库错误')
+            raise exceptions.HarborError(message='删除目录失败，数据库错误')
 
         return True
 
@@ -391,7 +395,8 @@ class HarborManager:
         """
         bucket = self.get_bucket(bucket_name, user)
         if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket(message='存储桶不存在'))
 
         qs = self._list_bucket_dir_queryset(bucket=bucket, path=path)
         return qs, bucket
@@ -409,18 +414,19 @@ class HarborManager:
         """
         # 桶锁操作检查
         if not bucket.lock_readable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
+            raise exceptions.BucketLockWrite()
 
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
         ok, qs = bfm.get_cur_dir_files()
         if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='未找到相关记录')
+            raise exceptions.HarborError.from_error(
+                exceptions.NotFound(message='未找到相关记录'))
 
         return qs
 
     def list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000, user=None, paginator=None):
-        '''
+        """
         获取目录下的文件列表信息生成器
 
         :param bucket_name: 桶名
@@ -436,7 +442,7 @@ class HarborManager:
                 print(objs)         # objs type list, raise HarborError when error
 
         :raise HarborError
-        '''
+        """
         qs, _ = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
 
         def generator(queryset, per_num, paginator=None):
@@ -449,18 +455,18 @@ class HarborManager:
                 try:
                     ret = paginator.pagenate_to_list(queryset, offset=offset, limit=limit)
                 except Exception as e:
-                    raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+                    raise exceptions.HarborError(message=str(e))
 
                 yield ret
-                l = len(ret)
-                if l < per_num:
+                length = len(ret)
+                if length < per_num:
                     return
-                offset = offset + l
+                offset = offset + length
 
         return generator(queryset=qs, per_num=per_num, paginator=paginator)
 
     def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None, paginator=None):
-        '''
+        """
         获取目录下的文件列表信息
 
         :param bucket_name: 桶名
@@ -474,12 +480,12 @@ class HarborManager:
                 failed:      raise HarborError
 
         :raise HarborError
-        '''
+        """
         files, bucket = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
 
         if paginator is None:
             paginator = BucketFileLimitOffsetPagination()
-        if limit <= 0 :
+        if limit <= 0:
             limit = paginator.default_limit
         else:
             limit = min(limit, paginator.max_limit)
@@ -491,14 +497,14 @@ class HarborManager:
         paginator.limit = limit
 
         try:
-            l = paginator.pagenate_to_list(files, offset=offset, limit=limit)
+            li = paginator.pagenate_to_list(files, offset=offset, limit=limit)
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=str(e))
+            raise exceptions.HarborError(message=str(e))
 
-        return (l, bucket)
+        return li, bucket
 
     def move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None, user=None):
-        '''
+        """
         移动或重命名对象
 
         :param bucket_name: 桶名
@@ -511,32 +517,36 @@ class HarborManager:
             failed : raise HarborError
 
         :raise HarborError
-        '''
+        """
         path, filename = PathParser(filepath=obj_path).get_path_and_filename()
         if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         move_to, rename = self._validate_move_rename_params(move_to=move, rename=rename)
         if move_to is None and rename is None:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='请至少提交一个要执行操作的参数')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='请至少提交一个要执行操作的参数'))
 
         # 存储桶验证和获取桶对象
         try:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         if obj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='文件对象不存在'))
 
         return self._move_rename_obj(bucket=bucket, obj=obj, move_to=move_to, rename=rename)
 
-    def _move_rename_obj(self, bucket, obj, move_to, rename):
-        '''
+    @staticmethod
+    def _move_rename_obj(bucket, obj, move_to, rename):
+        """
         移动重命名对象
 
         :param bucket: 对象所在桶
@@ -548,7 +558,7 @@ class HarborManager:
             failed : raise HarborError
 
         :raise HarborError
-        '''
+        """
         table_name = bucket.get_bucket_table_name()
         new_obj_name = rename if rename else obj.name # 移动后对象的名称，对象名称不变或重命名
 
@@ -564,10 +574,11 @@ class HarborManager:
                 target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
                 new_na = bfm.build_dir_full_name(new_obj_name)
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
+            raise exceptions.HarborError(message='移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
 
         if target_obj:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'))
 
         if move_to is not None:     # 移动对象或重命名
             _, did = bfm.get_cur_dir_id()
@@ -577,13 +588,13 @@ class HarborManager:
         obj.name = new_obj_name
         obj.reset_na_md5()
         if not obj.do_save():
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg= '移动对象操作失败')
+            raise exceptions.HarborError(message='移动对象操作失败')
 
         return obj, bucket
 
     @staticmethod
     def _validate_move_rename_params(move_to, rename):
-        '''
+        """
         校验移动或重命名参数
 
         :return:
@@ -592,7 +603,7 @@ class HarborManager:
                 rename  # None 或 string
 
         :raise HarborError
-        '''
+        """
         # 移动对象参数
         if move_to is not None:
             move_to = move_to.strip('/')
@@ -600,15 +611,17 @@ class HarborManager:
         # 重命名对象参数
         if rename is not None:
             if '/' in rename:
-                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称不能含“/”')
+                raise exceptions.HarborError.from_error(
+                    exceptions.BadRequest(message='对象名称不能含“/”'))
 
             if len(rename) > 255:
-                raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称不能大于255个字符长度')
+                raise exceptions.HarborError.from_error(
+                    exceptions.BadRequest(message='对象名称不能大于255个字符长度'))
 
         return move_to, rename
 
     def write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False, user=None):
-        '''
+        """
         向对象写入一个数据块
 
         :param bucket_name: 桶名
@@ -620,15 +633,16 @@ class HarborManager:
         :return:
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
-        '''
+        """
         if not isinstance(chunk, bytes):
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='数据不是bytes类型')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='数据不是bytes类型'))
 
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=chunk,
                                     reset=reset, user=user)
 
     def write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
-        '''
+        """
         向对象写入一个文件
 
         :param bucket_name: 桶名
@@ -640,12 +654,12 @@ class HarborManager:
         :return:
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
-        '''
+        """
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=file,
                                     reset=reset, user=user)
 
     def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, reset:bool=False, user=None):
-        '''
+        """
         向对象写入一个数据
 
         :param bucket_name: 桶名
@@ -657,7 +671,7 @@ class HarborManager:
         :return:
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
-        '''
+        """
         bucket, obj, created = self.create_empty_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
@@ -671,7 +685,7 @@ class HarborManager:
                 self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data)
             else:
                 self._save_one_file(obj=obj, rados=rados, offset=offset, file=data)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             # 如果对象是新创建的，上传失败删除对象元数据
             if created is True:
                 obj.do_delete()
@@ -696,26 +710,30 @@ class HarborManager:
         pp = PathParser(filepath=obj_path)
         path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         if len(filename) > 255:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称长度最大为255字符')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='对象名称长度最大为255字符'))
 
         # 存储桶验证和获取桶对象
         bucket = self.get_bucket(bucket_name, user=user)
         if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket(message='存储桶不存在'))
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
         return bucket, obj, created
 
-    def _get_obj_and_check_limit_or_create(self, table_name, path, filename):
-        '''
+    @staticmethod
+    def _get_obj_and_check_limit_or_create(table_name, path, filename):
+        """
         获取文件对象, 验证存储桶对象和目录数量上限，不存在并且验证通过则创建
 
         :param table_name: 桶对应的数据库表名
@@ -727,13 +745,13 @@ class HarborManager:
                 raise HarborError # 有错误，路径不存在，或已存在同名目录
 
         :raise HarborError
-        '''
+        """
         bfm = BucketFileManagement(path=path, collection_name=table_name)
 
         try:
             obj = bfm.get_dir_or_obj_exists(name=filename)
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=f'查询对象错误，{str(e)}')
+            raise exceptions.HarborError(message=f'查询对象错误，{str(e)}')
 
         # 文件对象已存在
         if obj and obj.is_file():
@@ -741,23 +759,25 @@ class HarborManager:
 
         # 已存在同名的目录
         if obj and obj.is_dir():
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='指定的对象名称与已有的目录重名，请重新指定一个名称')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='指定的对象名称与已有的目录重名，请重新指定一个名称'))
 
         ok, did = bfm.get_cur_dir_id()
         if not ok:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象路经不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='对象路经不存在'))
 
         # 验证集合文档上限
         # if not self.do_bucket_limit_validate(bfm):
         #     return None, None
 
         # 创建文件对象
-        BucketFileClass = bfm.get_obj_model_class()
+        model_cls = bfm.get_obj_model_class()
         full_filename = bfm.build_dir_full_name(filename)
-        bfinfo = BucketFileClass(na=full_filename,  # 全路径文件名
-                                 name=filename, #  文件名
-                                 fod=True,  # 文件
-                                 si=0, upt=timezone.now())  # 文件大小
+        bfinfo = model_cls(na=full_filename,  # 全路径文件名
+                           name=filename,       # 文件名
+                           fod=True,  # 文件
+                           si=0, upt=timezone.now())  # 文件大小
         # 有父节点
         if did:
             bfinfo.did = did
@@ -766,12 +786,13 @@ class HarborManager:
             bfinfo.save()
             obj = bfinfo
         except:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='新建对象元数据失败，数据库错误')
+            raise exceptions.HarborError(message='新建对象元数据失败，数据库错误')
 
         return obj, True
 
-    def _pre_reset_upload(self, obj, rados):
-        '''
+    @staticmethod
+    def _pre_reset_upload(obj, rados):
+        """
         覆盖上传前的一些操作
 
         :param obj: 文件对象元数据
@@ -779,7 +800,7 @@ class HarborManager:
         :return:
                 正常：True
                 错误：raise HarborError
-        '''
+        """
         # 先更新元数据，后删除rados数据（如果删除失败，恢复元数据）
         # 更新文件上传时间
         old_ult = obj.ult
@@ -790,7 +811,7 @@ class HarborManager:
         obj.si = 0
         obj.md5 = ''
         if not obj.do_save(update_fields=['ult', 'si', 'md5']):
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
+            raise exceptions.HarborError(message='修改对象元数据失败')
 
         ok, _ = rados.delete()
         if not ok:
@@ -799,12 +820,12 @@ class HarborManager:
             obj.si = old_size
             obj.md5 = old_md5
             obj.do_save(update_fields=['ult', 'si', 'md5'])
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='rados文件对象删除失败')
+            raise exceptions.HarborError(message='rados文件对象删除失败')
 
         return True
 
     def _save_one_chunk(self, obj, rados, offset:int, chunk:bytes, md5: str = ''):
-        '''
+        """
         保存一个上传的分片
 
         :param obj: 对象元数据
@@ -815,12 +836,12 @@ class HarborManager:
         :return:
             成功：True
             失败：raise HarborError
-        '''
+        """
         # 先更新元数据，后写rados数据
         # 更新文件修改时间和对象大小
         new_size = offset + len(chunk) # 分片数据写入后 对象偏移量大小
         if not self._update_obj_metadata(obj, size=new_size, md5=md5):
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
+            raise exceptions.HarborError(message='修改对象元数据失败')
 
         # 存储文件块
         try:
@@ -832,12 +853,12 @@ class HarborManager:
         if not ok:
             # 手动回滚对象元数据
             self._update_obj_metadata(obj, obj.si, obj.upt, md5=obj.md5)
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块rados写入失败:' + msg)
+            raise exceptions.HarborError(message='文件块rados写入失败:' + msg)
 
         return True
 
     def _save_one_file(self, obj, rados, offset:int, file):
-        '''
+        """
         向对象写入一个文件
 
         :param obj: 对象元数据
@@ -847,17 +868,18 @@ class HarborManager:
         :return:
             成功：True
             失败：raise HarborError
-        '''
+        """
         # 先更新元数据，后写rados数据
         # 更新文件修改时间和对象大小
         try:
             file_size = get_size(file)
         except AttributeError:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='输入必须是一个文件')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='输入必须是一个文件'))
 
         new_size = offset + file_size # 分片数据写入后 对象偏移量大小
         if not self._update_obj_metadata(obj, size=new_size):
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='修改对象元数据失败')
+            raise exceptions.HarborError(message='修改对象元数据失败')
 
         # 存储文件
         try:
@@ -869,12 +891,13 @@ class HarborManager:
         if not ok:
             # 手动回滚对象元数据
             self._update_obj_metadata(obj, obj.si, obj.upt)
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块rados写入失败:' + msg)
+            raise exceptions.HarborError(message='文件块rados写入失败:' + msg)
 
         return True
 
-    def _update_obj_metadata(self, obj, size, upt=None, md5: str = ''):
-        '''
+    @staticmethod
+    def _update_obj_metadata(obj, size, upt=None, md5: str = ''):
+        """
         更新对象元数据
         :param obj: 对象, obj实例不会被修改
         :param size: 对象大小
@@ -883,7 +906,7 @@ class HarborManager:
         :return:
             success: True
             failed: False
-        '''
+        """
         if not upt:
             upt = timezone.now()
 
@@ -910,7 +933,7 @@ class HarborManager:
         return False
 
     def delete_object(self, bucket_name:str, obj_path:str, user=None):
-        '''
+        """
         删除一个对象
 
         :param bucket_name: 桶名
@@ -921,29 +944,31 @@ class HarborManager:
             failed:  raise HarborError
 
         :raise HarborError
-        '''
+        """
         path, filename = PathParser(filepath=obj_path).get_path_and_filename()
         if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         # 存储桶验证和获取桶对象
         try:
             bucket, fileobj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         if fileobj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='文件对象不存在'))
 
         obj_key = fileobj.get_obj_key(bucket.id)
         old_id = fileobj.id
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not fileobj.do_delete():
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='删除对象原数据时错误')
+            raise exceptions.HarborError(message='删除对象原数据时错误')
 
         pool_name = bucket.get_pool_name()
         ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=fileobj.si)
@@ -952,12 +977,12 @@ class HarborManager:
             # 恢复元数据
             fileobj.id = old_id
             fileobj.do_save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='删除对象rados数据时错误')
+            raise exceptions.HarborError(message='删除对象rados数据时错误')
 
         return True
 
     def read_chunk(self, bucket_name:str, obj_path:str, offset:int, size:int, user=None):
-        '''
+        """
         从对象读取一个数据块
 
         :param bucket_name: 桶名
@@ -970,42 +995,44 @@ class HarborManager:
             failed:   raise HarborError         # 读取失败，抛出HarborError
 
         :raise HarborError
-        '''
+        """
         if offset < 0 or size < 0 or size > 20 * 1024 ** 2:  # 20Mb
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         # 存储桶验证和获取桶对象
         try:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         # 桶锁操作检查
         if not bucket.lock_readable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
+            raise exceptions.BucketLockWrite()
 
         if obj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='文件对象不存在'))
 
         # 自定义读取文件对象
         if size == 0:
-            return (bytes(), obj.si)
+            return bytes(), obj.si
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
         rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         ok, chunk = rados.read(offset=offset, size=size)
         if not ok:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg='文件块读取失败')
+            raise exceptions.HarborError(message='文件块读取失败')
 
         # 如果从0读文件就增加一次下载次数
         if offset == 0:
             obj.download_cound_increase()
 
-        return (chunk, obj)
+        return chunk, obj
 
     def get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2, user=None, all_public=False):
-        '''
+        """
         获取一个读取对象的生成器函数
 
         :param bucket_name: 桶名
@@ -1019,33 +1046,36 @@ class HarborManager:
                 for data in generator:
                     do something
         :raise HarborError
-        '''
+        """
         if per_size < 0 or per_size > 20 * 1024 ** 2:  # 20Mb
             per_size = 10 * 1024 ** 2   # 10Mb
 
         if offset < 0 or (end is not None and end < 0):
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         # 存储桶验证和获取桶对象
         try:
             bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user, all_public=all_public)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
 
         # 桶锁操作检查
         if not bucket.lock_readable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定读操作')
+            raise exceptions.BucketLockWrite()
 
         if obj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='文件对象不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='文件对象不存在'))
 
         # 增加一次下载次数
         obj.download_cound_increase()
         generator = self._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end, per_size=per_size)
         return generator, obj
 
-    def _get_obj_generator(self, bucket, obj, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
-        '''
+    @staticmethod
+    def _get_obj_generator(bucket, obj, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
+        """
         获取一个读取对象的生成器函数
 
         :param bucket: 存储桶实例
@@ -1057,7 +1087,7 @@ class HarborManager:
                 for data in generator:
                     do something
         :raise HarborError
-        '''
+        """
         # 读取文件对象生成器
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
@@ -1065,7 +1095,7 @@ class HarborManager:
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
     def get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool = False, user=None):
-        '''
+        """
         获取一个写入对象的生成器函数
 
         :param bucket_name: 桶名
@@ -1081,24 +1111,27 @@ class HarborManager:
             ok = generator.send((offset, bytes))  # ok = True写入成功， ok=False写入失败
 
         :raise HarborError
-        '''
+        """
         # 对象路径分析
         pp = PathParser(filepath=obj_path)
         path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         if len(filename) > 255:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='对象名称长度最大为255字符')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='对象名称长度最大为255字符'))
 
         # 存储桶验证和获取桶对象
         bucket = self.get_bucket(bucket_name, user=user)
         if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket(message='存储桶不存在'))
 
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
@@ -1120,7 +1153,7 @@ class HarborManager:
                         md5_handler.update(offset=offset, data=data)
                         hex_md5 = md5_handler.hex_md5
                     ok = self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data, md5=hex_md5)
-                except HarborError:
+                except exceptions.HarborError:
                     ok = False
 
         return generator()
@@ -1147,11 +1180,12 @@ class HarborManager:
             if bucket.check_user_own_bucket(user):
                 return bucket
             else:
-                raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='无权限访问存储桶')
+                raise exceptions.HarborError.from_error(
+                    exceptions.AccessDenied(message='无权限访问存储桶'))
         return bucket
 
     def get_bucket_and_obj_or_dir(self,bucket_name:str, path:str, user=None, all_public=False):
-        '''
+        """
         获取存储桶和对象或目录实例
 
         :param bucket_name: 桶名
@@ -1163,25 +1197,27 @@ class HarborManager:
                 failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
 
         :raise HarborError
-        '''
+        """
         pp = PathParser(filepath=path)
         dir_path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
-            raise HarborError(code=status.HTTP_400_BAD_REQUEST, msg='参数有误')
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='参数有误'))
 
         # 存储桶验证和获取桶对象
         bucket = self.get_bucket_by_name(bucket_name)
         if not bucket:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='存储桶不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket(message='存储桶不存在'))
         self.check_public_or_user_bucket(bucket=bucket, user=user, all_public=all_public)
 
         table_name = bucket.get_bucket_table_name()
         try:
             obj = self._get_obj_or_dir(table_name=table_name, path=dir_path, name=filename)
-        except HarborError as e:
+        except exceptions.HarborError as e:
             raise e
         except Exception as e:
-            raise HarborError(code=status.HTTP_500_INTERNAL_SERVER_ERROR, msg=f'查询目录或对象错误，{str(e)}')
+            raise exceptions.HarborError(message=f'查询目录或对象错误，{str(e)}')
 
         if not obj:
             return bucket, None
@@ -1189,7 +1225,7 @@ class HarborManager:
         return bucket, obj
 
     def get_bucket_and_obj(self, bucket_name: str, obj_path: str, user=None, all_public=False):
-        '''
+        """
         获取存储桶和对象实例
 
         :param bucket_name: 桶名
@@ -1201,7 +1237,7 @@ class HarborManager:
                 failed:   raise HarborError # 存储桶不存在，或参数有误，或有错误发生
 
         :raise HarborError
-        '''
+        """
         bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_path, user=user, all_public=all_public)
         if obj and obj.is_file():
             return bucket, obj
@@ -1209,7 +1245,7 @@ class HarborManager:
         return bucket, None
 
     def share_object(self, bucket_name:str, obj_path:str, share:int, days:int=0, password:str='', user=None):
-        '''
+        """
         设置对象共享或私有权限
 
         :param bucket_name: 桶名
@@ -1222,14 +1258,15 @@ class HarborManager:
             ok: bool, access_code: int      # ok == True: success; ok == False: failed
 
         :raise HarborError
-        '''
+        """
         bucket, obj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         if obj is None:
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='对象不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='对象不存在'))
 
         if obj.set_shared(share=share, days=days, password=password):
             return True, obj.get_access_permission_code(bucket)
@@ -1237,7 +1274,7 @@ class HarborManager:
         return False, obj.get_access_permission_code(bucket)
 
     def share_dir(self, bucket_name:str, path:str, share:int, days:int=0, password:str='', user=None):
-        '''
+        """
         设置目录共享或私有权限
 
         :param bucket_name: 桶名
@@ -1250,37 +1287,67 @@ class HarborManager:
             ok: bool, access_code: int      # ok == True: success; ok == False: failed
 
         :raise HarborError
-        '''
+        """
         bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=user)
         # 桶锁操作检查
         if not bucket.lock_writeable():
-            raise HarborError(code=status.HTTP_403_FORBIDDEN, msg='存储桶已锁定写操作')
+            raise exceptions.BucketLockWrite()
 
         if not obj or obj.is_file():
-            raise HarborError(code=status.HTTP_404_NOT_FOUND, msg='目录不存在')
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchKey(message='目录不存在'))
 
         if obj.set_shared(share=share, days=days, password=password):
             return True, obj.get_access_permission_code(bucket)
 
         return False, obj.get_access_permission_code(bucket)
 
+    def search_object_queryset(self, bucket, search: str, user):
+        """
+        检索对象查询集
+
+        :param bucket: bucket名称或对象
+        :param search: 搜索关键字
+        :param user: 用户对象
+        :return:
+            Bucket(), Queryset()
+
+        :raises: HarborError
+        """
+        if isinstance(bucket, str):
+            # 存储桶验证和获取桶对象
+            bucket = self.get_bucket_by_name(bucket)
+            if not bucket:
+                raise exceptions.HarborError.from_error(
+                    exceptions.NoSuchBucket(message='存储桶不存在'))
+
+        self.check_public_or_user_bucket(bucket=bucket, user=user, all_public=False)
+        table_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path='', collection_name=table_name)
+        try:
+            queryset = bfm.get_search_object_queryset(search=search, contain_dir=False)
+        except Exception as e:
+            raise exceptions.HarborError(message=str(e))
+
+        return bucket, queryset
+
 
 class FtpHarborManager:
-    '''
+    """
     ftp操作harbor对象数据元数据管理接口封装
-    '''
+    """
     def __init__(self):
         self.__hbManager = HarborManager()
 
     @ftp_close_old_connections
     def ftp_authenticate(self, bucket_name:str, password:str):
-        '''
+        """
         Bucket桶ftp访问认证
         :return:    (ok:bool, permission:bool, msg:str)
             ok:         True，认证成功；False, 认证失败
             permission: True, 可读可写权限；False, 只读权限
             msg:        认证结果字符串
-        '''
+        """
         bucket = self.__hbManager.get_bucket(bucket_name)
         if not bucket:
             return False, False, 'Have no this bucket.'
@@ -1297,7 +1364,7 @@ class FtpHarborManager:
 
     @ftp_close_old_connections
     def ftp_write_chunk(self, bucket_name:str, obj_path:str, offset:int, chunk:bytes, reset:bool=False):
-        '''
+        """
         向对象写入一个数据块
 
         :param bucket_name: 桶名
@@ -1308,12 +1375,12 @@ class FtpHarborManager:
         :return:
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
-        '''
+        """
         return self.__hbManager.write_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, chunk=chunk)
 
     @ftp_close_old_connections
     def ftp_write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
-        '''
+        """
         向对象写入一个文件
 
         :param bucket_name: 桶名
@@ -1325,13 +1392,13 @@ class FtpHarborManager:
         :return:
                 created             # created==True表示对象是新建的；created==False表示对象不是新建的
                 raise HarborError   # 写入失败
-        '''
+        """
         return self.__hbManager.write_file(bucket_name=bucket_name, obj_path=obj_path, offset=offset,
                                            file=file, reset=reset, user=user)
 
     @ftp_close_old_connections
     def ftp_move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None):
-        '''
+        """
         移动或重命名对象
 
         :param bucket_name: 桶名
@@ -1343,12 +1410,12 @@ class FtpHarborManager:
             failed : raise HarborError
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename, move=move)
 
     @ftp_close_old_connections
     def ftp_rename(self, bucket_name:str, obj_path:str, rename):
-        '''
+        """
         重命名对象
 
         :param bucket_name: 桶名
@@ -1359,12 +1426,12 @@ class FtpHarborManager:
             failed : raise HarborError
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.move_rename(bucket_name, obj_path=obj_path, rename=rename)
 
     @ftp_close_old_connections
     def ftp_read_chunk(self, bucket_name:str, obj_path:str, offset:int, size:int):
-        '''
+        """
         从对象读取一个数据块
 
         :param bucket_name: 桶名
@@ -1376,12 +1443,12 @@ class FtpHarborManager:
             failed:   raise HarborError         # 读取失败，抛出HarborError
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.read_chunk(bucket_name=bucket_name, obj_path=obj_path, offset=offset, size=size)
 
     @ftp_close_old_connections
     def ftp_get_obj_generator(self, bucket_name:str, obj_path:str, offset:int=0, end:int=None, per_size=10 * 1024 ** 2):
-        '''
+        """
         获取一个读取对象的生成器函数
 
         :param bucket_name: 桶名
@@ -1393,12 +1460,12 @@ class FtpHarborManager:
                 for data in generator:
                     do something
         :raise HarborError
-        '''
+        """
         return self.__hbManager.get_obj_generator(bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
 
     @ftp_close_old_connections
     def ftp_delete_object(self, bucket_name:str, obj_path:str):
-        '''
+        """
         删除一个对象
 
         :param bucket_name: 桶名
@@ -1408,12 +1475,12 @@ class FtpHarborManager:
             failed:  raise HarborError
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.delete_object(bucket_name=bucket_name, obj_path=obj_path)
 
     @ftp_close_old_connections
     def ftp_list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000):
-        '''
+        """
         获取目录下的文件列表信息
 
         :param bucket_name: 桶名
@@ -1425,12 +1492,12 @@ class FtpHarborManager:
                 failed:      raise HarborError
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.list_dir(bucket_name, path, offset=offset, limit=limit)
 
     @ftp_close_old_connections
     def ftp_list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000):
-        '''
+        """
         获取目录下的文件列表信息生成器
 
         :param bucket_name: 桶名
@@ -1444,12 +1511,12 @@ class FtpHarborManager:
                 print(objs)         # objs type list, raise HarborError when error
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.list_dir_generator(bucket_name=bucket_name, path=path, per_num=per_num)
 
     @ftp_close_old_connections
     def ftp_mkdir(self, bucket_name:str, path:str):
-        '''
+        """
         创建一个目录
         :param bucket_name: 桶名
         :param path: 目录全路径
@@ -1457,12 +1524,12 @@ class FtpHarborManager:
             True, dir: success
             raise HarborError: failed
         :raise HarborError
-        '''
+        """
         return self.__hbManager.mkdir(bucket_name=bucket_name, path=path)
 
     @ftp_close_old_connections
     def ftp_rmdir(self, bucket_name:str, path:str):
-        '''
+        """
         删除一个空目录
         :param bucket_name:桶名
         :param path: 目录全路径
@@ -1471,12 +1538,12 @@ class FtpHarborManager:
             raise HarborError(): failed
 
         :raise HarborError()
-        '''
+        """
         return self.__hbManager.rmdir(bucket_name, path)
 
     @ftp_close_old_connections
     def ftp_is_dir(self, bucket_name:str, path_name:str):
-        '''
+        """
         是否时一个目录
 
         :param bucket_name: 桶名
@@ -1486,12 +1553,12 @@ class FtpHarborManager:
             false: is file
 
         :raise HarborError  # 桶或路径不存在，发生错误
-        '''
+        """
         return self.__hbManager.is_dir(bucket_name=bucket_name, path_name=path_name)
 
     @ftp_close_old_connections
     def ftp_is_file(self, bucket_name:str, path_name:str):
-        '''
+        """
         是否时一个文件
         :param bucket_name: 桶名
         :param path_name: 文件路径
@@ -1500,12 +1567,12 @@ class FtpHarborManager:
             false: is dir
 
         :raise HarborError  # 桶或路径不存在，发生错误
-        '''
+        """
         return self.__hbManager.is_file(bucket_name=bucket_name, path_name=path_name)
 
     @ftp_close_old_connections
     def ftp_get_obj(self, bucket_name: str, path_name: str):
-        '''
+        """
         获取对象或目录实例
 
         :param bucket_name: 桶名
@@ -1514,12 +1581,12 @@ class FtpHarborManager:
             success: 对象实例
 
         :raise HarborError
-        '''
+        """
         return self.__hbManager.get_object(bucket_name=bucket_name, path_name=path_name)
 
     @ftp_close_old_connections
     def ftp_get_obj_size(self, bucket_name: str, path_name: str):
-        '''
+        """
         获取对象大小
 
         :param bucket_name: 桶名
@@ -1528,16 +1595,17 @@ class FtpHarborManager:
             int: 对象大小
 
         :raise HarborError  # 对象不存在, 不是文件是目录
-        '''
+        """
         obj = self.__hbManager.get_object(bucket_name=bucket_name, path_name=path_name)
         if obj.is_file():
             return obj.obj_size
 
-        raise HarborError(code=400, msg='目标是一个目录')
+        raise exceptions.HarborError.from_error(
+            exceptions.BadRequest(message='目标是一个目录'))
 
     @ftp_close_old_connections
     def ftp_get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool):
-        '''
+        """
         获取一个写入对象的生成器函数
 
         :param bucket_name: 桶名
@@ -1552,6 +1620,7 @@ class FtpHarborManager:
             ok = generator.send((offset, bytes))  # ok = True写入成功， ok=False写入失败
 
         :raise HarborError
-        '''
-        return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path, is_break_point=is_break_point)
+        """
+        return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path,
+                                                    is_break_point=is_break_point)
 
