@@ -171,7 +171,7 @@ APPEND_SLASH=False
 #登陆url
 LOGIN_URL = '/users/signin/'
 LOGOUT_URL = '/users/logout/'
-
+LOCAL_LOGIN_USE = False
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,

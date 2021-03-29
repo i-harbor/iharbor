@@ -13,9 +13,11 @@
                     <div>
                         <iframe height="300" width="280" frameborder="0" style="border:0 solid;" scrolling="no" src="{{ kjy_url }}"></iframe>
                     </div>
+                    {% if use_local_login %}
                     <div class="border-top">
                         <a class="btn btn-sm" href="{% url 'users:local_login' %}{% if next %}?next={{ next }}{% endif %}"><i class="fa fa-share"></i> <i class="fa fa-user"></i> {% trans '本地账号登录' %}</a>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
