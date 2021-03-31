@@ -2,7 +2,8 @@ import chardet
 import time
 from datetime import datetime
 
-from pyftpdlib.handlers import DTPHandler, FileProducer, FTPHandler
+from pyftpdlib.handlers import (TLS_DTPHandler as DTPHandler,
+                                FileProducer, TLS_FTPHandler as FTPHandler)
 from pyftpdlib.filesystems import FilesystemError
 from pyftpdlib.log import logger
 

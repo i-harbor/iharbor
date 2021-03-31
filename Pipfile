@@ -19,6 +19,7 @@ concurrent-log-handler = "*"
 drf-yasg = "==1.17.*"
 djangorestframework-simplejwt = "==4.4.0"
 pyjwt = "==1.7.1"
+pyopenssl = "==20.0.1"
 
 [dev-packages]
 
