@@ -1,0 +1,13 @@
+[Unit]
+Description=iharbor's ftp service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/bin/bash /home/uwsgi/iharbor/run_ftp.sh
+ExecReload=/bin/bash /home/uwsgi/iharbor/reload_ftp.sh
+ExecStop=/bin/bash /home/uwsgi/iharbor/stop_ftp.sh
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

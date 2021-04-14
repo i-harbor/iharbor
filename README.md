@@ -70,5 +70,12 @@ python manage.py migrate
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```python manage.py runserver 0.0.0.0:8000```   
 如果一切正常，打开浏览器输入url(主机IP:8000, 如：127.0.0.1：8000)即可查看站点;
+### 2.4 开机自启服务
+移动iharbor.service、iharbor_ftp.service两个文件到 /usr/lib/systemd/system/ 目录下
+```
+systemctl daemon-reload
+systemctl enable iharbor
+systemctl enable iharbor_ftp
+```
 
 
