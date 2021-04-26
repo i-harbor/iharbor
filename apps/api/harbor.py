@@ -303,12 +303,12 @@ class HarborManager:
         if _dir:
             # 目录已存在
             if _dir.is_dir():
-                err = exceptions.BadRequest(message=f'"{dir_name}"目录已存在')
+                err = exceptions.KeyAlreadyExists(message=f'"{dir_name}"目录已存在')
                 raise exceptions.HarborError.from_error(err)
 
             # 同名对象已存在
             if _dir.is_file():
-                err = exceptions.BadRequest(message=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
+                err = exceptions.SameKeyAlreadyExists(message=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
                 raise exceptions.HarborError.from_error(err)
 
         data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
@@ -373,7 +373,7 @@ class HarborManager:
 
         if not bfm.dir_is_empty(_dir):
             raise exceptions.HarborError.from_error(
-                exceptions.BadRequest(message='无法删除非空目录'))
+                exceptions.NoEmptyDir(message='无法删除非空目录'))
 
         if not _dir.do_delete():
             raise exceptions.HarborError(message='删除目录失败，数据库错误')
@@ -578,7 +578,7 @@ class HarborManager:
 
         if target_obj:
             raise exceptions.HarborError.from_error(
-                exceptions.BadRequest(message='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'))
+                exceptions.SameKeyAlreadyExists(message='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'))
 
         if move_to is not None:     # 移动对象或重命名
             _, did = bfm.get_cur_dir_id()

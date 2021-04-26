@@ -122,6 +122,24 @@ class BucketAlreadyExists(Error):
     default_status_code = 409
 
 
+class KeyAlreadyExists(Error):
+    default_message = '目标已存在。'
+    default_code = 'KeyAlreadyExists'
+    default_status_code = 409
+
+
+class SameKeyAlreadyExists(Error):
+    default_message = '同名目录或对象已存在。'
+    default_code = 'SameKeyAlreadyExists'
+    default_status_code = 409
+
+
+class NoEmptyDir(Error):
+    default_message = '无法删除非空目录。'
+    default_code = 'NoEmptyDir'
+    default_status_code = 409
+
+
 class Throttled(Error):
     default_message = 'Request was throttled.'
     default_code = 'Throttled'
