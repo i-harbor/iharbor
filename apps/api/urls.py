@@ -49,7 +49,7 @@ urlpatterns = [
     path('', include(detail_router.urls)),
     path('', include(no_slash_detail_router.urls)),
     path('', include(dlp_router.urls)),
-    path('auth-token/', auth.obtain_auth_token),
+    path('auth-token/', auth.obtain_auth_token, name='auth-token'),
     path('jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),
     path('jwt-refresh/', auth.JWTRefreshView.as_view(), name='jwt-refresh'),
     path('jwt-verify/', auth.JWTVerifyView.as_view(), name='jwt-verify'),
