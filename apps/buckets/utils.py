@@ -199,15 +199,16 @@ class BucketFileManagement:
 
         return False, None    # path参数有误,未找到对应目录信息
 
-    def get_cur_dir_files(self, cur_dir_id=None):
-        '''
+    def get_cur_dir_files(self, cur_dir_id=None, only_obj: bool = None):
+        """
         获得当前目录下的文件或文件夹记录
 
         :param cur_dir_id: 目录id;
+        :param only_obj: True(只列举对象), 其他忽略
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
 
         :raises: Exception
-        '''
+        """
         dir_id = None
         if cur_dir_id is not None:
             dir_id = cur_dir_id
@@ -220,12 +221,16 @@ class BucketFileManagement:
                 return False, None
 
         model_class = self.get_obj_model_class()
+        if dir_id:
+            filters = {'did': dir_id}
+        else:
+            filters = {'did': self.ROOT_DIR_ID}
+
+        if only_obj:
+            filters['fod'] = True
+
         try:
-            if dir_id:
-                files = model_class.objects.filter(did=dir_id).all()
-            else:
-                #存储桶下文件目录,did=0表示是存储桶下的文件目录
-                files = model_class.objects.filter(did=self.ROOT_DIR_ID).all()
+            files = model_class.objects.filter(**filters).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None

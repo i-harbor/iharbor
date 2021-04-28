@@ -1283,15 +1283,8 @@ class ObjViewSet(CustomGenericViewSet):
         if validated_param:
             offset = validated_param.get('offset')
             size = validated_param.get('size')
-            hManager = HarborManager()
-            try:
-                chunk, obj = hManager.read_chunk(bucket_name=bucket_name, obj_path=objpath,
-                                                 offset=offset, size=size, user=request.user)
-            except exceptions.HarborError as e:
-                return Response(data=e.err_data_old(), status=e.status_code)
-
-            return self.wrap_chunk_response(chunk=chunk, obj_size=obj.si)
-
+            return self.range_response(user=request.user, bucket_name=bucket_name,
+                                       obj_path=objpath, offset=offset, size=size, status_code=200)
         # 下载整个文件对象
         hManager = HarborManager()
         try:
@@ -1464,8 +1457,8 @@ class ObjViewSet(CustomGenericViewSet):
             try:
                 offset = int(chunk_offset)
                 size = int(chunk_size)
-                if offset < 0 or size < 0 or size > 20*1024**2: #20Mb
-                    raise Exception()
+                # if offset < 0 or size < 0 or size > 20*1024**2: #20Mb
+                #     raise Exception()
                 validated_data['offset'] = offset
                 validated_data['size'] = size
             except:
@@ -1497,6 +1490,37 @@ class ObjViewSet(CustomGenericViewSet):
         response['evob_chunk_size'] = c_len
         response['Content-Length'] = c_len
         response['evob_obj_size'] = obj_size
+        return response
+
+    @staticmethod
+    def offset_size_to_start_end(offset, size, obj_size):
+        filesize = obj_size
+        if offset >= filesize:
+            offset = filesize
+        else:
+            offset = max(0, offset)
+
+        end = min(offset + size - 1, filesize - 1)
+        return offset, end
+
+    def range_response(self, user, bucket_name: str, obj_path: str, offset: int, size: int,
+                       status_code: int = status.HTTP_206_PARTIAL_CONTENT):
+        try:
+            file_generator, obj = HarborManager().get_obj_generator(
+                bucket_name=bucket_name, obj_path=obj_path, offset=offset,
+                end=(offset + size - 1), user=user, all_public=True)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
+
+        filesize = obj.si
+        offset, end = self.offset_size_to_start_end(offset=offset, size=size, obj_size=filesize)
+        conten_len = end - offset + 1
+        response = StreamingHttpResponse(file_generator, status=status_code)
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
+        response['Content-Length'] = conten_len
+        response['evob_chunk_size'] = conten_len
+        response['evob_obj_size'] = filesize
         return response
 
     @staticmethod
@@ -1584,6 +1608,14 @@ class DirectoryViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取存储桶根目录下的文件和文件夹信息'),
+        manual_parameters=[
+            openapi.Parameter(
+                name='only-obj', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description=gettext_lazy("true(只列举对象，不含目录); 其他值忽略"),
+                required=False
+            ),
+        ],
         responses={
             status.HTTP_200_OK: """
                 {
@@ -1621,6 +1653,12 @@ class DirectoryViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取一个目录下的文件和文件夹信息'),
         manual_parameters=[
+            openapi.Parameter(
+                name='only-obj', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description=gettext_lazy("true(只列举对象，不含目录); 其他值忽略"),
+                required=False
+            ),
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
@@ -1680,6 +1718,11 @@ class DirectoryViewSet(CustomGenericViewSet):
     def list_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
+        only_obj = request.query_params.get('only-obj', None)
+        if only_obj and only_obj.lower() == 'true':
+            only_obj = True
+        else:
+            only_obj = None
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
@@ -1697,7 +1740,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         h_manager = HarborManager()
         try:
             files, bucket = h_manager.list_dir(bucket_name=bucket_name, path=dir_path, offset=offset, limit=limit,
-                                               user=request.user, paginator=paginator)
+                                               user=request.user, paginator=paginator, only_obj=only_obj)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 

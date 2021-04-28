@@ -380,13 +380,15 @@ class HarborManager:
 
         return True
 
-    def _list_dir_queryset(self, bucket_name: str, path: str, user=None):
+    def _list_dir_queryset(self, bucket_name: str, path: str, user=None,
+                           only_obj: bool = None):
         """
         获取目录下的文件列表信息
 
         :param bucket_name: 桶名
         :param path: 目录路径
         :param user: 用户，默认为None，如果给定用户只获取属于此用户的目录下的文件列表信息（只查找此用户的存储桶）
+        :param only_obj: True(只列举对象), 其他忽略
         :return:
                 success:    (QuerySet(), bucket) # django QuerySet实例和bucket实例
                 failed:      raise HarborError
@@ -398,14 +400,15 @@ class HarborManager:
             raise exceptions.HarborError.from_error(
                 exceptions.NoSuchBucket(message='存储桶不存在'))
 
-        qs = self._list_bucket_dir_queryset(bucket=bucket, path=path)
+        qs = self._list_bucket_dir_queryset(bucket=bucket, path=path, only_obj=only_obj)
         return qs, bucket
 
     @staticmethod
-    def _list_bucket_dir_queryset(bucket, path: str):
+    def _list_bucket_dir_queryset(bucket, path: str, only_obj: bool = None):
         """
         :param bucket: bucket instance
         :param path: 目录路径
+        :param only_obj: True(只列举对象), 其他忽略
         :return:
                 success:    QuerySet()
                 failed:      raise HarborError
@@ -418,7 +421,7 @@ class HarborManager:
 
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, qs = bfm.get_cur_dir_files()
+        ok, qs = bfm.get_cur_dir_files(only_obj=only_obj)
         if not ok:
             raise exceptions.HarborError.from_error(
                 exceptions.NotFound(message='未找到相关记录'))
@@ -465,7 +468,8 @@ class HarborManager:
 
         return generator(queryset=qs, per_num=per_num, paginator=paginator)
 
-    def list_dir(self, bucket_name:str, path:str, offset:int=0, limit:int=1000, user=None, paginator=None):
+    def list_dir(self, bucket_name: str, path: str, offset: int = 0,
+                 limit: int = 1000, user=None, paginator=None, only_obj: bool = None):
         """
         获取目录下的文件列表信息
 
@@ -475,13 +479,15 @@ class HarborManager:
         :param limit: 获取文件信息数量
         :param user: 用户，默认为None，如果给定用户只获取属于此用户的目录下的文件列表信息（只查找此用户的存储桶）
         :param paginator: 分页器，默认为None
+        :param only_obj: True(只列举对象), 其他忽略
         :return:
                 success:    (list[object, object,], bucket) # list和bucket实例
                 failed:      raise HarborError
 
         :raise HarborError
         """
-        files, bucket = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
+        files, bucket = self._list_dir_queryset(bucket_name=bucket_name, path=path,
+                                                user=user, only_obj=only_obj)
 
         if paginator is None:
             paginator = BucketFileLimitOffsetPagination()
@@ -760,7 +766,7 @@ class HarborManager:
         # 已存在同名的目录
         if obj and obj.is_dir():
             raise exceptions.HarborError.from_error(
-                exceptions.BadRequest(message='指定的对象名称与已有的目录重名，请重新指定一个名称'))
+                exceptions.SameKeyAlreadyExists(message='指定的对象名称与已有的目录重名，请重新指定一个名称'))
 
         ok, did = bfm.get_cur_dir_id()
         if not ok:
@@ -1069,7 +1075,9 @@ class HarborManager:
                 exceptions.NoSuchKey(message='文件对象不存在'))
 
         # 增加一次下载次数
-        obj.download_cound_increase()
+        if offset == 0:
+            obj.download_cound_increase()
+
         generator = self._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end, per_size=per_size)
         return generator, obj
 
