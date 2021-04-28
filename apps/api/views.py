@@ -2326,7 +2326,8 @@ class MetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj:
-            return Response(data={'code': 404, 'code_text': _('对象或目录不存在')}, status=status.HTTP_404_NOT_FOUND)
+            exc = exceptions.NoSuchKey(message=_('对象或目录不存在'))
+            return Response(data=exc.err_data_old(), status=404)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
 
