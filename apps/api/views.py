@@ -414,41 +414,6 @@ class BucketViewSet(CustomGenericViewSet):
                 'code': 'BucketAlreadyExists',    # or BucketAlreadyOwnedByYou
                 'code_text': 'xxx',      //错误码表述信息
             }
-
-    delete:
-    删除一个存储桶
-
-        >>Http Code: 状态码204,存储桶删除成功
-        >>Http Code: 状态码400
-            {
-                'code': 400,
-                'code_text': '存储桶id有误'
-            }
-        >>Http Code: 状态码404：
-            {
-                'code': 404,
-                'code_text': 'xxxxx'
-            }
-
-    partial_update:
-    存储桶访问权限设置
-
-        Http Code: 状态码200：上传成功无异常时，返回数据：
-        {
-            'code': 200,
-            'code_text': '对象共享设置成功'，
-            'public': xxx,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404;
-
-        Http code: 状态码500：
-        {
-            "code": 500,
-            "code_text": "保存到数据库时错误"
-        }
-
     """
     queryset = Bucket.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
@@ -599,6 +564,12 @@ class BucketViewSet(CustomGenericViewSet):
                     "ftp_ro_password": "666666666"
                   }
                 }
+            """,
+            "400, 403, 404": """
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
             """
         }
     )
@@ -620,7 +591,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         serializer = self.get_serializer(bucket)
         return Response({'code': 200, 'bucket': serializer.data})
@@ -641,6 +612,16 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        删除一个存储桶
+
+            >>Http Code: 状态码204,存储桶删除成功
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
+        """
         try:
             ids = self.get_buckets_ids(request)
         except ValueError as e:
@@ -650,7 +631,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         if not bucket.delete_and_archive():  # 删除归档
             return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -690,6 +671,26 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def partial_update(self, request, *args, **kwargs):
+        """
+        存储桶访问权限设置
+
+            Http Code: 状态码200：上传成功无异常时，返回数据：
+            {
+                'code': 200,
+                'code_text': '对象共享设置成功'，
+                'public': xxx,
+            }
+            >>Http Code: 400, 403, 404:
+            {
+                'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                'code_text': 'xxx',      //错误码表述信息
+            }
+            Http code: 状态码500：
+            {
+                "code": 500,
+                "code_text": "保存到数据库时错误"
+            }
+        """
         public = str_to_int_or_default(request.query_params.get('public', ''), 0)
         if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': _('public参数有误')}, status=status.HTTP_400_BAD_REQUEST)
@@ -708,7 +709,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         share_urls = []
         url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
@@ -749,6 +750,13 @@ class BucketViewSet(CustomGenericViewSet):
     def remarks(self, request, *args, **kwargs):
         """
         存储桶备注信息设置
+
+            >>Http Code 200 OK;
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
         """
         id_or_name, by_name = self.get_id_or_name_params(request, kwargs)
         if by_name:
@@ -768,7 +776,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         if not bucket.set_remarks(remarks=remarks):
             return Response(data={'code': 500, 'code_text': _('设置备注信息失败，更新数据库数据时错误')},
@@ -812,6 +820,11 @@ class BucketViewSet(CustomGenericViewSet):
               "permission": "readwrite",
               "created": "2020-12-21T11:13:07.022989+08:00"
             }
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest、TooManyBucketTokens
+                    'code_text': 'xxx',      //错误码表述信息
+                }
         """
         perm = request.query_params.get('permission', '').lower()
         if perm not in [BucketToken.PERMISSION_READWRITE, BucketToken.PERMISSION_READONLY]:
@@ -867,6 +880,11 @@ class BucketViewSet(CustomGenericViewSet):
                     },
                     ...
                   ]
+                }
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
                 }
         """
         id_or_name, by_name = self.get_id_or_name_params(request, kwargs)
@@ -1011,37 +1029,6 @@ class ObjViewSet(CustomGenericViewSet):
                 'code_text': '文件块rados写入失败'
             }
 
-    retrieve:
-        通过文件对象绝对路径,下载文件对象，或者自定义读取对象数据块
-
-        *注：
-        1. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
-        2. 不带参数时，返回整个文件对象；
-
-        >>Http Code: 状态码200：
-             evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
-            其他,返回整个文件对象bytes数据流
-
-        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-            {
-                'code': 400,
-                'code_text': 'xxxx参数有误'
-            }
-        >>Http Code: 状态码404：找不到资源;
-        >>Http Code: 状态码500：服务器内部错误;
-
-    destroy:
-        通过文件对象绝对路径,删除文件对象；
-
-        >>Http Code: 状态码204：删除成功，NO_CONTENT；
-        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-            {
-                'code': 400,
-                'code_text': '参数有误'
-            }
-        >>Http Code: 状态码404：找不到资源;
-        >>Http Code: 状态码500：服务器内部错误;
-
     partial_update:
     对象共享或私有权限设置
 
@@ -1053,9 +1040,11 @@ class ObjViewSet(CustomGenericViewSet):
             'share': xxx,
             'days': xxx
         }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404;
+        >>Http Code: 400 401 403 404 500
+        {
+            'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+            'code_text': '参数有误'
+        }
 
     """
     queryset = {}
@@ -1267,6 +1256,23 @@ class ObjViewSet(CustomGenericViewSet):
         }
     )
     def retrieve(self, request, *args, **kwargs):
+        """
+        通过文件对象绝对路径,下载文件对象，或者自定义读取对象数据块
+
+            *注：
+            1. offset && size参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
+            2. 不带参数时，返回整个文件对象；
+
+            >>Http Code: 状态码200：
+                 evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
+                其他,返回整个文件对象bytes数据流
+
+            >>Http Code: 400 401 403 404 500
+            {
+                'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+                'code_text': '参数有误'
+            }
+        """
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
 
@@ -1306,6 +1312,16 @@ class ObjViewSet(CustomGenericViewSet):
         operation_summary=gettext_lazy('删除一个对象')
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        通过文件对象绝对路径,删除文件对象；
+
+            >>Http Code: 状态码204：删除成功，NO_CONTENT；
+            >>Http Code: 400 401 403 404 500
+                {
+                    'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+                    'code_text': '参数有误'
+                }
+        """
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
 
@@ -1548,56 +1564,10 @@ class DirectoryViewSet(CustomGenericViewSet):
                 'bucket_name': xxx,             //存储桶名称
                 'dir_path': xxx,                //当前目录路径
             }
-        >>Http Code: 状态码400:
-            {
-                'code': 400,
-                'code_text': '参数有误'
-            }
-        >>Http Code: 状态码404:
-            {
-                'code': xxx,      //404
-                'code_text': xxx  //错误码描述
-            }
-
-    create_detail:
-        创建一个目录
-
-        >>Http Code: 状态码400, 请求参数有误:
-            {
-                "code": 400,
-                "code_text": 'xxxxx'        //错误信息
-            }
-        >>Http Code: 状态码201,创建文件夹成功：
-            {
-                'code': 201,
-                'code_text': '创建文件夹成功',
-                'data': {},      //请求时提交的数据
-                'dir': {}，      //新目录对象信息
-            }
-
-    destroy:
-        删除一个目录, 目录必须为空，否则400错误
-
-        >>Http Code: 状态码204,成功删除;
-        >>Http Code: 状态码400,参数无效或目录不为空;
-            {
-                'code': 400,
-                'code_text': 'xxx'
-            }
-        >>Http Code: 状态码404;
-            {
-                'code': 404,
-                'code_text': '文件不存在
-            }
-
-    partial_update:
-        设置目录访问权限
-
-        >>Http Code: 状态码200;
+        >>Http Code: 400 401 403 404 500
         {
-          "code": 200,
-          "code_text": "设置目录权限成功",
-          "share": "http://xxx/share/s/xx/xx" # 分享链接
+            "code": "xxx",   // NoSuchBucket、AccessDenied、BadRequest
+            "code_text": ""
         }
     """
     queryset = []
@@ -1792,6 +1762,22 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def create_detail(self, request, *args, **kwargs):
+        """
+        创建一个目录
+
+            >>Http Code: 状态码201,创建文件夹成功：
+                {
+                    'code': 201,
+                    'code_text': '创建文件夹成功',
+                    'data': {},      //请求时提交的数据
+                    'dir': {}，      //新目录对象信息
+                }
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "xxx",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
         path = kwargs.get(self.lookup_field, '')
 
@@ -1830,6 +1816,16 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        删除一个目录, 目录必须为空，否则400错误
+
+            >>Http Code: 状态码204,成功删除;
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite、NoEmptyDir
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
 
@@ -1887,6 +1883,15 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def partial_update(self, request, *args, **kwargs):
+        """
+        设置目录访问权限
+
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
 
         try:
@@ -2274,15 +2279,11 @@ class MetadataViewSet(CustomGenericViewSet):
                     "filename": "Firefox-latest.exe"           # 对象名称
                 }
             }
-        >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
+        >>Http Code: 400 401 403 404 500
             {
-                "code": 400,
-                "code_text": 'xxxxx'        //错误信息
+                'code': "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest
+                'code_text': '参数有误'
             }
-        >>Http Code: 状态码404, bucket桶、对象或目录不存在:
-            {
-                "code": 404,
-                "code_text": 'xxxxx'        //错误信息，
     """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]

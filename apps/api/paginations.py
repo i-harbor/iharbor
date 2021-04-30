@@ -234,9 +234,9 @@ class ListObjectsCursorPagination(CursorPagination):
         return self._data
 
     def get_paginated_data(self):
-        is_truncated = 'true' if self.has_next else 'false'
+        is_truncated = True if self.has_next else False
         data = {
-            'IsTruncated': is_truncated,  # can not use True
+            'IsTruncated': is_truncated,
             'MaxKeys': self.page_size,
             'KeyCount': len(self.page_data),
             'Next': self.get_next_link(),
