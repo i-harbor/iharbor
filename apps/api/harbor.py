@@ -265,6 +265,10 @@ class HarborManager:
 
         return True, bfinfo
 
+    @staticmethod
+    def get_root_dir():
+        return BucketFileManagement().root_dir()
+
     def validate_mkdir_params(self, bucket, dirpath: str):
         """
         post_detail参数验证
@@ -428,6 +432,28 @@ class HarborManager:
 
         return qs
 
+    @staticmethod
+    def get_queryset_list_dir(bucket, dir_id, only_obj: bool = None):
+        """
+        获取目录下的对象和目录列表信息
+
+        :param bucket: 桶实例
+        :param dir_id: 目录实例id
+        :param only_obj: True(只列举对象), 其他忽略
+        :return:
+                success:    QuerySet()   # django QuerySet实例
+                failed:      raise HarborError
+        """
+        collection_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(collection_name=collection_name)
+        try:
+            _, qs = bfm.get_cur_dir_files(cur_dir_id=dir_id, only_obj=only_obj)
+        except Exception as e:
+            raise exceptions.HarborError.from_error(
+                exceptions.Error(message=str(e)))
+
+        return qs
+
     def list_dir_generator(self, bucket_name:str, path:str, per_num:int=1000, user=None, paginator=None):
         """
         获取目录下的文件列表信息生成器
@@ -509,7 +535,57 @@ class HarborManager:
 
         return li, bucket
 
-    def move_rename(self, bucket_name:str, obj_path:str, rename=None, move=None, user=None):
+    def get_bucket_objects_dirs_queryset(self, bucket_name: str, user, prefix: str = ''):
+        """
+        获得所有对象和目录记录
+
+        :param bucket_name: 桶名
+        :param user: 用户对象
+        :param prefix: 路径前缀
+        :return:
+            bucket, QuerySet()
+
+        :raises: S3Error
+        """
+        # 存储桶验证和获取桶对象
+        bucket = self.get_bucket_by_name(bucket_name)
+        if not bucket:
+            raise exceptions.HarborError.from_error(
+                exceptions.NoSuchBucket('存储桶不存在'))
+
+        self.check_public_or_user_bucket(bucket=bucket, user=user, all_public=False)
+
+        table_name = bucket.get_bucket_table_name()
+        if not prefix:
+            objs = self.get_objects_dirs_queryset(table_name=table_name)
+        else:
+            objs = self.get_prefix_objects_dirs_queryset(table_name=table_name, prefix=prefix)
+
+        return bucket, objs
+
+    @staticmethod
+    def get_objects_dirs_queryset(table_name: str):
+        """
+        获得所有文件对象和目录记录
+
+        :return: QuerySet()
+        """
+        return BucketFileManagement(collection_name=table_name).get_objects_dirs_queryset()
+
+    @staticmethod
+    def get_prefix_objects_dirs_queryset(table_name: str, prefix: str):
+        """
+        获取存储桶下指定路径前缀的对象和目录查询集
+
+        :param table_name: 桶对应的数据库表名
+        :param prefix: 路径前缀
+        :return:
+                success:    QuerySet()   # django QuerySet实例
+        """
+        bfm = BucketFileManagement(collection_name=table_name)
+        return bfm.get_prefix_objects_dirs_queryset(prefix=prefix)
+
+    def move_rename(self, bucket_name: str, obj_path: str, rename=None, move=None, user=None):
         """
         移动或重命名对象
 

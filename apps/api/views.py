@@ -3516,3 +3516,181 @@ class SearchObjectViewSet(CustomGenericViewSet):
             ('files', files)
         ])
         return paginator.get_paginated_response(data_dict)
+
+
+class ListBucketObjectViewSet(CustomGenericViewSet):
+    """
+    检索对象视图
+    """
+    queryset = {}
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
+    lookup_field = 'bucket_name'
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('列举存储桶内对象和目录'),
+        manual_parameters=[
+            openapi.Parameter(
+                name='prefix', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("列举指定前缀开头的对象"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='delimiter', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("分隔符是用于对键进行分组的字符"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='continuation-token', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("指示使用令牌在该存储桶上继续该列表"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='max-keys', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("设置响应中返回的最大对象数"),
+                required=False
+            ),
+        ]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """
+        列举存储桶内对象和目录
+
+            * prefix与delimiter配合可以列举一个目录;
+             当使用delimiter参数时，prefix必须存在（对象或目录）；
+             prefix=""或"/" 并且 delimiter="/"时列举桶根目录
+
+            * 由于path唯一，即不允许同名的对象和目录存在，prefix="test"和prefix="test/"结果相同
+
+            http code 200:
+            {
+              "Name": "ddd",            # bucket name
+              "Prefix": "test",
+              "Delimiter": "/",         # 只有提交参数delimiter时，此内容才存在
+              "IsTruncated": "false",
+              "MaxKeys": 1000,
+              "KeyCount": 2,
+              "Next": "http://159.226.91.140:8000/api/v1/list/bucket/ddd/?continuation-token=cD01NQ%3D%3D&delimiter=%2F&max-keys=1",
+              "Previous": "http://159.226.91.140:8000/api/v1/list/bucket/ddd/?continuation-token=cj0xJnA9NTU%3D&delimiter=%2F&max-keys=1",
+              "ContinuationToken": "cD03Ng==",      # 只有提交参数continuation-token时，此内容才存在
+              "NextContinuationToken": "cD01Ng==",  # 此内容在"IsTruncated" == "true"时存在
+              "Contents": [
+                {
+                  "Key": "test/月报",     # 对象完整路径
+                  "LastModified": "2021-03-31T01:40:05.190793Z",
+                  "ETag": "d41d8cd98f00b204e9800998ecf8427e",
+                  "Size": 0,
+                  "IsObject": false
+                }
+              ]
+            }
+
+            http code 404: 当使用delimiter参数时，prefix不存在（对象或目录）
+            {
+              "code": "NoSuchKey",
+              "message": "无效的参数prefix，对象或目录不存在"
+            }
+        """
+        return self.list_objects(request=request, **kwargs)
+
+    def list_objects(self, request, **kwargs):
+        delimiter = request.query_params.get('delimiter', None)
+        prefix = request.query_params.get('prefix', '')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        if not delimiter:    # list所有对象和目录
+            return self.list_objects_list_prefix(request=request, bucket_name=bucket_name, prefix=prefix)
+
+        if delimiter != '/':
+            exc = exceptions.BadRequest(message='参数“delimiter”必须是“/”')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        hm = HarborManager()
+        path = prefix.strip('/')
+        if not path and delimiter:     # list root dir
+            try:
+                bucket = hm.get_user_own_bucket(bucket_name, request.user)
+            except exceptions.Error as exc:
+                return Response(data=exc.err_data(), status=exc.status_code)
+
+            root_dir = hm.get_root_dir()
+            return self.list_objects_list_dir(request=request, bucket=bucket,
+                                              dir_obj=root_dir)
+
+        try:
+            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if obj is None:
+            exc = exceptions.NoSuchKey('无效的参数prefix，对象或目录不存在')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        paginator = paginations.ListObjectsCursorPagination()
+        max_keys = paginator.get_page_size(request=request)
+
+        # list dir
+        if obj.is_dir():
+            return self.list_objects_list_dir(request=request, bucket=bucket, dir_obj=obj)
+
+        # list object metadata
+        ret_data = {
+            'IsTruncated': False,
+            'Name': bucket_name,
+            'Prefix': prefix,
+            'MaxKeys': max_keys,
+            'Delimiter': delimiter
+        }
+        serializer = serializers.ListBucketObjectsSerializer(obj)
+        ret_data['Contents'] = [serializer.data]
+        ret_data['KeyCount'] = 1
+        return Response(data=ret_data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def list_objects_list_dir(request, bucket, dir_obj):
+        delimiter = request.query_params.get('delimiter', None)
+        prefix = request.query_params.get('prefix', '')
+
+        paginator = paginations.ListObjectsCursorPagination()
+        ret_data = {
+            'Name': bucket.name,
+            'Prefix': prefix,
+            'Delimiter': delimiter
+        }
+        objs_qs = HarborManager().get_queryset_list_dir(bucket=bucket, dir_id=dir_obj.id)
+        objs = paginator.paginate_queryset(objs_qs, request=request)
+        serializer = serializers.ListBucketObjectsSerializer(objs, many=True)
+
+        data = paginator.get_paginated_data()
+        ret_data.update(data)
+        ret_data['Contents'] = serializer.data
+        return Response(data=ret_data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def list_objects_list_prefix(request, bucket_name, prefix):
+        """
+        列举所有对象和目录
+        """
+        hm = HarborManager()
+        try:
+            bucket, objs_qs = hm.get_bucket_objects_dirs_queryset(bucket_name=bucket_name, user=request.user, prefix=prefix)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        paginator = paginations.ListObjectsCursorPagination()
+        objs_dirs = paginator.paginate_queryset(objs_qs, request=request)
+        serializer = serializers.ListBucketObjectsSerializer(objs_dirs, many=True)
+
+        data = paginator.get_paginated_data()
+        data['Contents'] = serializer.data
+        data['Name'] = bucket_name
+        data['Prefix'] = prefix
+        return Response(data=data, status=status.HTTP_200_OK)

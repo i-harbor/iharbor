@@ -65,6 +65,11 @@ class BadRequest(Error):
     default_status_code = 400
 
 
+class InvalidArgument(BadRequest):
+    default_message = 'Invalid Argument'
+    default_code = 'InvalidArgument'
+
+
 class TooManyBucketTokens(Error):
     default_message = "You have attempted to create more tokens than allowed."
     default_code = 'TooManyBucketTokens'
