@@ -4,14 +4,15 @@ import random
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
-from django.db.models import Sum, Count, Model
+from django.db.models import Sum, Count
 from django.db.models.functions import Lower
 from django.db.models.query import Q
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned
 from django.apps import apps
 from django.conf import settings
 
 from .models import BucketFileBase, get_str_hexMD5
+from api import exceptions
 
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -291,7 +292,7 @@ class BucketFileManagement:
         if check_path_exists:
             ok, did = self.get_cur_dir_id()
             if not ok:
-                raise Exception(f'父路径（{self._path}）不存在，或路径有误')
+                raise exceptions.NoParentPath(message=f'父路径（{self._path}）不存在，或路径有误')
 
         path = self.build_dir_full_name(name)
         try:

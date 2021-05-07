@@ -99,6 +99,11 @@ class NoSuchKey(NotFound):
     default_code = 'NoSuchKey'
 
 
+class NoParentPath(NotFound):
+    default_message = 'The parent path does not exist.'
+    default_code = 'NoParentPath'
+
+
 class NoSuchToken(NotFound):
     default_message = 'The specified token does not exist.'
     default_code = 'NoSuchToken'

@@ -181,7 +181,7 @@ class HarborManager:
         try:
             obj = bfm.get_dir_or_obj_exists(name=name)
         except Exception as e:
-            raise exceptions.HarborError(message=str(e))
+            raise exceptions.HarborError.from_error(e)
 
         if obj:
             return obj, bfm   # 目录或对象存在
@@ -833,7 +833,7 @@ class HarborManager:
         try:
             obj = bfm.get_dir_or_obj_exists(name=filename)
         except Exception as e:
-            raise exceptions.HarborError(message=f'查询对象错误，{str(e)}')
+            raise exceptions.HarborError.from_error(e)
 
         # 文件对象已存在
         if obj and obj.is_file():
