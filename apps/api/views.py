@@ -255,7 +255,7 @@ class UserViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary=gettext_lazy('注册一个用户'),
         responses={
-            status.HTTP_200_OK: ''
+            status.HTTP_201_CREATED: ''
         }
     )
     def create(self, request, *args, **kwargs):
@@ -276,8 +276,9 @@ class UserViewSet(CustomGenericViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        if not (request.user.id == instance.id):
+        if not self.has_update_user_permission(request, instance=instance):
             return Response(data={"detail": _("您没有执行该操作的权限")}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
