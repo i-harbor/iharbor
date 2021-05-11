@@ -3522,7 +3522,7 @@ class SearchObjectViewSet(CustomGenericViewSet):
 
 class ListBucketObjectViewSet(CustomGenericViewSet):
     """
-    检索对象视图
+    列举存储桶内对象和目录
     """
     queryset = {}
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]

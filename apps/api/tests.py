@@ -21,6 +21,7 @@ from users.models import UserProfile
 
 
 User = get_user_model()
+EMPTY_HEX_MD5 = 'd41d8cd98f00b204e9800998ecf8427e'
 
 
 def get_or_create_user(username='test', password='password'):
@@ -970,7 +971,7 @@ class MetadataAPITests(MyAPITransactionTestCase):
             testcase.assertKeysIn(['obj', 'info'], response.data)
             testcase.assertKeysIn(['rados', 'size', 'filename'], response.data['info'])
             testcase.assertDictIsSubDict(response.data['obj'], {
-                'na': key, 'name': filename, 'fod': True, 'si': 0, 'did': 0
+                'na': key, 'name': filename, 'fod': True, 'si': 0,
             })
 
         return response
@@ -1306,3 +1307,131 @@ class UserAPITests(MyAPITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['is_active'], False)
+
+
+class ListBucketObjecttsAPITests(MyAPITransactionTestCase):
+    databases = {'default', 'metadata'}
+
+    def setUp(self):
+        self.user_password = 'password'
+        user: UserProfile = get_or_create_user(password=self.user_password)
+        self.user = user
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+
+        self.bucket_name = 'test'
+        r = BucketsAPITests.create_bucket(self.client, self.bucket_name)
+        self.assertEqual(r.status_code, 201)
+
+    def test_search_objects_in_bucket(self):
+        prefix = 'gg'
+        key1 = f'{prefix}/ab.txt'
+        key2 = 'ABCD.txt'
+        file = random_bytes_io(mb_num=1)
+        r = DirAPITests.create_dir_response(self.client, bucket_name=self.bucket_name, dirpath=prefix)
+        self.assertEqual(r.status_code, 201)
+
+        MetadataAPITests.create_empty_object_metadata(
+            self, bucket_name=self.bucket_name, key=key1, check_response=True
+        )
+
+        response = ObjectsAPITests.put_object_response(self.client, bucket_name=self.bucket_name, key=key2, file=file)
+        self.assertEqual(response.status_code, 200)
+
+        # list bucket all
+        base_url = reverse('api:list-bucket-detail', kwargs={'bucket_name': self.bucket_name})
+        response = self.client.get(base_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['Name', 'Prefix', 'IsTruncated', 'MaxKeys', 'KeyCount',
+                           'Next', 'Previous', 'Contents'], response.data)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': '', 'IsTruncated': False,
+            'MaxKeys': 1000, 'KeyCount': 3
+        })
+        self.assertKeysIn(['Key', 'LastModified', 'ETag', 'Size', 'IsObject'],
+                          response.data['Contents'][0])
+
+        # list bucket all ?prefix
+        query = parse.urlencode({'prefix': prefix})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': prefix, 'IsTruncated': False,
+            'MaxKeys': 1000, 'KeyCount': 2
+        })
+        for o in response.data['Contents']:
+            self.assertIn(o['Key'], [prefix, key1])
+
+        # list bucket base dir
+        query = parse.urlencode({'prefix': '', 'delimiter': '/'})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': '', 'IsTruncated': False,
+            'MaxKeys': 1000, 'KeyCount': 2, 'Delimiter': '/'
+        })
+        obj1 = response.data['Contents'][0]
+        if obj1['Key'] == prefix:
+            self.assertKeysIn(['Key', 'LastModified', 'ETag', 'Size', 'IsObject'], obj1)
+            self.assertDictIsSubDict(obj1, {
+                'Key': prefix, 'ETag': EMPTY_HEX_MD5, 'Size': 0,
+                'IsObject': False
+            })
+        elif obj1['Key'] == key2:
+            self.assertKeysIn(['Key', 'LastModified', 'ETag', 'Size', 'IsObject'], obj1)
+            self.assertDictIsSubDict(obj1, {
+                'Key': key2, 'Size': 1024*1024, 'IsObject': True
+            })
+
+        # list bucket base dir ?max-keys & continuation-token
+        query = parse.urlencode({'prefix': '', 'delimiter': '/', 'max-keys': 1})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['Name', 'Prefix', 'IsTruncated', 'MaxKeys', 'KeyCount',
+                           'Next', 'Previous', 'Contents', 'NextContinuationToken'], response.data)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': '', 'IsTruncated': True,
+            'MaxKeys': 1, 'KeyCount': 1, 'Delimiter': '/'
+        })
+        obj1 = response.data['Contents'][0]
+        next_token = response.data['NextContinuationToken']
+        query = parse.urlencode({'prefis': '', 'delimiter': '/', 'max-keys': 1,
+                                 'continuation-token': next_token})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['Name', 'Prefix', 'IsTruncated', 'MaxKeys', 'KeyCount',
+                           'Next', 'Previous', 'Contents', 'ContinuationToken'], response.data)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': '', 'IsTruncated': False,
+            'MaxKeys': 1, 'KeyCount': 1, 'Delimiter': '/', 'ContinuationToken': next_token
+        })
+        obj2 = response.data['Contents'][0]
+        if obj1['Key'] == prefix:
+            self.assertEqual(obj2['Key'], key2)
+        elif obj1['Key'] == key2:
+            self.assertEqual(obj2['Key'], prefix)
+        else:
+            self.fail('Failed to list bucket base dir ?max-keys & continuation-token')
+
+        # list bucket sub dir
+        query = parse.urlencode({'prefix': prefix, 'delimiter': '/'})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertDictIsSubDict(response.data, {
+            'Name': self.bucket_name, 'Prefix': prefix, 'IsTruncated': False,
+            'MaxKeys': 1000, 'KeyCount': 1, 'Delimiter': '/'
+        })
+        self.assertDictIsSubDict(response.data['Contents'][0], {
+            'Key': key1, 'ETag': EMPTY_HEX_MD5, 'Size': 0,
+            'IsObject': True
+        })
+
+        # list bucket not exists dir
+        query = parse.urlencode({'prefix': 'test', 'delimiter': '/'})
+        response = self.client.get(f'{base_url}?{query}')
+        self.assertEqual(response.status_code, 404)
+        self.assertErrorResponse(status_code=404, code='NoSuchKey', response=response)
+
+    def tearDown(self):
+        r = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
+        self.assertEqual(r.status_code, 204)
+        BucketsAPITests.clear_bucket_archive(self.bucket_name)

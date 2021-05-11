@@ -3,6 +3,7 @@ import logging
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db import close_old_connections
+from django.db.models import BigIntegerField
 
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
@@ -999,7 +1000,7 @@ class HarborManager:
         new_size = max(size, old_size)  # 更新文件大小（只增不减）
 
         kwargs = {
-            'si': Case(When(si__lt=new_size, then=Value(new_size)), default=F('si')),
+            'si': Case(When(si__lt=new_size, then=Value(new_size)), default=F('si'), output_field=BigIntegerField()),
             'upt': upt
         }
         if md5 and len(md5) == 32:

@@ -10,8 +10,6 @@ from django.conf import settings
 from django.utils import timezone
 
 
-# Create your models here.
-
 class UserProfile(AbstractUser):
     '''
     自定义用户模型
@@ -34,6 +32,7 @@ class UserProfile(AbstractUser):
         (ROLE_APP_SUPPER_USER, '第三方APP超级用户')
     )
 
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     telephone = models.CharField(verbose_name='电话', max_length=11, default='')
     company = models.CharField(verbose_name='公司/单位', max_length=255, default='')
     third_app = models.SmallIntegerField(verbose_name='第三方应用登录', choices=THIRD_APP_CHOICES, default=NON_THIRD_APP)
@@ -59,7 +58,8 @@ class UserProfile(AbstractUser):
 
         return self.secret_key
 
-    def new_user_secret_key(self):
+    @staticmethod
+    def new_user_secret_key():
         return binascii.hexlify(os.urandom(10)).decode()
 
     @classmethod
@@ -96,6 +96,7 @@ class Email(models.Model):
     '''
     邮箱
     '''
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     email_host = models.CharField(max_length=255)
     sender = models.EmailField(verbose_name='发送者')
     receiver = models.EmailField(verbose_name='接收者')
