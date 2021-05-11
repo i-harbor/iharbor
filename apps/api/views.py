@@ -30,7 +30,6 @@ from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
 from utils.time import to_django_timezone
-from vpn.models import VPNAuth
 from .models import User, Bucket, BucketToken
 from . import serializers
 from . import paginations
@@ -3141,95 +3140,6 @@ class FtpViewSet(CustomGenericViewSet):
         Defaults to using `self.serializer_class`.
         Custom serializer_class
         """
-        return Serializer
-
-
-class VPNViewSet(CustomGenericViewSet):
-    """
-    VPN相关API
-    """
-    queryset = []
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('获取VPN口令'),
-        deprecated=True,
-        responses={
-            status.HTTP_200_OK: ''
-        }
-    )
-    def list(self, request, *args, **kwargs):
-        """
-        获取VPN口令信息
-
-            Http Code: 状态码200，返回数据：
-            {
-                "code": 200,
-                "code_text": "获取成功",
-                "vpn": {
-                    "id": 2,
-                    "password": "2523c77e7b",
-                    "created_time": "2020-03-04T06:01:50+00:00",
-                    "modified_time": "2020-03-04T06:01:50+00:00",
-                    "user": {
-                        "id": 3,
-                        "username": "869588058@qq.com"
-                    }
-                }
-            }
-        """
-        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
-        return Response(data={'code': 200, 'code_text': _('获取成功'), 'vpn': serializers.VPNSerializer(vpn).data})
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('修改vpn口令'),
-        deprecated=True,
-        responses={
-            status.HTTP_201_CREATED: """
-                {
-                    "code": 201,
-                    "code_text": "修改成功"
-                }
-            """,
-            status.HTTP_400_BAD_REQUEST: """
-                    {
-                        "code": 400,
-                        "code_text": "xxxx"
-                    }
-                """
-        }
-    )
-    def create(self, request, *args, **kwargs):
-        """
-        修改vpn口令
-        """
-        serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid(raise_exception=False):
-            code_text = 'password error'
-            try:
-                for key, err_list in serializer.errors.items():
-                    code_text = f'{key},{err_list[0]}'
-                    break
-            except:
-                pass
-            return Response(data={'code': 400, 'code_text': code_text}, status=status.HTTP_400_BAD_REQUEST)
-
-        password = serializer.validated_data['password']
-        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
-        if vpn.reset_password(password):
-            return Response(data={'code': 201, 'code_text': _('修改成功'), 'vpn': serializers.VPNSerializer(vpn).data}, status=status.HTTP_201_CREATED)
-
-        return Response(data={'code': 400, 'code_text': _('修改失败')}, status=status.HTTP_400_BAD_REQUEST)
-
-    def get_serializer_class(self):
-        """
-        Return the class to use for the serializer.
-        Defaults to using `self.serializer_class`.
-        Custom serializer_class
-        """
-        if self.action == 'create':
-            return serializers.VPNPostSerializer
         return Serializer
 
 

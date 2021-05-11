@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'api',
     # 'evcloud',
     'docs',
-    'vpn',
+    # 'vpn',
     'share',
 ]
 
