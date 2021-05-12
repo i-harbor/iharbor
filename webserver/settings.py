@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['*',]
+ALLOWED_HOSTS = ['*', ]
 INTERNAL_IPS = []
 # Application definition
 
@@ -46,13 +46,11 @@ INSTALLED_APPS = [
     'ckeditor',
     # 'ckeditor_uploader',
 
-    #自定义apps
+    # 自定义apps
     'buckets.apps.BucketsConfig',
     'users.apps.UsersConfig',
     'api',
-    # 'evcloud',
     'docs',
-    # 'vpn',
     'share',
 ]
 
@@ -148,27 +146,27 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'collect_static')
-#静态文件查找路径
+# 静态文件查找路径
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-#上传文件
+# 上传文件
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, "media") 
 
-#session 有效期设置
-SESSION_SAVE_EVERY_REQUEST = True #
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True #True：关闭浏览器，则Cookie失效。
+# session 有效期设置
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # True：关闭浏览器，则Cookie失效。
 # SESSION_COOKIE_AGE=60*30   #30分钟
 
-#自定义用户模型
+# 自定义用户模型
 AUTH_USER_MODEL = 'users.UserProfile'
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 # 避免django把未以/结尾的url重定向到以/结尾的url
 APPEND_SLASH = False
 
-#登陆url
+# 登陆url
 LOGIN_URL = '/users/signin/'
 LOGOUT_URL = '/users/logout/'
 LOCAL_LOGIN_USE = False
@@ -281,14 +279,14 @@ LOGGING = {
         # output to console settings
         'console': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],# working with debug mode
+            'filters': ['require_debug_true'],  # working with debug mode
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
         },
         # debug logging file settings
         'debug': {
             'level': 'DEBUG',
-            'filters': ['require_debug_false'],# working with debug mode
+            'filters': ['require_debug_false'],     # working with debug mode
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOGGING_FILES_DIR, 'debug.log'),
             'formatter': 'dubug_formatter',
@@ -309,13 +307,13 @@ LOGGING = {
             'propagate': True,
         },
         'django.request': {
-            'handlers': ['file', 'console'],#'mail_admins'
+            'handlers': ['file', 'console'],    # 'mail_admins'
             'level': 'ERROR',
             'propagate': False,
         },
         'debug': {
             'handlers': ['debug'],
-            'level': 'WARNING',#'DEBUG',
+            'level': 'WARNING',     # 'DEBUG',
             'propagate': False,
         },
         # 'django.db.backends': {
@@ -397,7 +395,7 @@ THIRD_PARTY_APP_AUTH = {
         # 'client_id': 000,
         # 'client_secret': 'xxx',
         'client_home_url': 'http://obs.cstcloud.cn',
-        'client_callback_url': 'http://obs.cstcloud.cn/callback/', # 认证回调地址
+        'client_callback_url': 'http://obs.cstcloud.cn/callback/',  # 认证回调地址
         'login_url': 'https://passport.escience.cn/oauth2/authorize?response_type=code&theme=embed',
         'token_url': 'https://passport.escience.cn/oauth2/token',
         'logout_url': 'https://passport.escience.cn/logout'
@@ -490,4 +488,4 @@ if DEBUG:
     DEBUG_TOOLBAR_CONFIG = {
         # 'SHOW_COLLAPSED': True,
     }
-    INTERNAL_IPS += ['159.226.50.246', '127.0.0.1'] # 通过这些IP地址访问时，页面才会出现django debug toolbar面板
+    INTERNAL_IPS += ['159.226.50.246', '127.0.0.1']     # 通过这些IP地址访问时，页面才会出现django debug toolbar面板
