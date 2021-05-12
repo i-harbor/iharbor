@@ -53,7 +53,7 @@ def create_table_for_model_class(model):
         using = router.db_for_write(model)
         with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
             schema_editor.create_model(model)
-            if isinstance(model, BucketFileBase):
+            if issubclass(model, BucketFileBase):
                 try:
                     table_name = schema_editor.quote_name(model.Meta.db_table)
                     sql = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT NULL COLLATE 'utf8_bin' AFTER " \
