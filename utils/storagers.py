@@ -1,7 +1,9 @@
 import os
 
 from django.conf import settings
-from django.core.files.uploadhandler import FileUploadHandler
+from django.core.files.uploadhandler import (FileUploadHandler,
+                                             MemoryFileUploadHandler,
+                                             TemporaryFileUploadHandler)
 from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
@@ -244,3 +246,41 @@ class FileUploadToCephHandler(FileUploadHandler):
 
         return ''
 
+
+class Md5MemoryFileUploadHandler(MemoryFileUploadHandler):
+    def new_file(self, *args, **kwargs):
+        super().new_file(*args, **kwargs)
+        if self.activated:
+            self.file_md5_handler = FileMD5Handler()
+
+    def receive_data_chunk(self, raw_data, start):
+        """Add the data to the BytesIO file."""
+        if self.activated and self.file_md5_handler:
+            self.file_md5_handler.update(offset=start, data=raw_data)
+
+        return super().receive_data_chunk(raw_data=raw_data, start=start)
+
+    def file_complete(self, file_size):
+        f = super().file_complete(file_size=file_size)
+        f.file_md5_handler = self.file_md5_handler
+        f.file_md5 = self.file_md5_handler.hex_md5
+        return f
+
+
+class Md5TemporaryFileUploadHandler(TemporaryFileUploadHandler):
+    def new_file(self, *args, **kwargs):
+        """
+        Create the file object to append to as data is coming in.
+        """
+        super().new_file(*args, **kwargs)
+        self.file_md5_handler = FileMD5Handler()
+
+    def receive_data_chunk(self, raw_data, start):
+        super().receive_data_chunk(raw_data=raw_data, start=start)
+        self.file_md5_handler.update(offset=start, data=raw_data)
+
+    def file_complete(self, file_size):
+        f = super().file_complete(file_size=file_size)
+        f.file_md5_handler = self.file_md5_handler
+        f.file_md5 = self.file_md5_handler.hex_md5
+        return f

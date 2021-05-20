@@ -108,6 +108,9 @@ def calculate_file_md5(filename):
 
 
 def calculate_md5(file):
+    if hasattr(file, 'seek'):
+        file.seek(0)
+
     md5obj = hashlib.md5()
     if isinstance(file, collections.Iterable):
         for data in file:
@@ -753,9 +756,19 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         """200 ok"""
         url = reverse('api:obj-detail', kwargs={'bucket_name': bucket_name, 'objpath': key})
         file_md5 = calculate_md5(file)
-        headers = {'Content_MD5': file_md5}
+        headers = {'HTTP_Content_MD5': file_md5}
         file.seek(0)
         return client.put(url, data={'file': file}, **headers)
+
+    @staticmethod
+    def put_object_v2_response(client, bucket_name: str, key: str, file):
+        """200 ok"""
+        url = reverse('api:v2-obj-detail', kwargs={'bucket_name': bucket_name, 'objpath': key})
+        file_md5 = calculate_md5(file)
+        headers = {'HTTP_Content_MD5': file_md5}
+        file.seek(0)
+        return client.put(url, data=file.read(),
+                          content_type='application/octet-stream', **headers)
 
     def download_object_response(self, bucket_name: str, key: str,
                                  offset: int = None, size: int = None):
@@ -787,15 +800,39 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         return self.client.post(url, data={"chunk_offset": offset,
                                            "chunk_size": len(chunk), 'chunk': chunk_file})
 
+    def upload_one_chunk_v2(self, bucket_name: str, key: str, offset: int, chunk: bytes):
+        """
+        上传一个分片
+
+        :param bucket_name:
+        :param key: object key
+        :param offset: 分片偏移量
+        :param chunk: 分片
+        :return:
+            Response
+        """
+        url = reverse('api:v2-obj-detail', kwargs={'bucket_name': bucket_name, 'objpath': key})
+        query = parse.urlencode({'offset': offset})
+        file_md5 = calculate_md5(io.BytesIO(chunk))
+        headers = {'HTTP_Content_MD5': file_md5}
+        return self.client.post(f'{url}?{query}', data=chunk,
+                                content_type='application/octet-stream', **headers)
+
     def multipart_upload_object(self, bucket_name: str, key: str, file,
-                                part_size: int = 5*1024**2):
+                                part_size: int = 5*1024**2, api_version: str = 'v1'):
         offset = 0
         for chunk in chunks(file, chunk_size=part_size):
             if not chunk:
                 return True
 
-            response = self.upload_one_chunk(bucket_name, key, offset, chunk)
-            self.assertEqual(response.status_code, 200)
+            if api_version == 'v1':
+                response = self.upload_one_chunk(bucket_name, key, offset, chunk)
+                self.assertEqual(response.status_code, 200, 'upload_one_chunk failed')
+            elif api_version == 'v2':
+                response = self.upload_one_chunk_v2(bucket_name, key, offset, chunk)
+                self.assertEqual(response.status_code, 200, 'upload_one_chunk_v2 failed')
+            else:
+                raise Exception(f'invalid param api_version value, {api_version}')
 
             offset += len(chunk)
 
@@ -941,6 +978,40 @@ class ObjectsAPITests(MyAPITransactionTestCase):
 
         # delete object
         response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=move_key)
+        self.assertEqual(response.status_code, 204)
+
+    def test_v2_put_object(self):
+        file = random_bytes_io(mb_num=16)
+        file_md5 = calculate_md5(file)
+        key = 'v2test.pdf'
+        response = self.put_object_v2_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], True)
+
+        response = self.download_object_response(bucket_name=self.bucket_name, key=key)
+        self.assertEqual(response.status_code, 200)
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of upload file and download file')
+
+        # delete object
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key)
+        self.assertEqual(response.status_code, 204)
+
+    def test_v2_multipart_upload_download_delete(self):
+        file = random_bytes_io(mb_num=16)
+        file_md5 = calculate_md5(file)
+        key = 'v2test.pdf'
+        ok = self.multipart_upload_object(bucket_name=self.bucket_name, key=key,
+                                          file=file, api_version='v2')
+        self.assertTrue(ok, 'multipart_upload_object v2 failed')
+
+        response = self.download_object_response(bucket_name=self.bucket_name, key=key)
+        self.assertEqual(response.status_code, 200)
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of multipart upload file and download file')
+
+        # delete object
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key)
         self.assertEqual(response.status_code, 204)
 
     def tearDown(self):
@@ -1578,5 +1649,7 @@ class ShareAPITests(MyAPITransactionTestCase):
         response = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
         self.assertEqual(response.status_code, 204)
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
+
+
 
 

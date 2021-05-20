@@ -34,7 +34,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    path('api/v1/', include('api.urls', namespace='api')),
+    path('api/', include('api.urls', namespace='api')),
     # path('evcloud/', include('evcloud.urls', namespace='evcloud')),
     path('share/', include('share.urls', namespace='share')),
     path('', include('buckets.urls', namespace='buckets')),
