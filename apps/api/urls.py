@@ -5,6 +5,7 @@ from . import auth
 from . import views
 from .routers import DetailPostRouter, DetailListPostRouter
 from users.auth.views import ObtainAuthKey
+from . import v2views
 
 app_name = "api"
 
@@ -45,14 +46,19 @@ no_slash_detail_router = DetailPostRouter(trailing_slash=False)
 no_slash_detail_router.register(r'share/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ShareViewSet, basename='share')
 
 
+v2_detail_router = DetailPostRouter()
+v2_detail_router.register(r'obj/(?P<bucket_name>[a-z0-9-_]{3,64})', v2views.V2ObjViewSet, basename='v2-obj')
+
+
 urlpatterns = [
-    path('', include(router.urls)),
-    path('', include(detail_router.urls)),
-    path('', include(no_slash_detail_router.urls)),
-    path('', include(dlp_router.urls)),
-    path('auth-token/', auth.obtain_auth_token, name='auth-token'),
-    path('jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),
-    path('jwt-refresh/', auth.JWTRefreshView.as_view(), name='jwt-refresh'),
-    path('jwt-verify/', auth.JWTVerifyView.as_view(), name='jwt-verify'),
+    path('v1/', include(router.urls)),
+    path('v1/', include(detail_router.urls)),
+    path('v1/', include(no_slash_detail_router.urls)),
+    path('v1/', include(dlp_router.urls)),
+    path('v2/', include(v2_detail_router.urls)),
+    path('v1/auth-token/', auth.obtain_auth_token, name='auth-token'),
+    path('v1/jwt/', auth.JWTObtainPairView.as_view(), name='jwt-token'),
+    path('v1/jwt-refresh/', auth.JWTRefreshView.as_view(), name='jwt-refresh'),
+    path('v1/jwt-verify/', auth.JWTVerifyView.as_view(), name='jwt-verify'),
 ]
 
