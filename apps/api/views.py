@@ -8,7 +8,7 @@ from django.http import StreamingHttpResponse, FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.utils.translation import gettext_lazy, gettext as _
 from django.core.validators import validate_email
-from django.core import exceptions
+from django.core import exceptions as dj_exceptions
 from django.urls import reverse as django_reverse
 from rest_framework import status
 from rest_framework.response import Response
@@ -30,7 +30,6 @@ from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
 from utils.time import to_django_timezone
-from vpn.models import VPNAuth
 from .models import User, Bucket, BucketToken
 from . import serializers
 from . import paginations
@@ -474,7 +473,7 @@ class BucketViewSet(CustomGenericViewSet):
         """
         获取存储桶列表
         """
-        self.queryset = Bucket.objects.select_related('user').filter(user=request.user).all() # user's own
+        self.queryset = Bucket.objects.select_related('user').filter(user=request.user).all()   # user's own
 
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -483,7 +482,7 @@ class BucketViewSet(CustomGenericViewSet):
             return self.get_paginated_response(serializer.data)
         else:
             serializer = self.get_serializer(queryset, many=True)
-            data = {'code': 200, 'buckets': serializer.data,}
+            data = {'code': 200, 'buckets': serializer.data}
         return Response(data)
 
     @swagger_auto_schema(
@@ -534,7 +533,8 @@ class BucketViewSet(CustomGenericViewSet):
                 bucket.delete()
                 delete_table_for_model_class(model=model_class)
                 logger.error(f'创建桶“{bucket.name}”的数据库表失败')
-                return Response(data={'code': 500, 'code_text': _('创建桶失败，数据库错误')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(data={'code': 500, 'code_text': _('创建桶失败，数据库错误')},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,
@@ -643,7 +643,8 @@ class BucketViewSet(CustomGenericViewSet):
                 return Response(data={'code': 404, 'code_text': _('未找到要删除的存储桶')}, status=status.HTTP_404_NOT_FOUND)
             for bucket in buckets:
                 if not bucket.delete_and_archive():  # 删除归档
-                    return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response(data={'code': 500, 'code_text': _('删除存储桶失败')},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -717,7 +718,8 @@ class BucketViewSet(CustomGenericViewSet):
         url = request.build_absolute_uri(url)
         share_urls.append(url)
         if not bucket.set_permission(public=public):
-            return Response(data={'code': 500, 'code_text': _('更新数据库数据时错误')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('更新数据库数据时错误')},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 200,
@@ -1114,9 +1116,9 @@ class ObjViewSet(CustomGenericViewSet):
         offset = data.get('chunk_offset')
         file = request.data.get('chunk')
 
-        hManager = HarborManager()
+        hmanager = HarborManager()
         try:
-            created = hManager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
+            created = hmanager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
                                           reset=reset, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
@@ -1164,9 +1166,10 @@ class ObjViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
-        hManager = HarborManager()
+        hmanager = HarborManager()
         try:
-            bucket, obj, created = hManager.create_empty_obj(bucket_name=bucket_name, obj_path=objpath, user=request.user)
+            bucket, obj, created = hmanager.create_empty_obj(
+                bucket_name=bucket_name, obj_path=objpath, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
@@ -1176,9 +1179,10 @@ class ObjViewSet(CustomGenericViewSet):
         rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             try:
-                hManager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
+                hmanager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
             except Exception as e:
-                return Response({'code': 400, 'code_text': f'reset object error, {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'code': 400, 'code_text': f'reset object error, {str(e)}'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         return self.update_handle(request=request, bucket=bucket, obj=obj, rados=rados, created=created)
 
@@ -1188,19 +1192,19 @@ class ObjViewSet(CustomGenericViewSet):
         uploader = FileUploadToCephHandler(request, pool_name=pool_name, obj_key=obj_key)
         request.upload_handlers = [uploader]
 
-        def clean_put(uploader, obj, created):
+        def clean_put(_uploader, _obj, _created, _rados):
             # 删除数据和元数据
-            f = getattr(uploader, 'file', None)
+            f = getattr(_uploader, 'file', None)
             s = f.size if f else 0
-            rados.delete(obj_size=s)
-            if created:
-                obj.delete()
+            _rados.delete(obj_size=s)
+            if _created:
+                _obj.delete()
 
         # 数据验证
         try:
             put_data = self.get_data(request)
         except Exception as e:
-            clean_put(uploader, obj, created)
+            clean_put(uploader, obj, created, rados)
             return Response({
                 'code': 400, 'code_text': str(e),
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -1208,7 +1212,7 @@ class ObjViewSet(CustomGenericViewSet):
         serializer = self.get_serializer(data=put_data)
         if not serializer.is_valid(raise_exception=False):
             # 删除数据和元数据
-            clean_put(uploader, obj, created)
+            clean_put(uploader, obj, created, rados)
             msg = serializer_error_text(serializer.errors)
             return Response({'code': 400, 'code_text': msg}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1217,8 +1221,10 @@ class ObjViewSet(CustomGenericViewSet):
         if content_md5:
             if content_md5 != file.file_md5.lower():
                 # 删除数据和元数据
-                clean_put(uploader, obj, created)
-                return Response({'code': 400, 'code_text': _('标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏')}, status=status.HTTP_400_BAD_REQUEST)
+                clean_put(uploader, obj, created, rados)
+                return Response({'code': 400,
+                                 'code_text': _('标头Content-MD5和上传数据的MD5值不一致，数据在上传过程中可能损坏')},
+                                status=status.HTTP_400_BAD_REQUEST)
         else:
             content_md5 = file.file_md5.lower()
 
@@ -1228,7 +1234,7 @@ class ObjViewSet(CustomGenericViewSet):
             obj.save(update_fields=['si', 'md5'])
         except Exception as e:
             # 删除数据和元数据
-            clean_put(uploader, obj, created)
+            clean_put(uploader, obj, created, rados)
             return Response({'code': 400, 'code_text': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         data = {'code': 200, 'created': created}
@@ -1293,10 +1299,10 @@ class ObjViewSet(CustomGenericViewSet):
             return self.range_response(user=request.user, bucket_name=bucket_name,
                                        obj_path=objpath, offset=offset, size=size, status_code=200)
         # 下载整个文件对象
-        hManager = HarborManager()
+        h_manager = HarborManager()
         try:
-            file_generator, obj = hManager.get_obj_generator(bucket_name=bucket_name, obj_path=objpath,
-                                                             user=request.user, all_public=True)
+            file_generator, obj = h_manager.get_obj_generator(bucket_name=bucket_name, obj_path=objpath,
+                                                              user=request.user, all_public=True)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
@@ -1331,9 +1337,9 @@ class ObjViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
-        hManager = HarborManager()
+        hmanager = HarborManager()
         try:
-            ok = hManager.delete_object(bucket_name=bucket_name, obj_path=objpath, user=request.user)
+            ok = hmanager.delete_object(bucket_name=bucket_name, obj_path=objpath, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
@@ -1389,7 +1395,8 @@ class ObjViewSet(CustomGenericViewSet):
 
         if pw:  # 指定密码
             if not (4 <= len(pw) <= 8):
-                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')},
+                                status=status.HTTP_400_BAD_REQUEST)
             password = pw
         elif pw is None:  # 不设密码
             password = ''
@@ -1408,14 +1415,17 @@ class ObjViewSet(CustomGenericViewSet):
         if share not in [0, 1, 2]:
             return Response(data={'code': 400, 'code_text': _('share参数有误')}, status=status.HTTP_400_BAD_REQUEST)
 
-        hManager = HarborManager()
+        hmanager = HarborManager()
         try:
-            ok, access_code = hManager.share_object(bucket_name=bucket_name, obj_path=objpath, share=share, days=days, password=password, user=request.user)
+            ok, access_code = hmanager.share_object(
+                bucket_name=bucket_name, obj_path=objpath, share=share,
+                days=days, password=password, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
         if not ok:
-            return Response(data={'code': 500, 'code_text': _('对象共享权限设置失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': _('对象共享权限设置失败')},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         share_uri = django_reverse('share:obs-detail', kwargs={'objpath': f'{bucket_name}/{objpath}'})
         if password:
@@ -1478,7 +1488,7 @@ class ObjViewSet(CustomGenericViewSet):
                 #     raise Exception()
                 validated_data['offset'] = offset
                 validated_data['size'] = size
-            except:
+            except Exception:
                 response = Response(data={'code': 400, 'code_text': _('offset或size参数有误')},
                                     status=status.HTTP_400_BAD_REQUEST)
                 return None, response
@@ -1721,7 +1731,8 @@ class DirectoryViewSet(CustomGenericViewSet):
             ('dir_path', dir_path),
         ])
 
-        serializer = self.get_serializer(files, many=True, context={'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
+        serializer = self.get_serializer(files, many=True, context={
+            'bucket_name': bucket_name, 'dir_path': dir_path, 'bucket': bucket})
         data_dict['files'] = serializer.data
         return paginator.get_paginated_response(data_dict)
 
@@ -1907,7 +1918,8 @@ class DirectoryViewSet(CustomGenericViewSet):
 
         if pw:  # 指定密码
             if not (4 <= len(pw) <= 8):
-                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('password参数长度为4-8个字符')},
+                                status=status.HTTP_400_BAD_REQUEST)
             password = pw
         elif pw is None:  # 不设密码
             password = ''
@@ -1997,7 +2009,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
 
         if not bucket:
             return Response(data={'code': 404, 'code_text': _('bucket_name参数有误，存储桶不存在')},
-                                  status=status.HTTP_404_NOT_FOUND)
+                            status=status.HTTP_404_NOT_FOUND)
 
         data = bucket.get_stats()
         data.update({
@@ -2069,7 +2081,7 @@ class SecurityViewSet(CustomGenericViewSet):
 
         try:
             self.validate_username(username)
-        except exceptions.ValidationError as e:
+        except dj_exceptions.ValidationError as e:
             msg = e.message or 'Must be a valid email.'
             return Response({'username': msg}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2105,7 +2117,7 @@ class SecurityViewSet(CustomGenericViewSet):
         """
         try:
             user = User.objects.get(username=username)
-        except exceptions.ObjectDoesNotExist:
+        except dj_exceptions.ObjectDoesNotExist:
             user = None
 
         if user:
@@ -2321,11 +2333,13 @@ class MetadataViewSet(CustomGenericViewSet):
 
         h_manager = HarborManager()
         try:
-            bucket, obj = h_manager.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path_name, user=request.user)
+            bucket, obj = h_manager.get_bucket_and_obj_or_dir(
+                bucket_name=bucket_name, path=path_name, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
-            return Response(data={'code': 500, 'code_text': f'error，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj:
             exc = exceptions.NoSuchKey(message=_('对象或目录不存在'))
@@ -2401,7 +2415,8 @@ class MetadataViewSet(CustomGenericViewSet):
 
         h_manager = HarborManager()
         try:
-            bucket, obj, created = h_manager.create_empty_obj(bucket_name=bucket_name, obj_path=path_name, user=request.user)
+            bucket, obj, created = h_manager.create_empty_obj(
+                bucket_name=bucket_name, obj_path=path_name, user=request.user)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
@@ -2505,7 +2520,8 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
         ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         ok, ret = ho.get_rados_stat(obj_id=obj_key)
         if not ok:
-            return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         size, mtime = ret
         if size == 0 and mtime is None:  # rados对象不存在
@@ -2520,7 +2536,8 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             try:
                 obj.save(update_fields=['si', 'upt'])
             except Exception as e:
-                return Response(data={'code': 400, 'code_text': _('更新对象大小元数据失败') + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'code': 400, 'code_text': _('更新对象大小元数据失败') + str(e)},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         info = {
             'size': size,
@@ -2674,7 +2691,7 @@ class UserStatsViewSet(CustomGenericViewSet):
         username = kwargs.get(self.lookup_field)
         try:
             user = User.objects.get(username=username)
-        except exceptions.ObjectDoesNotExist:
+        except dj_exceptions.ObjectDoesNotExist:
             return Response(data={'code': 404, 'code_text': _('username参数有误，用户不存在')},
                             status=status.HTTP_404_NOT_FOUND)
 
@@ -2829,7 +2846,8 @@ class CephPerformanceViewSet(CustomGenericViewSet):
     def list(self, request, *args, **kwargs):
         ok, data = HarborObject(pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
-            return Response(data={'code': 500, 'code_text': 'Get io status error:' + data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data={'code': 500, 'code_text': 'Get io status error:' + data},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(data=data)
 
 
@@ -3144,95 +3162,6 @@ class FtpViewSet(CustomGenericViewSet):
         return Serializer
 
 
-class VPNViewSet(CustomGenericViewSet):
-    """
-    VPN相关API
-    """
-    queryset = []
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('获取VPN口令'),
-        deprecated=True,
-        responses={
-            status.HTTP_200_OK: ''
-        }
-    )
-    def list(self, request, *args, **kwargs):
-        """
-        获取VPN口令信息
-
-            Http Code: 状态码200，返回数据：
-            {
-                "code": 200,
-                "code_text": "获取成功",
-                "vpn": {
-                    "id": 2,
-                    "password": "2523c77e7b",
-                    "created_time": "2020-03-04T06:01:50+00:00",
-                    "modified_time": "2020-03-04T06:01:50+00:00",
-                    "user": {
-                        "id": 3,
-                        "username": "869588058@qq.com"
-                    }
-                }
-            }
-        """
-        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
-        return Response(data={'code': 200, 'code_text': _('获取成功'), 'vpn': serializers.VPNSerializer(vpn).data})
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('修改vpn口令'),
-        deprecated=True,
-        responses={
-            status.HTTP_201_CREATED: """
-                {
-                    "code": 201,
-                    "code_text": "修改成功"
-                }
-            """,
-            status.HTTP_400_BAD_REQUEST: """
-                    {
-                        "code": 400,
-                        "code_text": "xxxx"
-                    }
-                """
-        }
-    )
-    def create(self, request, *args, **kwargs):
-        """
-        修改vpn口令
-        """
-        serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid(raise_exception=False):
-            code_text = 'password error'
-            try:
-                for key, err_list in serializer.errors.items():
-                    code_text = f'{key},{err_list[0]}'
-                    break
-            except:
-                pass
-            return Response(data={'code': 400, 'code_text': code_text}, status=status.HTTP_400_BAD_REQUEST)
-
-        password = serializer.validated_data['password']
-        vpn, created = VPNAuth.objects.get_or_create(user=request.user)
-        if vpn.reset_password(password):
-            return Response(data={'code': 201, 'code_text': _('修改成功'), 'vpn': serializers.VPNSerializer(vpn).data}, status=status.HTTP_201_CREATED)
-
-        return Response(data={'code': 400, 'code_text': _('修改失败')}, status=status.HTTP_400_BAD_REQUEST)
-
-    def get_serializer_class(self):
-        """
-        Return the class to use for the serializer.
-        Defaults to using `self.serializer_class`.
-        Custom serializer_class
-        """
-        if self.action == 'create':
-            return serializers.VPNPostSerializer
-        return Serializer
-
-
 class ObjKeyViewSet(CustomGenericViewSet):
     """
     对象CEPH RADOS KEY视图集
@@ -3240,7 +3169,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
     retrieve:
         获取对象对应的ceph rados key信息
 
-    	>>Http Code: 状态码200：
+        >>Http Code: 状态码200：
             {
                 "code": 200,
                 "code_text": "请求成功",
@@ -3683,7 +3612,8 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
         """
         hm = HarborManager()
         try:
-            bucket, objs_qs = hm.get_bucket_objects_dirs_queryset(bucket_name=bucket_name, user=request.user, prefix=prefix)
+            bucket, objs_qs = hm.get_bucket_objects_dirs_queryset(
+                bucket_name=bucket_name, user=request.user, prefix=prefix)
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 

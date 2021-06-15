@@ -408,7 +408,6 @@ class ShareDownloadViewSet(CustomGenericViewSet):
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
 
-
     @swagger_auto_schema(
         operation_summary=gettext_lazy('下载分享的目录下的文件对象'),
         manual_parameters=[
@@ -609,10 +608,33 @@ class ShareDirViewSet(CustomGenericViewSet):
     retrieve:
     获取分享目录下的子目录和文件对象列表
 
-        * 支持断点续传，通过HTTP头 Range和Content-Range
-
         >>Http Code: 状态码200：
-
+        {
+          "code": 200,
+          "bucket_name": "ddd",
+          "subpath": "",
+          "share_base": "ddd/occi规范",
+          "files": [
+            {
+              "na": "occi规范/英文",
+              "name": "英文",
+              "fod": false,
+              "did": 22,
+              "si": 0,
+              "ult": "2021-01-27T11:02:21.658748+08:00",
+              "upt": "2021-01-27T11:02:21.658787+08:00",
+              "dlc": 0,
+              "download_url": ""
+            }
+          ],
+          "count": 2,
+          "next": null,
+          "page": {
+            "current": 1,
+            "final": 1
+          },
+          "previous": null
+        }
 
         >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
             {
@@ -633,7 +655,6 @@ class ShareDirViewSet(CustomGenericViewSet):
     pagination_class = BucketFileLimitOffsetPagination
     lookup_field = 'share_base'
     lookup_value_regex = '.+'
-
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取分享目录下的子目录和文件对象列表'),
@@ -658,7 +679,7 @@ class ShareDirViewSet(CustomGenericViewSet):
             )
         ],
         responses={
-            status.HTTP_200_OK: "Content-Type: application/octet-stream"
+            status.HTTP_200_OK: ""
         }
     )
     def retrieve(self, request, *args, **kwargs):
@@ -744,7 +765,8 @@ class ShareDirViewSet(CustomGenericViewSet):
         """
         return serializers.ShareObjInfoSerializer
 
-    def has_access_permission(self, bucket, base_dir_obj):
+    @staticmethod
+    def has_access_permission(bucket, base_dir_obj):
         '''
         是否有访问对象的权限
 

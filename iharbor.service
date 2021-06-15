@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 Type=forking
+PIDFile=/home/uwsgi/iharbor/uwsgi-master.pid
 ExecStart=/bin/bash /home/uwsgi/iharbor/run_uwsgi.sh
 ExecReload=/bin/bash /home/uwsgi/iharbor/reload_uwsgi.sh
 ExecStop=/bin/bash /home/uwsgi/iharbor/stop_uwsgi.sh

@@ -305,12 +305,19 @@ class AuthKeyAPITests(MyAPITestCase):
         # self.client.force_login(user=user)
         self.user = user
 
+    @staticmethod
+    def create_user_auth_key(client, username, password):
+        """
+        201
+        """
+        url = reverse('api:auth-key-list')
+        return client.post(url, data={'username': username, 'password': password})
+
     def test_keys(self):
         username = self.user.username
 
         # create key
-        url = reverse('api:auth-key-list')
-        response = self.client.post(url, data={'username': username, 'password': self.user_password})
+        response = self.create_user_auth_key(self.client, username, self.user_password)
         self.assertEqual(response.status_code, 201)
         self.assertKeysIn(['key'], response.data)
         self.assertKeysIn(['access_key', 'secret_key', 'user', 'create_time',
@@ -346,7 +353,7 @@ class AuthKeyAPITests(MyAPITestCase):
         # create key
         self.client.logout()
         url = reverse('api:auth-key-list')
-        response = self.client.post(url, data={'username': username, 'password': self.user_password})
+        response = self.create_user_auth_key(self.client, username, self.user_password)
         self.assertEqual(response.status_code, 201)
 
         # 认证header
@@ -630,6 +637,10 @@ class DirAPITests(MyAPITransactionTestCase):
         self.user = user
         set_token_auth_header(self, username=self.user.username, password=self.user_password)
 
+        self.bucket_name = 'test'
+        response = BucketsAPITests.create_bucket(self.client, self.bucket_name)
+        self.assertEqual(response.status_code, 201, 'create bucket failed')
+
     @staticmethod
     def create_dir_response(client, bucket_name: str, dirpath: str):
         """201 ok"""
@@ -637,9 +648,7 @@ class DirAPITests(MyAPITransactionTestCase):
         return client.post(url)
 
     def test_dir(self):
-        bucket_name = 'test'
-        response = BucketsAPITests.create_bucket(self.client, bucket_name)
-        self.assertEqual(response.status_code, 201, 'create bucket failed')
+        bucket_name = self.bucket_name
 
         # create dir
         parent_dir = '父目录名'
@@ -720,10 +729,11 @@ class DirAPITests(MyAPITransactionTestCase):
         response = self.client.delete(url)
         self.assertOldErrorResponse(404, 'NoSuchKey', response)
 
+    def tearDown(self):
         # delete bucket
-        response = BucketsAPITests.delete_bucket(self.client, bucket_name)
+        response = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
         self.assertEqual(response.status_code, 204)
-        BucketsAPITests.clear_bucket_archive(bucket_name)
+        BucketsAPITests.clear_bucket_archive(self.bucket_name)
 
 
 class ObjectsAPITests(MyAPITransactionTestCase):
@@ -1195,7 +1205,7 @@ class UserAPITests(MyAPITestCase):
         user = get_or_create_user(password=self.user_password)
         self.user = user
         set_token_auth_header(self, username=self.user.username, password=self.user_password)
-        self.target_user = get_or_create_user(username='target_user', password=self.user_password)
+        self.target_user = get_or_create_user(username='target_user@test.com', password=self.user_password)
 
     def test_user_count(self):
         # 超级用户权限设置
@@ -1307,6 +1317,38 @@ class UserAPITests(MyAPITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['is_active'], False)
+
+    def test_user_security(self):
+        url = reverse('api:security-detail', kwargs={'username': self.target_user.username})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+        # 超级用户权限设置
+        self.user.is_superuser = True
+        self.user.save()
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['user', 'token', 'jwt'], response.data)
+        self.assertNotIn('keys', response.data)
+
+        # keys
+        response = self.client.get(f'{url}?key')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['user', 'token', 'jwt', 'keys'], response.data)
+        self.assertEqual(0, len(response.data['keys']))
+
+        self.client.logout()
+        r = AuthKeyAPITests.create_user_auth_key(self.client, self.target_user.username, self.user_password)
+        self.assertEqual(r.status_code, 201)
+
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+        response = self.client.get(f'{url}?key')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['user', 'token', 'jwt', 'keys'], response.data)
+        self.assertEqual(1, len(response.data['keys']))
+        self.assertKeysIn(['user', 'access_key', 'secret_key', 'create_time',
+                           'state', 'permission'], response.data['keys'][0])
 
 
 class ListBucketObjecttsAPITests(MyAPITransactionTestCase):
@@ -1435,3 +1477,106 @@ class ListBucketObjecttsAPITests(MyAPITransactionTestCase):
         r = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
         self.assertEqual(r.status_code, 204)
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
+
+
+class ShareAPITests(MyAPITransactionTestCase):
+    databases = {'default', 'metadata'}
+
+    def setUp(self):
+        self.user_password = 'password'
+        user = get_or_create_user(password=self.user_password)
+        self.user = user
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+
+        self.bucket_name = 'test'
+        response = BucketsAPITests.create_bucket(self.client, self.bucket_name)
+        self.assertEqual(response.status_code, 201, 'create bucket failed')
+
+    def test_list_share_dir(self):
+        bucket_name = self.bucket_name
+        file = random_bytes_io(mb_num=6)
+        file_md5 = calculate_md5(file)
+        parent_dir = '父目录名'
+        sub_dir = '子目录名'
+        sub_dir_path = f'{parent_dir}/{sub_dir}'
+        object_name = 'test.pdf'
+        key = f'{sub_dir_path}/{object_name}'
+
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+        response = DirAPITests.create_dir_response(self.client, bucket_name, dirpath=parent_dir)
+        self.assertEqual(response.status_code, 201)
+
+        response = DirAPITests.create_dir_response(self.client, bucket_name, dirpath=sub_dir_path)
+        self.assertEqual(response.status_code, 201)
+
+        response = ObjectsAPITests.put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
+        self.assertEqual(response.status_code, 200)
+
+        # list share dir
+        self.client.logout()
+        list_base_url = reverse('share:list-detail', kwargs={'share_base': f'{bucket_name}/{parent_dir}'})
+        response = self.client.get(list_base_url)
+        self.assertEqual(response.status_code, 403)
+
+        # set permission
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+        share_password = 'password'
+        url = reverse('api:dir-detail', kwargs={'bucket_name': bucket_name, 'dirpath': parent_dir})
+        query = parse.urlencode({'share': BucketFileBase.SHARE_ACCESS_READONLY, 'days': 6, 'password': share_password})
+        response = self.client.patch(f'{url}?{query}')
+        self.assertEqual(response.status_code, 200)
+
+        self.client.logout()
+        # list share dir
+        list_base_url = reverse('share:list-detail', kwargs={'share_base': f'{bucket_name}/{parent_dir}'})
+        query = parse.urlencode({'p': share_password})
+        response = self.client.get(f'{list_base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['bucket_name', 'subpath', 'share_base', 'files', 'count',
+                           'next', 'previous', 'page'], response.data)
+        self.assertDictIsSubDict(response.data, {
+            'bucket_name': self.bucket_name, 'subpath': '',
+            'share_base': f'{self.bucket_name}/{parent_dir}',
+            'count': 1
+        })
+        self.assertDictIsSubDict(response.data['files'][0], {
+            'na': sub_dir_path, 'name': sub_dir, 'fod': False, 'si': 0
+        })
+
+        query = parse.urlencode({'subpath': sub_dir, 'p': share_password})
+        response = self.client.get(f'{list_base_url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['bucket_name', 'subpath', 'share_base', 'files', 'count',
+                           'next', 'previous', 'page'], response.data)
+        self.assertDictIsSubDict(response.data, {
+            'bucket_name': self.bucket_name, 'subpath': sub_dir,
+            'share_base': f'{self.bucket_name}/{parent_dir}',
+            'count': 1
+        })
+        self.assertDictIsSubDict(response.data['files'][0], {
+            'na': key, 'name': object_name, 'fod': True, 'si': 6*1024*1024
+        })
+
+        # download share
+        url = reverse('share:download-detail', kwargs={'share_base': f'{bucket_name}/{parent_dir}'})
+        query = parse.urlencode({'subpath': f'{sub_dir}/{object_name}', 'p': share_password})
+        response = self.client.get(f'{url}?{query}')
+        self.assertEqual(response.status_code, 200)
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of upload file and download file')
+
+        # download share range
+        url = reverse('share:download-detail', kwargs={'share_base': f'{bucket_name}/{parent_dir}'})
+        query = parse.urlencode({'subpath': f'{sub_dir}/{object_name}', 'p': share_password})
+        response = self.client.get(f'{url}?{query}', HTTP_RANGE='bytes=1-10')
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(response.headers.get('content-length'), '10')
+
+    def tearDown(self):
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
+        # delete bucket
+        response = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
+        self.assertEqual(response.status_code, 204)
+        BucketsAPITests.clear_bucket_archive(self.bucket_name)
+
+
