@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect, reverse
 from django.contrib.auth import logout, login, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.utils.translation import gettext_lazy
 from django.utils.translation import gettext as _
+from django.conf import settings
 from rest_framework.authtoken.models import Token
 
 from utils.jwt_token import JWTokenTool2
@@ -53,7 +53,9 @@ def sign_in(request, *args, **kwargs):
         request.session['next'] = next_url
 
     kjy_url = get_kjy_login_url()
-    return render(request, 'signin.html', context={'kjy_url': kjy_url, 'next': next_url})
+    use_local_login = getattr(settings, 'LOCAL_LOGIN_USE', False)
+    return render(request, 'signin.html', context={'kjy_url': kjy_url, 'next': next_url,
+                                                   'use_local_login': use_local_login})
 
 
 def login_user(request):

@@ -255,7 +255,7 @@ class UserViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary=gettext_lazy('注册一个用户'),
         responses={
-            status.HTTP_200_OK: ''
+            status.HTTP_201_CREATED: ''
         }
     )
     def create(self, request, *args, **kwargs):
@@ -276,8 +276,9 @@ class UserViewSet(CustomGenericViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        if not (request.user.id == instance.id):
+        if not self.has_update_user_permission(request, instance=instance):
             return Response(data={"detail": _("您没有执行该操作的权限")}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -414,41 +415,6 @@ class BucketViewSet(CustomGenericViewSet):
                 'code': 'BucketAlreadyExists',    # or BucketAlreadyOwnedByYou
                 'code_text': 'xxx',      //错误码表述信息
             }
-
-    delete:
-    删除一个存储桶
-
-        >>Http Code: 状态码204,存储桶删除成功
-        >>Http Code: 状态码400
-            {
-                'code': 400,
-                'code_text': '存储桶id有误'
-            }
-        >>Http Code: 状态码404：
-            {
-                'code': 404,
-                'code_text': 'xxxxx'
-            }
-
-    partial_update:
-    存储桶访问权限设置
-
-        Http Code: 状态码200：上传成功无异常时，返回数据：
-        {
-            'code': 200,
-            'code_text': '对象共享设置成功'，
-            'public': xxx,
-        }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404;
-
-        Http code: 状态码500：
-        {
-            "code": 500,
-            "code_text": "保存到数据库时错误"
-        }
-
     """
     queryset = Bucket.objects.select_related('user').all()
     permission_classes = [IsAuthenticated]
@@ -599,6 +565,12 @@ class BucketViewSet(CustomGenericViewSet):
                     "ftp_ro_password": "666666666"
                   }
                 }
+            """,
+            "400, 403, 404": """
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
             """
         }
     )
@@ -620,7 +592,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         serializer = self.get_serializer(bucket)
         return Response({'code': 200, 'bucket': serializer.data})
@@ -641,6 +613,16 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        删除一个存储桶
+
+            >>Http Code: 状态码204,存储桶删除成功
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
+        """
         try:
             ids = self.get_buckets_ids(request)
         except ValueError as e:
@@ -650,7 +632,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         if not bucket.delete_and_archive():  # 删除归档
             return Response(data={'code': 500, 'code_text': _('删除存储桶失败')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -690,6 +672,26 @@ class BucketViewSet(CustomGenericViewSet):
         }
     )
     def partial_update(self, request, *args, **kwargs):
+        """
+        存储桶访问权限设置
+
+            Http Code: 状态码200：上传成功无异常时，返回数据：
+            {
+                'code': 200,
+                'code_text': '对象共享设置成功'，
+                'public': xxx,
+            }
+            >>Http Code: 400, 403, 404:
+            {
+                'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                'code_text': 'xxx',      //错误码表述信息
+            }
+            Http code: 状态码500：
+            {
+                "code": 500,
+                "code_text": "保存到数据库时错误"
+            }
+        """
         public = str_to_int_or_default(request.query_params.get('public', ''), 0)
         if public not in [1, 2, 3]:
             return Response(data={'code': 400, 'code_text': _('public参数有误')}, status=status.HTTP_400_BAD_REQUEST)
@@ -708,7 +710,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         share_urls = []
         url = django_reverse('share:share-view', kwargs={'share_base': bucket.name})
@@ -749,6 +751,13 @@ class BucketViewSet(CustomGenericViewSet):
     def remarks(self, request, *args, **kwargs):
         """
         存储桶备注信息设置
+
+            >>Http Code 200 OK;
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
+                }
         """
         id_or_name, by_name = self.get_id_or_name_params(request, kwargs)
         if by_name:
@@ -768,7 +777,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = self.get_user_bucket(id_or_name=id_or_name, by_name=by_name, user=request.user)
         except exceptions.Error as exc:
-            return Response({'code': exc.status_code, 'code_text': exc.message}, status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         if not bucket.set_remarks(remarks=remarks):
             return Response(data={'code': 500, 'code_text': _('设置备注信息失败，更新数据库数据时错误')},
@@ -812,6 +821,11 @@ class BucketViewSet(CustomGenericViewSet):
               "permission": "readwrite",
               "created": "2020-12-21T11:13:07.022989+08:00"
             }
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest、TooManyBucketTokens
+                    'code_text': 'xxx',      //错误码表述信息
+                }
         """
         perm = request.query_params.get('permission', '').lower()
         if perm not in [BucketToken.PERMISSION_READWRITE, BucketToken.PERMISSION_READONLY]:
@@ -867,6 +881,11 @@ class BucketViewSet(CustomGenericViewSet):
                     },
                     ...
                   ]
+                }
+            >>Http Code: 400, 403, 404:
+                {
+                    'code': 'NoSuchBucket',    # or AccessDenied、BadRequest
+                    'code_text': 'xxx',      //错误码表述信息
                 }
         """
         id_or_name, by_name = self.get_id_or_name_params(request, kwargs)
@@ -1011,37 +1030,6 @@ class ObjViewSet(CustomGenericViewSet):
                 'code_text': '文件块rados写入失败'
             }
 
-    retrieve:
-        通过文件对象绝对路径,下载文件对象，或者自定义读取对象数据块
-
-        *注：
-        1. offset && size(最大20MB，否则400错误) 参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
-        2. 不带参数时，返回整个文件对象；
-
-        >>Http Code: 状态码200：
-             evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
-            其他,返回整个文件对象bytes数据流
-
-        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-            {
-                'code': 400,
-                'code_text': 'xxxx参数有误'
-            }
-        >>Http Code: 状态码404：找不到资源;
-        >>Http Code: 状态码500：服务器内部错误;
-
-    destroy:
-        通过文件对象绝对路径,删除文件对象；
-
-        >>Http Code: 状态码204：删除成功，NO_CONTENT；
-        >>Http Code: 状态码400：文件路径参数有误：对应参数错误信息;
-            {
-                'code': 400,
-                'code_text': '参数有误'
-            }
-        >>Http Code: 状态码404：找不到资源;
-        >>Http Code: 状态码500：服务器内部错误;
-
     partial_update:
     对象共享或私有权限设置
 
@@ -1053,9 +1041,11 @@ class ObjViewSet(CustomGenericViewSet):
             'share': xxx,
             'days': xxx
         }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404;
+        >>Http Code: 400 401 403 404 500
+        {
+            'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+            'code_text': '参数有误'
+        }
 
     """
     queryset = {}
@@ -1267,6 +1257,23 @@ class ObjViewSet(CustomGenericViewSet):
         }
     )
     def retrieve(self, request, *args, **kwargs):
+        """
+        通过文件对象绝对路径,下载文件对象，或者自定义读取对象数据块
+
+            *注：
+            1. offset && size参数校验失败时返回状态码400和对应参数错误信息，无误时，返回bytes数据流
+            2. 不带参数时，返回整个文件对象；
+
+            >>Http Code: 状态码200：
+                 evhb_obj_size,文件对象总大小信息,通过标头headers传递：自定义读取时：返回指定大小的bytes数据流；
+                其他,返回整个文件对象bytes数据流
+
+            >>Http Code: 400 401 403 404 500
+            {
+                'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+                'code_text': '参数有误'
+            }
+        """
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
 
@@ -1283,15 +1290,8 @@ class ObjViewSet(CustomGenericViewSet):
         if validated_param:
             offset = validated_param.get('offset')
             size = validated_param.get('size')
-            hManager = HarborManager()
-            try:
-                chunk, obj = hManager.read_chunk(bucket_name=bucket_name, obj_path=objpath,
-                                                 offset=offset, size=size, user=request.user)
-            except exceptions.HarborError as e:
-                return Response(data=e.err_data_old(), status=e.status_code)
-
-            return self.wrap_chunk_response(chunk=chunk, obj_size=obj.si)
-
+            return self.range_response(user=request.user, bucket_name=bucket_name,
+                                       obj_path=objpath, offset=offset, size=size, status_code=200)
         # 下载整个文件对象
         hManager = HarborManager()
         try:
@@ -1313,6 +1313,16 @@ class ObjViewSet(CustomGenericViewSet):
         operation_summary=gettext_lazy('删除一个对象')
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        通过文件对象绝对路径,删除文件对象；
+
+            >>Http Code: 状态码204：删除成功，NO_CONTENT；
+            >>Http Code: 400 401 403 404 500
+                {
+                    'code': "NoSuchKey",   // AccessDenied、BadRequest、BucketLockWrite
+                    'code_text': '参数有误'
+                }
+        """
         objpath = kwargs.get(self.lookup_field, '')
         bucket_name = kwargs.get('bucket_name', '')
 
@@ -1464,8 +1474,8 @@ class ObjViewSet(CustomGenericViewSet):
             try:
                 offset = int(chunk_offset)
                 size = int(chunk_size)
-                if offset < 0 or size < 0 or size > 20*1024**2: #20Mb
-                    raise Exception()
+                # if offset < 0 or size < 0 or size > 20*1024**2: #20Mb
+                #     raise Exception()
                 validated_data['offset'] = offset
                 validated_data['size'] = size
             except:
@@ -1500,6 +1510,37 @@ class ObjViewSet(CustomGenericViewSet):
         return response
 
     @staticmethod
+    def offset_size_to_start_end(offset, size, obj_size):
+        filesize = obj_size
+        if offset >= filesize:
+            offset = filesize
+        else:
+            offset = max(0, offset)
+
+        end = min(offset + size - 1, filesize - 1)
+        return offset, end
+
+    def range_response(self, user, bucket_name: str, obj_path: str, offset: int, size: int,
+                       status_code: int = status.HTTP_206_PARTIAL_CONTENT):
+        try:
+            file_generator, obj = HarborManager().get_obj_generator(
+                bucket_name=bucket_name, obj_path=obj_path, offset=offset,
+                end=(offset + size - 1), user=user, all_public=True)
+        except exceptions.HarborError as e:
+            return Response(data=e.err_data_old(), status=e.status_code)
+
+        filesize = obj.si
+        offset, end = self.offset_size_to_start_end(offset=offset, size=size, obj_size=filesize)
+        conten_len = end - offset + 1
+        response = StreamingHttpResponse(file_generator, status=status_code)
+        response['Content-Type'] = 'application/octet-stream'  # 注意格式
+        response['Content-Ranges'] = f'bytes {offset}-{end}/{filesize}'
+        response['Content-Length'] = conten_len
+        response['evob_chunk_size'] = conten_len
+        response['evob_obj_size'] = filesize
+        return response
+
+    @staticmethod
     def get_data(request):
         return request.data
 
@@ -1524,56 +1565,10 @@ class DirectoryViewSet(CustomGenericViewSet):
                 'bucket_name': xxx,             //存储桶名称
                 'dir_path': xxx,                //当前目录路径
             }
-        >>Http Code: 状态码400:
-            {
-                'code': 400,
-                'code_text': '参数有误'
-            }
-        >>Http Code: 状态码404:
-            {
-                'code': xxx,      //404
-                'code_text': xxx  //错误码描述
-            }
-
-    create_detail:
-        创建一个目录
-
-        >>Http Code: 状态码400, 请求参数有误:
-            {
-                "code": 400,
-                "code_text": 'xxxxx'        //错误信息
-            }
-        >>Http Code: 状态码201,创建文件夹成功：
-            {
-                'code': 201,
-                'code_text': '创建文件夹成功',
-                'data': {},      //请求时提交的数据
-                'dir': {}，      //新目录对象信息
-            }
-
-    destroy:
-        删除一个目录, 目录必须为空，否则400错误
-
-        >>Http Code: 状态码204,成功删除;
-        >>Http Code: 状态码400,参数无效或目录不为空;
-            {
-                'code': 400,
-                'code_text': 'xxx'
-            }
-        >>Http Code: 状态码404;
-            {
-                'code': 404,
-                'code_text': '文件不存在
-            }
-
-    partial_update:
-        设置目录访问权限
-
-        >>Http Code: 状态码200;
+        >>Http Code: 400 401 403 404 500
         {
-          "code": 200,
-          "code_text": "设置目录权限成功",
-          "share": "http://xxx/share/s/xx/xx" # 分享链接
+            "code": "xxx",   // NoSuchBucket、AccessDenied、BadRequest
+            "code_text": ""
         }
     """
     queryset = []
@@ -1584,6 +1579,14 @@ class DirectoryViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取存储桶根目录下的文件和文件夹信息'),
+        manual_parameters=[
+            openapi.Parameter(
+                name='only-obj', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description=gettext_lazy("true(只列举对象，不含目录); 其他值忽略"),
+                required=False
+            ),
+        ],
         responses={
             status.HTTP_200_OK: """
                 {
@@ -1621,6 +1624,12 @@ class DirectoryViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取一个目录下的文件和文件夹信息'),
         manual_parameters=[
+            openapi.Parameter(
+                name='only-obj', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description=gettext_lazy("true(只列举对象，不含目录); 其他值忽略"),
+                required=False
+            ),
             openapi.Parameter(
                 name='dirpath', in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
@@ -1680,6 +1689,11 @@ class DirectoryViewSet(CustomGenericViewSet):
     def list_v1(self, request, *args, **kwargs):
         bucket_name = kwargs.get('bucket_name', '')
         dir_path = kwargs.get(self.lookup_field, '')
+        only_obj = request.query_params.get('only-obj', None)
+        if only_obj and only_obj.lower() == 'true':
+            only_obj = True
+        else:
+            only_obj = None
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
@@ -1697,7 +1711,7 @@ class DirectoryViewSet(CustomGenericViewSet):
         h_manager = HarborManager()
         try:
             files, bucket = h_manager.list_dir(bucket_name=bucket_name, path=dir_path, offset=offset, limit=limit,
-                                               user=request.user, paginator=paginator)
+                                               user=request.user, paginator=paginator, only_obj=only_obj)
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
@@ -1749,6 +1763,22 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def create_detail(self, request, *args, **kwargs):
+        """
+        创建一个目录
+
+            >>Http Code: 状态码201,创建文件夹成功：
+                {
+                    'code': 201,
+                    'code_text': '创建文件夹成功',
+                    'data': {},      //请求时提交的数据
+                    'dir': {}，      //新目录对象信息
+                }
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "xxx",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
         path = kwargs.get(self.lookup_field, '')
 
@@ -1787,6 +1817,16 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        删除一个目录, 目录必须为空，否则400错误
+
+            >>Http Code: 状态码204,成功删除;
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite、NoEmptyDir
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
         dirpath = kwargs.get(self.lookup_field, '')
 
@@ -1844,6 +1884,15 @@ class DirectoryViewSet(CustomGenericViewSet):
         }
     )
     def partial_update(self, request, *args, **kwargs):
+        """
+        设置目录访问权限
+
+            >>Http Code: 400 401 403 404 500
+                {
+                    "code": "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest、BucketLockWrite
+                    "code_text": ""
+                }
+        """
         bucket_name = kwargs.get('bucket_name', '')
 
         try:
@@ -2231,15 +2280,11 @@ class MetadataViewSet(CustomGenericViewSet):
                     "filename": "Firefox-latest.exe"           # 对象名称
                 }
             }
-        >>Http Code: 状态码400, 请求参数有误，已存在同名的对象或目录:
+        >>Http Code: 400 401 403 404 500
             {
-                "code": 400,
-                "code_text": 'xxxxx'        //错误信息
+                'code': "NoSuchKey",   // NoSuchBucket、AccessDenied、BadRequest
+                'code_text': '参数有误'
             }
-        >>Http Code: 状态码404, bucket桶、对象或目录不存在:
-            {
-                "code": 404,
-                "code_text": 'xxxxx'        //错误信息，
     """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
@@ -2283,7 +2328,8 @@ class MetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not obj:
-            return Response(data={'code': 404, 'code_text': _('对象或目录不存在')}, status=status.HTTP_404_NOT_FOUND)
+            exc = exceptions.NoSuchKey(message=_('对象或目录不存在'))
+            return Response(data=exc.err_data_old(), status=404)
 
         serializer = self.get_serializer(obj, context={'bucket': bucket, 'bucket_name': bucket_name, 'dir_path': path})
 
@@ -3472,3 +3518,181 @@ class SearchObjectViewSet(CustomGenericViewSet):
             ('files', files)
         ])
         return paginator.get_paginated_response(data_dict)
+
+
+class ListBucketObjectViewSet(CustomGenericViewSet):
+    """
+    列举存储桶内对象和目录
+    """
+    queryset = {}
+    permission_classes = [permissions.IsAuthenticatedOrBucketToken]
+    lookup_field = 'bucket_name'
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('列举存储桶内对象和目录'),
+        manual_parameters=[
+            openapi.Parameter(
+                name='prefix', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("列举指定前缀开头的对象"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='delimiter', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("分隔符是用于对键进行分组的字符"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='continuation-token', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("指示使用令牌在该存储桶上继续该列表"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='max-keys', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("设置响应中返回的最大对象数"),
+                required=False
+            ),
+        ]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """
+        列举存储桶内对象和目录
+
+            * prefix与delimiter配合可以列举一个目录;
+             当使用delimiter参数时，prefix必须存在（对象或目录）；
+             prefix=""或"/" 并且 delimiter="/"时列举桶根目录
+
+            * 由于path唯一，即不允许同名的对象和目录存在，prefix="test"和prefix="test/"结果相同
+
+            http code 200:
+            {
+              "Name": "ddd",            # bucket name
+              "Prefix": "test",
+              "Delimiter": "/",         # 只有提交参数delimiter时，此内容才存在
+              "IsTruncated": "false",
+              "MaxKeys": 1000,
+              "KeyCount": 2,
+              "Next": "http://159.226.91.140:8000/api/v1/list/bucket/ddd/?continuation-token=cD01NQ%3D%3D&delimiter=%2F&max-keys=1",
+              "Previous": "http://159.226.91.140:8000/api/v1/list/bucket/ddd/?continuation-token=cj0xJnA9NTU%3D&delimiter=%2F&max-keys=1",
+              "ContinuationToken": "cD03Ng==",      # 只有提交参数continuation-token时，此内容才存在
+              "NextContinuationToken": "cD01Ng==",  # 此内容在"IsTruncated" == "true"时存在
+              "Contents": [
+                {
+                  "Key": "test/月报",     # 对象完整路径
+                  "LastModified": "2021-03-31T01:40:05.190793Z",
+                  "ETag": "d41d8cd98f00b204e9800998ecf8427e",
+                  "Size": 0,
+                  "IsObject": false
+                }
+              ]
+            }
+
+            http code 404: 当使用delimiter参数时，prefix不存在（对象或目录）
+            {
+              "code": "NoSuchKey",
+              "message": "无效的参数prefix，对象或目录不存在"
+            }
+        """
+        return self.list_objects(request=request, **kwargs)
+
+    def list_objects(self, request, **kwargs):
+        delimiter = request.query_params.get('delimiter', None)
+        prefix = request.query_params.get('prefix', '')
+        bucket_name = kwargs.get('bucket_name', '')
+
+        if not delimiter:    # list所有对象和目录
+            return self.list_objects_list_prefix(request=request, bucket_name=bucket_name, prefix=prefix)
+
+        if delimiter != '/':
+            exc = exceptions.BadRequest(message='参数“delimiter”必须是“/”')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        hm = HarborManager()
+        path = prefix.strip('/')
+        if not path and delimiter:     # list root dir
+            try:
+                bucket = hm.get_user_own_bucket(bucket_name, request.user)
+            except exceptions.Error as exc:
+                return Response(data=exc.err_data(), status=exc.status_code)
+
+            root_dir = hm.get_root_dir()
+            return self.list_objects_list_dir(request=request, bucket=bucket,
+                                              dir_obj=root_dir)
+
+        try:
+            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if obj is None:
+            exc = exceptions.NoSuchKey('无效的参数prefix，对象或目录不存在')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        paginator = paginations.ListObjectsCursorPagination()
+        max_keys = paginator.get_page_size(request=request)
+
+        # list dir
+        if obj.is_dir():
+            return self.list_objects_list_dir(request=request, bucket=bucket, dir_obj=obj)
+
+        # list object metadata
+        ret_data = {
+            'IsTruncated': False,
+            'Name': bucket_name,
+            'Prefix': prefix,
+            'MaxKeys': max_keys,
+            'Delimiter': delimiter
+        }
+        serializer = serializers.ListBucketObjectsSerializer(obj)
+        ret_data['Contents'] = [serializer.data]
+        ret_data['KeyCount'] = 1
+        return Response(data=ret_data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def list_objects_list_dir(request, bucket, dir_obj):
+        delimiter = request.query_params.get('delimiter', None)
+        prefix = request.query_params.get('prefix', '')
+
+        paginator = paginations.ListObjectsCursorPagination()
+        ret_data = {
+            'Name': bucket.name,
+            'Prefix': prefix,
+            'Delimiter': delimiter
+        }
+        objs_qs = HarborManager().get_queryset_list_dir(bucket=bucket, dir_id=dir_obj.id)
+        objs = paginator.paginate_queryset(objs_qs, request=request)
+        serializer = serializers.ListBucketObjectsSerializer(objs, many=True)
+
+        data = paginator.get_paginated_data()
+        ret_data.update(data)
+        ret_data['Contents'] = serializer.data
+        return Response(data=ret_data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def list_objects_list_prefix(request, bucket_name, prefix):
+        """
+        列举所有对象和目录
+        """
+        hm = HarborManager()
+        try:
+            bucket, objs_qs = hm.get_bucket_objects_dirs_queryset(bucket_name=bucket_name, user=request.user, prefix=prefix)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        paginator = paginations.ListObjectsCursorPagination()
+        objs_dirs = paginator.paginate_queryset(objs_qs, request=request)
+        serializer = serializers.ListBucketObjectsSerializer(objs_dirs, many=True)
+
+        data = paginator.get_paginated_data()
+        data['Contents'] = serializer.data
+        data['Name'] = bucket_name
+        data['Prefix'] = prefix
+        return Response(data=data, status=status.HTTP_200_OK)

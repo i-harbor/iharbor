@@ -65,6 +65,11 @@ class BadRequest(Error):
     default_status_code = 400
 
 
+class InvalidArgument(BadRequest):
+    default_message = 'Invalid Argument'
+    default_code = 'InvalidArgument'
+
+
 class TooManyBucketTokens(Error):
     default_message = "You have attempted to create more tokens than allowed."
     default_code = 'TooManyBucketTokens'
@@ -94,6 +99,11 @@ class NoSuchKey(NotFound):
     default_code = 'NoSuchKey'
 
 
+class NoParentPath(NotFound):
+    default_message = 'The parent path does not exist.'
+    default_code = 'NoParentPath'
+
+
 class NoSuchToken(NotFound):
     default_message = 'The specified token does not exist.'
     default_code = 'NoSuchToken'
@@ -119,6 +129,24 @@ class BucketAlreadyOwnedByYou(Error):
 class BucketAlreadyExists(Error):
     default_message = 'The requested bucket name is already exists. Please select a different name and try again.'
     default_code = 'BucketAlreadyExists'
+    default_status_code = 409
+
+
+class KeyAlreadyExists(Error):
+    default_message = '目标已存在。'
+    default_code = 'KeyAlreadyExists'
+    default_status_code = 409
+
+
+class SameKeyAlreadyExists(Error):
+    default_message = '同名目录或对象已存在。'
+    default_code = 'SameKeyAlreadyExists'
+    default_status_code = 409
+
+
+class NoEmptyDir(Error):
+    default_message = '无法删除非空目录。'
+    default_code = 'NoEmptyDir'
     default_status_code = 409
 
 

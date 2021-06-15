@@ -1,7 +1,24 @@
+from urllib import parse
 from collections import OrderedDict
 
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination, _divide_with_ceil
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
+from . import exceptions
+
+
+def get_query_param(url, key):
+    """
+    get query param form url
+
+    :param url: url
+    :param key: name of query param
+    :return:
+        list(str) or None
+    """
+    (scheme, netloc, path, query, fragment) = parse.urlsplit(url)
+    query_dict = parse.parse_qs(query, keep_blank_values=True)
+    return query_dict.get(key, None)
 
 
 class BucketFileCursorPagination(CursorPagination):
@@ -179,5 +196,83 @@ class BucketsLimitOffsetPagination(LimitOffsetPagination):
         if current > final:
             current = final
 
-        return (current, final)
+        return current, final
 
+
+class ListObjectsCursorPagination(CursorPagination):
+    """
+    存储通文件对象分页器
+    """
+    cursor_query_param = 'continuation-token'
+    cursor_query_description = 'The pagination continuation-token value.'
+    page_size = 1000
+    invalid_cursor_message = 'Invalid continuation-token'
+    ordering = '-id'
+
+    page_size_query_param = 'max-keys'
+    page_size_query_description = 'Max number of results to return per page.'
+
+    max_page_size = 1000
+    offset_cutoff = 0
+
+    def __init__(self):
+        self._data = None
+
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        data = super().paginate_queryset(queryset=queryset, request=request, view=view)
+        if data is None:
+            data = []
+        self._data = data
+        return self._data
+
+    @property
+    def page_data(self):
+        if self._data is None:
+            raise AssertionError('You must call `.paginate_queryset()` before accessing `.data`.')
+
+        return self._data
+
+    def get_paginated_data(self):
+        is_truncated = True if self.has_next else False
+        data = {
+            'IsTruncated': is_truncated,
+            'MaxKeys': self.page_size,
+            'KeyCount': len(self.page_data),
+            'Next': self.get_next_link(),
+            'Previous': self.get_previous_link()
+        }
+        c_token = self.get_continuation_token(request=self.request)
+        if c_token:
+            data['ContinuationToken'] = c_token
+
+        nc_token = self.get_next_continuation_token()
+        if nc_token:
+            data['NextContinuationToken'] = nc_token
+
+        return data
+
+    def get_continuation_token(self, request):
+        return request.query_params.get(self.cursor_query_param, None)
+
+    def get_next_continuation_token(self):
+        next_link = self.get_next_link()
+        if next_link is None:
+            return None
+
+        params = get_query_param(url=next_link, key=self.cursor_query_param)
+        if not params:
+            return None
+
+        return params[0]
+
+    def decode_cursor(self, request):
+        try:
+            cursor = super().decode_cursor(request)
+        except NotFound as e:
+            raise exceptions.InvalidArgument(message='无效的参数continuation-token')
+
+        if cursor:
+            return cursor
+
+        return None

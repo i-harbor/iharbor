@@ -1,6 +1,7 @@
 import logging
 
 from django.utils.translation import gettext, gettext_lazy as _
+from django.utils.timezone import utc
 from rest_framework import serializers
 from rest_framework.reverse import reverse, replace_query_param
 
@@ -306,3 +307,33 @@ class BucketTokenSerializer(serializers.Serializer):
             return {}
 
 
+class ListBucketObjectsSerializer(serializers.Serializer):
+    """
+    对象序列化器
+    """
+    Key = serializers.SerializerMethodField(method_name='get_key')
+    LastModified = serializers.SerializerMethodField(method_name='get_last_modified')
+    ETag = serializers.SerializerMethodField(method_name='get_etag')
+    Size = serializers.SerializerMethodField(method_name='get_size')
+    IsObject = serializers.SerializerMethodField(method_name='get_is_object')
+
+    @staticmethod
+    def get_key(obj):
+        return obj.na
+
+    @staticmethod
+    def get_last_modified(obj):
+        t = obj.upt if obj.upt else obj.ult
+        return serializers.DateTimeField(default_timezone=utc).to_representation(t)
+
+    @staticmethod
+    def get_etag(obj):
+        return obj.hex_md5
+
+    @staticmethod
+    def get_size(obj):
+        return obj.si
+
+    @staticmethod
+    def get_is_object(obj):
+        return obj.fod

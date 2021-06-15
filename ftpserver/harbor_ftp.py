@@ -28,6 +28,8 @@ def main():
     handler.abstracted_fs = HarborFileSystem
     handler.dtp_handler = HarborDTPHandler
     handler.authorizer = authorizer
+    handler.certfile = '/etc/nginx/conf.d/ftp-keycert.pem'
+    handler.tls_data_required = True
 
     logging.basicConfig(level=logging.INFO)
     # print(dir(logger))

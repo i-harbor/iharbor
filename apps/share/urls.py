@@ -7,9 +7,9 @@ from . import views
 app_name = "share"
 # Create a router and register our viewsets with it.
 router = DefaultRouter(trailing_slash=False)
-router.register(r'obs', views.ObsViewSet, base_name='obs')
-router.register(r'list', views.ShareDirViewSet, base_name='list')
-router.register(r'sd', views.ShareDownloadViewSet, base_name='download')
+router.register(r'obs', views.ObsViewSet, basename='obs')
+router.register(r'list', views.ShareDirViewSet, basename='list')
+router.register(r'sd', views.ShareDownloadViewSet, basename='download')
 
 
 urlpatterns = [

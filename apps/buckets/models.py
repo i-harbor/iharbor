@@ -85,6 +85,7 @@ class Bucket(BucketBase):
         (LOCK_NO_READWRITE, _("锁定读写")),
     )
 
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     name = models.CharField(max_length=63, db_index=True, unique=True, verbose_name='bucket名称')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
@@ -180,7 +181,7 @@ class Bucket(BucketBase):
         if not self.collection_name:
             name = f'bucket_{self.id}'
             self.collection_name = name
-            self.save()
+            self.save(update_fields=['collection_name'])
 
         return self.collection_name
 
@@ -427,6 +428,7 @@ class BucketLimitConfig(models.Model):
     '''
     用户可拥有存储桶数量限制配置模型
     '''
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=2)
     user = models.OneToOneField(to=User, related_name='bucketlimit', on_delete=models.CASCADE, verbose_name='用户')
 
@@ -459,6 +461,7 @@ class ApiUsageDescription(models.Model):
         (DESC_S3_API, 'S3兼容API说明')
     )
 
+    id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     title = models.CharField(verbose_name='标题', default='使用说明', max_length=255)
     desc_for = models.SmallIntegerField(verbose_name='关于什么的说明', choices=DESC_FOR_CHOICES, default=DESC_API)
     content = RichTextField(verbose_name='说明内容', default='')

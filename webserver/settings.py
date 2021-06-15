@@ -164,14 +164,14 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True #True：关闭浏览器，则Cookie失效
 
 #自定义用户模型
 AUTH_USER_MODEL = 'users.UserProfile'
-
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 # 避免django把未以/结尾的url重定向到以/结尾的url
-APPEND_SLASH=False
+APPEND_SLASH = False
 
 #登陆url
 LOGIN_URL = '/users/signin/'
 LOGOUT_URL = '/users/logout/'
-
+LOCAL_LOGIN_USE = False
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,

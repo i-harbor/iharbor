@@ -4,14 +4,15 @@ import random
 
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
-from django.db.models import Sum, Count, Model
+from django.db.models import Sum, Count
 from django.db.models.functions import Lower
 from django.db.models.query import Q
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned
 from django.apps import apps
 from django.conf import settings
 
 from .models import BucketFileBase, get_str_hexMD5
+from api import exceptions
 
 
 logger = logging.getLogger('django.request')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
@@ -52,14 +53,15 @@ def create_table_for_model_class(model):
         using = router.db_for_write(model)
         with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
             schema_editor.create_model(model)
-            try:
-                table_name = schema_editor.quote_name(model.Meta.db_table)
-                sql = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT NULL COLLATE 'utf8_bin' AFTER " \
-                      f"`id`, CHANGE COLUMN `name` `name` VARCHAR(255) NOT NULL COLLATE 'utf8_bin' AFTER `na_md5`;"
-                schema_editor.execute(sql=sql)
-            except Exception as exc:
-                if delete_table_for_model_class(model):
-                    raise exc       # model table 删除成功，抛出错误
+            if isinstance(model, BucketFileBase):
+                try:
+                    table_name = schema_editor.quote_name(model.Meta.db_table)
+                    sql = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT NULL COLLATE 'utf8_bin' AFTER " \
+                          f"`id`, CHANGE COLUMN `name` `name` VARCHAR(255) NOT NULL COLLATE 'utf8_bin' AFTER `na_md5`;"
+                    schema_editor.execute(sql=sql)
+                except Exception as exc:
+                    if delete_table_for_model_class(model):
+                        raise exc       # model table 删除成功，抛出错误
     except Exception as e:
         msg = traceback.format_exc()
         logger.error(msg)
@@ -157,6 +159,14 @@ class BucketFileManagement:
 
         return self._bucket_file_class
 
+    def root_dir(self):
+        """
+        根目录对象
+        :return:
+        """
+        c = self.get_obj_model_class()
+        return c(id=self.ROOT_DIR_ID, na='', name='', fod=False, did=self.ROOT_DIR_ID, si=0)
+
     def get_collection_name(self):
         return self._collection_name
 
@@ -198,15 +208,16 @@ class BucketFileManagement:
 
         return False, None    # path参数有误,未找到对应目录信息
 
-    def get_cur_dir_files(self, cur_dir_id=None):
-        '''
+    def get_cur_dir_files(self, cur_dir_id=None, only_obj: bool = None):
+        """
         获得当前目录下的文件或文件夹记录
 
         :param cur_dir_id: 目录id;
+        :param only_obj: True(只列举对象), 其他忽略
         :return: 目录id下的文件或目录记录list; id==None时，返回存储桶下的文件或目录记录list
 
         :raises: Exception
-        '''
+        """
         dir_id = None
         if cur_dir_id is not None:
             dir_id = cur_dir_id
@@ -219,12 +230,16 @@ class BucketFileManagement:
                 return False, None
 
         model_class = self.get_obj_model_class()
+        if dir_id:
+            filters = {'did': dir_id}
+        else:
+            filters = {'did': self.ROOT_DIR_ID}
+
+        if only_obj:
+            filters['fod'] = True
+
         try:
-            if dir_id:
-                files = model_class.objects.filter(did=dir_id).all()
-            else:
-                #存储桶下文件目录,did=0表示是存储桶下的文件目录
-                files = model_class.objects.filter(did=self.ROOT_DIR_ID).all()
+            files = model_class.objects.filter(**filters).all()
         except Exception as e:
             logger.error('In get_cur_dir_files:' + str(e))
             return False, None
@@ -277,7 +292,7 @@ class BucketFileManagement:
         if check_path_exists:
             ok, did = self.get_cur_dir_id()
             if not ok:
-                raise Exception(f'父路径（{self._path}）不存在，或路径有误')
+                raise exceptions.NoParentPath(message=f'父路径（{self._path}）不存在，或路径有误')
 
         path = self.build_dir_full_name(name)
         try:
@@ -416,3 +431,23 @@ class BucketFileManagement:
 
         model_class = self.get_obj_model_class()
         return model_class.objects.annotate(lower_name=Lower('name')).filter(**lookup)
+
+    def get_objects_dirs_queryset(self):
+        """
+        获得所有文件对象和目录记录
+
+        :return: QuerySet()
+        """
+        model_class = self.get_obj_model_class()
+        return model_class.objects.all()
+
+    def get_prefix_objects_dirs_queryset(self, prefix: str):
+        """
+        获得指定路径前缀的对象和目录查询集
+
+        :param prefix: 路径前缀
+        :return: QuerySet()
+        """
+        model_class = self.get_obj_model_class()
+        return model_class.objects.filter(na__startswith=prefix).all()
+
