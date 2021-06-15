@@ -737,9 +737,10 @@ class ShareDirViewSet(CustomGenericViewSet):
 
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=collection_name)
-        ok, files = bfm.get_cur_dir_files(cur_dir_id=list_dir_id)
-        if not ok:
-            return Response(data={'code': 404, 'msg': _('未找到相关记录')}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            files = bfm.get_cur_dir_files(cur_dir_id=list_dir_id)
+        except Exception as exc:
+            return Response(data={'code': 404, 'msg': str(exc)}, status=status.HTTP_404_NOT_FOUND)
 
         data_dict = OrderedDict([
             ('code', 200),
