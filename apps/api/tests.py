@@ -842,6 +842,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         file = random_bytes_io(mb_num=6)
         file_md5 = calculate_md5(file)
         key = 'test.pdf'
+        key2 = 'a/b/c/D/大家/test.txt'
         response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['created'], True)
@@ -860,7 +861,19 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         download_md5 = calculate_md5(response)
         self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of upload file and download file')
 
+        response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key2, file=file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], True)
+
+        response = self.download_object_response(bucket_name=self.bucket_name, key=key2)
+        self.assertEqual(response.status_code, 200)
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of upload file and download file')
+
         # delete object
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key2)
+        self.assertEqual(response.status_code, 204)
+
         response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key)
         self.assertEqual(response.status_code, 204)
 
@@ -870,7 +883,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     def test_multipart_upload_download_delete(self):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
-        key = 'test.pdf'
+        key = 'a/的/test.pdf'
         ok = self.multipart_upload_object(bucket_name=self.bucket_name, key=key, file=file)
         self.assertTrue(ok, 'multipart_upload_object failed')
 
@@ -1422,7 +1435,7 @@ class UserAPITests(MyAPITestCase):
                            'state', 'permission'], response.data['keys'][0])
 
 
-class ListBucketObjecttsAPITests(MyAPITransactionTestCase):
+class ListBucketObjectsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):

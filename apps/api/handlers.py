@@ -129,8 +129,9 @@ class V2ObjectHandler:
 
         content_length = request.headers.get('content-length')
         if not content_length:
-            raise exceptions.BadRequest(
-                message='header "Content-Length" is required')
+            return response_exception(
+                exc=exceptions.BadRequest(
+                    message='header "Content-Length" is required'))
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=view)

@@ -2336,6 +2336,8 @@ class MetadataViewSet(CustomGenericViewSet):
             bucket, obj = h_manager.get_bucket_and_obj_or_dir(
                 bucket_name=bucket_name, path=path_name, user=request.user)
         except exceptions.HarborError as e:
+            if e.code == exceptions.NoParentPath.default_code:
+                e = exceptions.NoSuchKey.from_error(e)
             return Response(data=e.err_data_old(), status=e.status_code)
         except Exception as e:
             return Response(data={'code': 500, 'code_text': f'error，{str(e)}'},

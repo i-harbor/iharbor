@@ -243,28 +243,97 @@ class HarborManager:
         :raise HarborError
         """
         validated_data = self.validate_mkdir_params(bucket, path)
-
-        dir_path = validated_data.get('dir_path', '')
-        dir_name = validated_data.get('dir_name', '')
         did = validated_data.get('did', None)
         collection_name = validated_data.get('collection_name')
+        if not isinstance(did, int):
+            raise exceptions.HarborError(message='父路径id无效')
 
-        bfm = BucketFileManagement(dir_path, collection_name=collection_name)
-        dir_path_name = bfm.build_dir_full_name(dir_name)
-        model_class = bfm.get_obj_model_class()
-        bfinfo = model_class(na=dir_path_name,  # 全路经目录名
-                             name=dir_name,     # 目录名
-                             fod=False,         # 目录
-                             )
-        # 有父节点
-        if did:
-            bfinfo.did = did
+        obj = self._mkdir_metadata(table_name=collection_name, p_id=did, dir_path_name=path)
+        return True, obj
+
+    @staticmethod
+    def _mkdir_metadata(table_name: str, p_id: int, dir_path_name: str):
+        """
+        创建目录元数据
+
+        :param table_name: 目录所在存储桶对应的数据库表名
+        :param p_id: 父目录id
+        :param dir_path_name: 目录全路径
+        :return:
+            dir对象
+
+        :raises: S3Error
+        """
+        _, dir_name = PathParser(dir_path_name).get_path_and_filename()
+
+        bfm = BucketFileManagement(collection_name=table_name)
+        object_class = bfm.get_obj_model_class()
+        dir1 = object_class(na=dir_path_name,  # 全路经目录名
+                            name=dir_name,  # 目录名
+                            fod=False,  # 目录
+                            did=p_id)  # 父目录id
         try:
-            bfinfo.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
+            dir1.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
         except Exception as e:
-            raise exceptions.HarborError(message='创建失败，数据库错误')
+            raise exceptions.HarborError('创建目录元数据错误')
 
-        return True, bfinfo
+        return dir1
+
+    def create_parent_path(self, table_name, path: str):
+        """
+        创建整个目录路径
+
+        :param table_name: 桶的数据库表明称
+        :param path: 要创建的目录路径字符串
+        :return:
+            [dir,]      # 创建的目录路径上的目录(只包含新建的目录和路径上最后一个目录)的列表
+
+        :raises: S3Error
+        """
+        bfm = BucketFileManagement(collection_name=table_name)
+        paths = PathParser(path).get_path_breadcrumb()
+        if len(paths) == 0:
+            return bfm.root_dir()  # 根目录对象
+
+        index_paths = list(enumerate(paths))
+        index = 0
+        last_exist_dir = None  # 路径中已存在的最后的目录
+        for index, item in reversed(index_paths):
+            dir_name, dir_path_name = item
+            try:
+                obj = bfm.get_obj(path=dir_path_name)
+            except Exception as e:
+                raise exceptions.HarborError.from_error(str(e))
+            if not obj:
+                continue
+
+            if obj.is_file():
+                raise exceptions.HarborError.from_error(exceptions.SameKeyAlreadyExists(
+                    "The path of the object's key conflicts with the existing object's key"))
+
+            last_exist_dir = obj
+            break
+
+        if index == (len(index_paths) - 1) and last_exist_dir:  # 整个路径已存在
+            return [last_exist_dir]
+
+        # 从整个路径上已存在的目录处开始向后创建路径
+        if last_exist_dir:
+            now_last_dir = last_exist_dir  # 记录现在已创建的路径上的最后的目录
+            create_paths = index_paths[index + 1:]  # index目录存在不需创建
+        else:
+            now_last_dir = bfm.root_dir()  # 根目录对象
+            create_paths = index_paths[index:]  # index目录不存在需创建
+
+        dirs = []
+        for i, p in create_paths:
+            p_id = now_last_dir.id
+            dir_name, dir_path_name = p
+            dir1 = self._mkdir_metadata(table_name=table_name, p_id=p_id, dir_path_name=dir_path_name)
+            dirs.append(dir1)
+            now_last_dir = dir1
+
+        return dirs
 
     @staticmethod
     def get_root_dir():
@@ -316,7 +385,11 @@ class HarborManager:
                 err = exceptions.SameKeyAlreadyExists(message=f'"指定目录名称{dir_name}"已存在重名对象，请重新指定一个目录名称')
                 raise exceptions.HarborError.from_error(err)
 
-        data['did'] = bfm.cur_dir_id if bfm.cur_dir_id else bfm.get_cur_dir_id()[-1]
+        try:
+            data['did'] = bfm.get_cur_dir_id()
+        except exceptions.Error as e:
+            raise exceptions.HarborError.from_error(e)
+
         data['bucket_name'] = bucket.name
         data['dir_path'] = dir_path
         data['dir_name'] = dir_name
@@ -426,10 +499,10 @@ class HarborManager:
 
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=path, collection_name=collection_name)
-        ok, qs = bfm.get_cur_dir_files(only_obj=only_obj)
-        if not ok:
-            raise exceptions.HarborError.from_error(
-                exceptions.NotFound(message='未找到相关记录'))
+        try:
+            qs = bfm.get_cur_dir_files(only_obj=only_obj)
+        except Exception as exc:
+            raise exceptions.HarborError.from_error(exc)
 
         return qs
 
@@ -448,10 +521,9 @@ class HarborManager:
         collection_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=collection_name)
         try:
-            _, qs = bfm.get_cur_dir_files(cur_dir_id=dir_id, only_obj=only_obj)
+            qs = bfm.get_cur_dir_files(cur_dir_id=dir_id, only_obj=only_obj)
         except Exception as e:
-            raise exceptions.HarborError.from_error(
-                exceptions.Error(message=str(e)))
+            raise exceptions.HarborError.from_error(e)
 
         return qs
 
@@ -475,25 +547,25 @@ class HarborManager:
         """
         qs, _ = self._list_dir_queryset(bucket_name=bucket_name, path=path, user=user)
 
-        def generator(queryset, per_num, paginator=None):
+        def generator(queryset, _per_num, _paginator=None):
             offset = 0
-            limit = per_num
-            if paginator is None:
-                paginator = BucketFileLimitOffsetPagination()
+            limit = _per_num
+            if _paginator is None:
+                _paginator = BucketFileLimitOffsetPagination()
 
             while True:
                 try:
-                    ret = paginator.pagenate_to_list(queryset, offset=offset, limit=limit)
+                    ret = _paginator.pagenate_to_list(queryset, offset=offset, limit=limit)
                 except Exception as e:
                     raise exceptions.HarborError(message=str(e))
 
                 yield ret
                 length = len(ret)
-                if length < per_num:
+                if length < _per_num:
                     return
                 offset = offset + length
 
-        return generator(queryset=qs, per_num=per_num, paginator=paginator)
+        return generator(queryset=qs, _per_num=per_num, _paginator=paginator)
 
     def list_dir(self, bucket_name: str, path: str, offset: int = 0,
                  limit: int = 1000, user=None, paginator=None, only_obj: bool = None):
@@ -656,6 +728,8 @@ class HarborManager:
                 bfm = BucketFileManagement(path=move_to, collection_name=table_name)
                 target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
                 new_na = bfm.build_dir_full_name(new_obj_name)
+        except exceptions.Error as exc:
+            raise exceptions.HarborError.from_error(exc)
         except Exception as e:
             raise exceptions.HarborError(message='移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
 
@@ -664,7 +738,11 @@ class HarborManager:
                 exceptions.SameKeyAlreadyExists(message='无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录'))
 
         if move_to is not None:     # 移动对象或重命名
-            _, did = bfm.get_cur_dir_id()
+            try:
+                did = bfm.get_cur_dir_id()
+            except exceptions.Error as exc:
+                raise exceptions.HarborError.from_error(exc)
+
             obj.did = did
 
         obj.na = new_na
@@ -811,7 +889,15 @@ class HarborManager:
             raise exceptions.BucketLockWrite()
 
         collection_name = bucket.get_bucket_table_name()
-        obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+        try:
+            obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+        except exceptions.HarborError as exc:
+            if not exc.is_same_code(exceptions.NoParentPath()):
+                raise exc
+
+            self.create_parent_path(table_name=collection_name, path=path)
+            obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
+
         return bucket, obj, created
 
     @staticmethod
@@ -845,10 +931,10 @@ class HarborManager:
             raise exceptions.HarborError.from_error(
                 exceptions.SameKeyAlreadyExists(message='指定的对象名称与已有的目录重名，请重新指定一个名称'))
 
-        ok, did = bfm.get_cur_dir_id()
-        if not ok:
-            raise exceptions.HarborError.from_error(
-                exceptions.NoSuchKey(message='对象路经不存在'))
+        try:
+            did = bfm.get_cur_dir_id()
+        except exceptions.Error as exc:
+            raise exceptions.HarborError.from_error(exc)
 
         # 验证集合文档上限
         # if not self.do_bucket_limit_validate(bfm):

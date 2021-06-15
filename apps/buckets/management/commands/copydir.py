@@ -230,10 +230,12 @@ class Command(BaseCommand):
     def list_from_dir(self, path):
         table_name = self.from_bucket.get_bucket_table_name()
         bfm = BucketFileManagement(path=path, collection_name=table_name)
-        ok, qs = bfm.get_cur_dir_files()
-        if not ok:
-            ok, qs = bfm.get_cur_dir_files()
-            if not ok:
+        try:
+            qs = bfm.get_cur_dir_files()
+        except Exception as e:
+            try:
+                qs = bfm.get_cur_dir_files()
+            except Exception:
                 return None
 
         return qs

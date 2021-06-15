@@ -46,6 +46,12 @@ class Error(Exception):
 
         return cls(message=str(err))
 
+    def is_same_code(self, err):
+        if not isinstance(err, Error):
+            return False
+
+        return err.code == self.code
+
 
 class AuthenticationFailed(Error):
     default_status_code = 401
@@ -86,6 +92,11 @@ class BadDigest(BadRequest):
     default_message = 'The Content-MD5 you specified did not match what we received.'
     default_code = 'BadDigest'
     default_status_code = 400
+
+
+class InvalidKey(BadRequest):
+    default_message = 'The specified key is invalid.'
+    default_code = 'InvalidKey'
 
 
 class AccessDenied(Error):
