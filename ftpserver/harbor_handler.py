@@ -68,21 +68,21 @@ class HarborFTPHandler(FTPHandler):
             fd.close()
             raise
     
-    def decode(self, data: bytes):
-        """
-        这里主要为了解码。
-            客户端传送过来的内容需要解码的。解码主要是文件信息，比如文件名，不是指文件内容
-        chardet库的使用
-            客户端传送过来的数据并不知道是什么编码类型，所以解码也无从下手
-            chardet可以帮助识别bytes是什么编码类型，于是可以对症下药，对其进行解码
-        问题来源：
-            windows默认编码是gbk，而linux以及harbor_ftp服务端默认编码是utf8
-            此步主要为了兼容windows的网络映射功能
-        """
-        # print(chardet.detect(bytes)['encoding'])
-        if chardet.detect(data)['encoding'] not in ('utf-8', 'ascii'):
-            return data.decode('gbk', self.unicode_errors)
-        return data.decode('utf8', self.unicode_errors)
+    # def decode(self, data: bytes):
+    #     """
+    #     这里主要为了解码。
+    #         客户端传送过来的内容需要解码的。解码主要是文件信息，比如文件名，不是指文件内容
+    #     chardet库的使用
+    #         客户端传送过来的数据并不知道是什么编码类型，所以解码也无从下手
+    #         chardet可以帮助识别bytes是什么编码类型，于是可以对症下药，对其进行解码
+    #     问题来源：
+    #         windows默认编码是gbk，而linux以及harbor_ftp服务端默认编码是utf8
+    #         此步主要为了兼容windows的网络映射功能
+    #     """
+    #     # print(chardet.detect(bytes)['encoding'])
+    #     if chardet.detect(data)['encoding'] not in ('utf-8', 'ascii'):
+    #         return data.decode('gbk', self.unicode_errors)
+    #     return data.decode('utf8', self.unicode_errors)
 
     def ftp_MFMT(self, path, timeval):
         """ Sets the last modification time of file to timeval
