@@ -258,7 +258,7 @@ class Bucket(BucketBase):
 
         return True
 
-    def __update_stats(self):
+    def update_stats(self):
         from .utils import get_bfmanager
 
         table_name = self.get_bucket_table_name()
@@ -422,6 +422,26 @@ class Archive(BucketBase):
 
     def get_pool_name(self):
         return self.pool_name
+
+    def update_stats(self):
+        from .utils import get_bfmanager
+
+        table_name = self.get_bucket_table_name()
+        bfm = get_bfmanager(table_name=table_name)
+        data = bfm.get_bucket_space_and_count()
+        count = data.get('count')
+        space = data.get('space')
+        if space is None:
+            space = 0
+
+        now_time = timezone.now()
+        self.objs_count = count
+        self.size = space
+        self.stats_time = now_time
+        try:
+            self.save(update_fields=['objs_count', 'size', 'stats_time'])
+        except Exception as e:
+            pass
 
 
 class BucketLimitConfig(models.Model):
