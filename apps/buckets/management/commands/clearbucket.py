@@ -156,7 +156,6 @@ class Command(BaseCommand):
             while True:
                 ho = HarborObject(pool_name=pool_name, obj_id='')
                 objs = self.get_objs_and_dirs(model_class=model_class)
-                self.stdout.write('new loop, get objs ok')
                 if objs is None or len(objs) <= 0:
                     break
 

@@ -300,7 +300,7 @@ class Bucket(BucketBase):
         else:
             ts_stats = 0
         if now or (ts_now > ts_stats):
-            self.__update_stats()
+            self.update_stats()
 
         stats = {'space': self.size, 'count': self.objs_count}
         time_str = self.stats_time.astimezone(timezone.get_current_timezone()).isoformat()
