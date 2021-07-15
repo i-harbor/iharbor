@@ -194,7 +194,7 @@ class MyAPITransactionTestCase(APITransactionTestCase):
         assert_error_response(self, status_code, code, response, message_key='code_text')
 
 
-class JwtAPITests(MyAPITestCase):
+class JwtAPITests(MyAPITransactionTestCase):
     def setUp(self):
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -241,7 +241,7 @@ class JwtAPITests(MyAPITestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class TokenAPITests(MyAPITestCase):
+class TokenAPITests(MyAPITransactionTestCase):
     def setUp(self):
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -301,7 +301,7 @@ class TokenAPITests(MyAPITestCase):
         self.list_token_auth_by_token(new_token)
 
 
-class AuthKeyAPITests(MyAPITestCase):
+class AuthKeyAPITests(MyAPITransactionTestCase):
     def setUp(self):
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -1117,7 +1117,7 @@ class MetadataAPITests(MyAPITransactionTestCase):
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
 
 
-class CephAPITests(MyAPITestCase):
+class CephAPITests(MyAPITransactionTestCase):
     def setUp(self):
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
@@ -1283,7 +1283,7 @@ class StatsAPITests(MyAPITransactionTestCase):
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
 
 
-class UserAPITests(MyAPITestCase):
+class UserAPITests(MyAPITransactionTestCase):
     def setUp(self):
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
