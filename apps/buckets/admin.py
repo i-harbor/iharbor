@@ -27,8 +27,17 @@ def bucket_stats(modeladmin, request, queryset):
 bucket_stats.short_description = "更新存储桶统计信息"
 
 
+class NoDeleteSelectModelAdmin(admin.ModelAdmin):
+    def get_actions(self, request):
+        actions = super(NoDeleteSelectModelAdmin, self).get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+
+        return actions
+
+
 @admin.register(Bucket)
-class BucketAdmin(admin.ModelAdmin):
+class BucketAdmin(NoDeleteSelectModelAdmin):
     list_display = ('id', 'name', 'get_collection_name', 'type', 'created_time', 'lock', 'user', 'objs_count',
                     'size', 'ftp_enable', 'ftp_password', 'ftp_ro_password', 'modified_time')
     list_display_links = ('id', 'name')
@@ -46,7 +55,7 @@ class BucketAdmin(admin.ModelAdmin):
 
 
 @admin.register(Archive)
-class BucketArchiveAdmin(admin.ModelAdmin):
+class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
     list_display = ('id', 'original_id', 'name', 'type', 'table_name', 'archive_time', 'created_time', 'user', 'objs_count',
                     'size', 'ftp_enable', 'ftp_password', 'modified_time')
     list_display_links = ('id', 'name')
@@ -72,7 +81,8 @@ class UsageDescAdmin(admin.ModelAdmin):
     list_display_links = ('id', 'title')
     search_fields = ('title', 'content')  # 搜索字段
 
-    def get_desc_for(self, obj):
+    @staticmethod
+    def get_desc_for(obj):
         return obj.get_desc_for_display()
 
 
