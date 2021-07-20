@@ -271,7 +271,7 @@ class FileHandler(object):
     def write(self, data):
         self.ensure_init_write_generator()
         self.file.write(data)
-        if self.file.tell() >= 1024 ** 2 * 64:
+        if self.file.tell() >= 1024 ** 2 * 32:
             self._sync_cache()
 
         return len(data)

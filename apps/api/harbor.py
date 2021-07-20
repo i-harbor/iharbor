@@ -608,13 +608,14 @@ class HarborManager:
 
         return li, bucket
 
-    def get_bucket_objects_dirs_queryset(self, bucket_name: str, user, prefix: str = ''):
+    def get_bucket_objects_dirs_queryset(self, bucket_name: str, user, prefix: str = '', only_obj: bool = False):
         """
         获得所有对象和目录记录
 
         :param bucket_name: 桶名
         :param user: 用户对象
         :param prefix: 路径前缀
+        :param only_obj: True只查询对象
         :return:
             bucket, QuerySet()
 
@@ -633,6 +634,9 @@ class HarborManager:
             objs = self.get_objects_dirs_queryset(table_name=table_name)
         else:
             objs = self.get_prefix_objects_dirs_queryset(table_name=table_name, prefix=prefix)
+
+        if only_obj:
+            objs = objs.filter(fod=True)
 
         return bucket, objs
 

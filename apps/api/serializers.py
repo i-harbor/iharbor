@@ -313,6 +313,7 @@ class ListBucketObjectsSerializer(serializers.Serializer):
     """
     Key = serializers.SerializerMethodField(method_name='get_key')
     LastModified = serializers.SerializerMethodField(method_name='get_last_modified')
+    Creation = serializers.SerializerMethodField(method_name='get_creation')
     ETag = serializers.SerializerMethodField(method_name='get_etag')
     Size = serializers.SerializerMethodField(method_name='get_size')
     IsObject = serializers.SerializerMethodField(method_name='get_is_object')
@@ -320,6 +321,10 @@ class ListBucketObjectsSerializer(serializers.Serializer):
     @staticmethod
     def get_key(obj):
         return obj.na
+
+    @staticmethod
+    def get_creation(obj):
+        return serializers.DateTimeField(default_timezone=utc).to_representation(obj.ult)
 
     @staticmethod
     def get_last_modified(obj):

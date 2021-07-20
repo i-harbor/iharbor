@@ -3486,6 +3486,12 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
                 description=gettext_lazy("设置响应中返回的最大对象数"),
                 required=False
             ),
+            openapi.Parameter(
+                name='exclude-dir', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("排除目录，只列举对象；此参数不需要值（忽略），存在即有效"),
+                required=False
+            ),
         ]
     )
     def retrieve(self, request, *args, **kwargs):
@@ -3533,9 +3539,15 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
         delimiter = request.query_params.get('delimiter', None)
         prefix = request.query_params.get('prefix', '')
         bucket_name = kwargs.get('bucket_name', '')
+        exclude_dir = request.query_params.get('exclude-dir', None)
+
+        only_obj = False
+        if exclude_dir is not None:
+            only_obj = True
 
         if not delimiter:    # list所有对象和目录
-            return self.list_objects_list_prefix(request=request, bucket_name=bucket_name, prefix=prefix)
+            return self.list_objects_list_prefix(request=request, bucket_name=bucket_name,
+                                                 prefix=prefix, only_obj=only_obj)
 
         if delimiter != '/':
             exc = exceptions.BadRequest(message='参数“delimiter”必须是“/”')
@@ -3556,7 +3568,7 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
 
             root_dir = hm.get_root_dir()
             return self.list_objects_list_dir(request=request, bucket=bucket,
-                                              dir_obj=root_dir)
+                                              dir_obj=root_dir, only_obj=only_obj)
 
         try:
             bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=path, user=request.user)
@@ -3572,7 +3584,8 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
 
         # list dir
         if obj.is_dir():
-            return self.list_objects_list_dir(request=request, bucket=bucket, dir_obj=obj)
+            return self.list_objects_list_dir(request=request, bucket=bucket,
+                                              dir_obj=obj, only_obj=only_obj)
 
         # list object metadata
         ret_data = {
@@ -3588,7 +3601,7 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
         return Response(data=ret_data, status=status.HTTP_200_OK)
 
     @staticmethod
-    def list_objects_list_dir(request, bucket, dir_obj):
+    def list_objects_list_dir(request, bucket, dir_obj, only_obj: bool = False):
         delimiter = request.query_params.get('delimiter', None)
         prefix = request.query_params.get('prefix', '')
 
@@ -3598,7 +3611,8 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
             'Prefix': prefix,
             'Delimiter': delimiter
         }
-        objs_qs = HarborManager().get_queryset_list_dir(bucket=bucket, dir_id=dir_obj.id)
+        objs_qs = HarborManager().get_queryset_list_dir(bucket=bucket, dir_id=dir_obj.id,
+                                                        only_obj=only_obj)
         objs = paginator.paginate_queryset(objs_qs, request=request)
         serializer = serializers.ListBucketObjectsSerializer(objs, many=True)
 
@@ -3608,14 +3622,14 @@ class ListBucketObjectViewSet(CustomGenericViewSet):
         return Response(data=ret_data, status=status.HTTP_200_OK)
 
     @staticmethod
-    def list_objects_list_prefix(request, bucket_name, prefix):
+    def list_objects_list_prefix(request, bucket_name, prefix, only_obj: bool = False):
         """
         列举所有对象和目录
         """
         hm = HarborManager()
         try:
             bucket, objs_qs = hm.get_bucket_objects_dirs_queryset(
-                bucket_name=bucket_name, user=request.user, prefix=prefix)
+                bucket_name=bucket_name, user=request.user, prefix=prefix, only_obj=only_obj)
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
