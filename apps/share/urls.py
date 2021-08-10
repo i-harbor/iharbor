@@ -13,7 +13,6 @@ router.register(r'sd', views.ShareDownloadViewSet, basename='download')
 
 
 urlpatterns = [
-    path('', include(router.urls)), # The API URLs are now determined automatically by the router.
+    path('', include(router.urls)),     # The API URLs are now determined automatically by the router.
     re_path(r'^s/(?P<share_base>.+)', views.ShareView.as_view(), name='share-view'),
 ]
-

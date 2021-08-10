@@ -35,11 +35,9 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('api/', include('api.urls', namespace='api')),
-    # path('evcloud/', include('evcloud.urls', namespace='evcloud')),
     path('share/', include('share.urls', namespace='share')),
     path('', include('buckets.urls', namespace='buckets')),
     path('users/', include('users.urls', namespace='users')),
-    # path('vpn/', include('vpn.urls', namespace='vpn')),
     path('admin/', admin.site.urls),
     path('apidocs/', schema_view.with_ui('swagger', cache_timeout=0), name='apidocs'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='redoc'),

@@ -6,6 +6,7 @@ from django.views import View
 from django.http import FileResponse, QueryDict
 from django.utils.http import urlquote
 from django.contrib.auth.models import AnonymousUser
+from django.utils import translation
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from rest_framework import viewsets, status
@@ -13,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.serializers import Serializer
-from rest_framework.utils.urls import replace_query_param
+from rest_framework.utils.urls import replace_query_param, remove_query_param
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -21,7 +22,7 @@ from buckets.utils import BucketFileManagement
 from api.paginations import BucketFileLimitOffsetPagination
 from utils.storagers import PathParser
 from utils.jwt_token import JWTokenTool2, InvalidToken
-from utils.view import CustomGenericViewSet
+from utils.view import CustomGenericViewSet, set_language_redirect
 from utils.time import time_to_gmt, datetime_from_gmt
 from . import serializers
 from api.harbor import HarborManager
@@ -29,15 +30,17 @@ from api.exceptions import HarborError
 from .forms import SharePasswordForm
 
 
-# Create your views here.
+LANGUAGE_QUERY_PARAMETER = 'language'
+
+
 class InvalidError(Exception):
-    def __init__(self, code:int, msg:str='invalid'):
+    def __init__(self, code: int, msg: str = 'invalid'):
         self.code = code
         self.msg = msg
 
 
 class ObsViewSet(viewsets.GenericViewSet):
-    '''
+    """
     分享视图集
 
     retrieve:
@@ -80,7 +83,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
-    '''
+    """
     queryset = []
     permission_classes = []
     lookup_field = 'objpath'
@@ -227,18 +230,18 @@ class ObsViewSet(viewsets.GenericViewSet):
 
         return None
 
-    def get_offset_and_end(self, hRange:str, filesize:int):
-        '''
+    def get_offset_and_end(self, h_range: str, filesize: int):
+        """
         获取读取开始偏移量和结束偏移量
 
-        :param hRange: range Header
+        :param h_range: range Header
         :param filesize: 对象大小
         :return:
             (offset:int, end:int)
 
         :raise InvalidError
-        '''
-        start, end = self.parse_header_ranges(hRange)
+        """
+        start, end = self.parse_header_ranges(h_range)
         # 无法解析header ranges,返回整个对象
         if start is None and end is None:
             raise InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
@@ -249,22 +252,23 @@ class ObsViewSet(viewsets.GenericViewSet):
             end = filesize - 1
         else:
             offset = start
-            if end is None:
-                end = filesize - 1
-            else:
+            if end is not None and isinstance(end, int):
                 end = min(end, filesize - 1)
+            else:
+                end = filesize - 1
 
         return offset, end
 
-    def parse_header_ranges(self, ranges):
-        '''
+    @staticmethod
+    def parse_header_ranges(ranges):
+        """
         parse Range header string
 
         :param ranges: 'bytes={start}-{end}'  下载第M－N字节范围的内容
         :return: (M, N)
             start: int or None
             end: int or None
-        '''
+        """
         m = re.match(r'bytes=(\d*)-(\d*)', ranges)
         if not m:
             return None, None
@@ -277,7 +281,7 @@ class ObsViewSet(viewsets.GenericViewSet):
         return start, end
 
     def has_access_permission(self, request, bucket, obj):
-        '''
+        """
         当前已认证用户或未认证用户是否有访问对象的权限
 
         :param request: 请求体对象
@@ -288,7 +292,7 @@ class ObsViewSet(viewsets.GenericViewSet):
             raise InvalidError  # 不可访问
 
         :raises: InvalidError
-        '''
+        """
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
             return True
@@ -315,20 +319,21 @@ class ObsViewSet(viewsets.GenericViewSet):
         return True
 
     def authentication_url_token(self, request):
-        '''
+        """
         通过url中可能存在的token进行身份验证
         :param request:
         :return:
-        '''
+        """
         self.authenticate_auth_token(request)
         self.authenticate_jwt_token(request)
 
-    def authenticate_auth_token(self, request):
-        '''
+    @staticmethod
+    def authenticate_auth_token(request):
+        """
         auth-token验证
         :param request:
         :return: None
-        '''
+        """
         # 已身份认证
         if not isinstance(request.user, AnonymousUser):
             return
@@ -345,12 +350,13 @@ class ObsViewSet(viewsets.GenericViewSet):
         except AuthenticationFailed:
             pass
 
-    def authenticate_jwt_token(self, request):
-        '''
+    @staticmethod
+    def authenticate_jwt_token(request):
+        """
         jwt-token验证
         :param request:
         :return: None
-        '''
+        """
         # 已身份认证
         if not isinstance(request.user, AnonymousUser):
             return
@@ -369,7 +375,7 @@ class ObsViewSet(viewsets.GenericViewSet):
 
 
 class ShareDownloadViewSet(CustomGenericViewSet):
-    '''
+    """
     分享下载视图集
 
     retrieve:
@@ -402,7 +408,7 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
-    '''
+    """
     queryset = []
     permission_classes = []
     lookup_field = 'share_base'
@@ -511,18 +517,18 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         """
         return Serializer
 
-    def get_offset_and_end(self, hRange:str, filesize:int):
-        '''
+    def get_offset_and_end(self, h_range: str, filesize: int):
+        """
         获取读取开始偏移量和结束偏移量
 
-        :param hRange: range Header
+        :param h_range: range Header
         :param filesize: 对象大小
         :return:
             (offset:int, end:int)
 
         :raise InvalidError
-        '''
-        start, end = self.parse_header_ranges(hRange)
+        """
+        start, end = self.parse_header_ranges(h_range)
         # 无法解析header ranges,返回整个对象
         if start is None and end is None:
             InvalidError(code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, msg='Header Ranges is invalid')
@@ -533,22 +539,23 @@ class ShareDownloadViewSet(CustomGenericViewSet):
             end = filesize - 1
         else:
             offset = start
-            if end is None:
-                end = filesize - 1
-            else:
+            if end is not None and isinstance(end, int):
                 end = min(end, filesize - 1)
+            else:
+                end = filesize - 1
 
         return offset, end
 
-    def parse_header_ranges(self, ranges):
-        '''
+    @staticmethod
+    def parse_header_ranges(ranges):
+        """
         parse Range header string
 
         :param ranges: 'bytes={start}-{end}'  下载第M－N字节范围的内容
         :return: (M, N)
             start: int or None
             end: int or None
-        '''
+        """
         m = re.match(r'bytes=(\d*)-(\d*)', ranges)
         if not m:
             return None, None
@@ -558,19 +565,22 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         end = int(items[1]) if items[1] else None
         if isinstance(start, int) and isinstance(end, int) and start > end:
             return None, None
+
         return start, end
 
-    def has_access_permission(self, request, bucket, base_dir:str):
-        '''
+    @staticmethod
+    def has_access_permission(request, bucket, base_dir: str):
+        """
         是否有访问对象的权限
 
+        :param request:
         :param bucket: 存储桶对象
         :param base_dir: 分享根目录
         :return:
             True(可访问)；False（不可访问）
 
         :raises: InvalidError
-        '''
+        """
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
             return True
@@ -602,7 +612,7 @@ class ShareDownloadViewSet(CustomGenericViewSet):
 
 
 class ShareDirViewSet(CustomGenericViewSet):
-    '''
+    """
     list分享目录视图集
 
     retrieve:
@@ -649,7 +659,7 @@ class ShareDirViewSet(CustomGenericViewSet):
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
 
-    '''
+    """
     queryset = []
     permission_classes = []
     pagination_class = BucketFileLimitOffsetPagination
@@ -750,11 +760,13 @@ class ShareDirViewSet(CustomGenericViewSet):
         ])
         page = self.paginate_queryset(files)
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
+            serializer = self.get_serializer(page, many=True, context={
+                'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
             data_dict['files'] = serializer.data
             return self.get_paginated_response(data_dict)
         else:
-            serializer = self.get_serializer(files, many=True, context={'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
+            serializer = self.get_serializer(files, many=True, context={
+                'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
             data_dict['files'] = serializer.data
         return Response(data_dict)
 
@@ -768,13 +780,13 @@ class ShareDirViewSet(CustomGenericViewSet):
 
     @staticmethod
     def has_access_permission(bucket, base_dir_obj):
-        '''
+        """
         是否有访问对象的权限
 
         :param bucket: 存储桶对象
         :param base_dir_obj: 分享根目录对象, None为分享的存储桶
         :return: True(可访问)；False（不可访问）
-        '''
+        """
         obj = base_dir_obj
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
@@ -793,13 +805,24 @@ class ShareDirViewSet(CustomGenericViewSet):
 
 
 class ShareView(View):
-    '''
+    """
     list分享目录视图
-    '''
+    """
     lookup_field = 'share_base'
 
     def get(self, request, *args, **kwargs):
-        '''获取分享目录网页'''
+        """获取分享目录网页"""
+        lang_code = request.GET.get(LANGUAGE_QUERY_PARAMETER)
+        if lang_code:
+            try:
+                lang_code = translation.get_supported_language_variant(lang_code)
+                translation.activate(lang_code)
+                next_url = self.request.build_absolute_uri()
+                next_url = remove_query_param(next_url, LANGUAGE_QUERY_PARAMETER)
+                return set_language_redirect(lang_code=lang_code, next_url=next_url)
+            except LookupError:
+                pass
+
         share_base = kwargs.get(self.lookup_field, '')
 
         pp = PathParser(filepath=share_base)
@@ -829,7 +852,8 @@ class ShareView(View):
 
         # 无分享密码
         if (not base_obj) or (not base_obj.has_share_password()):
-            return render(request, 'share.html', context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': None})
+            return render(request, 'share.html', context={
+                'share_base': share_base, 'share_user': bucket.user.username, 'share_code': None})
 
         # 验证分享密码
         p = request.GET.get('p', None)
@@ -838,20 +862,21 @@ class ShareView(View):
             data.setlist('password', [p])
             form = SharePasswordForm(data)  # 模拟post请求数据
             if base_obj.check_share_password(p):
-                return render(request, 'share.html',
-                          context={'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
+                return render(request, 'share.html', context={
+                    'share_base': share_base, 'share_user': bucket.user.username, 'share_code': p})
             else:
                 form.is_valid()
                 form.add_error('password', error=_('分享密码有误'))
         else:
             form = SharePasswordForm()
 
-        content = {}
-        content['form_title'] = _('验证分享密码')
-        content['submit_text'] = _('确定')
-        content['form'] = form
-        content['share_base'] = share_base
-        content['share_user'] = bucket.user.username
+        content = {
+            'form_title': _('验证分享密码'),
+            'submit_text': _('确定'),
+            'form': form,
+            'share_base': share_base,
+            'share_user': bucket.user.username
+        }
         return render(request, 'share_form.html', context=content)
 
     def post(self, request, *args, **kwargs):
@@ -860,14 +885,15 @@ class ShareView(View):
         url = replace_query_param(url, 'p', p)
         return redirect(to=url)
 
-    def has_access_permission(self, bucket, base_dir_obj):
-        '''
+    @staticmethod
+    def has_access_permission(bucket, base_dir_obj):
+        """
         是否有访问对象的权限
 
         :param bucket: 存储桶对象
         :param base_dir_obj: 分享根目录对象, None为分享的存储桶
         :return: True(可访问)；False（不可访问）
-        '''
+        """
         obj = base_dir_obj
         # 存储桶是否是公有权限
         if bucket.is_public_permission():

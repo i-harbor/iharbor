@@ -1,6 +1,7 @@
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
+from django.conf import settings
 from rest_framework.schemas import AutoSchema
 from rest_framework import viewsets, exceptions as rf_exceptions
 from rest_framework.views import set_rollback
@@ -21,10 +22,12 @@ def exception_handler(exc, context):
     elif isinstance(exc, PermissionDenied):
         exc = exceptions.AccessDenied()
     elif isinstance(exc, APIException):
-        if getattr(exc, 'auth_header', None):
-            headers['WWW-Authenticate'] = exc.auth_header
-        if getattr(exc, 'wait', None):
-            headers['Retry-After'] = '%d' % exc.wait
+        auth_header = getattr(exc, 'auth_header', None)
+        if auth_header:
+            headers['WWW-Authenticate'] = auth_header
+        wait = getattr(exc, 'wait', None)
+        if wait:
+            headers['Retry-After'] = '%d' % wait
 
         if isinstance(exc, rf_exceptions.AuthenticationFailed):
             exc = exceptions.AuthenticationFailed(message=str(exc))
@@ -47,13 +50,13 @@ def exception_handler(exc, context):
 
 
 class CustomAutoSchema(AutoSchema):
-    '''
+    """
     自定义Schema
-    '''
+    """
     def get_manual_fields(self, path, method):
-        '''
+        """
         重写方法，为每个方法自定义参数字段, action或method做key
-        '''
+        """
         extra_fields = []
         action = None
         try:
@@ -72,9 +75,9 @@ class CustomAutoSchema(AutoSchema):
 
 
 class CustomGenericViewSet(viewsets.GenericViewSet):
-    '''
+    """
     自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
-    '''
+    """
     def get_serializer(self, *args, **kwargs):
         """
         Return the serializer instance that should be used for validating and
@@ -97,5 +100,22 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
                 if user.last_active < date:
                     user.last_active = date
                     user.save(update_fields=['last_active'])
-            except:
+            except Exception:
                 pass
+
+
+def set_language_redirect(lang_code: str, next_url: str):
+    """
+    Redirect to a given URL while setting the chosen language in a cookie.
+    """
+    response = HttpResponseRedirect(next_url)
+    response.set_cookie(
+        settings.LANGUAGE_COOKIE_NAME, lang_code,
+        max_age=settings.LANGUAGE_COOKIE_AGE,
+        path=settings.LANGUAGE_COOKIE_PATH,
+        domain=settings.LANGUAGE_COOKIE_DOMAIN,
+        secure=settings.LANGUAGE_COOKIE_SECURE,
+        httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
+        samesite=settings.LANGUAGE_COOKIE_SAMESITE,
+    )
+    return response
