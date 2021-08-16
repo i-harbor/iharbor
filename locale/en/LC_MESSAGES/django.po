@@ -1411,3 +1411,6 @@ msgstr "Upload file exceeds allowed size limit"
 
 msgid "地球大数据科学工程对象云存储"
 msgstr "Big Earth Data Science Project Object storage"
+
+msgid "对象存储服务"
+msgstr "Object Storage"
