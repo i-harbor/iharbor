@@ -1,9 +1,9 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import UserAdmin, csrf_protect_m, sensitive_post_parameters_m
 from django.utils.translation import ugettext_lazy as _
 
 from .models import UserProfile, Email, AuthKey
-# Register your models here.
+
 
 admin.site.site_header = 'iHarbor管理'
 admin.site.site_title = 'iHarbor站点管理'
@@ -30,10 +30,17 @@ class UserProfileAdmin(UserAdmin):
             'fields': ('username', 'password1', 'password2', 'company', 'first_name', 'last_name', 'telephone'),
         }),
     )
-    ordering = None # 使用Model中的ordering
+    ordering = None     # 使用Model中的ordering
+
     def fullname(self, obj):
         return obj.get_full_name()
     fullname.short_description = '姓名'
+
+    @sensitive_post_parameters_m
+    @csrf_protect_m
+    def add_view(self, request, form_url='', extra_context=None):
+        return self._add_view(request, form_url, extra_context)
+
 
 @admin.register(Email)
 class EmailAdmin(admin.ModelAdmin):
