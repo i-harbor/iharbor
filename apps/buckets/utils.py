@@ -5,7 +5,7 @@ import random
 from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.db import connections, router
 from django.db.models import Sum, Count
-from django.db.models.functions import Lower
+# from django.db.models.functions import Lower
 from django.db.models.query import Q
 from django.core.exceptions import MultipleObjectsReturned
 from django.apps import apps
@@ -381,15 +381,21 @@ class BucketFileManagement:
     def get_search_object_queryset(self, search: str, contain_dir: bool = False):
         """
         检索对象
-
         """
-        if contain_dir:
-            lookup = {'lower_name__icontains': search}
-        else:
-            lookup = {'fod': True, 'lower_name__icontains': search}
+        # if contain_dir:
+        #     lookup = {'lower_name__icontains': search}
+        # else:
+        #     lookup = {'fod': True, 'lower_name__icontains': search}
+        #
+        # model_class = self.get_obj_model_class()
+        # return model_class.objects.annotate(lower_name=Lower('name')).filter(**lookup)
 
+        if contain_dir:
+            lookup = {'name__icontains': search}
+        else:
+            lookup = {'fod': True, 'name__icontains': search}
         model_class = self.get_obj_model_class()
-        return model_class.objects.annotate(lower_name=Lower('name')).filter(**lookup)
+        return model_class.objects.filter(**lookup)
 
     def get_objects_dirs_queryset(self):
         """
