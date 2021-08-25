@@ -273,7 +273,7 @@
     //
     function on_create_bucket() {
         Swal.fire({
-            title: getTransText('请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-'),
+            title: getTransText('请输入3-63个字符长度的存储桶名称，可输入小写英文字母、数字或者-（不允许在开头和结尾）'),
             input: 'text',
             inputValidator: (value) => {
                 return (value.length < 3 || value.length > 63) && getTransText('请输入3-63个字符');

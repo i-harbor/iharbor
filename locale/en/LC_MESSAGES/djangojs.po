@@ -20,10 +20,10 @@ msgstr ""
 
 #: apps/buckets/static/buckets/bucket.js:267
 msgid ""
-"请输入一个符合DNS标准的存储桶名称，可输入英文字母(不区分大小写)、数字和-"
+"请输入3-63个字符长度的存储桶名称，可输入小写英文字母、数字或者-（不允许在开头和结尾）"
 msgstr ""
-"Please enter a bucket name that conforms to DNS standard. You can enter a-z, "
-"0-9 and '-'"
+"Please enter a bucket name with a length of 3-63 characters. "
+"You can enter lowercase English letters(a-z), numbers(0-9), or -(not allowed at the beginning and end)."
 
 #: apps/buckets/static/buckets/bucket.js:270
 msgid "请输入3-63个字符"
