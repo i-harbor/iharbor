@@ -1152,7 +1152,7 @@ class SearchBucketAPITests(MyAPITransactionTestCase):
 
     def test_search_objects_in_bucket(self):
         key1 = 'ab.txt'
-        key2 = 'ABCD.txt'
+        key2 = 'abCD.txt'
         MetadataAPITests.create_empty_object_metadata(
             self, bucket_name=self.bucket_name, key=key1, check_response=True
         )
@@ -1162,7 +1162,7 @@ class SearchBucketAPITests(MyAPITransactionTestCase):
 
         # search
         url = reverse('api:search-object-list')
-        query = parse.urlencode({'bucket': self.bucket_name, 'search': 'abc'})
+        query = parse.urlencode({'bucket': self.bucket_name, 'search': 'abC'})
         response = self.client.get(f'{url}?{query}')
         self.assertEqual(response.status_code, 200)
         self.assertKeysIn(['count', 'next', 'previous', 'page', 'files', 'bucket'], response.data)
@@ -1178,7 +1178,7 @@ class SearchBucketAPITests(MyAPITransactionTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 2)
 
-        query = parse.urlencode({'bucket': self.bucket_name, 'search': 'bb'})
+        query = parse.urlencode({'bucket': self.bucket_name, 'search': 'abc'})
         response = self.client.get(f'{url}?{query}')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 0)

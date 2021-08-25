@@ -107,10 +107,13 @@ class BucketSerializer(serializers.ModelSerializer):
     '''
     user = serializers.SerializerMethodField() # 自定义user字段内容
     access_permission = serializers.SerializerMethodField()
+    ftp_password = serializers.SerializerMethodField()
+    ftp_ro_password = serializers.SerializerMethodField()
 
     class Meta:
         model = Bucket
-        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'ftp_password', 'ftp_ro_password', 'remarks')
+        fields = ('id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable',
+                  'ftp_password', 'ftp_ro_password', 'remarks')
         # depth = 1
 
     @staticmethod
@@ -120,6 +123,14 @@ class BucketSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_access_permission(obj):
         return obj.get_access_permission_display()
+
+    @staticmethod
+    def get_ftp_password(obj):
+        return obj.raw_ftp_password
+
+    @staticmethod
+    def get_ftp_ro_password(obj):
+        return obj.raw_ftp_ro_password
 
 
 class BucketCreateSerializer(serializers.Serializer):

@@ -10,15 +10,21 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy, gettext as _
 from ckeditor.fields import RichTextField
+from django.conf import settings
 
 from utils.storagers import PathParser
 from utils.md5 import EMPTY_HEX_MD5
+from utils.crypto import Encryptor
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
 # 获取用户模型
 User = get_user_model()
+
+
+def get_encryptor():
+    return Encryptor(key=settings.SECRET_KEY)
 
 
 def get_uuid1_hex_string():
@@ -29,10 +35,10 @@ def rand_hex_string(length=10):
     return binascii.hexlify(os.urandom(length//2)).decode()
 
 
-def get_str_hexMD5(s:str):
-    '''
+def get_str_hexMD5(s: str):
+    """
     求字符串MD5
-    '''
+    """
     return hashlib.md5(s.encode(encoding='utf-8')).hexdigest()
 
 
@@ -63,8 +69,8 @@ class BucketBase(models.Model):
     size = models.BigIntegerField(verbose_name='桶大小', default=0)    # 桶内对象的总大小
     stats_time = models.DateTimeField(verbose_name='统计时间', default=timezone.now)
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
-    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=20, blank=True)
-    ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=20, blank=True)
+    ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=128, blank=True)
+    ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=128, blank=True)
     pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
     type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
 
@@ -110,16 +116,16 @@ class Bucket(BucketBase):
 
     @classmethod
     def get_user_valid_bucket_count(cls, user):
-        '''获取用户有效的存储桶数量'''
+        """获取用户有效的存储桶数量"""
         return cls.objects.filter(user=user).count()
 
     @classmethod
     def get_bucket_by_name(cls, bucket_name):
-        '''
+        """
         获取存储通对象
         :param bucket_name: 存储通名称
         :return: Bucket对象; None(不存在)
-        '''
+        """
         return Bucket.objects.select_related('user').filter(name=bucket_name).first()
 
     def save(self, *args, **kwargs):
@@ -174,10 +180,10 @@ class Bucket(BucketBase):
         return user.id == self.user_id
 
     def get_bucket_table_name(self):
-        '''
+        """
         获得bucket对应的数据库表名
         :return: 表名
-        '''
+        """
         if not self.collection_name:
             name = f'bucket_{self.id}'
             self.collection_name = name
@@ -186,12 +192,12 @@ class Bucket(BucketBase):
         return self.collection_name
 
     def set_permission(self, public:int=2):
-        '''
+        """
         设置存储桶公有或私有访问权限
 
         :param public:
         :return: True(success); False(error)
-        '''
+        """
         if public not in [self.PUBLIC, self.PRIVATE, self.PUBLIC_READWRITE]:
             return False
 
@@ -207,32 +213,32 @@ class Bucket(BucketBase):
         return True
 
     def is_public_permission(self):
-        '''
+        """
         存储桶是否是公共读访问权限
 
         :return: True(是公共); False(私有权限)
-        '''
+        """
         if self.access_permission in [self.PUBLIC, self.PUBLIC_READWRITE]:
             return True
         return False
 
     def has_public_write_perms(self):
-        '''
+        """
         存储桶是否是公共读写访问权限
 
         :return: True(公共可读可写); False(不可写)
-        '''
+        """
         if self.access_permission == self.PUBLIC_READWRITE:
             return True
         return False
 
     def obj_count_increase(self, save=True):
-        '''
+        """
         存储桶对象数量加1
 
         :param save: 是否更新到数据库
         :return: True(success); False(failure)
-        '''
+        """
         self.obj_count += 1
         if save:
             try:
@@ -243,13 +249,13 @@ class Bucket(BucketBase):
         return True
 
     def obj_count_decrease(self, save=True):
-        '''
+        """
         存储桶对象数量减1
 
         :param save: 是否更新到数据库
         :return: True(success); False(failure)
-        '''
-        self.obj_count = max(self.obj_count - 1, 0)
+        """
+        self.obj_count = max(self.objs_count - 1, 0)
         if not save:
             try:
                 self.save()
@@ -279,7 +285,7 @@ class Bucket(BucketBase):
             pass
 
     def get_stats(self, now=False):
-        '''
+        """
         获取存储桶统计数据
 
         :param now:  重新统计
@@ -290,7 +296,7 @@ class Bucket(BucketBase):
                 },
                 'stats_time': xxxx-xx-xx xx:xx:xx
             }
-        '''
+        """
         # 强制重新统计，或者旧的统计结果时间超过了50分钟， 满足其一条件重新统计
         now_t = timezone.now() - timedelta(minutes=50)
         ts_now = now_t.timestamp()
@@ -307,54 +313,90 @@ class Bucket(BucketBase):
         return {'stats': stats, 'stats_time': time_str}
 
     def is_ftp_enable(self):
-        '''是否开启了ftp'''
+        """是否开启了ftp"""
         return self.ftp_enable
 
     def check_ftp_password(self, password):
-        '''检查ftp密码是否一致'''
-        if password and (self.ftp_password == password):
+        """检查ftp密码是否一致"""
+        if password and (self.raw_ftp_password == password):
             return True
 
         return False
 
     def check_ftp_ro_password(self, password):
-        '''检查ftp只读密码是否一致'''
-        if password and (self.ftp_ro_password == password):
+        """检查ftp只读密码是否一致"""
+        if password and (self.raw_ftp_ro_password == password):
             return True
 
         return False
 
     def set_ftp_password(self, password):
-        '''
+        """
         设置ftp可读写密码，更改不会自动提交到数据库
 
         :param password: 要设置的密码
         :return:
             (True, str)    # 设置成功
             (False, str)   # 设置失败
-        '''
+        """
         if not (6 <= len(password) <= 20):
             return False, _('密码长度必须为6-20个字符')
-        if self.ftp_ro_password == password:
+        if self.raw_ftp_ro_password == password:
             return False, _('可读写密码不得和只读密码一致')
-        self.ftp_password = password
+
+        self._set_ftp_password(password)
         return True, _('修改成功')
 
+    def _set_ftp_password(self, password):
+        encryptor = get_encryptor()
+        self.ftp_password = encryptor.encrypt(password)
+
     def set_ftp_ro_password(self, password):
-        '''
+        """
         设置ftp只读密码，更改不会自动提交到数据库
 
         :param password: 要设置的密码
         :return:
             (True, str)    # 设置成功
             (False, str)   # 设置失败
-        '''
+        """
         if not (6 <= len(password) <= 20):
             return False, _('密码长度必须为6-20个字符')
-        if self.ftp_password == password:
+        if self.raw_ftp_password == password:
             return False, _('只读密码不得和可读写密码一致')
-        self.ftp_ro_password = password
+
+        self._set_ftp_ro_password(password)
         return True, _('修改成功')
+
+    def _set_ftp_ro_password(self, password):
+        encryptor = get_encryptor()
+        self.ftp_ro_password = encryptor.encrypt(password)
+
+    @property
+    def raw_ftp_password(self):
+        """
+        :return:
+            str     # success
+            str    # failed, invalid encrypted password
+        """
+        encryptor = get_encryptor()
+        try:
+            return encryptor.decrypt(self.ftp_password)
+        except encryptor.InvalidEncrypted as e:
+            return self.ftp_password
+
+    @property
+    def raw_ftp_ro_password(self):
+        """
+        :return:
+            str     # success
+            str    # failed, invalid encrypted password
+        """
+        encryptor = get_encryptor()
+        try:
+            return encryptor.decrypt(self.ftp_ro_password)
+        except encryptor.InvalidEncrypted as e:
+            return self.ftp_ro_password
 
     def set_remarks(self, remarks: str):
         """
@@ -389,9 +431,9 @@ class Bucket(BucketBase):
 
 
 class Archive(BucketBase):
-    '''
+    """
     存储桶bucket删除归档类
-    '''
+    """
     id = models.BigAutoField(primary_key=True)
     original_id = models.BigIntegerField(verbose_name='bucket id')
     archive_time = models.DateTimeField(auto_now_add=True, verbose_name='删除归档时间')
@@ -409,10 +451,10 @@ class Archive(BucketBase):
         return self.name if isinstance(self.name, str) else str(self.name)
 
     def get_bucket_table_name(self):
-        '''
+        """
         获得bucket对应的数据库表名
         :return: 表名
-        '''
+        """
         if not self.table_name:
             name = f'bucket_{self.original_id}'
             self.table_name = name
@@ -445,9 +487,9 @@ class Archive(BucketBase):
 
 
 class BucketLimitConfig(models.Model):
-    '''
+    """
     用户可拥有存储桶数量限制配置模型
-    '''
+    """
     id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
     limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=2)
     user = models.OneToOneField(to=User, related_name='bucketlimit', on_delete=models.CASCADE, verbose_name='用户')
@@ -469,9 +511,9 @@ class BucketLimitConfig(models.Model):
 
 
 class ApiUsageDescription(models.Model):
-    '''
+    """
     iHarbor 使用说明
-    '''
+    """
     DESC_API = 0
     DESC_FTP = 1
     DESC_S3_API = 2
@@ -505,7 +547,7 @@ SHARE_ACCESS_READWRITE = 2
 
 
 class BucketFileBase(models.Model):
-    '''
+    """
     存储桶bucket文件信息模型基类
 
     @ na : name，若该doc代表文件，则na为全路径文件名，若该doc代表目录，则na为目录路径;
@@ -521,7 +563,7 @@ class BucketFileBase(models.Model):
     @ sst: share_start_time，允许共享且有时间限制，则sst为该文件的共享起始时间，若该doc代表目录，则sst为空;
     @ set: share_end_time，  允许共享且有时间限制，则set为该文件的共享终止时间，若该doc代表目录，则set为空;
     @ sds: soft delete status,软删除,True->删除状态，get_sds_display()可获取可读值
-    '''
+    """
     SOFT_DELETE_STATUS_CHOICES = (
         (True, '删除'),
         (False, '正常'),
@@ -578,11 +620,11 @@ class BucketFileBase(models.Model):
         return self.md5
 
     def do_soft_delete(self):
-        '''
+        """
         软删除
 
         :return: True(success); False(error)
-        '''
+        """
         self.sds = True
         self.upt = timezone.now() # 修改时间标记删除时间
 
@@ -593,14 +635,14 @@ class BucketFileBase(models.Model):
         return True
 
     def set_shared(self, share=SHARE_ACCESS_NO, days=0, password:str=''):
-        '''
+        """
         设置对象共享或私有权限
 
         :param share: 读写权限；0（禁止访问），1（只读），2（可读可写）
         :param days: 共享天数，0表示永久共享, <0表示不共享
         :param password: 共享密码
         :return: True(success); False(error)
-        '''
+        """
         if share not in [self.SHARE_ACCESS_NO, self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
             return False
 
@@ -627,10 +669,10 @@ class BucketFileBase(models.Model):
         return True
 
     def is_shared_and_in_shared_time(self):
-        '''
+        """
         对象是否是分享的, 并且在有效分享时间内，即是否可公共访问
         :return: True(是), False(否)
-        '''
+        """
         # 是否可读
         if not self.is_read_perms():
             return False
@@ -646,25 +688,25 @@ class BucketFileBase(models.Model):
         return True
 
     def has_share_password(self):
-        '''
+        """
         是否设置了共享密码
         :return:
             True    # 是, 有密码
             False   # 否, 无密码
-        '''
+        """
         if self.shp:
             return True
 
         return False
 
     def check_share_password(self, password: str):
-        '''
+        """
         检测共享密码是否一致
 
         :return:
             True    # 一致, 或未设置密码
             False   # 否
-        '''
+        """
         shp = self.shp
         if shp and shp == password:
             return True
@@ -672,20 +714,20 @@ class BucketFileBase(models.Model):
         return False
 
     def get_share_password(self):
-        '''
+        """
         共享密码
-        '''
+        """
         return self.shp
 
     def set_share_password(self, password: str, commit=True):
-        '''
+        """
         设置新的共享密码
 
         :param commit: 是否立即更新到数据库；默认True，立即更新
         :return:
             True    # success
             False   # failed
-        '''
+        """
         if not password:
             password = ''
 
@@ -701,50 +743,50 @@ class BucketFileBase(models.Model):
         return True
 
     def can_shared_write(self):
-        '''
+        """
         是否分享并可写
 
         :return:
             True(是), False(否)
-        '''
+        """
         if self.is_shared_and_in_shared_time() and self.is_read_write_perms():
             return True
         return False
 
     def is_read_write_perms(self):
-        '''
+        """
         是否可读可写权限
 
         :return:
             True(是), False(否)
-        '''
+        """
         if self.share == self.SHARE_ACCESS_READWRITE:
             return True
         return False
 
     def is_read_perms(self):
-        '''
+        """
         是否有读权限
 
         :return:
             True(有), False(没有)
-        '''
+        """
         if self.share in [self.SHARE_ACCESS_READONLY, self.SHARE_ACCESS_READWRITE]:
             return True
         return False
 
     def has_shared_limit(self):
-        '''
+        """
         是否有分享时间限制
         :return: True(有), False(无)
-        '''
+        """
         return self.stl
 
     def is_shared_end_time_out(self):
-        '''
+        """
         是否超过分享终止时间
         :return: True(已过共享终止时间)，False(未超时)
-        '''
+        """
         ret = True
         if not isinstance(self.set, datetime):
             return ret
@@ -758,11 +800,11 @@ class BucketFileBase(models.Model):
         return ret
 
     def download_cound_increase(self):
-        '''
+        """
         下载次数加1
 
         :return: True(success); False(error)
-        '''
+        """
         self.dlc = F('dlc') + 1 # (self.dlc or 0) + 1  # 下载次数+1
         try:
             self.save(update_fields=['dlc'])
@@ -777,10 +819,10 @@ class BucketFileBase(models.Model):
         return not self.is_file()
 
     def do_delete(self):
-        '''
+        """
         删除
         :return: True(删除成功); False(删除失败)
-        '''
+        """
         try:
             self.delete()
         except Exception:
@@ -789,12 +831,12 @@ class BucketFileBase(models.Model):
         return True
 
     def get_obj_key(self, bucket_id):
-        '''
+        """
         获取此文档在ceph中对应的对象id
 
         :param bucket_id:
         :return: type:str; 无效的参数返回None
-        '''
+        """
         if self.id is None:
             raise ValueError('get_obj_key cannot be called before the model object is saved or after it is deleted')
 
@@ -803,12 +845,12 @@ class BucketFileBase(models.Model):
         return None
 
     def reset_na_md5(self):
-        '''
+        """
         na更改时，计算并重设新的na_md5
         :return: None
 
         :备注：不会自动更新的数据库
-        '''
+        """
         na = self.na if self.na else ''
         self.na_md5 = get_str_hexMD5(na)
 
@@ -818,11 +860,11 @@ class BucketFileBase(models.Model):
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def do_save(self, **kwargs):
-        '''
+        """
         创建一个文档或更新一个已存在的文档
 
         :return: True(成功); False(失败)
-        '''
+        """
         try:
             self.save(**kwargs)
         except Exception as e:
@@ -831,7 +873,7 @@ class BucketFileBase(models.Model):
         return True
 
     def get_parent_path(self):
-        '''获取父路经字符串'''
+        """获取父路经字符串"""
         path, _ = PathParser(filepath=self.na).get_path_and_filename()
         return path
 
