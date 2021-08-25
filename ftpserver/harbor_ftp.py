@@ -10,17 +10,13 @@ from pyftpdlib.log import logger
 
 from harbor_file_system import HarborFileSystem
 from harbor_auth import HarborAuthorizer
-from harbor_handler import HarborDTPHandler, HarborFTPHandler
+from harbor_handler import HarborDTPHandler, HarborFTPHandler, work_mode_in_tls
 
 
 def main():
     
     # Instantiate a dummy authorizer for managing 'virtual' users
     authorizer = HarborAuthorizer()
-    # authorizer = DummyAuthorizer()
-
-    # authorizer.add_user('root', 'root', '/home/ftp', perm='elradfmwM')
-    # authorizer.add_anonymous('/root/ftp/')
  
     # Instantiate FTP handler class
     handler = HarborFTPHandler
@@ -28,19 +24,18 @@ def main():
     handler.abstracted_fs = HarborFileSystem
     handler.dtp_handler = HarborDTPHandler
     handler.authorizer = authorizer
-    handler.certfile = '/etc/nginx/conf.d/ftp-keycert.pem'
-    handler.tls_data_required = True
+    if work_mode_in_tls:
+        print('work mode in TLS')
+        handler.certfile = '/etc/nginx/conf.d/ftp-keycert.pem'
+        handler.tls_data_required = True
 
     logging.basicConfig(level=logging.INFO)
-    # print(dir(logger))
     
     file_handler = concurrent_log_handler.ConcurrentRotatingFileHandler(filename='/var/log/iharbor/ftp.log',
                                                                         maxBytes=1024 ** 2 * 128,
                                                                         backupCount=10, use_gzip=True)
     file_handler.setLevel(logging.INFO)
     logger.addHandler(file_handler)
-    # print(logger.name)
-    # handler.log_prefix = '[%(time)s] %(remote_ip)s:%(remote_port)s-[%(username)s]'
 
     # Define a customized banner (string returned when client connects)
     handler.banner = "pyftpdlib based ftpd ready."
