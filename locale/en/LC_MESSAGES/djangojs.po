@@ -258,9 +258,11 @@ msgstr "Open"
 msgid "删除"
 msgstr "Delete"
 
-#: apps/buckets/static/buckets/bucket.js:976
-#: apps/buckets/static/buckets/bucket.js:1928
-msgid "分享公开"
+#: apps/buckets/static/buckets/bucket.js:994
+#: apps/buckets/static/buckets/bucket.js:1388
+#: apps/buckets/static/buckets/bucket.js:1551
+#: apps/buckets/static/buckets/bucket.js:2066
+msgid "公开分享"
 msgstr "Share"
 
 #: apps/buckets/static/buckets/bucket.js:977
@@ -289,17 +291,10 @@ msgstr "Share password"
 
 #: apps/buckets/static/buckets/bucket.js:1378
 msgid ""
-"目录已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有"
-"的旧的分享连接。"
+"当前对象已经是共享状态，点击“查询”查看当前共享连接，或点击“公开分享”重新设置"
+"共享。"
 msgstr ""
-"The directory is already publicly accessible or has been set up to share. "
-"Please choose to share from a new setting or query the existing old sharing "
-"connection."
-
-#: apps/buckets/static/buckets/bucket.js:1381
-#: apps/buckets/static/buckets/bucket.js:1544
-msgid "公开分享"
-msgstr "Share"
+"The current object is already in the sharing state, click 'Query' to view the current sharing connection, or click 'Share' to reset the sharing."
 
 #: apps/buckets/static/buckets/bucket.js:1382
 #: apps/buckets/static/buckets/bucket.js:1545
@@ -317,7 +312,7 @@ msgid "分享"
 msgstr "Share"
 
 #: apps/buckets/static/buckets/bucket.js:1462
-msgid "分享公开设置失败！"
+msgid "公开分享设置失败！"
 msgstr "Share public failure"
 
 #: apps/buckets/static/buckets/bucket.js:1504

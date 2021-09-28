@@ -991,7 +991,7 @@
                         {{set str_operation = $imports.getTransText('操作')}}
                         {{set str_open = $imports.getTransText('打开')}}
                         {{set str_delete = $imports.getTransText('删除')}}
-                        {{set str_share = $imports.getTransText('分享公开')}}
+                        {{set str_share = $imports.getTransText('公开分享')}}
                         {{set str_download = $imports.getTransText('下载')}}
                         {{set str_rename = $imports.getTransText('重命名')}}
                         {{each files}}
@@ -1105,7 +1105,7 @@
                     <div class="dropdown-menu">
                         <a class="dropdown-item bg-success" id="bucket-files-item-download" href="{{obj.download_url}}" >{{$imports.getTransText('下载')}}</a>
                         <a class="dropdown-item bg-danger" id="bucket-files-item-delete" href="" filename="{{obj.name}}">{{$imports.getTransText('删除')}}</a>
-                        <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}"  data-access-code="{{obj.access_code}}">{{$imports.getTransText('分享公开')}}</a>
+                        <a class="dropdown-item bg-info" id="bucket-files-obj-share" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}"  data-access-code="{{obj.access_code}}">{{$imports.getTransText('公开分享')}}</a>
                         <a class="dropdown-item bg-warning" id="bucket-files-obj-rename" href="" bucket_name="{{ $data['bucket_name']}}"  dir_path="{{$data['dir_path']}}" filename="{{obj.name}}">{{$imports.getTransText('重命名')}}</a>
                     </div>
                 </div>
@@ -1344,7 +1344,7 @@
                         return data;
                     }
                 }).catch((xhr) => {
-                    let msg = getTransText('分享公开设置失败') + xhr.statusText;
+                    let msg = getTransText('公开分享设置失败') + xhr.statusText;
                     msg = get_err_msg_or_default(xhr, msg);
                     Swal.showValidationMessage(msg);
                 });
@@ -1382,7 +1382,7 @@
         }
 
         Swal.fire({
-            title: getTransText("目录已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有的旧的分享连接。"),
+            title: getTransText("当前对象已经是共享状态，点击“查询”查看当前共享连接，或点击“公开分享”重新设置共享。"),
             showDenyButton: true,
             showCancelButton: true,
             confirmButtonText: getTransText("公开分享"),
@@ -1455,7 +1455,7 @@
                         return data;
                     }
                 }).catch((xhr) => {
-                    let msg = getTransText('分享公开设置失败！') + xhr.statusText;
+                    let msg = getTransText('公开分享设置失败！') + xhr.statusText;
                     msg = get_err_msg_or_default(xhr, msg);
                     Swal.showValidationMessage(msg);
                 });
@@ -1545,7 +1545,7 @@
             return;
         }
         Swal.fire({
-            title: getTransText("对象已是公共可访问的，或者已经设置过分享，请选择是从新设置分享，还是查询现有的旧的分享连接。"),
+            title: getTransText("当前对象已经是共享状态，点击“查询”查看当前共享连接，或点击“公开分享”重新设置共享。"),
             showDenyButton: true,
             showCancelButton: true,
             confirmButtonText: getTransText("公开分享"),
@@ -2063,7 +2063,7 @@
                     <div class="dropdown-menu">
                          <a class="dropdown-item bg-info" id="bucket-files-item-enter-dir" dir_path="{{dir.na}}">{{$imports.getTransText('打开')}}</a>
                          <a class="dropdown-item bg-danger" id="bucket-files-item-delete-dir" dir_path="{{dir.na}}">{{$imports.getTransText('删除')}}</a>
-                         <a class="dropdown-item bg-warning" id="bucket-files-item-dir-share" dir_path="{{dir.na}}" data-access-code="{{dir.access_code}}">{{$imports.getTransText('分享公开')}}</a>
+                         <a class="dropdown-item bg-warning" id="bucket-files-item-dir-share" dir_path="{{dir.na}}" data-access-code="{{dir.access_code}}">{{$imports.getTransText('公开分享')}}</a>
                     </div>
                 </div>
             </td>
