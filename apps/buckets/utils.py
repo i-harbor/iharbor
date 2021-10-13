@@ -202,7 +202,7 @@ class BucketFileManagement:
 
         path = self._hand_path(path)
         if not path:
-            return exceptions.InvalidKey(message='父路径无效')      # path参数有误
+            raise exceptions.InvalidKey(message='父路径无效')      # path参数有误
 
         try:
             obj = self.get_obj(path=path)

@@ -996,7 +996,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     def test_v2_put_object(self):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
-        key = 'v2test.pdf'
+        key = 'a/b/c/v2test.pdf'
         response = self.put_object_v2_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['created'], True)
@@ -1013,7 +1013,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     def test_v2_multipart_upload_download_delete(self):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
-        key = 'v2test.pdf'
+        key = 'a/b/v2test.pdf'
         ok = self.multipart_upload_object(bucket_name=self.bucket_name, key=key,
                                           file=file, api_version='v2')
         self.assertTrue(ok, 'multipart_upload_object v2 failed')

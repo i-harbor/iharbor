@@ -46,7 +46,7 @@ no_slash_detail_router = DetailPostRouter(trailing_slash=False)
 no_slash_detail_router.register(r'share/(?P<bucket_name>[a-z0-9-_]{3,64})', views.ShareViewSet, basename='share')
 
 
-v2_detail_router = DetailPostRouter()
+v2_detail_router = DetailPostRouter(trailing_slash=False)
 v2_detail_router.register(r'obj/(?P<bucket_name>[a-z0-9-_]{3,64})', v2views.V2ObjViewSet, basename='v2-obj')
 
 

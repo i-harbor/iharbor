@@ -83,8 +83,8 @@ class NoDeleteSelectModelAdmin(admin.ModelAdmin):
 @admin.register(Bucket)
 class BucketAdmin(NoDeleteSelectModelAdmin):
     list_display = ('id', 'name', 'get_collection_name', 'type', 'created_time', 'lock', 'user', 'objs_count',
-                    'size', 'ftp_enable', 'raw_ftp_password', 'ftp_password', 'raw_ftp_ro_password', 'ftp_ro_password',
-                    'modified_time')
+                    'size', 'stats_time', 'ftp_enable', 'raw_ftp_password', 'ftp_password', 'raw_ftp_ro_password',
+                    'ftp_ro_password', 'modified_time')
     list_display_links = ('id', 'name')
     list_editable = ('lock',)
     list_filter = ('created_time',)

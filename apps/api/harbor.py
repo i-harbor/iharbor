@@ -15,7 +15,8 @@ from utils.md5 import FileMD5Handler
 from . import exceptions
 
 
-debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+# 这里的日志记录器要和setting中的loggers选项对应，不能随意给参
+debug_logger = logging.getLogger('debug')
 
 
 def ftp_close_old_connections(func):
@@ -275,7 +276,7 @@ class HarborManager:
         try:
             dir1.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
         except Exception as e:
-            raise exceptions.HarborError('创建目录元数据错误')
+            raise exceptions.HarborError(f'创建目录元数据错误, {str(e)}')
 
         return dir1
 
@@ -735,7 +736,7 @@ class HarborManager:
         except exceptions.Error as exc:
             raise exceptions.HarborError.from_error(exc)
         except Exception as e:
-            raise exceptions.HarborError(message='移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误')
+            raise exceptions.HarborError(message=f'移动对象操作失败, 查询是否已存在同名对象或子目录时发生错误, {str(e)}')
 
         if target_obj:
             raise exceptions.HarborError.from_error(
@@ -958,8 +959,8 @@ class HarborManager:
         try:
             bfinfo.save()
             obj = bfinfo
-        except:
-            raise exceptions.HarborError(message='新建对象元数据失败，数据库错误')
+        except Exception as e:
+            raise exceptions.HarborError(message=f'新建对象元数据失败，数据库错误, {str(e)}')
 
         return obj, True
 
@@ -1413,7 +1414,8 @@ class HarborManager:
 
         :raise HarborError
         """
-        bucket, obj = self.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_path, user=user, all_public=all_public)
+        bucket, obj = self.get_bucket_and_obj_or_dir(
+            bucket_name=bucket_name, path=obj_path, user=user, all_public=all_public)
         if obj and obj.is_file():
             return bucket, obj
 
@@ -1636,7 +1638,8 @@ class FtpHarborManager:
                     do something
         :raise HarborError
         """
-        return self.__hbManager.get_obj_generator(bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
+        return self.__hbManager.get_obj_generator(
+            bucket_name=bucket_name, obj_path=obj_path, offset=offset, end=end, per_size=per_size)
 
     @ftp_close_old_connections
     def ftp_delete_object(self, bucket_name:str, obj_path:str):
@@ -1798,4 +1801,3 @@ class FtpHarborManager:
         """
         return self.__hbManager.get_write_generator(bucket_name=bucket_name, obj_path=obj_path,
                                                     is_break_point=is_break_point)
-
