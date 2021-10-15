@@ -585,7 +585,7 @@ class BucketFileBase(models.Model):
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
-    ult = models.DateTimeField(auto_now_add=True, default=timezone.now) # 文件的上传时间，或目录的创建时间
+    ult = models.DateTimeField(auto_now_add=True) # 文件的上传时间，或目录的创建时间
     upt = models.DateTimeField(blank=True, null=True, auto_now=True, verbose_name='修改时间') # 文件的最近修改时间，目录，则upt为空
     dlc = models.IntegerField(default=0, verbose_name='下载次数')  # 该文件的下载次数，目录时dlc为0
     shp = models.CharField(default='', max_length=10, verbose_name='共享密码') # 该文件的共享密码，目录时为空
@@ -595,6 +595,8 @@ class BucketFileBase(models.Model):
     sds = models.BooleanField(default=False, choices=SOFT_DELETE_STATUS_CHOICES) # soft delete status,软删除,True->删除状态
     md5 = models.CharField(default='', max_length=32, verbose_name='md5')  # 该文件的md5码，32位十六进制字符串
     share = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_NO)
+    async1 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第1备份点备份时间')
+    async2 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第2备份点备份时间')
 
     class Meta:
         abstract = True
@@ -931,3 +933,38 @@ class BucketToken(models.Model):
 
     def __str__(self):
         return self.key
+
+
+class BackupBucket(models.Model):
+    class Status(models.TextChoices):
+        START = 'start', gettext_lazy('开启同步')
+        STOP = 'stop', gettext_lazy('暂停同步')
+        DELETED = 'deleted', gettext_lazy('删除')
+
+    id = models.BigAutoField(auto_created=True, primary_key=True, verbose_name='ID')
+    bucket = models.ForeignKey(to=Bucket, on_delete=models.CASCADE, related_name='backup_buckets',
+                               verbose_name='存储桶')
+    endpoint_url = models.URLField(max_length=255, verbose_name='备份点服务地址', help_text='http(s)://exemple.com')
+    bucket_token = models.CharField(max_length=32, verbose_name='备份点bucket读写token')
+    bucket_name = models.CharField(max_length=63, verbose_name='备份点bucket名称')
+    created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
+    remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
+    status = models.CharField(max_length=16, verbose_name='状态', choices=Status.choices, default=Status.STOP)
+    backup_num = models.SmallIntegerField(verbose_name='备份点编号', choices=((1, '1'), (2, '2')), default=1)
+
+    class Meta:
+        ordering = ['-id']
+        verbose_name = '存储桶备份点'
+        verbose_name_plural = verbose_name
+        constraints = [
+            models.UniqueConstraint(
+                fields=['bucket', 'backup_num'], name='unique_bucket_backup_num'
+            )
+        ]
+
+    def __str__(self):
+        return f'<{self.bucket.name}> => [{self.endpoint_url}]<{self.bucket_name}>'
+
+    def is_start_async(self):
+        return self.status == self.Status.START

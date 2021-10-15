@@ -1,6 +1,10 @@
 from django.contrib import admin, messages
 
-from .models import (Bucket, BucketLimitConfig, ApiUsageDescription, Archive, BucketToken, get_encryptor)
+from .models import (
+    Bucket, BucketLimitConfig, ApiUsageDescription, Archive, BucketToken, get_encryptor,
+    BackupBucket
+)
+from .forms import BackupBUcketModelForm
 
 
 def bucket_stats(modeladmin, request, queryset):
@@ -135,4 +139,16 @@ class UsageDescAdmin(admin.ModelAdmin):
 class BucketTokenAdmin(admin.ModelAdmin):
     list_display = ('key', 'permission', 'created', 'bucket')
     list_display_links = ('key', )
+    search_fields = ('key', 'bucket__name')
+
+
+@admin.register(BackupBucket)
+class BackupBucketAdmin(admin.ModelAdmin):
+    form = BackupBUcketModelForm
+
+    list_display = ('id', 'bucket', 'endpoint_url', 'bucket_name', 'bucket_token', 'backup_num', 'status',
+                    'created_time', 'remarks')
+    list_display_links = ('id', )
+    list_select_related = ('bucket',)
+    raw_id_fields = ('bucket',)
     search_fields = ('key', 'bucket__name')

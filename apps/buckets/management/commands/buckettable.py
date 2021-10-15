@@ -1,27 +1,25 @@
 import threading
-from datetime import timedelta
 
-from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Q
-from django.db.utils import ProgrammingError
 
-from buckets.utils import BucketFileManagement, delete_table_for_model_class
+from buckets.utils import BucketFileManagement
 from buckets.models import Bucket
-from utils.oss import HarborObject
 
 
 class Command(BaseCommand):
     '''
-    为bucket对应的表，清理满足彻底删除条件的对象和目录
+    为bucket table执行sql
     '''
-    pool_sem = threading.Semaphore(1000)  # 定义最多同时启用多少个线程
+    pool_sem = threading.Semaphore(100)  # 定义最多同时启用多少个线程
+    error_buckets = []
 
     help = """** manage.py buckettable --all --sql="sql template" **    
            **  manage.py buckettable --bucket-name=xxx --sql="sql template" **  
            ** sql template example:**  
            ** ALTER TABLE {table_name} ADD md5 CHAR(32) NOT NULL DEFAULT '' COMMENT 'MD5' **  
-           ** ALTER TABLE {table_name} MODIFY COLUMN md5 VARCHAR(200) NOT NULL DEFAULT 'abcd' **"""
+           ** ALTER TABLE {table_name} MODIFY COLUMN md5 VARCHAR(200) NOT NULL DEFAULT 'abcd' **
+           ** ALTER TABLE {table_name} ADD COLUMN \`async1\` datetime(6) NULL; **
+           """
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -77,7 +75,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('Will exec sql for bucket named {0}'.format(bucketname)))
         return Bucket.objects.filter(name=bucketname).all()
 
-    def modufy_one_bucket(self, bucket):
+    def modify_one_bucket(self, bucket):
         '''
         为一个bucket执行sql
 
@@ -97,7 +95,9 @@ class Command(BaseCommand):
                 a = model_class.objects.raw(raw_query=sql)
                 b = a.query._execute_query()
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"error when execute sql for bucket '{bucket.name}': {str(e)}"))
+                self.error_buckets.append(bucket.name)
+                self.stdout.write(self.style.ERROR(
+                    f"error when execute sql for bucket '{bucket.name}':{type(e)} {str(e)}"))
             else:
                 self.stdout.write(self.style.SUCCESS(f"success to execute sql for bucket '{bucket.name}'"))
 
@@ -111,7 +111,7 @@ class Command(BaseCommand):
         '''
         for bucket in buckets:
             if self.pool_sem.acquire(): # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
-                worker = threading.Thread(target=self.modufy_one_bucket, kwargs={'bucket': bucket})
+                worker = threading.Thread(target=self.modify_one_bucket, kwargs={'bucket': bucket})
                 worker.start()
 
         # 等待所有线程结束
@@ -120,4 +120,7 @@ class Command(BaseCommand):
             if c <= 1:
                 break
 
-        self.stdout.write(self.style.SUCCESS('Successfully exec sql for {0} buckets'.format(buckets.count())))
+        self.stdout.write(self.style.SUCCESS(
+            'Successfully exec sql for {0} buckets'.format(buckets.count() - len(self.error_buckets))))
+        self.stdout.write(self.style.ERROR(
+            f"error when execute sql for buckets:{self.error_buckets}"))
