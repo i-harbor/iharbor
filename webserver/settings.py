@@ -231,15 +231,6 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# Ceph rados settings
-CEPH_RADOS = {
-    'CLUSTER_NAME': 'ceph',
-    'USER_NAME': 'client.obs',
-    'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
-    'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.obs.keyring',
-    'POOL_NAME': ('obs',),
-}
-
 # 日志配置
 LOGGING_FILES_DIR = '/var/log/iharbor'
 if not os.path.exists(LOGGING_FILES_DIR):
@@ -480,6 +471,26 @@ from .security_settings import *
 #         'client_id': 000,
 #         'client_secret': 'xxx',
 #     },
+# }
+
+# Ceph rados settings
+# CEPH_RADOS = {
+#     'default': {
+#         'CLUSTER_NAME': 'ceph',
+#         'USER_NAME': 'client.admin',
+#         'CONF_FILE_PATH': '/etc/ceph/ceph.conf',
+#         'KEYRING_FILE_PATH': '/etc/ceph/ceph.client.admin.keyring',
+#         'POOL_NAME': ('xxx',),
+#         'DISABLE_CHOICE': False,                # True: 创建bucket时不选择；
+#     },
+#     'xxx': {
+#         'CLUSTER_NAME': 'ceph',
+#         'USER_NAME': 'client.obs',
+#         'CONF_FILE_PATH': '/etc/ceph/ceph2.conf',
+#         'KEYRING_FILE_PATH': '/etc/ceph/ceph2.client.obs.keyring',
+#         'POOL_NAME': ('xxx',),
+#         'DISABLE_CHOICE': True,               # True: 创建bucket时不选择；
+#     }
 # }
 
 if DEBUG:

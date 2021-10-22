@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy, gettext as _
 from django.core.validators import validate_email
 from django.core import exceptions as dj_exceptions
 from django.urls import reverse as django_reverse
+from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -25,7 +26,7 @@ from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils.storagers import PathParser, FileUploadToCephHandler
-from utils.oss import HarborObject, RadosError
+from utils.oss import build_harbor_object, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
@@ -1176,7 +1177,7 @@ class ObjViewSet(CustomGenericViewSet):
         pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
 
-        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             try:
                 hmanager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
@@ -1189,7 +1190,7 @@ class ObjViewSet(CustomGenericViewSet):
     def update_handle(self, request, bucket, obj, rados, created):
         pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
-        uploader = FileUploadToCephHandler(request, pool_name=pool_name, obj_key=obj_key)
+        uploader = FileUploadToCephHandler(request, using=bucket.ceph_using, pool_name=pool_name, obj_key=obj_key)
         request.upload_handlers = [uploader]
 
         def clean_put(_uploader, _obj, _created, _rados):
@@ -2352,8 +2353,10 @@ class MetadataViewSet(CustomGenericViewSet):
         if obj.is_file():
             obj_key = obj.get_obj_key(bucket.id)
             pool_name = bucket.get_pool_name()
-            chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key,
-                                            obj_size=obj.obj_size).get_rados_key_info()
+            chunk_size, keys = build_harbor_object(
+                using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
+            ).get_rados_key_info()
+
             info = {
                 'rados': keys,
                 'chunk_size': chunk_size,
@@ -2430,7 +2433,7 @@ class MetadataViewSet(CustomGenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         rados_key = ho.get_rados_key_info()
         info = {
             'rados': rados_key,
@@ -2519,7 +2522,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         ok, ret = ho.get_rados_stat(obj_id=obj_key)
         if not ok:
             return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'},
@@ -2591,7 +2594,7 @@ class CephStatsViewSet(CustomGenericViewSet):
     )
     def list(self, request, *args, **kwargs):
         try:
-            stats = HarborObject(pool_name='', obj_id='').get_cluster_stats()
+            stats = build_harbor_object(using='default', pool_name='', obj_id='').get_cluster_stats()
         except RadosError as e:
             return Response(data={'code': 500, 'code_text': _('获取ceph集群信息错误：') + str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2846,7 +2849,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         operation_summary=gettext_lazy('ceph集群的IOPS，I/O带宽'),
     )
     def list(self, request, *args, **kwargs):
-        ok, data = HarborObject(pool_name='', obj_id='').get_ceph_io_status()
+        ok, data = build_harbor_object(using='default', pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
             return Response(data={'code': 500, 'code_text': 'Get io status error:' + data},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -3234,7 +3237,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        chunk_size, keys = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+        chunk_size, keys = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
         info = {
             'rados': keys,
             'chunk_size': chunk_size,

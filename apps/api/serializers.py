@@ -7,7 +7,7 @@ from rest_framework.reverse import reverse, replace_query_param
 
 from .models import User, Bucket, BucketToken
 from .validators import DNSStringValidator, bucket_limit_validator
-from buckets.utils import get_ceph_poolname_rand
+from buckets.utils import get_ceph_poolname_rand, get_ceph_alias_rand
 from . import exceptions
 
 
@@ -170,8 +170,9 @@ class BucketCreateSerializer(serializers.Serializer):
         if not request:
             return None
         user = request.user
-        pool_name = get_ceph_poolname_rand()
-        bucket = Bucket.objects.create(pool_name=pool_name, user=user, **validated_data) # 创建并保存
+        using = get_ceph_alias_rand()
+        pool_name = get_ceph_poolname_rand(using)
+        bucket = Bucket.objects.create(ceph_using=using, pool_name=pool_name, user=user, **validated_data) # 创建并保存
         return bucket
 
 

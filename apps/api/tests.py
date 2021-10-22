@@ -969,7 +969,8 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertKeysIn(['rados', 'chunk_size', 'size', 'filename'], response.data['info'])
-        self.assertIn(f"iharbor:{settings.CEPH_RADOS['CLUSTER_NAME']}/{self.bucket.pool_name}/{self.bucket.id}_",
+        self.assertIn(f"iharbor:{settings.CEPH_RADOS[self.bucket.ceph_using]['CLUSTER_NAME']}"
+                      f"/{self.bucket.pool_name}/{self.bucket.id}_",
                       response.data['info']['rados'][0])
         info: dict = response.data['info']
         info.pop('rados', None)

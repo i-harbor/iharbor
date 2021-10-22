@@ -8,7 +8,7 @@ from django.db.models import BigIntegerField
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
 from utils.storagers import PathParser
-from utils.oss import HarborObject, get_size
+from utils.oss import build_harbor_object, get_size
 from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
 from utils.md5 import FileMD5Handler
@@ -841,7 +841,7 @@ class HarborManager:
         bucket, obj, created = self.create_empty_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
@@ -1145,7 +1145,7 @@ class HarborManager:
             raise exceptions.HarborError(message='删除对象原数据时错误')
 
         pool_name = bucket.get_pool_name()
-        ho = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=fileobj.si)
+        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=fileobj.si)
         ok, _ = ho.delete()
         if not ok:
             # 恢复元数据
@@ -1194,7 +1194,7 @@ class HarborManager:
 
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         ok, chunk = rados.read(offset=offset, size=size)
         if not ok:
             raise exceptions.HarborError(message='文件块读取失败')
@@ -1267,7 +1267,7 @@ class HarborManager:
         # 读取文件对象生成器
         obj_key = obj.get_obj_key(bucket.id)
         pool_name = bucket.get_pool_name()
-        rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
     def get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool = False, user=None):
@@ -1316,7 +1316,7 @@ class HarborManager:
 
         def generator():
             ok = True
-            rados = HarborObject(pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+            rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
             if (created is False) and (not is_break_point):  # 对象已存在，不是新建的,非断点续传，重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
 

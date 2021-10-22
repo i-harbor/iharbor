@@ -88,12 +88,12 @@ class NoDeleteSelectModelAdmin(admin.ModelAdmin):
 class BucketAdmin(NoDeleteSelectModelAdmin):
     list_display = ('id', 'name', 'get_collection_name', 'type', 'created_time', 'lock', 'user', 'objs_count',
                     'size', 'stats_time', 'ftp_enable', 'raw_ftp_password', 'ftp_password', 'raw_ftp_ro_password',
-                    'ftp_ro_password', 'modified_time')
+                    'ftp_ro_password', 'modified_time', 'ceph_using')
     list_display_links = ('id', 'name')
     list_editable = ('lock',)
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
-    readonly_fields = ('collection_name', )
+    readonly_fields = ('collection_name', 'ceph_using')
     raw_id_fields = ('user',)
     actions = [bucket_stats, bucket_ftp_password_encrypt]
 
@@ -106,12 +106,12 @@ class BucketAdmin(NoDeleteSelectModelAdmin):
 @admin.register(Archive)
 class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
     list_display = ('id', 'original_id', 'name', 'type', 'table_name', 'archive_time', 'created_time', 'user', 'objs_count',
-                    'size', 'ftp_enable', 'ftp_password', 'modified_time')
+                    'size', 'ftp_enable', 'ftp_password', 'modified_time', 'ceph_using')
     list_display_links = ('id', 'name')
 
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
-    readonly_fields = ('table_name', 'original_id')
+    readonly_fields = ('table_name', 'original_id', 'ceph_using')
     actions = [bucket_stats]
 
 

@@ -19,7 +19,30 @@ logger = logging.getLogger('django.request')    # 这里的日志记录器要和
 debug_logger = logging.getLogger('debug')       # 这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
 
-def get_ceph_poolname_rand():
+def get_ceph_alias_rand():
+    """
+    从配置的CEPH集群中随机获取一个ceph集群的配置的别名
+    :return:
+        str
+
+    :raises: ValueError
+    """
+    cephs = settings.CEPH_RADOS
+    aliases = []
+    for k in cephs.keys():
+        ceph = cephs[k]
+        if ('DISABLE_CHOICE' in ceph) and (ceph['DISABLE_CHOICE'] is True):
+            continue
+
+        aliases.append(k)
+
+    if not aliases:
+        raise ValueError('配置文件CEPH_RADOS中没有可供选择的CEPH集群配置')
+
+    return random.choice(aliases)
+
+
+def get_ceph_poolname_rand(using: str):
     """
     从配置的CEPH pool name随机获取一个
     :return:
@@ -27,9 +50,9 @@ def get_ceph_poolname_rand():
 
     :raises: ValueError
     """
-    pools = settings.CEPH_RADOS.get('POOL_NAME', None)
+    pools = settings.CEPH_RADOS[using].get('POOL_NAME', None)
     if not pools:
-        raise ValueError('配置文件CEPH_RADOS中POOL_NAME配置项无效')
+        raise ValueError(f'配置文件CEPH_RADOS中别名“{using}”配置中POOL_NAME配置项无效')
 
     if isinstance(pools, str):
         return pools
@@ -37,7 +60,7 @@ def get_ceph_poolname_rand():
     if isinstance(pools, tuple) or isinstance(pools, list):
         return random.choice(pools)
 
-    raise ValueError('配置文件CEPH_RADOS中POOL_NAME配置项需要是一个元组tuple')
+    raise ValueError(f'配置文件CEPH_RADOS中别名“{using}”配置中POOL_NAME配置项需要是一个元组tuple')
 
 
 def create_table_for_model_class(model):

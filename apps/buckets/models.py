@@ -73,6 +73,7 @@ class BucketBase(models.Model):
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=128, blank=True)
     pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
     type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
+    ceph_using = models.CharField(verbose_name=_('CEPH集群配置别名'), max_length=16, default='default')
 
     class Meta:
         abstract = True
@@ -160,6 +161,7 @@ class Bucket(BucketBase):
             a.ftp_ro_password = self.ftp_ro_password
             a.pool_name = self.pool_name
             a.type = self.type
+            a.ceph_using = self.ceph_using
             a.save()
         except Exception as e:
             return False

@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
 
-from utils.oss.pyrados import HarborObject, FileWrapper
+from utils.oss.pyrados import build_harbor_object, FileWrapper
 from utils.md5 import FileMD5Handler
 
 
@@ -195,8 +195,9 @@ class FileUploadToCephHandler(FileUploadHandler):
     """
     chunk_size = 5 * 2 ** 20    # 5MB
 
-    def __init__(self, request=None, pool_name='', obj_key=''):
+    def __init__(self, request, using, pool_name='', obj_key=''):
         super().__init__(request=request)
+        self.using = using
         self.pool_name = pool_name
         self.obj_key = obj_key
         self.file = None
@@ -217,7 +218,8 @@ class FileUploadToCephHandler(FileUploadHandler):
         Create the file object to append to as data is coming in.
         """
         super().new_file(*args, **kwargs)
-        self.file = FileWrapper(HarborObject(pool_name=self.pool_name, obj_id=self.obj_key))
+        ho = build_harbor_object(using=self.using, pool_name=self.pool_name, obj_id=self.obj_key)
+        self.file = FileWrapper(ho)
         self.file_md5_handler = FileMD5Handler()
 
     def receive_data_chunk(self, raw_data, start):

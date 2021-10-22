@@ -7,7 +7,7 @@ from string import printable
 from utils.md5 import offset_chunks
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
-from .pyrados import HarborObject, get_size
+from .pyrados import build_harbor_object, get_size
 
 
 def random_string(length: int = 10):
@@ -33,6 +33,7 @@ def calculate_md5(data: bytes):
 
 class TestHarborObject(unittest.TestCase):
     POOL_NAME = 'obs-test'
+    USING = 'default'
 
     def build_data(self):
         data_io = random_bytes_io(60)  # 60MB
@@ -42,7 +43,7 @@ class TestHarborObject(unittest.TestCase):
 
     def test_rados(self):
         data_io, data_md5 = self.build_data()
-        ho = HarborObject(pool_name=self.POOL_NAME, obj_id='test_object')
+        ho = build_harbor_object(using=self.USING, pool_name=self.POOL_NAME, obj_id='test_object')
 
         # write
         data_io.seek(0)
@@ -54,7 +55,7 @@ class TestHarborObject(unittest.TestCase):
 
     def test_rados_file(self):
         data_io, data_md5 = self.build_data()
-        ho = HarborObject(pool_name=self.POOL_NAME, obj_id='test_object')
+        ho = build_harbor_object(using=self.USING, pool_name=self.POOL_NAME, obj_id='test_object')
 
         # write file
         data_io.seek(0)
@@ -65,7 +66,7 @@ class TestHarborObject(unittest.TestCase):
 
     def test_write_generator(self):
         data_io, data_md5 = self.build_data()
-        ho = HarborObject(pool_name=self.POOL_NAME, obj_id='test_object')
+        ho = build_harbor_object(using=self.USING, pool_name=self.POOL_NAME, obj_id='test_object')
         wg = ho.write_obj_generator()
         if next(wg):
             for chunk in offset_chunks(data_io):

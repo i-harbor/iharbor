@@ -7,7 +7,7 @@ from django.db.utils import ProgrammingError
 
 from buckets.utils import BucketFileManagement, delete_table_for_model_class
 from buckets.models import Archive
-from utils.oss import HarborObject
+from utils.oss import build_harbor_object
 
 
 class Command(BaseCommand):
@@ -154,7 +154,7 @@ class Command(BaseCommand):
         pool_name = bucket.get_pool_name()
         try:
             while True:
-                ho = HarborObject(pool_name=pool_name, obj_id='')
+                ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id='')
                 objs = self.get_objs_and_dirs(model_class=model_class)
                 if objs is None or len(objs) <= 0:
                     break
