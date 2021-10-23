@@ -15,7 +15,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase, APITransactionTestCase
 from rest_framework.test import APIClient
 
-from buckets.models import BucketToken, BucketFileBase, Bucket, Archive
+from buckets.models import BucketToken, BucketFileBase, Bucket, Archive, BackupBucket
 from buckets.management.commands.clearbucket import Command as ClearBucketCommand
 from users.models import UserProfile
 
@@ -1665,5 +1665,145 @@ class ShareAPITests(MyAPITransactionTestCase):
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
 
 
+from .backup import AsyncBucketManager
+from buckets.utils import BucketFileManagement
+class BackupFunctionTests(MyAPITransactionTestCase):
+    databases = {'default', 'metadata'}
 
+    def setUp(self):
+        self.user_password = 'password'
+        user = get_or_create_user(password=self.user_password)
+        self.user = user
+        set_token_auth_header(self, username=self.user.username, password=self.user_password)
 
+        self.bucket_name = 'test'
+        response = BucketsAPITests.create_bucket(self.client, self.bucket_name)
+        self.assertEqual(response.status_code, 201, 'create bucket failed')
+        self.bucket = Bucket.objects.get(id=response.data['bucket']['id'])
+
+    def test_get_need_async_bucket_queryset(self):
+        bucket1 = Bucket(name='test1')
+        bucket1.save()
+        bucket2 = Bucket(name='test2')
+        bucket2.save()
+        bucket3 = Bucket(name='test3')
+        bucket3.save()
+        BackupBucket(bucket=bucket1, endpoint_url='http://exemple.com',
+                     bucket_token='token', status=BackupBucket.Status.START,
+                     bucket_name='backup1', backup_num=1).save()
+
+        BackupBucket(bucket=bucket2, endpoint_url='http://exemple.com',
+                     bucket_token='token', status=BackupBucket.Status.STOP,
+                     bucket_name='backup2', backup_num=1).save()
+        BackupBucket(bucket=bucket3, endpoint_url='http://exemple.com',
+                     bucket_token='token', status=BackupBucket.Status.START,
+                     bucket_name='backup1', backup_num=1).save()
+
+        abm = AsyncBucketManager()
+        qs = abm.get_need_async_bucket_queryset()
+        self.assertEqual(len(qs), 2)
+
+        BackupBucket(bucket=bucket2, endpoint_url='http://exemple.com',
+                     bucket_token='token', status=BackupBucket.Status.START,
+                     bucket_name='backup2', backup_num=2).save()
+        qs = abm.get_need_async_bucket_queryset()
+        self.assertEqual(len(qs), 3)
+
+        qs = abm.get_need_async_bucket_queryset(limit=1)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, bucket1.id)
+        qs = abm.get_need_async_bucket_queryset(id_gt=qs[0].id, limit=1)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, bucket2.id)
+        qs = abm.get_need_async_bucket_queryset(id_gt=qs[0].id, limit=1)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, bucket3.id)
+
+    def create_object(self, bucket, key: str, size: int = 0, is_dir=False):
+        table_name = bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(collection_name=table_name)
+        object_class = bfm.get_obj_model_class()
+        name = key.split('/', maxsplit=1)[-1]
+        obj = object_class(na=key, name=name, fod= not is_dir, si=size)
+        obj.save()
+        return obj
+
+    def test_get_need_async_objects_queryset(self):
+        bucket = self.bucket
+        obj1 = self.create_object(bucket=bucket, key='obj1')
+        obj2 = self.create_object(bucket=bucket, key='obj2')
+        dir1 = self.create_object(bucket=bucket, key='dir1', is_dir=True)
+
+        abm = AsyncBucketManager()
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 0)
+
+        backup1 = BackupBucket(bucket=bucket, endpoint_url='http://exemple.com',
+                     bucket_token='token', status=BackupBucket.Status.START,
+                     bucket_name='backup1', backup_num=1)
+        backup1.save()
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 2)
+
+        # test param in_gt
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=1)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, obj1.id)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=qs[0].id, limit=1)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, obj2.id)
+
+        obj1.async1 = timezone.now()
+        obj1.save(update_fields=['async1'])
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, obj2.id)
+
+        obj1.upt = timezone.now()
+        obj1.save(update_fields=['upt'])
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 2)
+
+        backup1.status = backup1.Status.STOP
+        backup1.save(update_fields=['status'])
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 0)
+
+        backup2 = BackupBucket(bucket=bucket, endpoint_url='http://exemple.com',
+                               bucket_token='token', status=BackupBucket.Status.START,
+                               bucket_name='backup2', backup_num=2)
+        backup2.save()
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 2)
+
+        # only obj2 need to backup2
+        backup1.status = backup1.Status.START
+        backup1.save(update_fields=['status'])
+        obj1.async1 = timezone.now()
+        obj1.save(update_fields=['async1'])
+        obj2.async1 = timezone.now()
+        obj2.save(update_fields=['async1'])
+
+        obj1.async2 = timezone.now()
+        obj1.save(update_fields=['async2'])
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 1)
+        self.assertEqual(qs[0].id, obj2.id)
+
+        # obj1 need to backup1, obj2 need to backup2
+        obj1.upt = timezone.now()
+        obj1.save(update_fields=['upt'])
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs), 2)
+
+    def test_other(self):
+        bucket = self.bucket
+        obj1 = self.create_object(bucket=bucket, key='obj1', size=6)
+
+        abm = AsyncBucketManager()
+        b = abm.get_bucket_by_id(bucket_id=bucket.id)
+        self.assertEqual(b.id, bucket.id)
+        o = abm.get_object_by_id(bucket=b, object_id=obj1.id)
+        self.assertEqual(o.id, obj1.id)
+        ho = abm.get_object_ceph_rados(bucket=b, object=o)
+        data = ho.read(offset=0, size=2)
