@@ -102,6 +102,14 @@ class BucketAdmin(NoDeleteSelectModelAdmin):
 
     get_collection_name.short_description = '桶的表名'
 
+    def delete_model(self, request, obj):
+        if not obj.delete_and_archive():  # 删除归档
+            self.message_user(request=request, message='删除归档操作失败', level=messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        """Given a queryset, delete it from the database."""
+        self.message_user(request=request, message='不允许删除操作', level=messages.ERROR)
+
 
 @admin.register(Archive)
 class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
@@ -113,6 +121,13 @@ class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
     search_fields = ('name', 'user__username')  # 搜索字段
     readonly_fields = ('table_name', 'original_id', 'ceph_using')
     actions = [bucket_stats]
+
+    def delete_model(self, request, obj):
+        self.message_user(request=request, message='不允许删除归档记录', level=messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        """Given a queryset, delete it from the database."""
+        self.message_user(request=request, message='不允许删除操作', level=messages.ERROR)
 
 
 @admin.register(BucketLimitConfig)
