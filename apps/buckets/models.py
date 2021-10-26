@@ -943,17 +943,22 @@ class BackupBucket(models.Model):
         STOP = 'stop', gettext_lazy('暂停同步')
         DELETED = 'deleted', gettext_lazy('删除')
 
+    class BackupNum(models.IntegerChoices):
+        ONE = 1, '1'
+        TWO = 2, '2'
+
     id = models.BigAutoField(auto_created=True, primary_key=True, verbose_name='ID')
     bucket = models.ForeignKey(to=Bucket, on_delete=models.CASCADE, related_name='backup_buckets',
                                verbose_name='存储桶')
     endpoint_url = models.URLField(max_length=255, verbose_name='备份点服务地址', help_text='http(s)://exemple.com')
-    bucket_token = models.CharField(max_length=32, verbose_name='备份点bucket读写token')
+    bucket_token = models.CharField(max_length=64, verbose_name='备份点bucket读写token')
     bucket_name = models.CharField(max_length=63, verbose_name='备份点bucket名称')
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
     remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
     status = models.CharField(max_length=16, verbose_name='状态', choices=Status.choices, default=Status.STOP)
-    backup_num = models.SmallIntegerField(verbose_name='备份点编号', choices=((1, '1'), (2, '2')), default=1)
+    backup_num = models.SmallIntegerField(verbose_name='备份点编号', choices=BackupNum.choices, default=BackupNum.ONE)
+    error = models.CharField(verbose_name='错误信息', max_length=255, default='')
 
     class Meta:
         ordering = ['-id']

@@ -3,6 +3,7 @@ import io
 import random
 import hashlib
 import collections
+import requests
 from datetime import datetime, timedelta
 from urllib import parse
 from string import printable
@@ -18,6 +19,8 @@ from rest_framework.test import APIClient
 from buckets.models import BucketToken, BucketFileBase, Bucket, Archive, BackupBucket
 from buckets.management.commands.clearbucket import Command as ClearBucketCommand
 from users.models import UserProfile
+from buckets.utils import BucketFileManagement
+from .backup import AsyncBucketManager
 
 
 User = get_user_model()
@@ -355,7 +358,6 @@ class AuthKeyAPITests(MyAPITransactionTestCase):
 
         # create key
         self.client.logout()
-        url = reverse('api:auth-key-list')
         response = self.create_user_auth_key(self.client, username, self.user_password)
         self.assertEqual(response.status_code, 201)
 
@@ -784,10 +786,12 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         url = reverse('api:obj-detail', kwargs={'bucket_name': bucket_name, 'objpath': key})
         return client.delete(url)
 
-    def upload_one_chunk(self, bucket_name: str, key: str, offset: int, chunk):
+    @staticmethod
+    def upload_one_chunk(client, bucket_name: str, key: str, offset: int, chunk):
         """
         上传一个分片
 
+        :param client:
         :param bucket_name:
         :param key: object key
         :param offset: 分片偏移量
@@ -797,13 +801,15 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         """
         url = reverse('api:obj-detail', kwargs={'bucket_name': bucket_name, 'objpath': key})
         chunk_file = io.BytesIO(chunk)
-        return self.client.post(url, data={"chunk_offset": offset,
-                                           "chunk_size": len(chunk), 'chunk': chunk_file})
+        return client.post(url, data={
+            "chunk_offset": offset, "chunk_size": len(chunk), 'chunk': chunk_file})
 
-    def upload_one_chunk_v2(self, bucket_name: str, key: str, offset: int, chunk: bytes):
+    @staticmethod
+    def upload_one_chunk_v2(client, bucket_name: str, key: str, offset: int, chunk: bytes):
         """
         上传一个分片
 
+        :param client:
         :param bucket_name:
         :param key: object key
         :param offset: 分片偏移量
@@ -815,10 +821,10 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         query = parse.urlencode({'offset': offset})
         file_md5 = calculate_md5(io.BytesIO(chunk))
         headers = {'HTTP_Content_MD5': file_md5}
-        return self.client.post(f'{url}?{query}', data=chunk,
-                                content_type='application/octet-stream', **headers)
+        return client.post(f'{url}?{query}', data=chunk,
+                           content_type='application/octet-stream', **headers)
 
-    def multipart_upload_object(self, bucket_name: str, key: str, file,
+    def multipart_upload_object(self, client, bucket_name: str, key: str, file,
                                 part_size: int = 5*1024**2, api_version: str = 'v1'):
         offset = 0
         for chunk in chunks(file, chunk_size=part_size):
@@ -826,10 +832,10 @@ class ObjectsAPITests(MyAPITransactionTestCase):
                 return True
 
             if api_version == 'v1':
-                response = self.upload_one_chunk(bucket_name, key, offset, chunk)
+                response = self.upload_one_chunk(client, bucket_name, key, offset, chunk)
                 self.assertEqual(response.status_code, 200, 'upload_one_chunk failed')
             elif api_version == 'v2':
-                response = self.upload_one_chunk_v2(bucket_name, key, offset, chunk)
+                response = self.upload_one_chunk_v2(client, bucket_name, key, offset, chunk)
                 self.assertEqual(response.status_code, 200, 'upload_one_chunk_v2 failed')
             else:
                 raise Exception(f'invalid param api_version value, {api_version}')
@@ -884,7 +890,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
         key = 'a/的/test.pdf'
-        ok = self.multipart_upload_object(bucket_name=self.bucket_name, key=key, file=file)
+        ok = self.multipart_upload_object(client=self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertTrue(ok, 'multipart_upload_object failed')
 
         response = self.download_object_response(bucket_name=self.bucket_name, key=key)
@@ -1015,7 +1021,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
         key = 'a/b/v2test.pdf'
-        ok = self.multipart_upload_object(bucket_name=self.bucket_name, key=key,
+        ok = self.multipart_upload_object(client=self.client, bucket_name=self.bucket_name, key=key,
                                           file=file, api_version='v2')
         self.assertTrue(ok, 'multipart_upload_object v2 failed')
 
@@ -1665,8 +1671,6 @@ class ShareAPITests(MyAPITransactionTestCase):
         BucketsAPITests.clear_bucket_archive(self.bucket_name)
 
 
-from .backup import AsyncBucketManager
-from buckets.utils import BucketFileManagement
 class BackupFunctionTests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
@@ -1688,14 +1692,14 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         bucket2.save()
         bucket3 = Bucket(name='test3')
         bucket3.save()
-        BackupBucket(bucket=bucket1, endpoint_url='http://exemple.com',
+        BackupBucket(bucket=bucket1, endpoint_url='https://exemple.com',
                      bucket_token='token', status=BackupBucket.Status.START,
                      bucket_name='backup1', backup_num=1).save()
 
-        BackupBucket(bucket=bucket2, endpoint_url='http://exemple.com',
+        BackupBucket(bucket=bucket2, endpoint_url='https://exemple.com',
                      bucket_token='token', status=BackupBucket.Status.STOP,
                      bucket_name='backup2', backup_num=1).save()
-        BackupBucket(bucket=bucket3, endpoint_url='http://exemple.com',
+        BackupBucket(bucket=bucket3, endpoint_url='https://exemple.com',
                      bucket_token='token', status=BackupBucket.Status.START,
                      bucket_name='backup1', backup_num=1).save()
 
@@ -1703,7 +1707,7 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         qs = abm.get_need_async_bucket_queryset()
         self.assertEqual(len(qs), 2)
 
-        BackupBucket(bucket=bucket2, endpoint_url='http://exemple.com',
+        BackupBucket(bucket=bucket2, endpoint_url='https://exemple.com',
                      bucket_token='token', status=BackupBucket.Status.START,
                      bucket_name='backup2', backup_num=2).save()
         qs = abm.get_need_async_bucket_queryset()
@@ -1719,12 +1723,13 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         self.assertEqual(len(qs), 1)
         self.assertEqual(qs[0].id, bucket3.id)
 
-    def create_object(self, bucket, key: str, size: int = 0, is_dir=False):
+    @staticmethod
+    def create_object(bucket, key: str, size: int = 0, is_dir=False):
         table_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=table_name)
         object_class = bfm.get_obj_model_class()
         name = key.split('/', maxsplit=1)[-1]
-        obj = object_class(na=key, name=name, fod= not is_dir, si=size)
+        obj = object_class(na=key, name=name, fod=not is_dir, si=size)
         obj.save()
         return obj
 
@@ -1732,15 +1737,16 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         bucket = self.bucket
         obj1 = self.create_object(bucket=bucket, key='obj1')
         obj2 = self.create_object(bucket=bucket, key='obj2')
-        dir1 = self.create_object(bucket=bucket, key='dir1', is_dir=True)
+        self.create_object(bucket=bucket, key='dir1', is_dir=True)
 
         abm = AsyncBucketManager()
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
         self.assertEqual(len(qs), 0)
 
-        backup1 = BackupBucket(bucket=bucket, endpoint_url='http://exemple.com',
-                     bucket_token='token', status=BackupBucket.Status.START,
-                     bucket_name='backup1', backup_num=1)
+        backup1 = BackupBucket(
+            bucket=bucket, endpoint_url='https://exemple.com',
+            bucket_token='token', status=BackupBucket.Status.START,
+            bucket_name='backup1', backup_num=1)
         backup1.save()
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
         self.assertEqual(len(qs), 2)
@@ -1769,7 +1775,7 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
         self.assertEqual(len(qs), 0)
 
-        backup2 = BackupBucket(bucket=bucket, endpoint_url='http://exemple.com',
+        backup2 = BackupBucket(bucket=bucket, endpoint_url='https://exemple.com',
                                bucket_token='token', status=BackupBucket.Status.START,
                                bucket_name='backup2', backup_num=2)
         backup2.save()
@@ -1805,5 +1811,73 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         self.assertEqual(b.id, bucket.id)
         o = abm.get_object_by_id(bucket=b, object_id=obj1.id)
         self.assertEqual(o.id, obj1.id)
-        ho = abm.get_object_ceph_rados(bucket=b, object=o)
-        data = ho.read(offset=0, size=2)
+        ho = abm.get_object_ceph_rados(bucket=b, obj=o)
+        ho.read(offset=0, size=2)
+
+    @staticmethod
+    def create_usefull_backup(bucket):
+        backup_settings = settings.TEST_CASE['BACKUP_BUCKET']
+        endpoint_url = backup_settings['endpoint_url']
+        bucket_token = backup_settings['bucket_token']
+        bucket_name = backup_settings['bucket_name']
+        backup = BackupBucket(
+            bucket=bucket, endpoint_url=endpoint_url,
+            bucket_token=bucket_token, status=BackupBucket.Status.START,
+            bucket_name=bucket_name, backup_num=1)
+
+        try:
+            backup.save()
+        except Exception as e:
+            raise e
+
+        return backup
+
+    def test_async_object(self):
+        bucket = self.bucket
+        backup = self.create_usefull_backup(bucket=bucket)
+
+        file = random_bytes_io(mb_num=33)
+        file_md5 = calculate_md5(file)
+        print(f'file md5: {file_md5}')
+        key = 'a/b/c/test.pdf'
+        key2 = 'a/b/c/分片/test.txt'
+
+        response = ObjectsAPITests().put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
+        self.assertEqual(response.status_code, 200)
+
+        ok = ObjectsAPITests().multipart_upload_object(
+            client=self.client, bucket_name=self.bucket_name, key=key2, file=file)
+        self.assertTrue(ok, 'multipart_upload_object failed')
+
+        abm = AsyncBucketManager()
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        for obj in qs:
+            abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj.id, object_key=obj.na)
+
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
+
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key2})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
+
+        # test delete async
+        r = ObjectsAPITests().delete_object_response(client=self.client, bucket_name=bucket.name, key=key)
+        self.assertEqual(r.status_code, 204)
+        for obj in qs:
+            abm.async_delete_object(bucket_id=bucket.id, bucket_name=bucket.name, object_key=obj.na)
+
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 404)
+
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key2})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 200)
