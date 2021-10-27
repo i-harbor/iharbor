@@ -11,3 +11,4 @@ enable_utc = True
 broker_pool_limit = 20
 worker_pool = "gevent"
 worker_concurrency = 30
+task_time_limit = 7200  # 软超时时间为2h

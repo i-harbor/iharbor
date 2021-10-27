@@ -22,6 +22,7 @@ pyjwt = "==1.7.1"
 pyopenssl = "==20.0.1"
 gevent = "*"
 celery = "*"
+tqdm = "*"
 
 [dev-packages]
 
