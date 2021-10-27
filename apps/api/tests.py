@@ -1866,6 +1866,40 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         download_md5 = calculate_md5(response)
         self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
 
+        # async when object update time modified
+        file = random_bytes_io(mb_num=34)
+        file_md5 = calculate_md5(file)
+        print(f'file md5: {file_md5}')
+        ok = ObjectsAPITests().multipart_upload_object(
+            client=self.client, bucket_name=self.bucket_name, key=key2, file=file)
+        self.assertTrue(ok, 'multipart_upload_object failed')
+
+        qs2 = abm.get_need_async_objects_queryset(bucket=bucket)
+        self.assertEqual(len(qs2), 1)
+        obj2 = qs2[0]
+        self.assertEqual(obj2.na, key2)
+        abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj2.id, object_key=obj2.na)
+
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key2})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        download_md5 = calculate_md5(response)
+        self.assertNotEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
+
+        meet_async_timedelta_minutes = getattr(
+            settings, 'BACKUP_BUCKET_SETTINGS', {}).get('meet_async_timedelta_minutes', 60)
+
+        # 无法设置upt，upt会自动设置为当前时间，只能改async
+        obj2.async1 = obj2.async1 - timedelta(minutes=meet_async_timedelta_minutes)
+        obj2.save(update_fields=['async1'])
+
+        abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj2.id, object_key=obj2.na)
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key2})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
+
         # test delete async
         r = ObjectsAPITests().delete_object_response(client=self.client, bucket_name=bucket.name, key=key)
         self.assertEqual(r.status_code, 204)

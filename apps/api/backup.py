@@ -1,13 +1,19 @@
 from urllib import parse
+from datetime import timedelta
 import requests
 from django.db import close_old_connections
 from django.db.models import Q, F
 from django.utils import timezone
+from django.conf import settings
 
 from buckets.models import Bucket, BackupBucket
 from buckets.utils import BucketFileManagement
 from utils.oss.pyrados import build_harbor_object, FileWrapper, HarborObject
 from utils.md5 import FileMD5Handler
+
+
+backup_setting = getattr(settings, 'BACKUP_BUCKET_SETTINGS', {})
+meet_async_timedelta_minutes = backup_setting.get('meet_async_timedelta_minutes', 60)
 
 
 def async_close_old_connections(func):
@@ -201,9 +207,9 @@ class AsyncBucketManager:
         if obj is None:
             need_async_nums = BackupBucket.BackupNum.values
         else:
-            if obj.async1 is None or obj.upt >= obj.async1:
+            if obj.async1 is None or obj.upt >= (obj.async1 + timedelta(minutes=meet_async_timedelta_minutes)):
                 need_async_nums.append(BackupBucket.BackupNum.ONE)
-            if obj.async2 is None or obj.upt >= obj.async2:
+            if obj.async2 is None or obj.upt >= (obj.async2 + timedelta(minutes=meet_async_timedelta_minutes)):
                 need_async_nums.append(BackupBucket.BackupNum.TWO)
 
         if not need_async_nums:
@@ -282,15 +288,15 @@ class AsyncBucketManager:
         queryset = object_class.objects.filter(fod=True, id__gt=id_gt).all()
         if backup_nums == [BackupBucket.BackupNum.ONE, ]:
             queryset = queryset.filter(
-                Q(async1__isnull=True) | Q(upt__gte=F('async1'))
+                Q(async1__isnull=True) | Q(upt__gt=F('async1'))
             ).order_by('id')
         elif backup_nums == [BackupBucket.BackupNum.TWO, ]:
             queryset = queryset.filter(
-                Q(async2__isnull=True) | Q(upt__gte=F('async2'))
+                Q(async2__isnull=True) | Q(upt__gt=F('async2'))
             ).order_by('id')
         else:
             queryset = queryset.filter(
-                Q(async1__isnull=True) | Q(upt__gte=F('async1')) | Q(async2__isnull=True) | Q(upt__gte=F('async2'))
+                Q(async1__isnull=True) | Q(upt__gt=F('async1')) | Q(async2__isnull=True) | Q(upt__gt=F('async2'))
             ).order_by('id')
 
         return queryset[0:limit]
