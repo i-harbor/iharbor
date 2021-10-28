@@ -10,3 +10,4 @@ enable_utc = True
 broker_pool_limit = 20
 task_time_limit = 7200  # 软超时时间为2h
 imports = ['syncserver.sync']
+task_ignore_result = True

@@ -1,5 +1,6 @@
 import os
 import sys
+from time import sleep
 
 import django
 from tqdm import tqdm
@@ -9,9 +10,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
 django.setup()
 from syncserver.sync import sync_object
+from syncserver.ratelimit import RabbitMQTool
 from api.backup import AsyncBucketManager
 
 manager = AsyncBucketManager()
+controller = RabbitMQTool(host='http://localhost:15672', queue='celery', user='guest', passwd='guest')
 
 
 def main():
@@ -29,6 +32,7 @@ def main():
                 while True:
                     try:
                         objs = manager.get_need_async_objects_queryset(bucket, obj_id)
+                        sleep(controller.refresh())
                         if not objs:
                             break
                         for obj in tqdm(objs, desc="bucket: {}".format(str(bucket.id)), leave=False):
