@@ -3179,6 +3179,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
                 "code": 200,
                 "code_text": "请求成功",
                 "info": {
+                    "ceph_using": "default",            # 多ceph集群时，区分那个ceph集群
                     "rados": [                          # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
                         "iharbor:ceph/obs/217_12",      # 大小为 chunk_size
                         "iharbor:ceph/obs/217_12_1",     # 大小为 chunk_size
@@ -3239,6 +3240,7 @@ class ObjKeyViewSet(CustomGenericViewSet):
         pool_name = bucket.get_pool_name()
         chunk_size, keys = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
         info = {
+            'ceph_using': bucket.ceph_using,
             'rados': keys,
             'chunk_size': chunk_size,
             'size': obj.obj_size,

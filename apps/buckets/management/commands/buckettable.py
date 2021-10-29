@@ -34,8 +34,24 @@ class Command(BaseCommand):
             '--sql', default='', dest='sql', type=str,
             help='sql will be exec.',
         )
+        parser.add_argument(
+            '--id-gt', default=0, dest='id-gt', type=int,
+            help='All buckets with ID greater than "id-gt".',
+        )
+
+        parser.add_argument(
+            '--multithreading', default=None, nargs='?', dest='multithreading', const=True,
+            help='use multithreading mode.',
+        )
 
     def handle(self, *args, **options):
+        print(options)
+
+        multithreading = options.get('multithreading')
+        if multithreading:
+            self.stdout.write(self.style.NOTICE('work mode in multithreading'))
+        else:
+            self.stdout.write(self.style.NOTICE('work mode in one thread'))
 
         tpl_sql = options['sql']   # sql模板
         if not tpl_sql:
@@ -47,9 +63,12 @@ class Command(BaseCommand):
         if input('Are you sure you want to do this?\n\n' + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
             raise CommandError("cancelled.")
 
-        self.modify_buckets(buckets)
+        if multithreading:
+            self.modify_buckets_multithreading(buckets)
+        else:
+            self.modify_buckets(buckets)
 
-    def get_buckets(self, **options):
+    def _get_buckets(self, **options):
         '''
         获取给定的bucket或所有bucket
         :param options:
@@ -57,6 +76,7 @@ class Command(BaseCommand):
         '''
         bucketname = options['bucketname']
         all = options['all']
+        id_gt = options['id-gt']
 
         # 指定名字的桶
         if bucketname:
@@ -66,7 +86,11 @@ class Command(BaseCommand):
         # 全部的桶
         if all is not None:
             self.stdout.write(self.style.NOTICE( 'Will exec sql for all buckets.'))
-            return Bucket.objects.all()
+            qs = Bucket.objects.all()
+            if id_gt > 0:
+                qs = qs.filter(id__gt=id_gt)
+
+            return qs
 
         # 未给出参数
         if not bucketname:
@@ -75,18 +99,26 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('Will exec sql for bucket named {0}'.format(bucketname)))
         return Bucket.objects.filter(name=bucketname).all()
 
-    def modify_one_bucket(self, bucket):
+    def get_buckets(self, **options):
+        buckets = self._get_buckets(**options)
+        buckets = buckets.order_by('id')
+        return buckets
+
+    def modify_one_bucket(self, bucket, in_thread: bool = True):
         '''
         为一个bucket执行sql
 
         :param bucket: Bucket obj
+        :param in_thread: 是否是线程
         :return:
         '''
+        ret = True
         table_name = bucket.get_bucket_table_name()
         table_name = f'`{table_name}`'
         try:
             sql = self.tpl_sql.format(table_name=table_name)
         except Exception as e:
+            ret = False
             self.stdout.write(self.style.ERROR(f"error when format sql for bucket '{bucket.name}': {str(e)}"))
         else:
             bfm = BucketFileManagement(collection_name=table_name)
@@ -95,15 +127,19 @@ class Command(BaseCommand):
                 a = model_class.objects.raw(raw_query=sql)
                 b = a.query._execute_query()
             except Exception as e:
+                ret = False
                 self.error_buckets.append(bucket.name)
                 self.stdout.write(self.style.ERROR(
                     f"error when execute sql for bucket '{bucket.name}':{type(e)} {str(e)}"))
             else:
                 self.stdout.write(self.style.SUCCESS(f"success to execute sql for bucket '{bucket.name}'"))
 
-        self.pool_sem.release() # 可用线程数+1
+        if in_thread:
+            self.pool_sem.release() # 可用线程数+1
 
-    def modify_buckets(self, buckets):
+        return ret
+
+    def modify_buckets_multithreading(self, buckets):
         '''
         多线程为bucket执行sql
         :param buckets:
@@ -124,3 +160,26 @@ class Command(BaseCommand):
             'Successfully exec sql for {0} buckets'.format(buckets.count() - len(self.error_buckets))))
         self.stdout.write(self.style.ERROR(
             f"error when execute sql for buckets:{self.error_buckets}"))
+
+    def modify_buckets(self, buckets):
+        '''
+        单线程为bucket执行sql
+        :param buckets:
+        :return: None
+        '''
+        count = 0
+        for bucket in buckets:
+            ok = self.modify_one_bucket(bucket, in_thread=False)
+            if ok:
+                count += 1
+            else:
+                self.stdout.write(self.style.ERROR(
+                    f"error when execute sql for bucket: name={bucket.name}, id={bucket.id}"))
+                break
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                'Successfully exec sql for {0} buckets'.format(count)
+            )
+        )
+

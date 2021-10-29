@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='backupbucket',
             name='error',
-            field=models.CharField(default='', max_length=255, verbose_name='错误信息'),
+            field=models.CharField(blank=True, default='', max_length=255, verbose_name='错误信息'),
         ),
         migrations.AlterField(
             model_name='backupbucket',

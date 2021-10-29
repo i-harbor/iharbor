@@ -958,7 +958,7 @@ class BackupBucket(models.Model):
     remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
     status = models.CharField(max_length=16, verbose_name='状态', choices=Status.choices, default=Status.STOP)
     backup_num = models.SmallIntegerField(verbose_name='备份点编号', choices=BackupNum.choices, default=BackupNum.ONE)
-    error = models.CharField(verbose_name='错误信息', max_length=255, default='')
+    error = models.CharField(verbose_name='错误信息', max_length=255, blank=True, default='')
 
     class Meta:
         ordering = ['-id']

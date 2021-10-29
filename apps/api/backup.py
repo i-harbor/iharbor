@@ -183,7 +183,7 @@ class AsyncBucketManager:
     @staticmethod
     @async_close_old_connections
     def _update_object_async_time(obj, async_time, backup_num):
-        if backup_num == 1:
+        if backup_num == BackupBucket.BackupNum.ONE:
             obj.async1 = async_time
             obj.save(update_fields=['async1'])
         else:
