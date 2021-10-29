@@ -20,9 +20,9 @@ drf-yasg = "==1.20.0"
 djangorestframework-simplejwt = "==4.4.0"
 pyjwt = "==1.7.1"
 pyopenssl = "==20.0.1"
-gevent = "*"
-celery = "*"
-tqdm = "*"
+gevent = "==21.8.0"
+celery = "==5.1.2"
+tqdm = "==4.62.3"
 
 [dev-packages]
 
