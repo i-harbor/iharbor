@@ -1,6 +1,6 @@
 import os
 import sys
-from time import sleep
+import time
 
 import django
 from tqdm import tqdm
@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 设置项目的配置文件 不做修改的话就是 settings 文件
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
 django.setup()
-from syncserver.sync import sync_object
+from syncserver.tasks import sync_object
 from syncserver.ratelimit import RabbitMQTool
 from api.backup import AsyncBucketManager
 
@@ -18,6 +18,7 @@ controller = RabbitMQTool(host='http://localhost:15672', queue='celery', user='g
 
 
 def main():
+    _item = 0
     bucket_id = 0
     last_bucket_id = 0
     while True:
@@ -32,11 +33,12 @@ def main():
                 while True:
                     try:
                         objs = manager.get_need_async_objects_queryset(bucket, obj_id)
-                        sleep(controller.refresh())
+                        time.sleep(controller.refresh())
                         if not objs:
                             break
                         for obj in tqdm(objs, desc="bucket: {}".format(str(bucket.id)), leave=False):
                             obj_id = obj.id
+                            _item += 1
                             sync_object.delay(bucket.id, obj.id, bucket.name, obj.na)
                     except Exception as err:
                         if last_obj_id != obj_id:
@@ -52,7 +54,10 @@ def main():
             else:
                 print("bucket sync error! bucket: {} with {}".format(bucket_id, err))
                 break
+    return _item
 
 
 if __name__ == '__main__':
-    main()
+    s = time.perf_counter()
+    item = main()
+    print("Done, spend time: {}, total items: {}".format(round(time.perf_counter() - s, 2), item))

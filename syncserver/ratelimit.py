@@ -27,8 +27,10 @@ class RabbitMQTool(object):
 
         for i in self.resp:
             if i['name'] == self.queue:
-                return int(i['messages_unacknowledged']) + int(i['messages_ready'])
-            pass
+                try:
+                    return int(i['messages_unacknowledged']) + int(i['messages_ready'])
+                except KeyError:
+                    return 0
         return None
 
     def _get_msg_rate(self):
@@ -37,9 +39,11 @@ class RabbitMQTool(object):
         """
         for i in self.resp:
             if i['name'] == self.queue:
-                return int(i['message_stats']['publish_details']['rate']), int(
-                    i['message_stats']['ack_details']['rate'])
-            pass
+                try:
+                    return int(i['message_stats']['publish_details']['rate']), int(
+                        i['message_stats']['ack_details']['rate'])
+                except KeyError:
+                    return 1, 1
         return 0, 0
 
     def set_sleep(self):
