@@ -397,6 +397,9 @@ class BucketsAPITests(MyAPITransactionTestCase):
     def create_bucket(client, name):
         url = reverse('api:buckets-list')
         response = client.post(url, data={'name': name})
+        if response.status_code not in [200, 201]:
+            print(f'create bucket error: {response.data}')
+
         return response
 
     @staticmethod
@@ -1915,3 +1918,9 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
         response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
         self.assertEqual(response.status_code, 200)
+
+    def tearDown(self):
+        # delete bucket
+        response = BucketsAPITests.delete_bucket(self.client, self.bucket_name)
+        self.assertEqual(response.status_code, 204)
+        BucketsAPITests.clear_bucket_archive(self.bucket_name)

@@ -5,7 +5,7 @@ import hashlib
 from datetime import timedelta, datetime
 
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Max
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy, gettext as _
@@ -40,6 +40,24 @@ def get_str_hexMD5(s: str):
     求字符串MD5
     """
     return hashlib.md5(s.encode(encoding='utf-8')).hexdigest()
+
+
+def get_next_bucket_max_id():
+    """
+    从现有桶，归档桶查询最大桶id, +1自增生成一个bucket id
+    """
+    next_id = 0
+    b = Bucket.objects.all().aggregate(b_id=Max('id'))
+    a = Archive.objects.all().aggregate(a_id=Max('original_id'))
+    a_id = a['a_id']
+    b_id = b['b_id']
+    if isinstance(a_id, int):
+        next_id = max(a_id, next_id)
+
+    if isinstance(b_id, int):
+        next_id = max(b_id, next_id)
+
+    return next_id + 1
 
 
 class BucketBase(models.Model):

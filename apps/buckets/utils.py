@@ -78,7 +78,7 @@ def create_table_for_model_class(model):
             schema_editor.create_model(model)
             if issubclass(model, BucketFileBase):
                 try:
-                    table_name = schema_editor.quote_name(model.Meta.db_table)
+                    table_name = schema_editor.quote_name(model._meta.db_table)
                     sql1 = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT " \
                            f"NULL COLLATE 'utf8_bin' AFTER `id`;"
                     sql2 = f"ALTER TABLE {table_name} CHANGE COLUMN `name` `name` VARCHAR(255) " \
@@ -150,7 +150,7 @@ def get_obj_model_class(table_name):
     except LookupError:
         pass
 
-    meta = BucketFileBase.Meta
+    meta = BucketFileBase.Meta()
     meta.abstract = False
     meta.db_table = table_name  # 数据库表名
     return type(model_name, (BucketFileBase,), {'Meta': meta, '__module__': BucketFileBase.__module__})
@@ -438,4 +438,3 @@ class BucketFileManagement:
         """
         model_class = self.get_obj_model_class()
         return model_class.objects.filter(na__startswith=prefix).all()
-
