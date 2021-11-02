@@ -424,6 +424,10 @@ BACKUP_BUCKET_SETTINGS = {
     'meet_async_timedelta_minutes': 60
 }
 
+# http/https
+# nginx代理需要设置(proxy_set_header X-Forwarded-Proto $scheme;)这个header，告诉django代理前是http还是https请求
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # 导入安全相关的settings
 from .security_settings import *
 
