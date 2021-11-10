@@ -223,6 +223,18 @@ class AsyncBucketManager:
 
         return backup_map
 
+    @staticmethod
+    def _do_request(method: str, url: str, data, headders):
+        """
+        :raises: Exception, requests.exceptions.RequestException
+        """
+        method = method.lower()
+        func = getattr(requests, method, None)
+        if func is None:
+            raise Exception(f'package requests no method {method}')
+
+        return func(url=url, data=data, headers=headders)
+
     @async_close_old_connections
     def get_bucket_by_id(self, bucket_id):
         return self._get_bucket_by_id(bucket_id=bucket_id)
@@ -305,7 +317,7 @@ class AsyncBucketManager:
         ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
         obj_size = obj.obj_size
         hex_md5 = obj.hex_md5
-        if obj_size <= 200 * 1024**2 and hex_md5:       # 200MB
+        if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
             self.put_one_object(obj=obj, ho=ho, backup=backup, object_md5=hex_md5)
             return
 
@@ -319,11 +331,13 @@ class AsyncBucketManager:
         """
         async_time = timezone.now()
         api = self._build_object_base_url(backup=backup, object_key=obj.na)
+        headers = {
+            'Authorization': f'BucketToken {backup.bucket_token}',
+            'Content-MD5': object_md5
+        }
+        data = IterCephRaods(ho=ho)
         try:
-            r = requests.put(url=api, data=IterCephRaods(ho=ho), headers={
-                'Authorization': f'BucketToken {backup.bucket_token}',
-                'Content-MD5': object_md5
-            })
+            r = self._do_request(method='put', url=api, data=data, headders=headers)
         except requests.exceptions.RequestException as e:
             raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put object, {str(e)}',
                              code='FailedAsyncObject')
@@ -332,7 +346,8 @@ class AsyncBucketManager:
             self._update_object_async_time(obj=obj, async_time=async_time, backup_num=backup.backup_num)
             return
 
-        raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put object', code='FailedAsyncObject')
+        raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put object, {r.text}',
+                         code='FailedAsyncObject')
 
     def post_object_by_chunk(self, obj, ho, backup: BackupBucket, per_size: int = 32*1024**2):
         """
@@ -356,21 +371,19 @@ class AsyncBucketManager:
             md5_handler = FileMD5Handler()
             md5_handler.update(offset=0, data=data)
             hex_md5 = md5_handler.hex_md5
+            headers = {
+                'Authorization': f'BucketToken {backup.bucket_token}',
+                'Content-MD5': hex_md5
+            }
             try:
-                r = requests.post(url=api, data=data, headers={
-                    'Authorization': f'BucketToken {backup.bucket_token}',
-                    'Content-MD5': hex_md5
-                })
+                r = self._do_request(method='post', url=api, data=data, headders=headers)
                 if r.status_code == 200:
                     continue
             except requests.exceptions.RequestException as e:
                 pass
 
             try:
-                r = requests.post(url=api, data=data, headers={
-                    'Authorization': f'BucketToken {backup.bucket_token}',
-                    'Content-MD5': hex_md5
-                })
+                r = self._do_request(method='post', url=api, data=data, headders=headers)
             except requests.exceptions.RequestException as e:
                 raise AsyncError(f'Failed async object({obj.na}), {backup}, post by chunk, {str(e)}',
                                  code='FailedAsyncObject')
@@ -378,7 +391,8 @@ class AsyncBucketManager:
             if r.status_code == 200:
                 continue
 
-            raise AsyncError(f'Failed async object({obj.na}), {backup}, post by chunk', code='FailedAsyncObject')
+            raise AsyncError(f'Failed async object({obj.na}), {backup}, post by chunk, {r.text}',
+                             code='FailedAsyncObject')
 
         file.close()
         self._update_object_async_time(obj=obj, async_time=async_time, backup_num=backup.backup_num)
