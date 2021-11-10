@@ -50,11 +50,13 @@ class V2ObjectHandler:
                 exc=exceptions.BadRequest(message='Request body is empty.'))
 
         if content_length != file.size:
+            storagers.try_close_file(file)
             return response_exception(
                 exc=exceptions.BadRequest(
                     message='The length of body not same header "Content-Length"'))
 
         if content_md5 != file.file_md5:
+            storagers.try_close_file(file)
             return response_exception(
                 exc=exceptions.BadDigest())
 
@@ -63,8 +65,10 @@ class V2ObjectHandler:
             created = hmanager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
                                           reset=reset, user=request.user)
         except exceptions.HarborError as exc:
+            storagers.try_close_file(file)
             return response_exception(exc)
 
+        storagers.try_close_file(file)
         return Response(data={'created': created}, status=200)
 
     @staticmethod
@@ -169,6 +173,9 @@ class V2ObjectHandler:
         def clean_put(_uploader, _obj, _created, _rados):
             # 删除数据和元数据
             f = getattr(_uploader, 'file', None)
+            if f is not None:
+                storagers.try_close_file(f)
+
             s = f.size if f else 0
             _rados.delete(obj_size=s)
             if _created:

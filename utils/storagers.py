@@ -12,6 +12,16 @@ from utils.oss.pyrados import build_harbor_object, FileWrapper
 from utils.md5 import FileMD5Handler
 
 
+def try_close_file(f):
+    try:
+        if hasattr(f, 'close'):
+            f.close()
+    except Exception as e:
+        return False
+
+    return True
+
+
 class FileStorage:
     '''
     基于文件系统的文件存储

@@ -7,7 +7,7 @@ from django.db.models import BigIntegerField
 
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
-from utils.storagers import PathParser
+from utils.storagers import PathParser, try_close_file
 from utils.oss import build_harbor_object, get_size
 from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
@@ -1061,6 +1061,8 @@ class HarborManager:
         except Exception as e:
             ok = False
             msg = str(e)
+
+        try_close_file(file)
 
         if not ok:
             # 手动回滚对象元数据

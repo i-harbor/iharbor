@@ -10,7 +10,6 @@ from django.utils.translation import gettext_lazy, gettext as _
 from django.core.validators import validate_email
 from django.core import exceptions as dj_exceptions
 from django.urls import reverse as django_reverse
-from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -25,7 +24,7 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
-from utils.storagers import PathParser, FileUploadToCephHandler
+from utils.storagers import PathParser, FileUploadToCephHandler, try_close_file
 from utils.oss import build_harbor_object, RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
@@ -1196,6 +1195,9 @@ class ObjViewSet(CustomGenericViewSet):
         def clean_put(_uploader, _obj, _created, _rados):
             # 删除数据和元数据
             f = getattr(_uploader, 'file', None)
+            if f is not None:
+                try_close_file(f)
+
             s = f.size if f else 0
             _rados.delete(obj_size=s)
             if _created:

@@ -1006,6 +1006,9 @@ class FileWrapper:
         else:
             self.offset = size
 
+    def __del__(self):
+        self.close()
+
 
 def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int = 0):
     """
