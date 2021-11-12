@@ -82,6 +82,9 @@ def random_string(length: int = 10):
 
 def random_bytes_io(mb_num: int):
     bio = io.BytesIO()
+    if mb_num <= 0:
+        return bio
+
     for i in range(1024):           # MB
         s = ''.join(random_string(mb_num))
         b = s.encode() * 1024         # KB
@@ -772,7 +775,9 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         file_md5 = calculate_md5(file)
         headers = {'HTTP_Content_MD5': file_md5}
         file.seek(0)
-        return client.put(url, data=file.read(),
+        data = file.read()
+        headers.update({'HTTP_Content_Length': len(data)})
+        return client.put(url, data=data,
                           content_type='application/octet-stream', **headers)
 
     def download_object_response(self, bucket_name: str, key: str,
@@ -1006,7 +1011,10 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     def test_v2_put_object(self):
         file = random_bytes_io(mb_num=16)
         file_md5 = calculate_md5(file)
+        empty_file = random_bytes_io(mb_num=0)
+        empty_file_md5 = calculate_md5(empty_file)
         key = 'a/b/c/v2test.pdf'
+
         response = self.put_object_v2_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['created'], True)
@@ -1016,8 +1024,27 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         download_md5 = calculate_md5(response)
         self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of upload file and download file')
 
+        response = self.put_object_v2_response(self.client, bucket_name=self.bucket_name, key=key, file=empty_file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], False)
+
+        response = self.download_object_response(bucket_name=self.bucket_name, key=key)
+        self.assertEqual(response.status_code, 200)
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, empty_file_md5, msg='Compare the MD5 of upload empty file and download file')
+
         # delete object
         response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key)
+        self.assertEqual(response.status_code, 204)
+
+        # test empty object
+        empty_key = 'a/empty.txt'
+        response = self.put_object_v2_response(self.client, bucket_name=self.bucket_name, key=empty_key, file=empty_file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], True)
+
+        # delete empty object
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=empty_key)
         self.assertEqual(response.status_code, 204)
 
     def test_v2_multipart_upload_download_delete(self):

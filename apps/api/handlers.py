@@ -2,6 +2,7 @@ from rest_framework.response import Response
 
 from utils import storagers
 from utils.oss import build_harbor_object
+from utils.md5 import EMPTY_HEX_MD5
 from . import exceptions
 from .harbor import HarborManager
 from .views import check_authenticated_or_bucket_token
@@ -132,7 +133,7 @@ class V2ObjectHandler:
             return response_exception(exc=exceptions.InvalidDigest())
 
         content_length = request.headers.get('content-length')
-        if not content_length:
+        if content_length is None or content_length < 0:
             return response_exception(
                 exc=exceptions.BadRequest(
                     message='header "Content-Length" is required'))
@@ -188,19 +189,24 @@ class V2ObjectHandler:
             clean_put(uploader, obj, created, rados)
             return response_exception(exc=exceptions.Error(message=str(e)))
 
-        file = put_data.get('file')
-        if not file:
-            return response_exception(
-                exc=exceptions.BadRequest('Request body is empty.'))
-
         content_md5 = view.request.headers.get('Content-MD5', '').lower()
-        if content_md5 != file.file_md5.lower():
+        file = put_data.get('file')
+        if file:
+            file_md5 = file.file_md5.lower()
+            file_size = file.size
+            extend_msg = ''
+        else:
+            file_md5 = EMPTY_HEX_MD5
+            file_size = 0
+            extend_msg = 'Request body is empty'
+
+        if content_md5 != file_md5:
             # 删除数据和元数据
             clean_put(uploader, obj, created, rados)
-            return response_exception(exceptions.BadDigest())
+            return response_exception(exceptions.BadDigest(extend_msg=extend_msg))
 
         try:
-            obj.si = file.size
+            obj.si = file_size
             obj.md5 = content_md5
             obj.save(update_fields=['si', 'md5'])
         except Exception as e:
