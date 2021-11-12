@@ -133,10 +133,19 @@ class V2ObjectHandler:
             return response_exception(exc=exceptions.InvalidDigest())
 
         content_length = request.headers.get('content-length')
-        if content_length is None or content_length < 0:
+        if not content_length:
             return response_exception(
                 exc=exceptions.BadRequest(
                     message='header "Content-Length" is required'))
+
+        try:
+            content_length = int(content_length)
+            if content_length < 0:
+                raise ValueError
+        except ValueError:
+            return response_exception(
+                exc=exceptions.BadRequest(
+                    message='header "Content-Length" is invalid'))
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=view)
