@@ -9,7 +9,7 @@ from django.conf import settings
 from buckets.models import Bucket, BackupBucket
 from buckets.utils import BucketFileManagement
 from utils.oss.pyrados import build_harbor_object, FileWrapper, HarborObject
-from utils.md5 import FileMD5Handler
+from utils.md5 import FileMD5Handler, EMPTY_HEX_MD5
 
 
 backup_setting = getattr(settings, 'BACKUP_BUCKET_SETTINGS', {})
@@ -157,6 +157,14 @@ class AsyncBucketManager:
             )
 
         return obj
+
+    @staticmethod
+    def _build_object_metadata_base_url(backup: BackupBucket, object_key: str):
+        endpoint_url = backup.endpoint_url
+        endpoint_url = endpoint_url.rstrip('/')
+        object_key = object_key.lstrip('/')
+        url = f'{endpoint_url}/api/v1/metadata/{backup.bucket_name}/{object_key}/'
+        return url
 
     @staticmethod
     def _build_object_base_url(backup: BackupBucket, object_key: str, api_version='v2'):
@@ -317,11 +325,34 @@ class AsyncBucketManager:
         ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
         obj_size = obj.obj_size
         hex_md5 = obj.hex_md5
+        if obj_size == 0:
+            self.put_one_object(obj=obj, ho=None, backup=backup, object_md5=EMPTY_HEX_MD5)
+            return
+
         if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
             self.put_one_object(obj=obj, ho=ho, backup=backup, object_md5=hex_md5)
             return
 
         self.post_object_by_chunk(obj=obj, ho=ho, backup=backup)
+
+    def create_object_metadata(self, obj, backup: BackupBucket):
+        async_time = timezone.now()
+        url = self._build_object_metadata_base_url(backup=backup, object_key=obj.na)
+        headers = {
+            'Authorization': f'BucketToken {backup.bucket_token}'
+        }
+        try:
+            r = self._do_request(method='post', url=url, data=None, headders=headers)
+        except requests.exceptions.RequestException as e:
+            raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put empty object, {str(e)}',
+                             code='FailedAsyncObject')
+
+        if r.status_code == 200:
+            self._update_object_async_time(obj=obj, async_time=async_time, backup_num=backup.backup_num)
+            return
+
+        raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put empty object, {r.text}',
+                         code='FailedAsyncObject')
 
     def put_one_object(self, obj, ho, backup: BackupBucket, object_md5: str):
         """
@@ -335,7 +366,12 @@ class AsyncBucketManager:
             'Authorization': f'BucketToken {backup.bucket_token}',
             'Content-MD5': object_md5
         }
-        data = IterCephRaods(ho=ho)
+        if ho is None or obj.obj_size == 0:
+            data = None
+            headers['Content-Length'] = '0'
+        else:
+            data = IterCephRaods(ho=ho)
+
         try:
             r = self._do_request(method='put', url=api, data=data, headders=headers)
         except requests.exceptions.RequestException as e:

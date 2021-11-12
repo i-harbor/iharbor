@@ -776,7 +776,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         headers = {'HTTP_Content_MD5': file_md5}
         file.seek(0)
         data = file.read()
-        headers.update({'HTTP_Content_Length': len(data)})
+        headers.update({'HTTP_Content_Length': str(len(data))})
         return client.put(url, data=data,
                           content_type='application/octet-stream', **headers)
 
@@ -1945,6 +1945,41 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
         response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
         self.assertEqual(response.status_code, 200)
+
+    def test_async_empty_object(self):
+        # test empty object
+        bucket = self.bucket
+        backup = self.create_usefull_backup(bucket=bucket)
+        key = 'a/b/empty.txt'
+        MetadataAPITests.create_empty_object_metadata(
+            testcase=self, bucket_name=bucket.name, key=key, check_response=True)
+
+        # get metadata 404 before
+        # url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
+        # api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        # response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        # self.assertEqual(response.status_code, 404)
+
+        abm = AsyncBucketManager()
+        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        obj = qs[0]
+        self.assertEqual(obj.na, key)
+        abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj.id, object_key=obj.na)
+
+        # get metadata 404 after
+        url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 200)
+
+        r = ObjectsAPITests().delete_object_response(client=self.client, bucket_name=bucket.name, key=key)
+        self.assertEqual(r.status_code, 204)
+        abm.async_delete_object(bucket_id=bucket.id, bucket_name=bucket.name, object_key=obj.na)
+        # get metadata 404 after async delete
+        url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 404)
 
     def tearDown(self):
         # delete bucket
