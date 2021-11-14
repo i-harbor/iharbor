@@ -1,5 +1,5 @@
 broker_url = 'amqp://guest@localhost//'
-task_acks_late = True  # 任务完成后确认
+task_acks_late = False  # 接受消息后立即确认，防止同一任务同时执行
 worker_prefetch_multiplier = 1  # 设置预取数量为1
 task_serializer = 'json'
 accept_content = ['json']
