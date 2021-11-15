@@ -1881,8 +1881,11 @@ class BackupFunctionTests(MyAPITransactionTestCase):
 
         abm = AsyncBucketManager()
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        obj_key1 = None
         for obj in qs:
             abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj.id, object_key=obj.na)
+            if obj.na == key:
+                obj_key1 = obj
 
         url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
         api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
@@ -1891,6 +1894,21 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
 
         url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key2})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        download_md5 = calculate_md5(response)
+        self.assertEqual(download_md5, file_md5, msg='Compare the MD5 of async object and download object')
+
+        # test md5 invalid
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.delete(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 204)
+        obj_key1.async1 = None
+        obj_key1.md5 = 'md5test'
+        obj_key1.save(update_fields=['async1', 'md5'])
+        abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj_key1.id, object_key=obj_key1.na)
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
         api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
         response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
         download_md5 = calculate_md5(response)
@@ -1954,11 +1972,16 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         MetadataAPITests.create_empty_object_metadata(
             testcase=self, bucket_name=bucket.name, key=key, check_response=True)
 
+        url = reverse('api:obj-detail', kwargs={'bucket_name': backup.bucket_name, 'objpath': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.delete(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertIn(response.status_code, [204, 404])
+
         # get metadata 404 before
-        # url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
-        # api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
-        # response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
-        # self.assertEqual(response.status_code, 404)
+        url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
+        api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
+        response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})
+        self.assertEqual(response.status_code, 404)
 
         abm = AsyncBucketManager()
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
@@ -1966,7 +1989,7 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         self.assertEqual(obj.na, key)
         abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj.id, object_key=obj.na)
 
-        # get metadata 404 after
+        # get metadata 200 after
         url = reverse('api:metadata-detail', kwargs={'bucket_name': backup.bucket_name, 'path': key})
         api = f'{backup.endpoint_url.rstrip("/")}/{url.lstrip("/")}'
         response = requests.get(api, headers={'Authorization': f'BucketToken {backup.bucket_token}'})

@@ -330,8 +330,9 @@ class AsyncBucketManager:
             return
 
         if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
-            self.put_one_object(obj=obj, ho=ho, backup=backup, object_md5=hex_md5)
-            return
+            r = self.put_one_object(obj=obj, ho=ho, backup=backup, object_md5=hex_md5)
+            if r is True:
+                return
 
         self.post_object_by_chunk(obj=obj, ho=ho, backup=backup)
 
@@ -358,6 +359,10 @@ class AsyncBucketManager:
         """
         上传一个对象
 
+        :return:
+            True:               success
+            raise AsyncError:   failed
+            None:               md5 invalid, try async by chunk
         :raises: AsyncError
         """
         async_time = timezone.now()
@@ -380,7 +385,13 @@ class AsyncBucketManager:
 
         if r.status_code == 200:
             self._update_object_async_time(obj=obj, async_time=async_time, backup_num=backup.backup_num)
-            return
+            return True
+
+        if r.status_code == 400:
+            data = r.json()
+            code = data.get('code', '')
+            if code in ['BadDigest', 'InvalidDigest']:  # md5和数据不一致
+                return None
 
         raise AsyncError(message=f'Failed async object({obj.na}), {backup}, put object, {r.text}',
                          code='FailedAsyncObject')
