@@ -330,7 +330,16 @@ class HarborManager:
         for i, p in create_paths:
             p_id = now_last_dir.id
             dir_name, dir_path_name = p
-            dir1 = self._mkdir_metadata(table_name=table_name, p_id=p_id, dir_path_name=dir_path_name)
+            try:
+                dir1 = self._mkdir_metadata(table_name=table_name, p_id=p_id, dir_path_name=dir_path_name)
+            except Exception as e:      # 失败，检测目录是否已存在
+                dir1 = bfm.get_obj(path=dir_path_name)
+                if not dir1:
+                    raise e
+                if dir1.is_file():
+                    raise exceptions.HarborError.from_error(exceptions.SameKeyAlreadyExists(
+                        "The path of the object's key conflicts with the existing object's key"))
+
             dirs.append(dir1)
             now_last_dir = dir1
 
