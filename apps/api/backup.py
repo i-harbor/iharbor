@@ -29,6 +29,9 @@ class AsyncError(Exception):
         self.message = message
         self.code = code
 
+    def __str__(self):
+        return f'code={self.code}, message={self.message}'
+
 
 class IterFileWraper(FileWrapper):
     @property
