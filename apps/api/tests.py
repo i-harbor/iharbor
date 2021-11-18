@@ -1869,8 +1869,8 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         file = random_bytes_io(mb_num=33)
         file_md5 = calculate_md5(file)
         print(f'file md5: {file_md5}')
-        key = 'a/b/c/test.pdf'
-        key2 = 'a/b/c/分片/test.txt'
+        key = 'a/b/c/te st.pdf#'
+        key2 = 'a/b/c/分片/#tes t.txt#'
 
         response = ObjectsAPITests().put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)

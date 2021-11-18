@@ -166,6 +166,7 @@ class AsyncBucketManager:
         endpoint_url = backup.endpoint_url
         endpoint_url = endpoint_url.rstrip('/')
         object_key = object_key.lstrip('/')
+        object_key = parse.quote(object_key, safe='/')
         url = f'{endpoint_url}/api/v1/metadata/{backup.bucket_name}/{object_key}/'
         return url
 
@@ -174,6 +175,7 @@ class AsyncBucketManager:
         endpoint_url = backup.endpoint_url
         endpoint_url = endpoint_url.rstrip('/')
         object_key = object_key.lstrip('/')
+        object_key = parse.quote(object_key, safe='/')
         url = f'{endpoint_url}/api/{api_version}/obj/{backup.bucket_name}/{object_key}'
         if api_version == 'v2':
             return url
@@ -416,7 +418,10 @@ class AsyncBucketManager:
             api = self._build_post_chunk_url(backup=backup, object_key=obj.na, offset=offset, reset=reset)
             data = file.read(per_size)
             if not data:
-                break
+                if offset >= file.size:
+                    break
+                raise AsyncError(f'Failed async object({obj.na}), {backup}, post by chunk, read empty bytes from ceph, 对象同步可能不完整',
+                                 code='FailedAsyncObject')
 
             md5_handler = FileMD5Handler()
             md5_handler.update(offset=0, data=data)

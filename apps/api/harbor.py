@@ -886,7 +886,7 @@ class HarborManager:
         path, filename = pp.get_path_and_filename()
         if not bucket_name or not filename:
             raise exceptions.HarborError.from_error(
-                exceptions.BadRequest(message='参数有误'))
+                exceptions.BadRequest(message=f'参数有误, obj key [{obj_path}]'))
 
         if len(filename) > 255:
             raise exceptions.HarborError.from_error(
