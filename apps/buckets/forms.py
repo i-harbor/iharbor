@@ -5,17 +5,17 @@ from .models import Bucket
 from .validators import DNSStringValidator
 
 
-
 class BackupBUcketModelForm(forms.ModelForm):
-    def clean(self):
-        data = super().clean()
-        bucket = data.get('bucket')
-        if bucket:
-           c = bucket.backup_buckets.all().count()
-           if c >= 2:
-               raise ValidationError('每个存储同最多只能设置2个备份')
+    def save(self, commit=True):
+        if not self.instance.id:
+            data = self.cleaned_data
+            bucket = data.get('bucket')
+            if bucket:
+               c = bucket.backup_buckets.all().count()
+               if c >= 2:
+                   raise ValidationError('每个存储同最多只能设置2个备份')
 
-        return data
+        return super(BackupBUcketModelForm, self).save(commit=commit)
 
 
 class UploadFileForm(forms.Form):

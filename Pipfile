@@ -23,6 +23,7 @@ pyopenssl = "==20.0.1"
 gevent = "==21.8.0"
 celery = "==5.1.2"
 tqdm = "==4.62.3"
+psutil = "*"
 
 [dev-packages]
 
