@@ -20,9 +20,9 @@ LOGGER_NAME = 'async-logger'
 
 def config_logger(name: str = LOGGER_NAME, level=logging.INFO):
     # 日志配置
-    LOGGING_FILES_DIR = '/var/log/iharbor'
-    if not os.path.exists(LOGGING_FILES_DIR):
-        os.makedirs(LOGGING_FILES_DIR, exist_ok=True)
+    log_files_dir = '/var/log/iharbor'
+    if not os.path.exists(log_files_dir):
+        os.makedirs(log_files_dir, exist_ok=True)
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -34,7 +34,7 @@ def config_logger(name: str = LOGGER_NAME, level=logging.INFO):
     std_handler.setFormatter(formatter)
     logger.addHandler(std_handler)
 
-    file_handler = logging.FileHandler(filename=f"{LOGGING_FILES_DIR}/async_bucket.log")
+    file_handler = logging.FileHandler(filename=f"{log_files_dir}/async_bucket.log")
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
     logger.addHandler(file_handler)
@@ -63,17 +63,7 @@ class AsyncTask:
         self.max_threads = max_threads
         self.pool_sem = threading.Semaphore(self.max_threads)    # 定义最多同时启用多少个线程
         self.node_count = node_count
-
-        if node_num is not None:
-            if not isinstance(node_num, int):
-                self.logger.error(f"Invalid node_num {node_num}")
-
-            if node_num <= 0 or node_num > node_count:
-                self.logger.error(f"Invalid node_num {node_num}")
-
-            self.node_num = node_num
-        else:
-            self.node_num = self.get_current_node_num_from_hostname()
+        self.node_num = node_num
 
         try:
             self.validate_params()
@@ -85,6 +75,12 @@ class AsyncTask:
         """
         :raises: ValueError
         """
+        if self.node_num is None:
+            self.node_num = self.get_current_node_num_from_hostname()
+
+        if not isinstance(self.node_num, int):
+            raise ValueError(f"Invalid node_num {self.node_num}")
+
         if self.node_num <= 0:
             raise ValueError(f'node_num({self.node_num}) must be greater than 0')
 
@@ -101,14 +97,19 @@ class AsyncTask:
         if self.test:
             self.logger.warning('Test async.')
 
-        self.check_same_task_run()
+        try:
+            self.check_same_task_run()
+        except Exception as e:
+            self.logger.error(str(e))
+            exit(1)  # exit error
+
         while True:
+            # print('running')
+            # time.sleep(5)
             try:
                 self.loop_buckets()
-            except KeyboardInterrupt as e:
-                msg = f'Exit, KeyboardInterrupt, {str(e)}'
-                self.logger.error(msg)
-                print(msg)
+            except KeyboardInterrupt:
+                self.logger.error('Exit, KeyboardInterrupt')
 
             while self.in_multi_thread:     # 多线程模式下，等待所有线程结束
                 c = threading.active_count()
@@ -119,29 +120,42 @@ class AsyncTask:
 
         self.logger.warning('Exit')
 
-    def check_same_task_run(self):
-        # 检测系统中是否存在该程序进程
-        for pid in psutil.pids():
-            # 不判断当前进程
-            if pid == os.getpid():
-                continue
+    @staticmethod
+    def check_same_task_run():
+        """
+        检测系统中是否存在该程序进程
+
+        :raises: Exception
+        """
+        pid_self = os.getpid()
+        cmd_self = psutil.Process(pid_self).cmdline()
+        pid_list = psutil.pids()
+        if pid_self in pid_list:    # remove self pid
+            pid_list.remove(pid_self)
+
+        cmd_name = sys.argv[0]
+        li = cmd_name.rsplit('/', maxsplit=1)
+        if len(li) == 1:
+            cmd_name = li[0]
+        else:
+            cmd_name = li[1]
+
+        for pid in pid_list:
             # 进程命令
             try:
                 process_line = psutil.Process(pid).cmdline()
-            except:
+            except Exception as e:
                 continue
             if not process_line:
                 continue
 
-            if 'bucket_async_worker' in process_line[0]:
-                print()
+            if "python" in process_line[0]:
+                if cmd_name in process_line[1]:
+                    msg = f"检测到可能有该程序进程正在运行, PID={pid}, Process cmd:{process_line}; 当前Process cmd：{cmd_self}"
+                    raise Exception(msg)
 
-            if "python" in process_line[0] and sys.argv[0] in process_line[1]:
-                msg = f"Exit, 检测到可能有该程序进程正在运行, PID={pid}, Process cmd:{process_line}; 当前Process cmd：{sys.argv}"
-                self.logger.error(msg)
-                exit(1)      # 直接退出
-
-    def get_current_node_num_from_hostname(self):
+    @staticmethod
+    def get_current_node_num_from_hostname():
         f = os.popen("hostname")
         hostname = f.readline().strip()
         host_node_num = hostname.replace("ip", "")
@@ -152,7 +166,6 @@ class AsyncTask:
         except ValueError as e:
             msg = f'Get host node number error, Hostname is {hostname}, ' \
                   f'host node number is {host_node_num}, can not to int'
-            self.logger.error(msg)
             raise ValueError(f'{msg}, {str(e)}')
 
         return host_node_num
@@ -168,6 +181,9 @@ class AsyncTask:
         return False
 
     def loop_buckets(self):
+        """
+        loop all buckets one times
+        """
         manager = AsyncBucketManager()
         last_bucket_id = 0
         while True:
@@ -184,8 +200,12 @@ class AsyncTask:
 
     def async_bucket(self, bucket, last_object_id: int = 0, limit: int = 100, is_loop: bool = True):
         """
+        :param bucket: Bucket instance
         :param last_object_id: 同步id大于last_object_id的对象
+        :param limit: select objects number per times
         :param is_loop: True(循环遍历完桶内所有对象)；False(只查询一次，最多limit个对象，然后结束)
+
+        :raises: Exception, AsyncError
         """
         self.logger.debug(f'Start async Bucket(id={bucket.id}, name={bucket.name}).')
         manager = AsyncBucketManager()
@@ -232,6 +252,8 @@ class AsyncTask:
         :return:
             None    # success
             Error   # failed
+
+        :raises: Exception, AsyncError
         """
         ret = None
         msg = f"[bucket(id={bucket.id}, name={bucket.name})]," \
@@ -269,19 +291,19 @@ PARAM_NAME_LIST = [
 
 def print_help():
     print(
-    f"""
-    python scripts/bucket_async_worker.py [{PARAM_DEBUG}] [{PARAM_HELP}] [{PARAM_NODE_NUM}=1] [{PARAM_NODE_COUNT}=100] ...
+        f"""
+    python scripts/bucket_async_worker.py [{PARAM_DEBUG}] [{PARAM_HELP}] [{PARAM_NODE_NUM}=1] [{PARAM_NODE_COUNT}=100]
+        
+    {PARAM_DEBUG}:          Print debug message, No value is required.
+    {PARAM_HELP}:           Print help message, No value is required.
+    {PARAM_TEST}:           Run cmd but not async objects, No value is required.
+    {PARAM_NODE_NUM}:       Specifies the node number of the command, Required value int; Default try get from hostname. 
+    {PARAM_NODE_COUNT}:     Total number of nodes, Required value int.
+    {PARAM_MULTI_THREAD}:   Work in multi-threading mode, No value is required.
     
-    {PARAM_DEBUG}:          Print debug message.
-    {PARAM_HELP}:           Print help message.
-    {PARAM_TEST}:           Run cmd but not async objects.
-    {PARAM_NODE_NUM}:       Specifies the node number of the command;Default try get from hostname. 
-    {PARAM_NODE_COUNT}:     Total number of nodes.
-    {PARAM_MULTI_THREAD}:   Work in multi-threading mode.
-    
-    * deamon mode run cmd:
+    * daemon mode run cmd:
         nohup cmd >/dev/null 2>&1 &
-    """
+        """
     )
 
 
@@ -309,6 +331,7 @@ def parse_params():
 
     return params
 
+
 def validate_params(params):
     """
     :return: dict
@@ -319,7 +342,7 @@ def validate_params(params):
         try:
             node_num = int(node_num)
         except ValueError as e:
-            raise ValueError(f'Invalid value({node_num}) of param "{PARAM_NODE_NUM}", must be int')
+            raise ValueError(f'Invalid value({node_num}) of param "{PARAM_NODE_NUM}", must be int, {str(e)}')
 
         if node_num <= 0:
             raise ValueError(f'"{PARAM_NODE_NUM}"({node_num}) must be greater than 0')
@@ -331,7 +354,7 @@ def validate_params(params):
         try:
             node_count = int(node_count)
         except ValueError as e:
-            raise ValueError(f'Invalid value({node_count}) of param "{PARAM_NODE_COUNT}", must be int')
+            raise ValueError(f'Invalid value({node_count}) of param "{PARAM_NODE_COUNT}", must be int, {str(e)}')
 
         if node_count <= 0:
             raise ValueError(f'"{PARAM_NODE_COUNT}"({node_count}) must be greater than 0')
@@ -341,9 +364,11 @@ def validate_params(params):
         if PARAM_NODE_NUM in params:
             node_num = params[PARAM_NODE_NUM]
             if node_num > node_count:
-                raise ValueError(f'{PARAM_NODE_NUM}({node_num}) cannot be greater than {PARAM_NODE_COUNT}({node_count})')
+                raise ValueError(
+                    f'{PARAM_NODE_NUM}({node_num}) cannot be greater than {PARAM_NODE_COUNT}({node_count})')
 
     return params
+
 
 def main():
     try:
@@ -359,7 +384,7 @@ def main():
         print_help()
         exit(0)
 
-    kwargs={}
+    kwargs = {}
     if PARAM_TEST in params:
         kwargs['test'] = True
 
