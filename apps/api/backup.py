@@ -3,6 +3,7 @@ from datetime import timedelta
 import requests
 from django.db import close_old_connections
 from django.db.models import Q, F
+from django.db.models.functions import Mod
 from django.utils import timezone
 from django.conf import settings
 
@@ -207,7 +208,7 @@ class AsyncBucketManager:
     def _get_meet_time(self):
         return timezone.now() - timedelta(minutes=self.MEET_ASYNC_TIMEDELTA_MINUTES)
 
-    def _need_async_backup_map(self, bucket, obj):
+    def _need_async_backup_map(self, bucket, obj, backup_num: int = None):
         """
         需要同步的备份点
 
@@ -234,7 +235,11 @@ class AsyncBucketManager:
         if not need_async_nums:
             return backup_map
 
-        backups = bucket.backup_buckets.select_related('bucket').all()
+        lookups = {}
+        if backup_num is not None:
+            lookups['backup_num'] = backup_num
+
+        backups = bucket.backup_buckets.filter(**lookups).select_related('bucket').all()
         for b in backups:
             if b.is_start_async():
                 if b.backup_num in need_async_nums:
@@ -293,7 +298,8 @@ class AsyncBucketManager:
         ).all().order_by('id')[0:limit]
 
     @async_close_old_connections
-    def get_need_async_objects_queryset(self, bucket, id_gt: int = 0, limit: int = 1000, meet_time=None):
+    def get_need_async_objects_queryset(self, bucket, id_gt: int = 0, limit: int = 1000, meet_time=None,
+                                        id_mod_div: int = None, id_mod_equal: int = None, backup_num: int = None):
         """
         获取需要同步的对象的查询集, id正序排序
 
@@ -301,6 +307,9 @@ class AsyncBucketManager:
         :param id_gt: 查询id大于id_gt的数据，实现分页续读
         :param limit: 获取数据的数量
         :param meet_time: 查询upt大于此时间的对象
+        :param id_mod_div: object id求余的除数，和参数id_mod_equal一起使用
+        :param id_mod_equal: object id求余的余数相等的筛选条件，仅在参数id_mod有效时有效
+        :param backup_num: 筛选条件，只查询指定备份点编号需要同步的对象，默认查询所有备份点需要同步的对象
         :return:
             QuerySet
         """
@@ -309,10 +318,13 @@ class AsyncBucketManager:
         object_class = bfm.get_obj_model_class()
 
         backup_nums = []
-        for backup in bucket.backup_buckets.all():
-            if backup.status == BackupBucket.Status.START:
-                if backup.backup_num in backup.BackupNum.values:
-                    backup_nums.append(backup.backup_num)
+        if backup_num is not None:
+            backup_nums.append(backup_num)
+        else:
+            for backup in bucket.backup_buckets.all():
+                if backup.status == BackupBucket.Status.START:
+                    if backup.backup_num in backup.BackupNum.values:
+                        backup_nums.append(backup.backup_num)
 
         if not backup_nums:
             return object_class.objects.none()
@@ -336,6 +348,10 @@ class AsyncBucketManager:
             queryset = queryset.filter(
                 Q(async1__isnull=True) | Q(upt__gt=F('async1')) | Q(async2__isnull=True) | Q(upt__gt=F('async2'))
             ).order_by('id')
+
+        if id_mod_div is not None and id_mod_equal is not None:
+            if id_mod_div >= 1 and (0 <= id_mod_equal < id_mod_div):
+                queryset = queryset.annotate(id_mod=Mod('id', id_mod_div)).filter(id_mod=id_mod_equal)
 
         return queryset[0:limit]
 
@@ -492,7 +508,7 @@ class AsyncBucketManager:
             if not ok:
                 raise err
 
-    def async_bucket_object(self, bucket, obj):
+    def async_bucket_object(self, bucket, obj, backup_num: int = None):
         """
         :return:
             {
@@ -513,6 +529,8 @@ class AsyncBucketManager:
                 ret[num] = (True, None)
             except AsyncError as e:
                 ret[num] = (False, e)
+                backup.error = str(e)[:254]
+                backup.save(update_fields=['error'])
 
         return ret
 
