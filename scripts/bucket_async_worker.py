@@ -73,6 +73,8 @@ class AsyncTask:
             exit(1)     # exit error
 
         self.pool_sem = threading.Semaphore(self.max_threads)  # 定义最多同时启用多少个线程
+        self.ok_count = 0           # 同步对象成功次数
+        self.failed_count = 0       # 同步对象失败次数
 
     def validate_params(self):
         """
@@ -134,7 +136,7 @@ class AsyncTask:
 
             break
 
-        self.logger.warning('Exit')
+        self.logger.warning(f'Exit, async ok: {self.ok_count}, failed: {self.failed_count}')
 
     @staticmethod
     def check_same_task_run():
@@ -219,8 +221,11 @@ class AsyncTask:
         else:
             id_mod_equal = self.node_num
 
+        start_failed = self.failed_count     # 失败次数起始值
+        start_ok = self.ok_count
         manager = AsyncBucketManager()
         last_object_id = last_object_id
+        err_count = 0
         while True:
             try:
                 objs = manager.get_need_async_objects_queryset(
@@ -228,28 +233,55 @@ class AsyncTask:
                     id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
                     backup_num=backup_num
                 )
-                # self.logger.debug(f'objects count:{len(objs)}')
                 if len(objs) == 0:
                     break
-                for obj in objs:
-                    if self.is_object_should_be_handled_by_me(obj.id):
-                        if self.in_multi_thread:
-                            self.create_async_thread(bucket=bucket, obj=obj, backup_num=backup_num)
-                        else:
-                            r = self.async_one_object(bucket=bucket, obj=obj, in_multithread=False,
-                                                      backup_num=backup_num)
-                            if r is not None:
-                                raise r
 
-                    last_object_id = obj.id
+                l_id, err = self.handle_async_objects(bucket=bucket, objs=objs, backup_num=backup_num)
+                if l_id is not None:
+                    last_object_id = l_id
+                if err is not None:
+                    raise err
 
                 if not is_loop:
                     break
+
+                if self.is_unusual_async_failed(failed_start=start_failed, ok_start=start_ok):
+                    self.logger.debug(f"Skip bukcet(id={bucket.id}, name={bucket.name}), async unusual, "
+                                      f"failed: {self.failed_count - start_failed}, ok: {self.ok_count - start_ok}.")
+                    break
+                err_count = 0
             except Exception as err:
+                err_count += 1
+                if err_count >= 3:
+                    break
+
                 self.logger.error(f"Error, async_bucket,{str(err)}")
-                raise err  # continue
+                continue
 
         self.logger.debug(f'Exit async Bucket(id={bucket.id}, name={bucket.name}), Backup number {backup_num}.')
+
+    def handle_async_objects(self, bucket, objs, backup_num: int = None):
+        """
+        :return:
+            (
+                last_object_id,     # int or None, 已同步完成的最后一个对象的id
+                error               # None or Exception, AsyncError
+            )
+        """
+        last_object_id = None
+        for obj in objs:
+            if self.is_object_should_be_handled_by_me(obj.id):
+                if self.in_multi_thread:
+                    self.create_async_thread(bucket=bucket, obj=obj, backup_num=backup_num)
+                else:
+                    r = self.async_one_object(bucket=bucket, obj=obj, in_multithread=False,
+                                              backup_num=backup_num)
+                    if r is not None:
+                        return last_object_id, r
+
+            last_object_id = obj.id
+
+        return last_object_id, None
 
     def create_async_thread(self, bucket, obj, backup_num: int = None):
         if self.pool_sem.acquire():  # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
@@ -286,9 +318,11 @@ class AsyncTask:
                     if not ok:
                         raise err
         except Exception as e:
+            self.failed_count_plus()
             ret = e
             self.logger.error(f"Failed Async, {msg}, {str(e)}")
         else:
+            self.ok_count_plus()
             delta_seconds = time.time() - start_timestamp
             self.logger.debug(f"OK Async, Use {delta_seconds} s, Async actually done num {do_async_num_list}, {msg}")
 
@@ -296,6 +330,33 @@ class AsyncTask:
             self.pool_sem.release()  # 可用线程数+1
 
         return ret
+
+    def failed_count_plus(self):
+        self.failed_count += 1      # 多线程并发时可能有误差，为效率不加互斥锁
+
+    def ok_count_plus(self):
+        self.ok_count += 1      # 多线程并发时可能有误差，为效率不加互斥锁
+
+    def is_unusual_async_failed(self, failed_start: int, ok_start: int):
+        """
+        是否同步失败的次数不寻常
+        :return:
+            True    # unusual
+            False   # usual
+        """
+        count_failed = self.failed_count - failed_start
+        if count_failed < 10:   # 失败次数太少，避免偶然
+            return False
+
+        if count_failed > 1000:   # 失败次数太多
+            return True
+
+        count_ok = self.ok_count - ok_start
+        ratio = count_ok / count_failed     # 成功失败比例
+        if ratio > 3:
+            return False
+
+        return True
 
     def dev_test(self):
         if self.in_multi_thread:
@@ -451,9 +512,13 @@ def get_cmd_name():
     return cmd_name
 
 
-def do_stop(name: str):
-    cmd = f"ps aux | grep {name} | grep -v grep |awk '{{print $2}}' |xargs -r kill -9"
-    os.system(cmd)
+def do_stop():
+    # name = get_cmd_name()
+    # cmd = f"ps aux | grep {name} | grep -v grep |awk '{{print $2}}' |xargs -r kill -9"
+    # os.system(cmd)
+    pid = do_status()
+    if pid is not None:
+        os.system(f"kill -9 {pid}")
 
 
 def check_cmd_run():
@@ -461,12 +526,14 @@ def check_cmd_run():
     检测系统中是否存在该程序进程
 
     :return:
-        int, list
+        (
+            pid: int,        # None(不存在)， int(存在)
+            list
+        )
 
     :raises: Exception
     """
     pid_self = os.getpid()
-    # cmd_self = psutil.Process(pid_self).cmdline()
     pid_list = psutil.pids()
     if pid_self in pid_list:    # remove self pid
         pid_list.remove(pid_self)
@@ -495,6 +562,8 @@ def do_status():
     else:
         print(f"Found running commands, PID={pid}, {cmd_line}")
 
+    return pid
+
 
 def main():
     try:
@@ -514,8 +583,7 @@ def main():
         exit(0)
 
     if PARAM_STOP in params:
-        cmd_name = get_cmd_name()
-        do_stop(cmd_name)
+        do_stop()
         exit(0)
 
     kwargs = {}

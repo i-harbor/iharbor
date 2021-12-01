@@ -1786,6 +1786,28 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         qs = abm.get_need_async_objects_queryset(bucket=bucket)
         self.assertEqual(len(qs), 0)
 
+        # test param id_mod_div, id_mod_equal
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time)
+        self.assertEqual(len(qs), 2)
+        id_mod_div = 1
+        id_mod_equal = 0
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time,
+                                                 id_mod_div=id_mod_div, id_mod_equal=id_mod_equal)
+        self.assertEqual(len(qs), 2)
+
+        id_mod_div = 2
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time,
+                                                 id_mod_div=id_mod_div, id_mod_equal=id_mod_equal)
+        self.assertEqual(len(qs), 1)
+        for o in qs:
+            self.assertEqual(o.id % id_mod_div, id_mod_equal)
+
+        # test param backup_num
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1)
+        self.assertEqual(len(qs), 2)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2)
+        self.assertEqual(len(qs), 2)
+
         # test param in_gt
         qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=1, meet_time=meet_time)
         self.assertEqual(len(qs), 1)
@@ -1799,6 +1821,12 @@ class BackupFunctionTests(MyAPITransactionTestCase):
         qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
         self.assertEqual(len(qs), 1)
         self.assertEqual(qs[0].id, obj2.id)
+
+        # test param backup_num
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1)
+        self.assertEqual(len(qs), 1)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2)
+        self.assertEqual(len(qs), 2)
 
         # obj1.upt = timezone.now()
         obj1.save(update_fields=['upt'])    # upt会自动更新到now time

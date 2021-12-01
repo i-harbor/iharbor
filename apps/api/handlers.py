@@ -217,7 +217,7 @@ class V2ObjectHandler:
         try:
             obj.si = file_size
             obj.md5 = content_md5
-            obj.save(update_fields=['si', 'md5'])
+            obj.save(update_fields=['si', 'md5', 'upt'])
         except Exception as e:
             # 删除数据和元数据
             clean_put(uploader, obj, created, rados)
