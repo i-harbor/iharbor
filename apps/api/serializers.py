@@ -148,6 +148,21 @@ class BucketCreateSerializer(serializers.Serializer):
         request = self.context.get('request')
         user = request.user
 
+        bucket_name = self.validate_bucket_name(bucket_name=bucket_name)
+        data['name'] = bucket_name
+
+        # 用户存储桶限制数量检测
+        bucket_limit_validator(user=user)
+        return data
+
+    @staticmethod
+    def validate_bucket_name(bucket_name: str):
+        """
+        :return:
+            bucket_name: str
+
+        :raises: ValidationError
+        """
         if not bucket_name:
             raise serializers.ValidationError(gettext('存储桶bucket名称不能为空'))
 
@@ -155,12 +170,7 @@ class BucketCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(gettext('存储桶bucket名称不能以“-”开头或结尾'))
 
         DNSStringValidator(bucket_name)
-        bucket_name = bucket_name.lower()
-        data['name'] = bucket_name
-
-        # 用户存储桶限制数量检测
-        bucket_limit_validator(user=user)
-        return data
+        return bucket_name.lower()
 
     def create(self, validated_data):
         """

@@ -120,7 +120,7 @@ class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
     list_filter = ('created_time',)
     search_fields = ('name', 'user__username')  # 搜索字段
     readonly_fields = ('table_name', 'original_id', 'ceph_using')
-    actions = [bucket_stats]
+    actions = [bucket_stats, 'resume_archive_to_bucket']
 
     def delete_model(self, request, obj):
         self.message_user(request=request, message='不允许删除归档记录', level=messages.ERROR)
@@ -128,6 +128,25 @@ class BucketArchiveAdmin(NoDeleteSelectModelAdmin):
     def delete_queryset(self, request, queryset):
         """Given a queryset, delete it from the database."""
         self.message_user(request=request, message='不允许删除操作', level=messages.ERROR)
+
+    @admin.action(description="从归档恢复存储桶")
+    def resume_archive_to_bucket(self, request, queryset):
+        length = len(queryset)
+        if length == 0:
+            self.message_user(request=request, message='你没有选中任何一个桶归档记录', level=messages.ERROR)
+            return
+        if length > 1:
+            self.message_user(request=request, message='每次只能选中一个桶归档记录恢复', level=messages.ERROR)
+            return
+
+        obj = queryset[0]
+        try:
+            obj.resume_archive()
+        except Exception as e:
+            self.message_user(request=request, message=f'恢复存储桶失败，{str(e)}', level=messages.ERROR)
+            return
+
+        self.message_user(request=request, message='恢复存储桶成功', level=messages.SUCCESS)
 
 
 @admin.register(BucketLimitConfig)

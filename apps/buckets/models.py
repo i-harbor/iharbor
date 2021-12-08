@@ -4,7 +4,7 @@ import os
 import hashlib
 from datetime import timedelta, datetime
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models import F, Max
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -504,6 +504,32 @@ class Archive(BucketBase):
             self.save(update_fields=['objs_count', 'size', 'stats_time'])
         except Exception as e:
             pass
+
+    def resume_archive(self, bucket_name: str = None):
+        if not bucket_name:
+            bucket_name = self.name
+
+        bucket = Bucket()
+        bucket.id = self.original_id
+        bucket.name = bucket_name
+        bucket.user_id = self.user_id
+        bucket.created_time = self.created_time
+        bucket.collection_name = self.table_name
+        bucket.access_permission = self.access_permission
+        bucket.modified_time = self.modified_time
+        bucket.objs_count = self.objs_count
+        bucket.size = self.size
+        bucket.stats_time = self.stats_time
+        bucket.ftp_enable = self.ftp_enable
+        bucket.ftp_password = self.ftp_password
+        bucket.pool_name = self.pool_name
+        bucket.type = self.type
+        bucket.ceph_using = self.ceph_using
+        with transaction.atomic():
+            bucket.save(force_insert=True)
+            self.delete()
+
+        return bucket
 
 
 class BucketLimitConfig(models.Model):
