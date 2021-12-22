@@ -522,19 +522,9 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = serializer.save()
         except Exception as e:
+            logger.error(f'创建桶“{bucket.name}”失败, {str(e)}')
             exc = exceptions.Error(message=_('创建桶失败') + str(e))
             return Response(data=exc.err_data_old(), status=exc.status_code)
-
-        col_name = bucket.get_bucket_table_name()
-        bfm = BucketFileManagement(collection_name=col_name)
-        model_class = bfm.get_obj_model_class()
-        if not create_table_for_model_class(model=model_class):
-            if not create_table_for_model_class(model=model_class):
-                bucket.delete()
-                delete_table_for_model_class(model=model_class)
-                logger.error(f'创建桶“{bucket.name}”的数据库表失败')
-                return Response(data={'code': 500, 'code_text': _('创建桶失败，数据库错误')},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         data = {
             'code': 201,

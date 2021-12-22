@@ -11,7 +11,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.apps import apps
 from django.conf import settings
 
-from .models import BucketFileBase, get_str_hexMD5
+from .models import BucketFileBase, get_str_hexMD5, Bucket, get_next_bucket_max_id
 from api import exceptions
 
 
@@ -42,11 +42,11 @@ def get_ceph_alias_rand():
     return random.choice(aliases)
 
 
-def get_ceph_poolname_rand(using: str):
+def get_ceph_poolnames(using: str):
     """
-    从配置的CEPH pool name随机获取一个
+    从配置中获取CEPH pool name元组
     :return:
-        poolname: str
+        tuple
 
     :raises: ValueError
     """
@@ -55,12 +55,26 @@ def get_ceph_poolname_rand(using: str):
         raise ValueError(f'配置文件CEPH_RADOS中别名“{using}”配置中POOL_NAME配置项无效')
 
     if isinstance(pools, str):
-        return pools
+        return (pools,)
 
-    if isinstance(pools, tuple) or isinstance(pools, list):
-        return random.choice(pools)
+    if isinstance(pools, tuple):
+       return pools
+
+    if isinstance(pools, list):
+        return tuple(pools)
 
     raise ValueError(f'配置文件CEPH_RADOS中别名“{using}”配置中POOL_NAME配置项需要是一个元组tuple')
+
+def get_ceph_poolname_rand(using: str):
+    """
+    从配置的CEPH pool name随机获取一个
+    :return:
+        poolname: str
+
+    :raises: ValueError
+    """
+    pools = get_ceph_poolnames(using)
+    return random.choice(pools)
 
 
 def create_table_for_model_class(model):
@@ -127,7 +141,7 @@ def is_model_table_exists(model):
     """
     using = router.db_for_write(model)
     connection = connections[using]
-    return model.Meta.db_table in connection.introspection.table_names()
+    return model._meta.db_table in connection.introspection.table_names()
 
 
 def get_obj_model_class(table_name):
@@ -154,6 +168,54 @@ def get_obj_model_class(table_name):
     meta.abstract = False
     meta.db_table = table_name  # 数据库表名
     return type(model_name, (BucketFileBase,), {'Meta': meta, '__module__': BucketFileBase.__module__})
+
+
+def create_bucket(name: str, user, _id: int = None, ceph_using: str = None, pool_name: str = None):
+    """
+    创建存储桶
+
+    :param name: bucket name
+    :param user: user bucket belong to
+    :param _id: bucket id
+    :param ceph_using: 多ceph集群时，指定使用那个ceph集群
+    :param pool_name: ceph pool name that bucket objects data storage
+    """
+    if not ceph_using and pool_name:
+        raise exceptions.Error(message=f'指定"pool_name"时必须同时指定"ceph_using"')
+
+    if not ceph_using:
+        ceph_using = get_ceph_alias_rand()
+
+    if pool_name:
+        pools = get_ceph_poolnames(ceph_using)
+        if pool_name not in pools:
+            raise exceptions.Error(message=f'指定"pool_name"（{pool_name}）不在"ceph_using"（{ceph_using}）中')
+    else:
+        pool_name = get_ceph_poolname_rand(ceph_using)
+
+    bucket_id = _id
+    bucket_name = name
+    if not _id:
+        bucket_id = get_next_bucket_max_id()
+
+    try:
+        bucket = Bucket(id=bucket_id, name=bucket_name,
+                        ceph_using=ceph_using, pool_name=pool_name,
+                        user=user)
+        bucket.save(force_insert=True)
+    except Exception as e:
+        raise exceptions.Error(message=f"create bucket metadata failed, {str(e)}.")
+
+    col_name = bucket.get_bucket_table_name()
+    bfm = BucketFileManagement(collection_name=col_name)
+    model_class = bfm.get_obj_model_class()
+    if not create_table_for_model_class(model=model_class):
+        if not create_table_for_model_class(model=model_class):
+            bucket.delete()
+            delete_table_for_model_class(model=model_class)
+            raise exceptions.Error(f"create bucket table failed.")
+
+    return bucket
 
 
 def get_bfmanager(path='', table_name=''):
