@@ -6,18 +6,14 @@ from buckets.models import Bucket, BackupBucket
 
 
 class Command(BaseCommand):
-    help = 'manage.py statsbucket --all --name-contains str1 str2 str3 --id-gt=0 --limit=100  --async="async1"'
+    help = 'manage.py bucketasync --all --name-contains str1 str2 str3 --id-gt=0 --limit=100  --async="async1"'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--bucket-name', default=None, dest='bucket-name',
-            help='Name of bucket have been deleted will be clearing,',
+            help='Name of bucket will be action,',
         )
 
-        parser.add_argument(
-            '--days-ago', default='30', dest='days_ago', type=int,
-            help='Clear objects and directories that have been deleted more than days ago.',
-        )
         parser.add_argument(
             # 当命令行有此参数时取值const, 否则取值default
             '--all', default=None, nargs='?', dest='all_deleted', const=True,
@@ -86,8 +82,8 @@ class Command(BaseCommand):
     def action_buckets(self, buckets, options):
         name_contains = options['name-contains']        # None or [str, ]
         async = options['async']
-        if async and async not in ['async1', 'async1']:
-            raise CommandError("async must in ['async1', 'async1']")
+        if async and async not in ['async1', 'async2']:
+            raise CommandError("async must in ['async1', 'async2']")
 
         no_empty_bucket = 0
         buckets_count = len(buckets)
