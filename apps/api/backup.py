@@ -283,19 +283,25 @@ class AsyncBucketManager:
                                    obj_id=obj_key, obj_size=obj.obj_size)
 
     @async_close_old_connections
-    def get_need_async_bucket_queryset(self, id_gt: int = 0, limit: int = 1000):
+    def get_need_async_bucket_queryset(self, id_gt: int = 0, limit: int = 1000, names: list = None):
         """
         获取设置了备份点并开启了备份的所有桶, id正序排序
 
         :param id_gt: 查询id大于id_gt的数据，实现分页续读
         :param limit: 获取数据的数量
+        :param names: bucket name list
         :return:
             QuerySet
         """
-        return Bucket.objects.filter(
+        qs = Bucket.objects.filter(
             id__gt=id_gt,
             backup_buckets__status=BackupBucket.Status.START
-        ).all().order_by('id')[0:limit]
+        )
+
+        if names:
+            qs = qs.filter(name__in=names)
+
+        return qs.order_by('id')[0:limit]
 
     @async_close_old_connections
     def get_need_async_objects_queryset(self, bucket, id_gt: int = 0, limit: int = 1000, meet_time=None,
@@ -508,6 +514,7 @@ class AsyncBucketManager:
             if not ok:
                 raise err
 
+    @async_close_old_connections
     def async_bucket_object(self, bucket, obj, backup_num: int = None):
         """
         :return:

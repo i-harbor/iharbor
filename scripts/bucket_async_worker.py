@@ -7,6 +7,7 @@ import time
 
 import django
 import psutil
+from django.db import connections
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 设置项目的配置文件 不做修改的话就是 settings 文件
@@ -46,7 +47,7 @@ def config_logger(name: str = LOGGER_NAME, level=logging.INFO):
 class AsyncTask:
     def __init__(self, node_num: int = None, node_count: int = 100,
                  in_multi_thread: bool = False, max_threads: int = 10,
-                 test: bool = False, logger=None
+                 test: bool = False, logger=None, buckets: list = None
                  ):
         """
         :param node_num: 当前工作节点编号，不指定尝试从hostname获取
@@ -55,6 +56,7 @@ class AsyncTask:
         :param max_threads: 多线程工作模式时，最大线程数
         :param test: 不同步对象，打印一些参数
         :param logger:
+        :param buckets: 只同步指定桶
         """
         if logger is None:
             logger = logging.getLogger(LOGGER_NAME)
@@ -65,6 +67,7 @@ class AsyncTask:
         self.max_threads = max_threads
         self.node_count = node_count
         self.node_num = node_num
+        self.buckets = buckets
 
         try:
             self.validate_params()
@@ -108,6 +111,9 @@ class AsyncTask:
             mode_str = 'Will Starting in mode single-threading'
 
         self.logger.warning(f'{mode_str}, node_num={self.node_num}, node_count={self.node_count}')
+        if self.buckets:
+            self.logger.warning(f'Only async buckets: {self.buckets}')
+
         if self.test:
             self.logger.warning('Test Mode.')
 
@@ -122,7 +128,7 @@ class AsyncTask:
                 # self.dev_test()
                 for num in BackupBucket.BackupNum.values:
                     self.logger.debug(f"Start Backup number {num} async loop.")
-                    self.loop_buckets(backup_num=num)
+                    self.loop_buckets(backup_num=num, names=self.buckets)
             except KeyboardInterrupt:
                 self.logger.error('Quit soon, because KeyboardInterrupt')
 
@@ -178,7 +184,7 @@ class AsyncTask:
 
         return False
 
-    def loop_buckets(self, backup_num: int):
+    def loop_buckets(self, backup_num: int, names: list = None):
         """
         loop all buckets one times
         """
@@ -186,7 +192,7 @@ class AsyncTask:
         last_bucket_id = 0
         while True:
             try:
-                buckets = manager.get_need_async_bucket_queryset(id_gt=last_bucket_id, limit=10)
+                buckets = manager.get_need_async_bucket_queryset(id_gt=last_bucket_id, limit=10, names=names)
                 if len(buckets) == 0:  # 所有桶循环一遍完成
                     break
                 for bucket in buckets:
@@ -328,6 +334,7 @@ class AsyncTask:
 
         if in_multithread:
             self.pool_sem.release()  # 可用线程数+1
+            connections.close_all()
 
         return ret
 
@@ -399,9 +406,10 @@ PARAM_MULTI_THREAD = 'multi-thread'
 PARAM_MAX_THREADS = 'max-threads'
 PARAM_STOP = 'stop'
 PARAM_STATUS = 'status'
+PARAM_BUCKETS = 'buckets'
 PARAM_NAME_LIST = [
     PARAM_DEBUG, PARAM_HELP, PARAM_TEST, PARAM_NODE_NUM, PARAM_NODE_COUNT, PARAM_MULTI_THREAD, PARAM_MAX_THREADS,
-    PARAM_STOP, PARAM_STATUS
+    PARAM_STOP, PARAM_STATUS, PARAM_BUCKETS
 ]
 
 
@@ -419,6 +427,7 @@ def print_help():
     {PARAM_MAX_THREADS}:    Maximum number of threads when work in multi-threading mode, Required value int.
     {PARAM_STOP}:           Stop process
     {PARAM_STATUS}:         Is it running
+    {PARAM_BUCKETS}:        Only bucket to async, '["name1","name2"]'
     
     * daemon mode run cmd:
         nohup cmd >/dev/null 2>&1 &
@@ -497,6 +506,19 @@ def validate_params(params):
             raise ValueError(f'"{PARAM_MAX_THREADS}"({max_threads}) must be greater than 0')
 
         params[PARAM_MAX_THREADS] = max_threads
+
+    if PARAM_BUCKETS in params:
+        buckets = params[PARAM_BUCKETS]
+        import json
+        try:
+            b = json.loads(buckets)
+        except Exception as e:
+            raise ValueError(f'"{PARAM_BUCKETS}"({buckets}) must be json list, No spaces allowed, {str(e)}')
+
+        if not isinstance(b, list):
+            raise ValueError(f'"{PARAM_BUCKETS}"({buckets}) must be json list')
+
+        params[PARAM_BUCKETS] = b
 
     return params
 
@@ -606,6 +628,9 @@ def main():
         logger = config_logger(level=logging.DEBUG)
     else:
         logger = config_logger(level=logging.DEBUG)
+
+    if PARAM_BUCKETS in params:
+        kwargs['buckets'] = params[PARAM_BUCKETS]
 
     task = AsyncTask(logger=logger, **kwargs)
     task.run()
