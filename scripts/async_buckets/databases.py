@@ -47,6 +47,9 @@ class ConnectionHandler:
     def __iter__(self):
         return iter(self.settings.keys())
 
+    def __del__(self):
+        self.close_all()
+
     def all(self):
         return [self[alias] for alias in self]
 
@@ -56,11 +59,8 @@ class ConnectionHandler:
         return DatabaseWrapper(db, alias)
 
     def close_all(self):
-        for alias in self:
-            try:
-                connection = getattr(self._connections, alias)
-            except AttributeError:
-                continue
+        for alias in self._connections.keys():
+            connection = self._connections[alias]
             connection.close()
 
     def ensure_defaults(self, alias):

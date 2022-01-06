@@ -66,31 +66,27 @@ class IterCephRaods:
         return self.ho.read_obj_generator(offset=self.offset, end=self.size-1, block_size=self.block_size)
 
 
-class AsyncBucketManager:
-    AsyncError = AsyncError
-
+class IharborBucketClient:
     @staticmethod
-    def _build_object_metadata_base_url(backup: dict, object_key: str):
-        endpoint_url = backup['endpoint_url']
+    def _build_object_metadata_base_url(endpoint_url: str, bucket_name: str, object_key: str):
         endpoint_url = endpoint_url.rstrip('/')
         object_key = object_key.lstrip('/')
         object_key = parse.quote(object_key, safe='/')
-        url = f'{endpoint_url}/api/v1/metadata/{backup["bucket_name"]}/{object_key}/'
+        url = f'{endpoint_url}/api/v1/metadata/{bucket_name}/{object_key}/'
         return url
 
     @staticmethod
-    def _build_object_base_url(backup: dict, object_key: str, api_version='v2'):
-        endpoint_url = backup['endpoint_url']
+    def _build_object_base_url(endpoint_url: str, bucket_name: str, object_key: str, api_version='v2'):
         endpoint_url = endpoint_url.rstrip('/')
         object_key = object_key.lstrip('/')
         object_key = parse.quote(object_key, safe='/')
-        url = f'{endpoint_url}/api/{api_version}/obj/{backup["bucket_name"]}/{object_key}'
+        url = f'{endpoint_url}/api/{api_version}/obj/{bucket_name}/{object_key}'
         if api_version == 'v2':
             return url
 
-        return url+'/'
+        return url + '/'
 
-    def _build_post_chunk_url(self, backup: dict, object_key: str, offset: int, reset=None):
+    def _build_post_chunk_url(self, endpoint_url: str, bucket_name: str, object_key: str, offset: int, reset=None):
         querys = {
             'offset': offset
         }
@@ -98,7 +94,8 @@ class AsyncBucketManager:
             querys['reset'] = True
 
         query_str = parse.urlencode(query=querys)
-        base_url = self._build_object_base_url(backup=backup, object_key=object_key)
+        base_url = self._build_object_base_url(
+            endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key)
         return f'{base_url}?{query_str}'
 
     @staticmethod
@@ -112,6 +109,127 @@ class AsyncBucketManager:
             raise Exception(f'package requests no method {method}')
 
         return func(url=url, data=data, headers=headders)
+
+    def create_object_metadata(self, endpoint_url: str, bucket_name: str, object_key: str, bucket_token: str):
+        """
+        :return:
+            True:               success
+        """
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        url = self._build_object_metadata_base_url(
+            endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key)
+        headers = {
+            'Authorization': f'BucketToken {bucket_token}'
+        }
+        try:
+            r = self._do_request(method='post', url=url, data=None, headders=headers)
+        except requests.exceptions.RequestException as e:
+            raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put empty object, {str(e)}',
+                             code='FailedAsyncObject')
+
+        if r.status_code == 200:
+            return True
+
+        raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put empty object, {r.text}',
+                         code='FailedAsyncObject')
+
+    def put_one_object(self, ho, endpoint_url: str, bucket_name: str, object_key: str,
+                       bucket_token: str, object_md5: str):
+        """
+        上传一个对象
+
+        :return:
+            True:               success
+            raise AsyncError:   failed
+            None:               md5 invalid, try async by chunk
+        :raises: AsyncError
+        """
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        api = self._build_object_base_url(endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key)
+        headers = {
+            'Authorization': f'BucketToken {bucket_token}',
+            'Content-MD5': object_md5
+        }
+        if ho is None:
+            data = None
+            headers['Content-Length'] = '0'
+        else:
+            data = IterCephRaods(ho=ho)
+
+        try:
+            r = self._do_request(method='put', url=api, data=data, headders=headers)
+        except requests.exceptions.RequestException as e:
+            raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put object, {str(e)}',
+                             code='FailedAsyncObject')
+
+        if r.status_code == 200:
+            return True
+
+        if r.status_code == 400:
+            data = r.json()
+            code = data.get('code', '')
+            if code in ['BadDigest', 'InvalidDigest']:  # md5和数据不一致
+                return None
+
+        raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put object, {r.text}',
+                         code='FailedAsyncObject')
+
+    def post_object_by_chunk(self, ho, endpoint_url: str, bucket_name: str, object_key: str,
+                             bucket_token: str, per_size: int = 32 * 1024 ** 2):
+        """
+        分片上传一个对象
+
+        :raises: AsyncError
+        """
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        file = FileWrapper(ho=ho).open()
+        while True:
+            offset = file.offset
+            reset = None
+            if offset == 0:
+                reset = True
+
+            api = self._build_post_chunk_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                             object_key=object_key, offset=offset, reset=reset)
+            data = file.read(per_size)
+            if not data:
+                if offset >= file.size:
+                    break
+                raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, read empty bytes from ceph, '
+                                 f'对象同步可能不完整', code='FailedAsyncObject')
+
+            md5_handler = FileMD5Handler()
+            md5_handler.update(offset=0, data=data)
+            hex_md5 = md5_handler.hex_md5
+            headers = {
+                'Authorization': f'BucketToken {bucket_token}',
+                'Content-MD5': hex_md5
+            }
+            try:
+                r = self._do_request(method='post', url=api, data=data, headders=headers)
+                if r.status_code == 200:
+                    continue
+            except requests.exceptions.RequestException as e:
+                pass
+
+            try:
+                r = self._do_request(method='post', url=api, data=data, headders=headers)
+            except requests.exceptions.RequestException as e:
+                raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, {str(e)}',
+                                 code='FailedAsyncObject')
+
+            if r.status_code == 200:
+                continue
+
+            raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, {r.text}',
+                             code='FailedAsyncObject')
+
+        file.close()
+        return True
+
+
+class AsyncBucketManager:
+    AsyncError = AsyncError
 
     @staticmethod
     def get_object_ceph_rados(bucket: dict, obj: dict):
@@ -134,137 +252,29 @@ class AsyncBucketManager:
             True        # 同步成功
 
         """
-        ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
+        client = IharborBucketClient()
+        object_key = obj['na']
         obj_size = obj['si']
         hex_md5 = obj['md5']
+        endpoint_url = backup['endpoint_url']
+        bucket_name = backup['bucket_name']
+        bucket_token = backup['bucket_token']
+
         if obj_size == 0:
-            self.put_one_object(bucket=bucket, obj=obj, ho=None, backup=backup, object_md5=EMPTY_HEX_MD5)
+            client.put_one_object(ho=None, endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                  object_key=object_key, bucket_token=bucket_token, object_md5=EMPTY_HEX_MD5)
             return True
 
+        ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
         if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
-            r = self.put_one_object(bucket=bucket, obj=obj, ho=ho, backup=backup, object_md5=hex_md5)
+            r = client.put_one_object(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                      object_key=object_key, bucket_token=bucket_token, object_md5=hex_md5)
             if r is True:
                 return True
 
-        self.post_object_by_chunk(bucket=bucket, obj=obj, ho=ho, backup=backup)
+        client.post_object_by_chunk(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                    object_key=object_key, bucket_token=bucket_token)
         return True
-
-    def create_object_metadata(self, bucket: dict, obj: dict, backup: dict):
-        key = obj['na']
-        async_time = get_utcnow()
-        url = self._build_object_metadata_base_url(backup=backup, object_key=key)
-        headers = {
-            'Authorization': f'BucketToken {backup["bucket_token"]}'
-        }
-        try:
-            r = self._do_request(method='post', url=url, data=None, headders=headers)
-        except requests.exceptions.RequestException as e:
-            raise AsyncError(message=f'Failed async object({key}), {backup}, put empty object, {str(e)}',
-                             code='FailedAsyncObject')
-
-        if r.status_code == 200:
-            QueryHandler().update_object_async_time(
-                bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
-            return
-
-        raise AsyncError(message=f'Failed async object({key}), {backup}, put empty object, {r.text}',
-                         code='FailedAsyncObject')
-
-    def put_one_object(self, bucket: dict, obj: dict, ho, backup: dict, object_md5: str):
-        """
-        上传一个对象
-
-        :return:
-            True:               success
-            raise AsyncError:   failed
-            None:               md5 invalid, try async by chunk
-        :raises: AsyncError
-        """
-        key = obj['na']
-        async_time = get_utcnow()
-        api = self._build_object_base_url(backup=backup, object_key=key)
-        headers = {
-            'Authorization': f'BucketToken {backup["bucket_token"]}',
-            'Content-MD5': object_md5
-        }
-        if ho is None or obj['si'] == 0:
-            data = None
-            headers['Content-Length'] = '0'
-        else:
-            data = IterCephRaods(ho=ho)
-
-        try:
-            r = self._do_request(method='put', url=api, data=data, headders=headers)
-        except requests.exceptions.RequestException as e:
-            raise AsyncError(message=f'Failed async object({key}), {backup}, put object, {str(e)}',
-                             code='FailedAsyncObject')
-
-        if r.status_code == 200:
-            QueryHandler().update_object_async_time(
-                bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
-            return True
-
-        if r.status_code == 400:
-            data = r.json()
-            code = data.get('code', '')
-            if code in ['BadDigest', 'InvalidDigest']:  # md5和数据不一致
-                return None
-
-        raise AsyncError(message=f'Failed async object({key}), {backup}, put object, {r.text}',
-                         code='FailedAsyncObject')
-
-    def post_object_by_chunk(self, bucket: dict, obj: dict, ho, backup: dict, per_size: int = 32*1024**2):
-        """
-        分片上传一个对象
-
-        :raises: AsyncError
-        """
-        key = obj['na']
-        async_time = get_utcnow()
-        file = FileWrapper(ho=ho).open()
-        while True:
-            offset = file.offset
-            reset = None
-            if offset == 0:
-                reset = True
-
-            api = self._build_post_chunk_url(backup=backup, object_key=key, offset=offset, reset=reset)
-            data = file.read(per_size)
-            if not data:
-                if offset >= file.size:
-                    break
-                raise AsyncError(f'Failed async object({key}), {backup}, post by chunk, read empty bytes from ceph, '
-                                 f'对象同步可能不完整', code='FailedAsyncObject')
-
-            md5_handler = FileMD5Handler()
-            md5_handler.update(offset=0, data=data)
-            hex_md5 = md5_handler.hex_md5
-            headers = {
-                'Authorization': f'BucketToken {backup["bucket_token"]}',
-                'Content-MD5': hex_md5
-            }
-            try:
-                r = self._do_request(method='post', url=api, data=data, headders=headers)
-                if r.status_code == 200:
-                    continue
-            except requests.exceptions.RequestException as e:
-                pass
-
-            try:
-                r = self._do_request(method='post', url=api, data=data, headders=headers)
-            except requests.exceptions.RequestException as e:
-                raise AsyncError(f'Failed async object({key}), {backup}, post by chunk, {str(e)}',
-                                 code='FailedAsyncObject')
-
-            if r.status_code == 200:
-                continue
-
-            raise AsyncError(f'Failed async object({key}), {backup}, post by chunk, {r.text}',
-                             code='FailedAsyncObject')
-
-        file.close()
-        QueryHandler().update_object_async_time(
-            bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
 
     def async_bucket_object(self, bucket, obj, backup):
         """
@@ -273,8 +283,15 @@ class AsyncBucketManager:
 
         """
         # 对象是否需要同步
+        backup_num = backup['backup_num']
+        async_time = get_utcnow()
         try:
-            self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
+            ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
+            if ok:
+                r = QueryHandler().update_object_async_time(
+                    bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+                if not r:
+                    raise AsyncError(message=f'update async{backup_num} failed', code='UpdateAsyncFailed')
         except AsyncError as e:
             raise e
 

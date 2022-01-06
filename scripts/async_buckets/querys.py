@@ -13,7 +13,7 @@ DEFAULT = 'default'
 _metadata_db_lock = threading.Lock()
 
 
-def db_write_lock(func):
+def db_readwrite_lock(func):
     @wraps(func)
     def wrapper(*arge, **kwargs):
         _metadata_db_lock.acquire()
@@ -65,6 +65,7 @@ def db_datetime_str(dt: datetime):
 class QueryHandler:
     MEET_ASYNC_TIMEDELTA_MINUTES = meet_async_timedelta_minutes
 
+    @db_readwrite_lock
     def select(self,using: str, sql: str, result_type: str = 'all'):
         """
         :param result_type: one, all
@@ -99,7 +100,7 @@ class QueryHandler:
     def select_all(self,using: str, sql: str):
         return self.select(using=using, sql=sql, result_type='all')
 
-    @db_write_lock
+    @db_readwrite_lock
     def update(self,using: str, sql: str):
         try:
             conn = get_connection(using)
