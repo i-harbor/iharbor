@@ -1,18 +1,10 @@
-import sys
 import os
 import time
 import threading
 import random
 
-import django
-from django.db import connections
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 设置项目的配置文件 不做修改的话就是 settings 文件
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
-django.setup()
-
-from api.backup import AsyncBucketManager
-from buckets.models import BackupBucket
+from .managers import AsyncBucketManager
+from .querys import QueryHandler
 
 
 class AsyncTask:
@@ -47,8 +39,7 @@ class AsyncTask:
             exit(1)     # exit error
 
         self.pool_sem = threading.Semaphore(self.max_threads)  # 定义最多同时启用多少个线程
-        self.ok_count = 0           # 同步对象成功次数
-        self.failed_count = 0       # 同步对象失败次数
+        self.in_exiting = False         # 多线程时标记是否正在退出
 
     def validate_params(self):
         """
@@ -91,23 +82,32 @@ class AsyncTask:
         while True:
             try:
                 # self.dev_test()
-                for num in BackupBucket.BackupNum.values:
+                for num in [1, 2]:
                     self.logger.debug(f"Start Backup number {num} async loop.")
                     self.loop_buckets(backup_num=num, names=self.buckets)
             except KeyboardInterrupt:
+                self.in_exiting = True
                 self.logger.error('Quit soon, because KeyboardInterrupt')
 
+            key_ipt_count = 0
             while self.in_multi_thread:     # 多线程模式下，等待所有线程结束
-                c = threading.active_count()
-                if c <= 1:
-                    break
+                try:
+                    c = threading.active_count()
+                    if c <= 1:
+                        break
 
-                self.logger.debug(f'There are {c} threads left to end.')
-                time.sleep(2)
+                    self.logger.debug(f'There are {c} threads left to end.')
+                    time.sleep(5)
+                except KeyboardInterrupt:
+                    self.in_exiting = True
+                    key_ipt_count += 1
+                    self.logger.debug(f'You need to enter CTL + C {3 - key_ipt_count} times, will be forced to exit.')
+                    if key_ipt_count >= 3:
+                        break
 
             break
 
-        self.logger.warning(f'Exit, async ok: {self.ok_count}, failed: {self.failed_count}')
+        self.logger.warning('Exit')
 
     @staticmethod
     def get_current_node_num_from_hostname():
@@ -139,130 +139,137 @@ class AsyncTask:
         """
         loop all buckets one times
         """
-        manager = AsyncBucketManager()
         last_bucket_id = 0
+        error_count = 0
         while True:
             try:
-                buckets = manager.get_need_async_bucket_queryset(id_gt=last_bucket_id, limit=10, names=names)
+                buckets = QueryHandler().get_need_async_buckets(id_gt=last_bucket_id, limit=10, names=names)
                 if len(buckets) == 0:  # 所有桶循环一遍完成
                     break
                 for bucket in buckets:
-                    backup = bucket.backup_buckets.filter(backup_num=backup_num).first()
-                    if backup is not None and backup.status == BackupBucket.Status.START:
-                        try:
-                            self.async_bucket(bucket, backup_num=backup_num)       # 同步桶
-                        except Exception as err:
-                            continue
+                    bucket_id = bucket['id']
+                    backup = QueryHandler().get_bucket_backup(bucket_id=bucket_id, backup_num=backup_num)
+                    if backup is not None and backup['status'] == 'start':
+                        if self.in_multi_thread:
+                            self.create_async_bucket_thread(bucket=bucket, backup=backup)
+                        else:
+                            self.async_one_bucket(bucket=bucket, backup=backup)
 
-                    last_bucket_id = bucket.id
+                    last_bucket_id = bucket_id
+                    error_count = 0
             except Exception as err:
                 self.logger.error(f'{str(err)}')
+                error_count += 1
+                if error_count > 5:
+                    break
+
                 continue
 
-    def async_bucket(self, bucket, last_object_id: int = 0, limit: int = 100, is_loop: bool = True,
-                     backup_num: int = None
-                     ):
+    def create_async_bucket_thread(self, bucket: dict, last_object_id: int = 0, limit: int = 100, backup: dict = None):
+        if self.pool_sem.acquire():  # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
+            try:
+                worker = threading.Thread(
+                    target=self.thread_async_one_bucket,
+                    kwargs={'bucket': bucket, 'last_object_id': last_object_id, 'limit': limit, 'backup': backup}
+                )
+                worker.start()
+            except Exception as e:
+                self.pool_sem.release()  # 可用线程数+1
+
+    def thread_async_one_bucket(self, bucket: dict, last_object_id: int = 0, limit: int = 100, backup: dict = None):
+        try:
+            self.async_one_bucket(bucket=bucket, last_object_id=last_object_id, limit=limit, backup=backup)
+        except Exception as e:
+            pass
+        finally:
+            self.pool_sem.release()  # 可用线程数+1
+
+    def async_one_bucket(self, bucket: dict, last_object_id: int = 0, limit: int = 100, backup: dict = None):
         """
         :param bucket: Bucket instance
         :param last_object_id: 同步id大于last_object_id的对象
         :param limit: select objects number per times
-        :param is_loop: True(循环遍历完桶内所有对象)；False(只查询一次，最多limit个对象，然后结束)
-        :param backup_num: 要同步的备份点编号
-
-        :raises: Exception, AsyncError
+        :param backup: 要同步的备份点
         """
-        self.logger.debug(f'Start async Bucket(id={bucket.id}, name={bucket.name}), Backup number {backup_num}.')
+        backup_num = backup["backup_num"]
+        bucket_id = bucket["id"]
+        bucket_name = bucket["name"]
+        self.logger.debug(f'Start async Bucket(id={bucket_id}, name={bucket_name}), Backup number {backup_num}.')
         id_mod_div = self.node_count
         if self.node_count == self.node_num:
             id_mod_equal = 0
         else:
             id_mod_equal = self.node_num
 
-        start_failed = self.failed_count     # 失败次数起始值
-        start_ok = self.ok_count
-        manager = AsyncBucketManager()
+        failed_count = 0
+        ok_count = 0
+        query_hand = QueryHandler()
         last_object_id = last_object_id
-        err_count = 0
         while True:
             try:
-                backup = bucket.backup_buckets.filter(backup_num=backup_num).first()
+                if self.in_exiting:     # 退出中
+                    break
+
+                backup = query_hand.get_bucket_backup(bucket_id=bucket_id, backup_num=backup_num)
                 if backup is None:
                     raise Exception(f'Bucket backup number {backup_num} not exists')
-                elif backup.status != BackupBucket.Status.START:
+                elif backup['status'] != 'start':
                     raise Exception(f'Bucket backup number {backup_num} not start')
 
-                objs = manager.get_need_async_objects_queryset(
-                    bucket, id_gt=last_object_id, limit=limit,
+                objs = query_hand.get_need_async_objects(
+                    bucket_id=bucket_id, id_gt=last_object_id, limit=limit,
                     id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
-                    backup_num=backup_num
+                    backup_nums=[backup_num,]
                 )
                 if len(objs) == 0:
                     break
 
-                l_id, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup)
+                ok_num, l_id, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup)
+                ok_count += ok_num
                 if l_id is not None:
                     last_object_id = l_id
                 if err is not None:
                     raise err
-
-                if not is_loop:
-                    break
-
-                if self.is_unusual_async_failed(failed_start=start_failed, ok_start=start_ok):
-                    self.logger.debug(f"Skip bukcet(id={bucket.id}, name={bucket.name}), async unusual, "
-                                      f"failed: {self.failed_count - start_failed}, ok: {self.ok_count - start_ok}.")
-                    break
-                err_count = 0
             except Exception as err:
-                err_count += 1
-                if err_count >= 3:
+                failed_count += 1
+                if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
+                    self.logger.debug(f"Skip bukcet(id={bucket_id}, name={bucket_name}), async unusual, "
+                                      f"failed: {failed_count}, ok: {ok_count}.")
                     break
 
                 self.logger.error(f"Error, async_bucket,{str(err)}")
                 continue
 
-        self.logger.debug(f'Exit async Bucket(id={bucket.id}, name={bucket.name}), Backup number {backup_num}.')
+        self.logger.debug(f'Exit async Bucket(id={bucket_id}, name={bucket_name}), Backup number {backup_num}, '
+                          f'ok {ok_count}, failed {failed_count}.')
 
-    def handle_async_objects(self, bucket, objs, backup):
+    def handle_async_objects(self, bucket, objs: list, backup: dict):
         """
         :return:
             (
+                int                 # 成功同步对象数
                 last_object_id,     # int or None, 已同步完成的最后一个对象的id
                 error               # None or Exception, AsyncError
             )
         """
+        ok_count = 0
         last_object_id = None
         for obj in objs:
-            if self.is_object_should_be_handled_by_me(obj.id):
-                if self.in_multi_thread:
-                    self.create_async_thread(bucket=bucket, obj=obj, backup=backup)
-                else:
-                    r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
-                    if r is not None:
-                        return last_object_id, r
+            if self.in_exiting:
+                break
 
-            last_object_id = obj.id
+            obj_id = obj['id']
+            if self.is_object_should_be_handled_by_me(obj_id):
+                r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
+                if r is not None:
+                    return ok_count, last_object_id, r
 
-        return last_object_id, None
+            last_object_id = obj_id
+            ok_count += 1
 
-    def create_async_thread(self, bucket, obj, backup):
-        if self.pool_sem.acquire():  # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
-            worker = threading.Thread(
-                target=self.thread_async_one_object,
-                kwargs={'bucket': bucket, 'obj': obj, 'backup': backup}
-            )
-            worker.start()
+        return ok_count, last_object_id, None
 
-    def thread_async_one_object(self, bucket, obj, backup):
-        try:
-            self.async_one_object(bucket=bucket, obj=obj, backup=backup)
-        except Exception as e:
-            pass
-        finally:
-            self.pool_sem.release()  # 可用线程数+1
-            connections.close_all()
-
-    def async_one_object(self, bucket, obj, backup):
+    def async_one_object(self, bucket: dict, obj: dict, backup: dict):
         """
         :return:
             None    # success
@@ -271,8 +278,9 @@ class AsyncTask:
         :raises: Exception, AsyncError
         """
         ret = None
-        msg = f"backup num {backup.backup_num}, [bucket(id={bucket.id}, name={bucket.name})]," \
-              f"[object(id={obj.id}, key={obj.na})];"
+        backup_num = backup['backup_num']
+        msg = f"backup num {backup_num}, [bucket(id={bucket['id']}, name={bucket['name']})]," \
+              f"[object(id={obj['id']}, key={obj['na']}, size={obj['si']})];"
 
         self.logger.debug(f"Start Async, {msg}")
         start_timestamp = time.time()
@@ -281,41 +289,32 @@ class AsyncTask:
                 self.logger.debug(f"Test async {msg}")
                 time.sleep(1)
             else:
-                ok, err = AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup)
-                if not ok:
-                    raise err
+                AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup)
         except Exception as e:
-            self.failed_count_plus()
             ret = e
             self.logger.error(f"Failed Async, {msg}, {str(e)}")
         else:
-            self.ok_count_plus()
             delta_seconds = time.time() - start_timestamp
             self.logger.debug(f"OK Async, Use {delta_seconds} s, {msg}")
 
         return ret
 
-    def failed_count_plus(self):
-        self.failed_count += 1      # 多线程并发时可能有误差，为效率不加互斥锁
-
-    def ok_count_plus(self):
-        self.ok_count += 1      # 多线程并发时可能有误差，为效率不加互斥锁
-
-    def is_unusual_async_failed(self, failed_start: int, ok_start: int):
+    @staticmethod
+    def is_unusual_async_failed(failed_count: int, ok_count: int):
         """
         是否同步失败的次数不寻常
         :return:
             True    # unusual
             False   # usual
         """
-        count_failed = self.failed_count - failed_start
+        count_failed = failed_count
         if count_failed < 10:   # 失败次数太少，避免偶然
             return False
 
         if count_failed > 1000:   # 失败次数太多
             return True
 
-        count_ok = self.ok_count - ok_start
+        count_ok = ok_count
         ratio = count_ok / count_failed     # 成功失败比例
         if ratio > 3:
             return False
@@ -336,9 +335,16 @@ class AsyncTask:
                 break
 
     def test_working_multi_thread(self):
+        from .querys import db_write_lock
+        @db_write_lock
+        def test_do_something(seconds: int):
+            # time.sleep(seconds)
+            pass
+
         def do_something(seconds: int, self, in_multithread: bool = True):
             ident = threading.current_thread().ident
             print(f"Threading ident: {ident}, Start.")
+            test_do_something(seconds)
             time.sleep(seconds)
             if in_multithread:
                 self.pool_sem.release()  # 可用线程数+1

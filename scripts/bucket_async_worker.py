@@ -4,7 +4,11 @@ import logging
 
 import psutil
 
-from async_task import AsyncTask
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+# from async_task import AsyncTask
+from async_buckets import AsyncTask
 
 
 def config_logger(name: str = 'async-logger', level=logging.INFO):

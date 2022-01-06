@@ -208,7 +208,7 @@ class AsyncBucketManager:
     def _get_meet_time(self):
         return timezone.now() - timedelta(minutes=self.MEET_ASYNC_TIMEDELTA_MINUTES)
 
-    def _need_async_backup_map(self, bucket, obj, backup_num: int = None):
+    def _need_async_backup_map(self, bucket, obj, backup):
         """
         需要同步的备份点
 
@@ -235,15 +235,12 @@ class AsyncBucketManager:
         if not need_async_nums:
             return backup_map
 
-        lookups = {}
-        if backup_num is not None:
-            lookups['backup_num'] = backup_num
+        if backup.bucket_id != bucket.id:
+            return backup_map
 
-        backups = bucket.backup_buckets.filter(**lookups).select_related('bucket').all()
-        for b in backups:
-            if b.is_start_async():
-                if b.backup_num in need_async_nums:
-                    backup_map[b.backup_num] = b
+        if backup.is_start_async():
+            if backup.backup_num in need_async_nums:
+                backup_map[backup.backup_num] = backup
 
         return backup_map
 
@@ -325,7 +322,10 @@ class AsyncBucketManager:
 
         backup_nums = []
         if backup_num is not None:
-            backup_nums.append(backup_num)
+            if isinstance(backup_num, list):
+                backup_nums = backup_num
+            else:
+                backup_nums.append(backup_num)
         else:
             for backup in bucket.backup_buckets.all():
                 if backup.status == BackupBucket.Status.START:
@@ -508,38 +508,37 @@ class AsyncBucketManager:
             bucket=bucket, object_id=object_id, object_key=object_key
         )
 
-        r = self.async_bucket_object(bucket=bucket, obj=obj)
-        for num, val in r.items():
-            ok, err = val
-            if not ok:
+        backup_qs = BackupBucket.objects.filter(bucket_id=bucket_id, backup_num__in=BackupBucket.BackupNum.values,
+                                             status=BackupBucket.Status.START).all()
+        for backup in backup_qs:
+            ok, err = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup)
+            if not ok and err is not None:
                 raise err
 
     @async_close_old_connections
-    def async_bucket_object(self, bucket, obj, backup_num: int = None):
+    def async_bucket_object(self, bucket, obj, backup):
         """
         :return:
-            {
-                backup_num:             # key是备份点编号1或2，可能都不存在；1存在表示备份点1进行了同步工作
-                (bool, AsyncError)      # value[0]指示同步是否成功，value[1]为None或者AsyncError
-            }
+            (
+                bool,       # True 成功, False失败，None未同步
+                AsyncError  # 为None或者AsyncError
+            )
         """
         # 对象是否需要同步
-        backup_map = self._need_async_backup_map(bucket=bucket, obj=obj)
+        backup_map = self._need_async_backup_map(bucket=bucket, obj=obj, backup=backup)
         if not backup_map:
-            return {}
+            return None, None
 
         # async
-        ret = {}
-        for num, backup in backup_map.items():
-            try:
-                self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
-                ret[num] = (True, None)
-            except AsyncError as e:
-                ret[num] = (False, e)
-                backup.error = str(e)[:254]
-                backup.save(update_fields=['error'])
+        num, backup = backup_map.popitem()
+        try:
+            self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
+        except AsyncError as e:
+            backup.error = str(e)[:254]
+            backup.save(update_fields=['error'])
+            return False, e
 
-        return ret
+        return True, None
 
     def async_delete_object_to_backup_bucket(self, object_key, backup):
         url = self._build_object_base_url(backup=backup, object_key=object_key, api_version='v1')
@@ -572,18 +571,17 @@ class AsyncBucketManager:
         if obj is not None:     # 对象存在（可能删除后上传同名对象）不需要删除
             return
 
-        # 对象是否需要同步
-        backup_map = self._need_async_backup_map(bucket=bucket, obj=None)
-        if not backup_map:
-            return
+        backup_qs = BackupBucket.objects.filter(bucket_id=bucket_id, backup_num__in=BackupBucket.BackupNum.values,
+                                                status=BackupBucket.Status.START).all()
+        for bp in backup_qs:
+            # 对象是否需要同步
+            backup_map = self._need_async_backup_map(bucket=bucket, obj=None, backup=bp)
+            if not backup_map:
+                return
 
-        # async
-        err = None
-        for num, backup in backup_map.items():
+            # async
+            num, backup = backup_map.popitem()
             try:
                 self.async_delete_object_to_backup_bucket(object_key=object_key, backup=backup)
             except AsyncError as e:
-                err = e
-
-        if err is not None:
-            raise err
+                raise e
