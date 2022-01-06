@@ -1,4 +1,5 @@
 import threading
+from functools import wraps
 import MySQLdb as Database
 from MySQLdb.constants import CLIENT
 from MySQLdb.cursors import DictCursor
@@ -249,3 +250,38 @@ def close_old_connections(**kwargs):
 def get_connection(using: str):
     close_old_connections()
     return connections[using]
+
+
+METADATA = 'metadata'
+DEFAULT = 'default'
+_default_db_lock = threading.Lock()
+_metadata_db_lock = threading.Lock()
+
+def _acquire_lock(using):
+    if using == METADATA:
+        _metadata_db_lock.acquire()
+        return _metadata_db_lock
+    elif using == DEFAULT:
+        _default_db_lock.acquire()
+        return _default_db_lock
+    else:
+        raise Exception(f'Invalid database alias using "{using}"')
+
+
+def db_readwrite_lock(func):
+    """
+    调用被装饰的函数必须使用using关键字参数
+    """
+    @wraps(func)
+    def wrapper(*arge, **kwargs):
+        using = kwargs['using']
+        _lock = _acquire_lock(using)
+
+        try:
+            return func(*arge, **kwargs)
+        except Exception as e:
+            raise e
+        finally:
+            _lock.release()
+
+    return wrapper

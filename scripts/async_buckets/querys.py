@@ -1,30 +1,10 @@
-import threading
-from functools import wraps
 from datetime import timedelta, datetime
 from pytz import utc
 
-from .databases import get_connection, meet_async_timedelta_minutes
-
-
-METADATA = 'metadata'
-DEFAULT = 'default'
-
-
-_metadata_db_lock = threading.Lock()
-
-
-def db_readwrite_lock(func):
-    @wraps(func)
-    def wrapper(*arge, **kwargs):
-        _metadata_db_lock.acquire()
-        try:
-            return func(*arge, **kwargs)
-        except Exception as e:
-            raise e
-        finally:
-            _metadata_db_lock.release()
-
-    return wrapper
+from .databases import (
+    get_connection, meet_async_timedelta_minutes,
+    METADATA, DEFAULT, db_readwrite_lock
+)
 
 
 class BackupNum:
