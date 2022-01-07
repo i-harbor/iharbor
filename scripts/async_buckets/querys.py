@@ -197,16 +197,16 @@ class QueryHandler:
 
         where_list = [f"`fod` AND `id` > {id_gt}"]
         if meet_time is None:
-            meet_time = self._get_meet_time()
+            meet_time = self.get_meet_time()
 
         meet_time_str = db_datetime_str(meet_time)
         where_list.append(f"(`upt` < '{meet_time_str}' OR `upt` IS NULL)")
 
         num_where_items = []
-        if 1 in backup_nums:
+        if BackupNum.ONE in backup_nums:
             num_where_items.append("`async1` IS NULL OR `upt` > `async1`")
 
-        if 2 in backup_nums:
+        if BackupNum.TWO in backup_nums:
             num_where_items.append("`async2` IS NULL OR `upt` > `async2`")
 
         if num_where_items:
@@ -251,7 +251,7 @@ class QueryHandler:
         )
         return self.select_all(using=METADATA, sql=sql)
 
-    def _get_meet_time(self):
+    def get_meet_time(self):
         return datetime.utcnow() - timedelta(minutes=self.MEET_ASYNC_TIMEDELTA_MINUTES)
 
     def update_object_async_time(self, bucket_id, obj_id, async_time, backup_num):

@@ -4,7 +4,7 @@ import threading
 import random
 
 from .managers import AsyncBucketManager
-from .querys import QueryHandler
+from .querys import QueryHandler, BackupNum
 
 
 class AsyncTask:
@@ -219,7 +219,7 @@ class AsyncTask:
                 objs = query_hand.get_need_async_objects(
                     bucket_id=bucket_id, id_gt=last_object_id, limit=limit,
                     id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
-                    backup_nums=[backup_num,]
+                    backup_nums=[backup_num, ]
                 )
                 if len(objs) == 0:
                     break
@@ -260,9 +260,10 @@ class AsyncTask:
 
             obj_id = obj['id']
             if self.is_object_should_be_handled_by_me(obj_id):
-                r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
-                if r is not None:
-                    return ok_count, last_object_id, r
+                if self.is_meet_async_to_backup(obj=obj, backup=backup):
+                    r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
+                    if r is not None:
+                        return ok_count, last_object_id, r
 
             last_object_id = obj_id
             ok_count += 1
@@ -300,6 +301,31 @@ class AsyncTask:
         return ret
 
     @staticmethod
+    def is_meet_async_to_backup(obj, backup):
+        """
+        对象是否满足条件同步到备份点
+
+        :return:
+            True    #
+            False   #
+        """
+        # 对象修改时间超过now足够时间段后才允许同步, 尽量保证对象上传完成后再同步
+        neet_time = QueryHandler().get_meet_time()
+        async1 = obj['async1']
+        async2 = obj['async2']
+        upt = obj['upt']
+        backup_num = backup['backup_num']
+
+        if backup_num == BackupNum.ONE:
+            if async1 is None or (async1 <= upt < neet_time):
+                return True
+        elif backup_num == BackupNum.TWO:
+            if async2 is None or (async2 <= upt < neet_time):
+                return True
+
+        return False
+
+    @staticmethod
     def is_unusual_async_failed(failed_count: int, ok_count: int):
         """
         是否同步失败的次数不寻常
@@ -327,7 +353,8 @@ class AsyncTask:
         else:
             self.test_working(forever=True)
 
-    def test_working(self, forever: bool = False):
+    @staticmethod
+    def test_working(forever: bool = False):
         while True:
             print('Running test')
             time.sleep(5)
@@ -335,19 +362,22 @@ class AsyncTask:
                 break
 
     def test_working_multi_thread(self):
-        from .querys import db_write_lock
-        @db_write_lock
-        def test_do_something(seconds: int):
-            # time.sleep(seconds)
+        from .databases import db_readwrite_lock, DEFAULT, METADATA
+
+        @db_readwrite_lock
+        def test_do_something(seconds: int, using):
+            print(f'using {using}')
+            time.sleep(seconds)
             pass
 
-        def do_something(seconds: int, self, in_multithread: bool = True):
+        def do_something(seconds: int, _self, in_multithread: bool = True):
             ident = threading.current_thread().ident
             print(f"Threading ident: {ident}, Start.")
-            test_do_something(seconds)
-            time.sleep(seconds)
+            using = random.choice([DEFAULT, METADATA])
+            test_do_something(seconds, using=using)
+            # time.sleep(seconds)
             if in_multithread:
-                self.pool_sem.release()  # 可用线程数+1
+                _self.pool_sem.release()  # 可用线程数+1
 
             print(f"Threading ident: {ident}, End.")
 
@@ -355,6 +385,6 @@ class AsyncTask:
             if self.pool_sem.acquire():  # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
                 worker = threading.Thread(
                     target=do_something,
-                    kwargs={'seconds': random.randint(1, 10), 'self': self, 'in_multithread': True}
+                    kwargs={'seconds': random.randint(1, 10), '_self': self, 'in_multithread': True}
                 )
                 worker.start()
