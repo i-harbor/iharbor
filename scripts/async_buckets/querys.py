@@ -42,6 +42,30 @@ def db_datetime_str(dt: datetime):
     return str(dt)
 
 
+def quote_name(name):
+    """
+    :return: str
+        `name`
+    """
+    if name.startswith("`") and name.endswith("`"):
+        return name
+
+    return f"`{name}`"
+
+
+def table_columns(table_name: str):
+    def _table_columns(column: str, table_name: str = table_name):
+        """
+        :return: str
+            `tablename`.`column`
+        """
+        table_name = quote_name(table_name)
+        column = quote_name(column)
+        return f"{table_name}.{column}"
+
+    return _table_columns
+
+
 class QueryHandler:
     MEET_ASYNC_TIMEDELTA_MINUTES = meet_async_timedelta_minutes
 
@@ -106,35 +130,41 @@ class QueryHandler:
         :return:
             str
         """
+        table_name = 'buckets_bucket'
+        tc = table_columns(table_name=table_name)
+        qn = quote_name
         fields = [
-            '`buckets_bucket`.`id`',
-            '`buckets_bucket`.`access_permission`',
-            '`buckets_bucket`.`user_id`',
-            '`buckets_bucket`.`objs_count`',
-            '`buckets_bucket`.`size`',
-            '`buckets_bucket`.`stats_time`',
-            '`buckets_bucket`.`ftp_enable`',
-            '`buckets_bucket`.`ftp_password`',
-            '`buckets_bucket`.`ftp_ro_password`',
-            '`buckets_bucket`.`pool_name`',
-            '`buckets_bucket`.`type`',
-            '`buckets_bucket`.`ceph_using`',
-            '`buckets_bucket`.`name`',
-            '`buckets_bucket`.`created_time`',
-            '`buckets_bucket`.`collection_name`',
-            '`buckets_bucket`.`modified_time`',
-            '`buckets_bucket`.`remarks`',
-            '`buckets_bucket`.`lock`'
+            tc('id'),
+            tc('access_permission'),
+            tc('user_id'),
+            tc('objs_count'),
+            tc('size'),
+            tc('stats_time'),
+            tc('ftp_enable'),
+            tc('ftp_password'),
+            tc('ftp_ro_password'),
+            tc('pool_name'),
+            tc('type'),
+            tc('ceph_using'),
+            tc('name'),
+            tc('created_time'),
+            tc('collection_name'),
+            tc('modified_time'),
+            tc('remarks'),
+            tc('lock')
         ]
-        fields_sql = ','.join(fields)
-        inner_join = "INNER JOIN `buckets_backupbucket` ON (`buckets_bucket`.`id` = `buckets_backupbucket`.`bucket_id`)"
-        where = f"`buckets_backupbucket`.`status` = 'start' AND `buckets_bucket`.`id` > {id_gt}"
+        fields_sql = ', '.join(fields)
+
+        backup_table = 'buckets_backupbucket'
+        backup_tc = table_columns(table_name=backup_table)
+        inner_join = f"INNER JOIN {qn(backup_table)} ON ({tc('id')} = {backup_tc('bucket_id')})"
+        where = f"{backup_tc('status')} = 'start' AND {tc('id')} > {id_gt}"
         if names:
             in_names = ', '.join([f'"{n}"' for n in names])
-            where += f" AND `buckets_bucket`.`name` IN ({in_names})"
+            where += f" AND {tc('name')} IN ({in_names})"
 
-        sql = f'SELECT {fields_sql} FROM `buckets_bucket` {inner_join} WHERE ({where}) ' \
-              f'ORDER BY `buckets_bucket`.`id` ASC LIMIT {limit}'
+        sql = f'SELECT {fields_sql} FROM {qn(table_name)} {inner_join} WHERE ({where}) ' \
+              f'ORDER BY {tc("id")} ASC LIMIT {limit}'
         return sql
 
     def get_need_async_buckets(self, id_gt: int = 0, limit: int = 10, names: list = None):
@@ -172,42 +202,44 @@ class QueryHandler:
             return []
 
         table_name = self._bucket_table_name(bucket_id)
+        tc = table_columns(table_name=table_name)
+        qn = quote_name
         fields = [
-            f'`{table_name}`.`id`',
-            f'`{table_name}`.`na`',
-            f'`{table_name}`.`na_md5`',
-            f'`{table_name}`.`name`',
-            f'`{table_name}`.`fod`',
-            f'`{table_name}`.`did`',
-            f'`{table_name}`.`si`',
-            f'`{table_name}`.`ult`',
-            f'`{table_name}`.`upt`',
-            f'`{table_name}`.`dlc`',
-            f'`{table_name}`.`shp`',
-            f'`{table_name}`.`stl`',
-            f'`{table_name}`.`sst`',
-            f'`{table_name}`.`set`',
-            f'`{table_name}`.`sds`',
-            f'`{table_name}`.`md5`',
-            f'`{table_name}`.`share`',
-            f'`{table_name}`.`async1`',
-            f'`{table_name}`.`async2`'
+            tc('id'),
+            tc('na'),
+            tc('na_md5'),
+            tc('name'),
+            tc('fod'),
+            tc('did'),
+            tc('si'),
+            tc('ult'),
+            tc('upt'),
+            tc('dlc'),
+            tc('shp'),
+            tc('stl'),
+            tc('sst'),
+            tc('set'),
+            tc('sds'),
+            tc('md5'),
+            tc('share'),
+            tc('async1'),
+            tc('async2')
         ]
-        fields_sql = ','.join(fields)
+        fields_sql = ', '.join(fields)
 
-        where_list = [f"`fod` AND `id` > {id_gt}"]
+        where_list = [f"{tc('fod')} AND {tc('id')} > {id_gt}"]
         if meet_time is None:
             meet_time = self.get_meet_time()
 
         meet_time_str = db_datetime_str(meet_time)
-        where_list.append(f"(`upt` < '{meet_time_str}' OR `upt` IS NULL)")
+        where_list.append(f"({tc('upt')} < '{meet_time_str}' OR {tc('upt')} IS NULL)")
 
         num_where_items = []
         if BackupNum.ONE in backup_nums:
-            num_where_items.append("`async1` IS NULL OR `upt` > `async1`")
+            num_where_items.append(f"{tc('async1')} IS NULL OR {tc('upt')} > {tc('async1')}")
 
         if BackupNum.TWO in backup_nums:
-            num_where_items.append("`async2` IS NULL OR `upt` > `async2`")
+            num_where_items.append(f"{tc('async2')} IS NULL OR {tc('upt')} > {tc('async2')}")
 
         if num_where_items:
             num_where = ' OR '.join(num_where_items)
@@ -215,10 +247,10 @@ class QueryHandler:
 
         if id_mod_div is not None and id_mod_equal is not None:
             if id_mod_div >= 1 and (0 <= id_mod_equal < id_mod_div):
-                where_list.append(f"MOD(`id`, {id_mod_div}) = {id_mod_equal}")
+                where_list.append(f"MOD({tc('id')}, {id_mod_div}) = {id_mod_equal}")
 
         where = " AND ".join(where_list)
-        sql = f"SELECT {fields_sql} FROM `{table_name}` WHERE ({where}) ORDER BY `id` ASC LIMIT {limit}"
+        sql = f"SELECT {fields_sql} FROM {qn(table_name)} WHERE ({where}) ORDER BY {tc('id')} ASC LIMIT {limit}"
 
         return sql
 
@@ -257,13 +289,17 @@ class QueryHandler:
     def update_object_async_time(self, bucket_id, obj_id, async_time, backup_num):
         async_time_str = db_datetime_str(async_time)
         table_name = self._bucket_table_name(bucket_id)
+        tc = table_columns(table_name=table_name)
+        qn = quote_name
 
         if backup_num == BackupNum.ONE:
             update_field = 'async1'
         else:
             update_field = 'async2'
 
-        sql = f"UPDATE `{table_name}` SET `{update_field}` = '{async_time_str}' WHERE `id` = {obj_id}"
+        fields_set = f"{tc(update_field)} = '{async_time_str}'"
+        where = f"{tc('id')} = {obj_id}"
+        sql = f"UPDATE {qn(table_name)} SET {fields_set} WHERE {where}"
         rows = self.update(using=METADATA, sql=sql)
         if rows == 1:
             return True
@@ -275,25 +311,33 @@ class QueryHandler:
 
         INNER JOIN `buckets_bucket` ON (`bucket_id` = `buckets_bucket`.`id`)
         """
+        table_name = 'buckets_backupbucket'
+        qn = quote_name
+        tc = table_columns(table_name=table_name)
+
         fields = [
-            '`buckets_backupbucket`.`id`',
-            '`buckets_backupbucket`.`bucket_id`',
-            '`buckets_backupbucket`.`endpoint_url`',
-            '`buckets_backupbucket`.`bucket_token`',
-            '`buckets_backupbucket`.`bucket_name`',
-            'buckets_backupbucket.`created_time`',
-            '`buckets_backupbucket`.`modified_time`',
-            '`buckets_backupbucket`.`remarks`',
-            '`buckets_backupbucket`.`status`',
-            '`buckets_backupbucket`.`backup_num`',
-            '`buckets_backupbucket`.`error`'
+            tc('id'),
+            tc('bucket_id'),
+            tc('endpoint_url'),
+            tc('bucket_token'),
+            tc('bucket_name'),
+            tc('created_time'),
+            tc('modified_time'),
+            tc('remarks'),
+            tc('status'),
+            tc('backup_num'),
+            tc('error')
         ]
         fields_sql = ', '.join(fields)
 
-        where = f"`buckets_backupbucket`.`backup_num` = {backup_num} AND " \
-                f"`buckets_backupbucket`.`bucket_id` = {bucket_id}"
-        sql = f"SELECT {fields_sql} FROM `buckets_backupbucket` WHERE ({where}) " \
-              f"ORDER BY `buckets_backupbucket`.`id` DESC LIMIT 1"
+        where = " AND ".join(
+            [
+                f"{tc('bucket_id')} = {bucket_id}",
+                f"{tc('backup_num')} = {backup_num}"
+            ]
+        )
+        sql = f"SELECT {fields_sql} FROM {qn(table_name)} WHERE ({where}) " \
+              f"ORDER BY {tc('id')} DESC LIMIT 1"
         return sql
 
     def get_bucket_backup(self, bucket_id, backup_num: int):

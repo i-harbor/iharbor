@@ -281,6 +281,7 @@ class AsyncBucketManager:
         :return:
             backup_num
 
+        :raises: AsyncError, CanNotConnection
         """
         # 对象是否需要同步
         backup_num = backup['backup_num']

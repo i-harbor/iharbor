@@ -5,6 +5,7 @@ import random
 
 from .managers import AsyncBucketManager
 from .querys import QueryHandler, BackupNum
+from .databases import CanNotConnection
 
 
 class AsyncTask:
@@ -141,6 +142,7 @@ class AsyncTask:
         """
         last_bucket_id = 0
         error_count = 0
+        can_not_connection = 0
         while True:
             try:
                 buckets = QueryHandler().get_need_async_buckets(id_gt=last_bucket_id, limit=10, names=names)
@@ -157,6 +159,14 @@ class AsyncTask:
 
                     last_bucket_id = bucket_id
                     error_count = 0
+                can_not_connection = max(can_not_connection - 1, 0)
+            except CanNotConnection as exc:
+                can_not_connection += 1
+                if can_not_connection > 6:
+                    break
+
+                self.logger.error(f"Error, loop_buckets, CanNotConnection db, sleep {can_not_connection} s,{str(exc)}")
+                time.sleep(can_not_connection)
             except Exception as err:
                 self.logger.error(f'{str(err)}')
                 error_count += 1
@@ -165,7 +175,7 @@ class AsyncTask:
 
                 continue
 
-    def create_async_bucket_thread(self, bucket: dict, last_object_id: int = 0, limit: int = 100, backup: dict = None):
+    def create_async_bucket_thread(self, bucket: dict, last_object_id: int = 0, limit: int = 1000, backup: dict = None):
         if self.pool_sem.acquire():  # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
             try:
                 worker = threading.Thread(
@@ -195,12 +205,13 @@ class AsyncTask:
         bucket_id = bucket["id"]
         bucket_name = bucket["name"]
         self.logger.debug(f'Start async Bucket(id={bucket_id}, name={bucket_name}), Backup number {backup_num}.')
-        id_mod_div = self.node_count
-        if self.node_count == self.node_num:
-            id_mod_equal = 0
-        else:
-            id_mod_equal = self.node_num
+        # id_mod_div = self.node_count
+        # if self.node_count == self.node_num:
+        #     id_mod_equal = 0
+        # else:
+        #     id_mod_equal = self.node_num
 
+        can_not_connection = 0
         failed_count = 0
         ok_count = 0
         query_hand = QueryHandler()
@@ -218,7 +229,7 @@ class AsyncTask:
 
                 objs = query_hand.get_need_async_objects(
                     bucket_id=bucket_id, id_gt=last_object_id, limit=limit,
-                    id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
+                    # id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
                     backup_nums=[backup_num, ]
                 )
                 if len(objs) == 0:
@@ -230,6 +241,16 @@ class AsyncTask:
                     last_object_id = l_id
                 if err is not None:
                     raise err
+
+                can_not_connection = max(can_not_connection - 1, 0)
+            except CanNotConnection as exc:
+                can_not_connection += 1
+                if can_not_connection > 6:
+                    break
+
+                self.logger.error(f"Error, async Bucket(id={bucket_id}, name={bucket_name}), "
+                                  f"CanNotConnection db, sleep {can_not_connection} s,{str(exc)}")
+                time.sleep(can_not_connection)
             except Exception as err:
                 failed_count += 1
                 if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
@@ -249,7 +270,7 @@ class AsyncTask:
             (
                 int                 # 成功同步对象数
                 last_object_id,     # int or None, 已同步完成的最后一个对象的id
-                error               # None or Exception, AsyncError
+                error               # None or Exception, AsyncError, CanNotConnection
             )
         """
         ok_count = 0
@@ -265,8 +286,9 @@ class AsyncTask:
                     if r is not None:
                         return ok_count, last_object_id, r
 
+                    ok_count += 1
+
             last_object_id = obj_id
-            ok_count += 1
 
         return ok_count, last_object_id, None
 
@@ -274,9 +296,7 @@ class AsyncTask:
         """
         :return:
             None    # success
-            Error   # failed
-
-        :raises: Exception, AsyncError
+            Error   # failed Exception, AsyncError, CanNotConnection
         """
         ret = None
         backup_num = backup['backup_num']

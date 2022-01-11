@@ -14,6 +14,10 @@ class ConnectionDoesNotExist(Exception):
     pass
 
 
+class CanNotConnection(Exception):
+    pass
+
+
 class ConnectionHandler:
     settings_name = 'DATABASES'
     exception_class = ConnectionDoesNotExist
@@ -140,11 +144,17 @@ class DatabaseWrapper:
                     ))
         self.isolation_level = isolation_level
         kwargs.update(options)
+        if 'connect_timeout' not in kwargs:
+            kwargs['connect_timeout'] = 5
+
         return kwargs
 
     def get_new_connection(self, conn_params):
         conn_params['cursorclass'] = DictCursor
-        connection = Database.connect(**conn_params)
+        try:
+            connection = Database.connect(**conn_params)
+        except Database.OperationalError as e:
+            raise CanNotConnection(str(e))
         # bytes encoder in mysqlclient doesn't work and was added only to
         # prevent KeyErrors in Django < 2.0. We can remove this workaround when
         # mysqlclient 2.1 becomes the minimal mysqlclient supported by Django.
