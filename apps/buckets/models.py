@@ -149,9 +149,9 @@ class Bucket(BucketBase):
 
     def save(self, *args, **kwargs):
         if not self.ftp_password or len(self.ftp_password) < 6:
-            self.ftp_password = rand_hex_string()
+            self.set_ftp_password(rand_hex_string())
         if not self.ftp_ro_password or len(self.ftp_ro_password) < 6:
-            self.ftp_ro_password = rand_hex_string()
+            self.set_ftp_ro_password(rand_hex_string())
         super().save(**kwargs)
 
     def delete_and_archive(self):
