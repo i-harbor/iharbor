@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 ExecStart=/usr/local/bin/uwsgi --ini /home/uwsgi/iharbor/iharbor_uwsgi.ini
-ExecReload=/usr/local/bin/uwsgi --stop /home/uwsgi/iharbor/uwsgi-master.pid
-ExecStop=/usr/local/bin/uwsgi --reload /home/uwsgi/iharbor/uwsgi-master.pid
+ExecReload=/usr/local/bin/uwsgi --reload /home/uwsgi/iharbor/uwsgi-master.pid
+ExecStop=/usr/local/bin/uwsgi --stop /home/uwsgi/iharbor/uwsgi-master.pid
 Restart=on-failure
 
 [Install]
