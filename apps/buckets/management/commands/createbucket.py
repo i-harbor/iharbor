@@ -1,17 +1,17 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from buckets.utils import BucketFileManagement, create_bucket, create_table_for_model_class, delete_table_for_model_class
+from buckets.utils import create_bucket
 from buckets.models import Bucket
 from users.models import UserProfile
 
 
 class Command(BaseCommand):
-    '''
-    为bucket table执行sql
-    '''
     error_buckets = []
 
-    help = """"""
+    help = """
+    create bucket: 
+    manage.py --bucket-name="xxx" [--id=x] --username="xxx"
+    """
 
     def add_arguments(self, parser):
         parser.add_argument(

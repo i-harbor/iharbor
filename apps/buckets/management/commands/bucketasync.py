@@ -6,6 +6,9 @@ from buckets.models import Bucket, BackupBucket
 
 
 class Command(BaseCommand):
+    """
+    设置桶内对象的同步备份点标记为null
+    """
     help = 'manage.py bucketasync --all --name-contains str1 str2 str3 --id-gt=0 --limit=100  --async="async1"'
 
     def add_arguments(self, parser):

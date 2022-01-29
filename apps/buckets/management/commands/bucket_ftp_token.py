@@ -8,13 +8,29 @@ from users.models import UserProfile
 
 
 class Command(BaseCommand):
-    '''
-    为bucket table执行sql
-    '''
     error_buckets = []
 
-    help = """** manage.py buckettable --all --sql="sql template" **
-           """
+    help = """
+        export bucket token to file '/home/export-bucket-token.txt':
+        [manage.py bucket_ftp_token --export-bucket-token];
+    
+        import bucket token from file:
+        running in (--host) iharbor service
+        [manage.py bucket_ftp_token --import-bucket-token];
+    
+        upate bucket ftp status、password to another iharbor service(--host) same name bucket:
+        [manage.py bucket_ftp_token --ftp-update --all --id-gt=0 --host="x.x.x.x" --token="xxx"];
+    
+        upate bucket public/private permission to another iharbor service(--host) same name bucket:
+        [manage.py bucket_ftp_token --permission --all --id-gt=0 --host="x.x.x.x" --token="xxx"];
+    
+        export bucket with user to file '/home/export-buckets.txt':
+        [manage.py bucket_ftp_token --export-buckets];
+    
+        belong bucket to user by file '/home/export-buckets.txt':
+        running in (--host) iharbor service
+        [manage.py bucket_ftp_token --to-user];
+    """
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -243,7 +259,6 @@ class Command(BaseCommand):
                 f.write(line)
 
         self.stdout.write(self.style.SUCCESS(f'Successfully export {len(buckets)} buckets to file: {filename}'))
-
 
     def get_buckets_map(self, filename='/home/export-buckets.txt'):
         buckets_map = {}

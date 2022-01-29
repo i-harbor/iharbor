@@ -1,11 +1,14 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from buckets.models import Bucket, Archive
-from api.validators import DNSStringValidator, ValidationError
+from api.validators import ValidationError
 from api.serializers import BucketCreateSerializer
 
 
 class Command(BaseCommand):
+    """
+    恢复删除的桶
+    """
     help = 'manage.py resumebucket --archive-id=1 --bucket-name="test"'
 
     def add_arguments(self, parser):
