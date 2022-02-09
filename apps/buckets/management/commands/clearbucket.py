@@ -14,7 +14,7 @@ class Command(BaseCommand):
     """
     清理bucket命令，清理满足彻底删除条件的对象和目录
     """
-    pool_sem = threading.Semaphore(1000)  # 定义最多同时启用多少个线程
+    pool_sem = threading.Semaphore(10)  # 定义最多同时启用多少个线程
 
     help = 'Really delete objects and directories that have been deleted from a bucket'
     _clear_datetime = None
@@ -39,11 +39,21 @@ class Command(BaseCommand):
             '--multithreading', default=None, nargs='?', dest='multithreading', const=True,
             help='use multithreading mode.',
         )
+        parser.add_argument(
+            '--max-threads', default=10, dest='max-threads', type=int,
+            help='max threads on multithreading mode.',
+        )
 
     def handle(self, *args, **options):
+        max_threads = options.get('max-threads')
+        if not max_threads or max_threads < 1:
+            raise CommandError(f"Clearing buckets cancelled. invalid value of 'max-threads', {max_threads}")
+
+        self.pool_sem = threading.Semaphore(max_threads)  # 定义最多同时启用多少个线程
+
         multithreading = options.get('multithreading')
         if multithreading:
-            self.stdout.write(self.style.NOTICE('work mode in multithreading'))
+            self.stdout.write(self.style.NOTICE(f'work mode in multithreading, max_threads {max_threads}'))
         else:
             self.stdout.write(self.style.NOTICE('work mode in one thread'))
 
@@ -85,7 +95,7 @@ class Command(BaseCommand):
 
         # 全部已删除归档的桶
         if all_deleted:
-            self.stdout.write(self.style.NOTICE('Will clear all buckets that have been softly deleted '))
+            self.stdout.write(self.style.NOTICE('Will clear all buckets that have been deleted '))
             return Archive.objects.filter(type=Archive.TYPE_COMMON, archive_time__lt=self._clear_datetime).all()
 
         # 未给出参数
@@ -135,7 +145,15 @@ class Command(BaseCommand):
 
         return False
 
-    def clear_one_bucket(self, bucket, in_thread: bool = True):
+    def thread_clear_one_bucket(self, bucket):
+        try:
+            self.clear_one_bucket(bucket=bucket)
+        except Exception as e:
+            pass
+        finally:
+            self.pool_sem.release()  # 可用线程数+1
+
+    def clear_one_bucket(self, bucket):
         """
         清除一个bucket中满足删除条件的对象和目录
 
@@ -153,7 +171,9 @@ class Command(BaseCommand):
 
         pool_name = bucket.get_pool_name()
         try:
+            times = 0
             while True:
+                times += 1
                 ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id='')
                 objs = self.get_objs_and_dirs(model_class=model_class)
                 if objs is None or len(objs) <= 0:
@@ -173,7 +193,7 @@ class Command(BaseCommand):
                         obj.delete()
 
                 self.stdout.write(self.style.WARNING(
-                    f"Success deleted {objs.count()} objects from bucket {bucket.name}."))
+                    f"{times} Success deleted {objs.count()} objects from bucket {bucket.name}."))
 
             # 如果bucket对应表没有对象了，删除bucket和表
             if model_class.objects.filter(fod=True).count() == 0:
@@ -191,9 +211,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}'))
 
-        if in_thread:
-            self.pool_sem.release()     # 可用线程数+1
-
     def clear_buckets_multithreading(self, buckets):
         """
         多线程清理bucket
@@ -202,7 +219,7 @@ class Command(BaseCommand):
         """
         for bucket in buckets:
             if self.pool_sem.acquire():     # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
-                worker = threading.Thread(target=self.clear_one_bucket, kwargs={'bucket': bucket})
+                worker = threading.Thread(target=self.thread_clear_one_bucket, kwargs={'bucket': bucket})
                 worker.start()
 
         # 等待所有线程结束
@@ -216,7 +233,7 @@ class Command(BaseCommand):
     def clear_buckets(self, buckets):
         for bucket in buckets:
             try:
-                self.clear_one_bucket(bucket, in_thread=False)
+                self.clear_one_bucket(bucket)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'deleted bucket({bucket.name}) table error: {e}'))
 
