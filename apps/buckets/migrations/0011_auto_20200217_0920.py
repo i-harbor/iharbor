@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='bucket',
             name='remarks',
-            field=models.CharField(default='', max_length=255, verbose_name='备注'),
+            field=models.CharField(blank=True, default='', max_length=255, verbose_name='备注'),
         ),
     ]

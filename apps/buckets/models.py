@@ -115,7 +115,7 @@ class Bucket(BucketBase):
     created_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     collection_name = models.CharField(max_length=50, default='', blank=True, verbose_name='存储桶对应的表名')
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
-    remarks = models.CharField(verbose_name='备注', max_length=255, default='')
+    remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
     lock = models.SmallIntegerField(verbose_name=_('读写锁'), default=LOCK_READWRITE, choices=CHOICES_LOCK,
                                     help_text=_('锁定存储桶，控制存储桶的读写。'))
 
