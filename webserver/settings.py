@@ -184,7 +184,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'buckets.authentication.BucketTokenAuthentication',
-        'api.s3v4.S3V4Authentication',
+        'api.authentications.aai.authentication.AAIJWTAuthentication',
+        # 'api.authentications.s3v4.S3V4Authentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
@@ -229,6 +230,29 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+}
+
+PASSPORT_JWT = {
+    'ALGORITHM': 'RS512',
+    'SIGNING_KEY': '',
+    # 'VERIFYING_KEY': None,
+    # 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    # 'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUDIENCE': None,
+    'ISSUER': None,
+
+    'AUTH_HEADER_TYPES': ('AAI-JWT',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'username',
+    'USER_ID_CLAIM': 'email',              # 'cstnetId','email'
+    'TOKEN_TYPE_CLAIM': 'type',
+    'EXPIRATION_CLAIM': 'exp',
+
+    # 'JTI_CLAIM': 'jti'
+
+    # passort jwt field
+    'ORG_NAME_FIELD': 'orgName',
+    'TRUE_NAME_FIELD': 'name'
 }
 
 # 日志配置
