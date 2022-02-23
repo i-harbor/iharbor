@@ -15,6 +15,10 @@ Json web token认证方式，使用简单，包括access jwt和refresh jwt，acc
 jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“Bearer”为前缀，空格分隔两个字符串，例如：   
 `Authorization: Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
 
+## 科技云通行证JWT认证
+支持科技云通行证JWT认证，jwt应包含在Authorization HTTP标头中，密钥应以字符串文字“AAI-JWT”为前缀，空格分隔两个字符串，例如：   
+`Authorization: AAI-JWT eyJhbGciOiAiSFMyNTYiLCAidHlwIj`
+
 ## 访问密钥  
 访问密钥是一个密钥对（AccessKey和SecretKey），AccessKey会在网络中传输，SecretKey不在网络上传输，需要用户妥善保管。
 密钥对用于安全凭证的生成，通过一些签名算法，以SecretKey为加密参数，对一些适当的数据内容进行加密生成安全凭证。访问密钥认证
