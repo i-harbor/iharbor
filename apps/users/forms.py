@@ -147,8 +147,15 @@ class LoginForm(forms.Form):
         password = self.cleaned_data.get('password')
 
         #验证用户
-        user = authenticate(username=username, password=password)
-        if not user:
+        try:
+            user = User.objects.get_by_natural_key(username)
+        except User.DoesNotExist:
+            raise forms.ValidationError(_('用户名或密码有误，请注意区分字母大小写'))
+
+        if not user.is_active:
+            raise forms.ValidationError(_('用户未激活'))
+        
+        if not user.check_password(password):
             raise forms.ValidationError(_('用户名或密码有误，请注意区分字母大小写'))
         else:
             if user.third_app != user.LOCAL_USER:

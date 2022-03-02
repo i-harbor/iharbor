@@ -91,6 +91,21 @@ class UserProfile(AbstractUser):
         '''是否是第三方app接入特殊超级用户'''
         return self.role == self.ROLE_APP_SUPPER_USER
 
+    def active_user(self, raise_error=False):
+        if self.is_active:
+            return True
+
+        self.is_active = True
+        try:
+            self.save(update_fields=['is_active'])
+        except Exception as e:
+            if raise_error:
+                raise e
+
+            return False
+
+        return True
+
 
 class Email(models.Model):
     '''

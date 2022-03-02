@@ -240,11 +240,14 @@ def active_user(request):
     try:
         token = Token.objects.select_related('user').get(key=key)
     except Token.DoesNotExist:
-        return render(request, 'message.html', context={'message': _('用户激活失败，无待激活账户，或者账户已被激活，请直接尝试登录'), 'urls': urls})
+        return render(request, 'message.html', context={
+            'message': _('用户激活失败，无待激活账户，或者账户已被激活，请直接尝试登录'), 'urls': urls})
 
     user = token.user
-    user.is_active = True
-    user.save()
+    try:
+        user.active_user(raise_error=True)
+    except Exception as e:
+        return render(request, 'message.html', context={'message': _('用户激活失败。') + str(e), 'urls': urls})
 
     reflesh_new_token(token)
 

@@ -62,6 +62,9 @@ def create_kjy_auth_user(request, token):
         user = None
     # 已存在, 返回用户
     if user:
+        if not user.is_active:
+            user.active_user()
+
         return user
 
     # 创建用户
