@@ -442,6 +442,9 @@ SWAGGER_SETTINGS = {
 # 自定义文件上传处理文件大小限制, type: int
 CUSTOM_UPLOAD_MAX_FILE_SIZE = 10 * 2**30  # 10GB; None: 无限制
 
+# 临时缓存文件路径设置
+FILE_UPLOAD_TEMP_DIR = '/dev/shm'
+
 # bucket备份同步相关自定义设置
 BACKUP_BUCKET_SETTINGS = {
     # 对象修改时间与async同步时间的时间差大于此设定值（尽量确保对象已上传完成），才允许同步;在同步时使用此参数
