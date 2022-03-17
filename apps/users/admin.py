@@ -5,10 +5,6 @@ from django.utils.translation import ugettext_lazy as _
 from .models import UserProfile, Email, AuthKey
 
 
-admin.site.site_header = 'iHarbor管理'
-admin.site.site_title = 'iHarbor站点管理'
-
-
 @admin.register(UserProfile)
 class UserProfileAdmin(UserAdmin):
     list_display = ('id', 'username', 'fullname', 'company', 'telephone', 'is_active', 'is_staff', 'last_active', 'date_joined')
