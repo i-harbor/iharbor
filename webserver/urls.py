@@ -22,7 +22,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-from .views import kjy_login_callback
+from .views import kjy_login_callback, home
 from . import admin_site    # admin后台一些设置
 
 schema_view = get_schema_view(
@@ -38,6 +38,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('api/', include('api.urls', namespace='api')),
     path('share/', include('share.urls', namespace='share')),
+    path('', home, name='home'),
     path('', include('buckets.urls', namespace='buckets')),
     path('users/', include('users.urls', namespace='users')),
     path('admin/', admin.site.urls),

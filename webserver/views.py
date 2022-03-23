@@ -1,11 +1,16 @@
 from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
+from django.urls import reverse
 import requests
 import json
 
 
 User = get_user_model()     # 获取用户模型
+
+
+def home(request, *args, **kwargs):
+    return redirect(to=reverse('buckets:bucket_view'))
 
 
 def kjy_login_callback(request, *args, **kwargs):

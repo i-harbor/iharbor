@@ -1,5 +1,6 @@
 import math
 
+from django.conf import settings
 from django import template
 from django.template.defaultfilters import stringfilter
 
@@ -38,4 +39,8 @@ def format_size(size):
     else:
         return f'{(size/(1024**4)):.4} TB'
 
+
+@register.simple_tag(name='get_frontend_url')
+def do_get_frontend_url():
+    return getattr(settings, 'FRONTEND_URL', None)
 

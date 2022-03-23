@@ -1,6 +1,7 @@
 {% extends 'html.html' %}
 {% load static %}
 {% load i18n %}
+{% load custom_filters %}
 
 {% block page-head %}
     <script type="text/javascript" src="{% url 'javascript-catalog' %}"></script>
@@ -13,7 +14,13 @@
 {#        <a class="navbar-brand" href="#"><img class="navbar-brand" src="{% static 'images/icon/logo_pic.png' %}" height="30"></a>#}
 {#        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '地球大数据科学工程对象云存储' %}</a>#}
         <a class="navbar-brand" href="#"><img src="{% static 'images/icon/logo.png' %}" height="30"></a>
-        <a class="navbar-brand" href="{% url 'buckets:bucket_view' %}">{% trans '对象存储服务' %}</a>
+        <a class="navbar-brand" href="{% url 'home' %}">{% trans '对象存储服务' %}</a>
+        {% get_frontend_url as front_url %}
+        {% if front_url %}
+            <a class="nav-link" href="{{ front_url }}">{% trans '管理控制台' %}</a>
+        {% else %}
+            <a class="nav-link" href="{% url 'buckets:bucket_view' %}">{% trans '管理控制台' %}</a>
+        {% endif %}
 
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
                 aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
