@@ -1,0 +1,1 @@
+"use strict";(self["webpackChunkiharbor_front"]=self["webpackChunkiharbor_front"]||[]).push([[47],{5047:(s,r,a)=>{a.r(r),a.d(r,{default:()=>o});var t=a(3673);const e={class:"FTP"},c=(0,t.aZ)({setup(s){return(s,r)=>((0,t.wg)(),(0,t.iD)("div",e," this is FTP "))}});var i=a(4260);const n=(0,i.Z)(c,[["__scopeId","data-v-9b0db002"]]),o=n}}]);
