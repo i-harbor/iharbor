@@ -7,6 +7,7 @@ from rest_framework import viewsets, exceptions as rf_exceptions
 from rest_framework.views import set_rollback
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
+from rest_framework import serializers
 
 from api import exceptions
 
@@ -78,6 +79,8 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
     """
     自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
     """
+    serializer_class = serializers.Serializer
+
     def get_serializer(self, *args, **kwargs):
         """
         Return the serializer instance that should be used for validating and

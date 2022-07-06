@@ -117,7 +117,7 @@ class TokenBackend:
         # For PyJWT >= 2.0.0a1
         return token
 
-    def decode(self, token, verify=True):
+    def decode(self, token, verify_signature=True):
         """
         Performs a validation of the given token and returns its payload
         dictionary.
@@ -125,13 +125,14 @@ class TokenBackend:
         signature check fails, or if its 'exp' claim indicates it has expired.
         """
         try:
-            pj = PyJWT()
-            payload = pj.decode(
-                token, self.verifying_key, algorithms=[self.algorithm], verify=verify,
+            return PyJWT().decode_complete(
+                token, self.verifying_key, algorithms=[self.algorithm],
                 audience=self.audience, issuer=self.issuer,
-                options={'verify_aud': self.audience is not None})
-            header = pj.get_unverified_header(token)
-            return {'payload': payload, 'header': header}
+                options={
+                    'verify_aud': self.audience is not None,
+                    'verify_signature': verify_signature
+                }
+            )
         except InvalidAlgorithmError as ex:
             raise JWTInvalidError('Invalid algorithm specified') from ex
         except InvalidTokenError:
@@ -163,12 +164,23 @@ class Token:
         self.current_time = make_utc(datetime.utcnow())
 
         # Set up token
-        self.decode_token = token_backend.decode(token, verify=verify)
-        self.headers = self.decode_token['header']
-        self.payload = self.decode_token['payload']
+        if token is not None:
+            self.decode_token = token_backend.decode(token, verify_signature=verify)
+            self.headers = self.decode_token['header']
+            self.payload = self.decode_token['payload']
 
-        if verify:
-            self.verify()
+            if verify:
+                self.verify()
+        else:
+            # New token.  Skip all the verification steps.
+            self.headers = {JWT_SETTINGS.TOKEN_TYPE_CLAIM: self.token_type}
+            self.payload = {}
+
+            # Set "exp" claim with default value
+            self.set_exp(from_time=self.current_time, lifetime=self.lifetime)
+
+            # Set "jti" claim
+            self.set_jti()
 
     def __repr__(self):
         return repr(self.payload)
