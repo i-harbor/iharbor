@@ -94,9 +94,9 @@ def create_table_for_model_class(model):
                 try:
                     table_name = schema_editor.quote_name(model._meta.db_table)
                     sql1 = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT " \
-                           f"NULL COLLATE 'utf8_bin' AFTER `id`;"
+                           f"NULL COLLATE 'utf8mb4_bin' AFTER `id`;"
                     sql2 = f"ALTER TABLE {table_name} CHANGE COLUMN `name` `name` VARCHAR(255) " \
-                           f"NOT NULL COLLATE 'utf8_bin' AFTER `na_md5`;"
+                           f"NOT NULL COLLATE 'utf8mb4_bin' AFTER `na_md5`;"
                     schema_editor.execute(sql=sql1)
                     schema_editor.execute(sql=sql2)
                 except Exception as exc:
