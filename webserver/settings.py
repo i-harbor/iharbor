@@ -167,7 +167,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 APPEND_SLASH = False
 
 # 登陆url
-LOGIN_URL = '/users/signin/'
+LOGIN_URL = '/users/login/'
 LOGOUT_URL = '/users/logout/'
 LOCAL_LOGIN_USE = True
 

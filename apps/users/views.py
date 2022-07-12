@@ -120,7 +120,7 @@ def change_password(request):
             user.save()
 
             #注销当前用户，重新登陆
-            login_url = reverse('users:login')
+            login_url = reverse('users:local_login')
 
             if user.third_app == User.THIRD_APP_KJY: # 如果当前未第三方科技云通行证登录认证
                 logout(request)
