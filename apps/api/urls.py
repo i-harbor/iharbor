@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import auth
 from . import views
+from .views_v1.bucketbackup import BackupNodeViewSet
 from .routers import DetailPostRouter, DetailListPostRouter
 from users.auth.views import ObtainAuthKey
 from . import v2views
@@ -32,6 +33,9 @@ router.register(r'search/object', views.SearchObjectViewSet, basename='search-ob
 router.register(r'list/bucket',
                 views.ListBucketObjectViewSet, basename='list-bucket')
 
+no_slash_router = DefaultRouter(trailing_slash=False)
+no_slash_router.register(r'backup', BackupNodeViewSet, basename='backup_bucket')
+
 dlp_router = DetailListPostRouter()
 dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryViewSet, basename='dir')
 
@@ -54,6 +58,7 @@ urlpatterns = [
     path('v1/', include(router.urls)),
     path('v1/', include(detail_router.urls)),
     path('v1/', include(no_slash_detail_router.urls)),
+    path('v1/', include(no_slash_router.urls)),
     path('v1/', include(dlp_router.urls)),
     path('v2/', include(v2_detail_router.urls)),
     path('v1/auth-token/', auth.obtain_auth_token, name='auth-token'),

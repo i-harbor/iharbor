@@ -252,6 +252,8 @@ class ObjInfoSerializer(serializers.Serializer):
     access_permission = serializers.SerializerMethodField()     # 公共读权限
     access_code = serializers.SerializerMethodField()  # 公共读权限
     md5 = serializers.SerializerMethodField(method_name='get_md5')
+    async1 = serializers.DateTimeField()
+    async2 = serializers.DateTimeField()
 
     def get_md5(self, obj):
         return obj.hex_md5
@@ -368,3 +370,34 @@ class ListBucketObjectsSerializer(serializers.Serializer):
     @staticmethod
     def get_is_object(obj):
         return obj.fod
+
+
+class BucketBackupSerializer(serializers.Serializer):
+    """
+    存储桶备份点
+    """
+    endpoint_url = serializers.URLField(
+        label='备份点服务地址', max_length=255, required=True, help_text='http(s)://exemple.com')
+    bucket_name = serializers.CharField(max_length=63, label='备份点bucket名称', required=True)
+    bucket_token = serializers.CharField(max_length=64, label='备份点bucket读写token', required=True)
+    backup_num = serializers.IntegerField(label='备份点编号', required=True, min_value=1, max_value=2)
+    remarks = serializers.CharField(label='备注', required=False, max_length=255, allow_blank=True, default='')
+
+    id = serializers.IntegerField(label='ID', read_only=True)
+    created_time = serializers.DateTimeField(label='创建时间', read_only=True)
+    modified_time = serializers.DateTimeField(label='修改时间', read_only=True)
+    status = serializers.CharField(label='状态', max_length=16, read_only=True)
+    error = serializers.CharField(label='错误信息', max_length=255, read_only=True)
+    bucket = serializers.SerializerMethodField(label='存储桶', read_only=True, method_name='get_bucket')
+
+    def get_bucket(self, obj):
+        return {
+            'id': obj.bucket.id,
+            'name': obj.bucket.name
+        }
+
+    @staticmethod
+    def get_id(obj):
+        return {
+            'id': obj.id,
+        }
