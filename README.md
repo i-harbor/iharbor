@@ -100,7 +100,7 @@ python manage.py migrate
 
 #### 2.3.2 生产环境模式运行服务
 * 收集静态文件  
-```python3 manage.py colectstatic```
+```python3 manage.py collectstatic```
 
 * systemctl管理配置，开机自启服务
 在项目根目录下执行脚本：   

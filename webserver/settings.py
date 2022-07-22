@@ -463,6 +463,7 @@ FRONTEND_URL = None
 from .security_settings import *
 
 if DEBUG:
+    from .test_settings import TEST_CASE
     # django debug toolbar
     INSTALLED_APPS.append('debug_toolbar')
     MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
