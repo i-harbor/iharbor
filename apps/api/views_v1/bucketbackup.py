@@ -15,7 +15,7 @@ from rest_framework.serializers import Serializer
 from rest_framework.pagination import LimitOffsetPagination
 
 from buckets.utils import BucketFileManagement
-from api.serializers import BucketBackupCreateSerializer
+from api.serializers import BucketBackupCreateSerializer, BucketBackupUpdateSerializer
 from utils.view import CustomGenericViewSet
 from buckets.models import Bucket, BackupBucket
 from api import serializers, permissions
@@ -194,16 +194,23 @@ class BackupNodeViewSet(CustomGenericViewSet):
 
         """
         bucket_name = kwargs.get('bucket_name', '')
+        if bucket_name.startswith('-') or bucket_name.endswith('-'):
+            exc = exceptions.NotFound(message=_('存储桶bucket名称不能以“-”开头或结尾'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
         r = re.match('[a-z0-9-_]{3,64}$', bucket_name)
         if not r:
             exc = exceptions.NotFound(message=_('桶不存在'))
             return Response(data=exc.err_data(), status=exc.status_code)
 
-        # 检测桶是否存在且是否是该用户的桶
-        bucket = self.get_user_bucket(bucket_name, True, user=request.user)
-
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='read', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        # 检测桶是否存在且是否是该用户的桶
+        try:
+            bucket = self.get_user_bucket(bucket_name, True, user=request.user)
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
@@ -216,12 +223,36 @@ class BackupNodeViewSet(CustomGenericViewSet):
     @swagger_auto_schema(
         operation_summary=gettext_lazy('创建桶的备份信息'),
         responses={
-            status.HTTP_200_OK: ""
+            status.HTTP_201_CREATED: ""
         }
     )
     def create(self, request, *args, **kwargs):
         """
         创建备份
+
+            http 201:
+            {
+              "endpoint_url": "http://10.102.50.2:8000",
+              "bucket_name": "akk",
+              "bucket_token": "243ba516daf13576145152b713091c008760c947",
+              "backup_num": 1,
+              "remarks": "string",
+              "id": 43,
+              "created_time": "2022-07-25T08:58:44.097681+08:00",
+              "modified_time": "2022-07-25T08:58:44.100556+08:00",
+              "status": "start",
+              "error": "",
+              "bucket": {
+                "id": 1,
+                "name": "wang"
+              }
+            }
+            http code 400 403 404:
+            {
+              "code": "BadRequest",  // AccessDenied、NoSuchBucket
+              "message": ""
+            }
+
         """
         # 校验参数
         serializer = self.get_serializer(data=request.data)
@@ -245,9 +276,12 @@ class BackupNodeViewSet(CustomGenericViewSet):
             return Response(data=exc.err_data(), status=exc.status_code)
 
         # 用户是否能操作该桶
-        bucket = self.get_user_bucket(id_or_name=bucket_id, user=request.user)
+        try:
+            bucket = self.get_user_bucket(id_or_name=bucket_id, user=request.user)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
-        error = self.check_field(endpoint_url, bucket_name, bucket_token)
+        error = self.check_field(endpoint_url=endpoint_url, bucket_name=bucket_name, bucket_token=bucket_token)
         if error:
             return Response(data=error.err_data(), status=error.status_code)
 
@@ -289,10 +323,20 @@ class BackupNodeViewSet(CustomGenericViewSet):
             ),
         ],
         responses={
-            status.HTTP_200_OK: ""
+            status.HTTP_204_NO_CONTENT: ""
         }
     )
     def destroy(self, request, *args, **kwargs):
+        """
+        删除备份
+
+            >>Http Code: 状态码204,备份删除成功
+            >>Http Code: 403, 404:
+                {
+                    'code': 'xxx',    # AccessDenied、Notfound
+                    'code_text': 'xxx',      //错误码表述信息
+                }
+        """
         backup_id = kwargs.get(self.lookup_field, "")
         backup = BackupBucket.objects.select_related('bucket').filter(id=backup_id).first()
         if not backup:
@@ -304,8 +348,10 @@ class BackupNodeViewSet(CustomGenericViewSet):
         if bucket.user_id != request.user.id:
             exc = exceptions.AccessDenied(message=_('您没有权限。'))
             return Response(data=exc.err_data(), status=status.HTTP_403_FORBIDDEN)
+
         backup.delete()
 
+        # 根据collection_name 找到 metadata 对应表
         bfm = BucketFileManagement(collection_name=bucket.get_bucket_table_name())
         model_cls = bfm.get_obj_model_class()
         # 删除 async1、async2 时间
@@ -317,7 +363,77 @@ class BackupNodeViewSet(CustomGenericViewSet):
         except Exception as e:
             pass
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('修改备份信息'),
+        responses={
+            status.HTTP_200_OK: ""
+        }
+    )
+    def partial_update(self, request, *args, **kwargs):
+        """
+        修改备份
+
+            http 200:
+            {
+              "endpoint_url": "http://10.102.50.2:8000",
+              "bucket_name": "akk",
+              "bucket_token": "b1031cdb476ceba7939bc211ce7d941fd920c74b",
+              "backup_num": 1,
+              "remarks": "akk",
+              "id": 44,
+              "created_time": "2022-07-25T09:12:18.478248+08:00",
+              "modified_time": "2022-07-25T17:45:18.733384+08:00",
+              "status": "start",
+              "error": "",
+              "bucket": {
+                "id": 1,
+                "name": "wang"
+              }
+            }
+            http code 400 403 404:
+            {
+              "code": "BadRequest",  // AccessDenied、NotFound
+              "message": ""
+            }
+
+        """
+        backup_id = kwargs.get(self.lookup_field, '')
+        bucket_token = request.data.get('bucket_token')
+        # 查看数据是否存在
+        backup = BackupBucket.objects.select_related('bucket').filter(id=backup_id).first()
+        if not backup:
+            exc = exceptions.NotFound(message=_('资源不存在'))
+            return Response(data=exc.err_data(), status=status.HTTP_404_NOT_FOUND)
+        bucket = backup.bucket
+
+        serializer = self.get_serializer(instance=backup, data=request.data, partial=True)
+        if not serializer.is_valid(raise_exception=False):
+            code_text = serializer_error_text(serializer.errors, default='参数验证有误')
+            exc = exceptions.BadRequest(message=_(code_text))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        # 桶的读写权限
+        try:
+            check_authenticated_or_bucket_token(request, bucket_id=bucket.id, act='write', view=self)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        # 用户是否拥有该桶的权限
+        if bucket.user_id != request.user.id:
+            exc = exceptions.AccessDenied(message=_('您没有权限。'))
+            return Response(data=exc.err_data(), status=status.HTTP_403_FORBIDDEN)
+
+        # 查看bucket_token权限
+        exc = self.check_field(bucket_token=bucket_token, endpoint_url=backup.endpoint_url,
+                               bucket_name=backup.bucket_name)
+        if exc:
+            return Response(data=exc.err_data(), status=status.HTTP_400_BAD_REQUEST)
+
+        backup = serializer.save()
+        serializer = serializers.BucketBackupSerializer(instance=backup)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         """
@@ -329,6 +445,8 @@ class BackupNodeViewSet(CustomGenericViewSet):
             return serializers.BucketBackupSerializer
         if self.action == 'create':
             return BucketBackupCreateSerializer
+        if self.action == 'partial_update':
+            return BucketBackupUpdateSerializer
         return Serializer
 
     @staticmethod
@@ -371,13 +489,18 @@ class BackupNodeViewSet(CustomGenericViewSet):
         # 删除文件
         exc = self.request_delete_file(endpoint_url, headers, bucket_name, file_name)
         if exc:
-            return self.request_delete_file(endpoint_url, headers, bucket_name, file_name)
+            exc = self.request_delete_file(endpoint_url, headers, bucket_name, file_name)
+            if exc:
+                pass
         return
 
     @staticmethod
     def check_server_file(self, endpoint_url, bucket_name, bucket_token):
-        # 从a-zA-Z0-9生成指定数量的随机字符：
-        file_name = ''.join(random.sample(string.ascii_letters + string.digits + '@#!&.+', 10))
+        # 从 a-zA-Z0-9(![]@)- 生成指定数量的随机字符：
+        # /  \: *" < > | ？ 不能创建文件的特殊字符
+        # + % # & = ? / ulr占用的特殊字符
+        file_name = ''.join(random.sample(string.ascii_letters + string.digits + '(![]@)-', 10))
+        endpoint_url = endpoint_url.rstrip('/')  # 规范url 不受 / 影响
         url = endpoint_url + f'/api/v1/metadata/{bucket_name}/{file_name}/'
         headers = {
             'Authorization': 'BucketToken ' + bucket_token
@@ -395,12 +518,11 @@ class BackupNodeViewSet(CustomGenericViewSet):
                 exc = exceptions.BadRequest(message=_('服务异常，请重试。'))
                 return '', '', '', exc
 
-        if r.status_code == 404 and r.json()['code'] == 'NoSuchKey':
-
+        if r.status_code == 404 and r.json()["code"] == "NoSuchKey":
             return url, headers, file_name, ''
 
         if r.status_code != 404:
-            exc = exceptions.BadRequest(message=_('请查看endpoint_url、bucket_name、bucket_token 填写正确及权限问题。'))
+            exc = exceptions.BadRequest(message=_('请查看关键参数填写是否正确。'))
             return '', '', '', exc
 
     @staticmethod

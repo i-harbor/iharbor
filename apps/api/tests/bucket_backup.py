@@ -142,7 +142,7 @@ class BackupBucketAPITests(tests.MyAPITransactionTestCase):
             raise Exception("Please configure the securty_settings.py file")
 
         endpoint_url = test_settings_case['BACKUP_SERVER']['PROVIDER']['endpoint_url']
-        readwritetoken = test_settings_securty['BACKUP_BUCKET']['bucket_token']
+        readwritetoken = test_settings_securty['BACKUP_BUCKET_TOKEN']['bucket_token_write']
         bucket_name = test_settings_case['BACKUP_SERVER']['PROVIDER']['bucket_name']
         bucket_id = self.bucket_wang.id
         backup_num = 1
@@ -157,11 +157,33 @@ class BackupBucketAPITests(tests.MyAPITransactionTestCase):
         self.assertKeysIn(['endpoint_url', 'bucket_name', 'bucket_token', 'backup_num', 'remarks', 'id', 'created_time',
                            'modified_time', 'status', 'error', 'bucket'], response.data)
         self.assertKeysIn(['id', 'name'], response.data['bucket'])
+        response_id = response.data['id']
+
+        # 修改备份数据
+        url = reverse('api:backup_bucket-detail', kwargs={'id': response_id})
+        response = self.client.patch(url, data={'bucket_token': readwritetoken})
+        self.assertEqual(response.status_code, 200)
+        self.assertKeysIn(['endpoint_url', 'bucket_name', 'bucket_token', 'backup_num', 'remarks', 'id', 'created_time',
+                           'modified_time', 'status', 'error', 'bucket'], response.data)
+        self.assertKeysIn(['id', 'name'], response.data['bucket'])
+
+        # 修改备份数据 bucket_token 只读权限
+        bucket_token_read = test_settings_securty['BACKUP_BUCKET_TOKEN']['bucket_token_read']
+        url = reverse('api:backup_bucket-detail', kwargs={'id': response_id})
+        response = self.client.patch(url, data={'bucket_token': bucket_token_read})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], 'BadRequest')
+        # 修改备份数据 bucket_token 随机
+        bucket_token_read = '4a0bc1fe3fb34e631ddd6fsdfwefvdefw684c'
+        url = reverse('api:backup_bucket-detail', kwargs={'id': response_id})
+        response = self.client.patch(url, data={'bucket_token': bucket_token_read})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], 'BadRequest')
 
         # 删除备份数据
-        url = reverse('api:backup_bucket-detail', kwargs={'id': response.data['id']})
+        url = reverse('api:backup_bucket-detail', kwargs={'id': response_id})
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
         url = reverse('api:backup_bucket-list')
         # 服务地址填写错误

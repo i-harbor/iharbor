@@ -457,3 +457,19 @@ class BucketBackupCreateSerializer(serializers.Serializer):
         )
         backup.save()
         return backup
+
+
+class BucketBackupUpdateSerializer(serializers.Serializer):
+    bucket_token = serializers.CharField(max_length=64, label='备份点bucket读写token', required=True)
+
+    def update(self, instance, validated_data):
+
+        instance.bucket_token = validated_data.get('bucket_token', instance.bucket_token)
+        instance.endpoint_url = validated_data.get('endpoint_url', instance.endpoint_url)
+        instance.bucket_name = validated_data.get('bucket_name', instance.bucket_name)
+        instance.remarks = validated_data.get('remarks', instance.bucket_name)
+        instance.status = validated_data.get('status', instance.status)
+        instance.backup_num = validated_data.get('backup_num', instance.backup_num)
+        instance.bucket_id = validated_data.get('bucket_id', instance.bucket_id)
+        instance.save()
+        return instance

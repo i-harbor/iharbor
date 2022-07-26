@@ -7,7 +7,6 @@ TEST_CASE = {
             'bucket_name': 'akk'
         }
     },
-
 }
 
 TEST_CASE.update(TEST_CASE_SECURITY)
