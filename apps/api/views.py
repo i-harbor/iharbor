@@ -1608,6 +1608,8 @@ class DirectoryViewSet(CustomGenericViewSet):
                       "dlc": 0,                         # 下载次数
                       "download_url": "",               # 下载url
                       "access_permission": "公有"
+                      "async1": null,                     # 备份点同步时间
+                      "async2": null
                     }
                   ],
                   "count": 5,
@@ -1670,6 +1672,8 @@ class DirectoryViewSet(CustomGenericViewSet):
                       "dlc": 1,
                       "download_url": "http://159.226.91.140:8000/share/obs/666/sacva/client.ovpn",
                       "access_permission": "公有"
+                      "async1": null,                     # 备份点同步时间
+                      "async2": null
                     }
                   ],
                   "count": 1,
@@ -1761,6 +1765,8 @@ class DirectoryViewSet(CustomGenericViewSet):
                     "dlc": 0,
                     "download_url": "",
                     "access_permission": "私有"
+                    "async1": null, 
+                    "async2": null
                   }
                 }
             """
@@ -2204,7 +2210,9 @@ class MoveViewSet(CustomGenericViewSet):
                     "upt": "2020-03-03T20:52:04.187179+08:00",
                     "dlc": 1,
                     "download_url": "http://159.226.91.140:8000/share/obs/666/d%20d/data.json2",
-                    "access_permission": "公有"
+                    "access_permission": "公有",
+                    "async1": null,
+                    "async2": null
                   }
                 }
             """
@@ -2271,7 +2279,9 @@ class MetadataViewSet(CustomGenericViewSet):
                     "upt": "2019-02-20T13:56:25+08:00",       # 最后修改时间； 目录时此字段为空
                     "dlc": 2,                           # 下载次数； 目录时此字段为0
                     "download_url": "http://10.0.86.213/obs/gggg/upload/Firefox-latest.exe", # 对象下载url; 目录此字段为空
-                    "access_permission": "私有"          # 访问权限，‘私有’或‘公有’； 目录此字段为空
+                    "access_permission": "私有"，          # 访问权限，‘私有’或‘公有’； 目录此字段为空
+                    "async1": null,                     # 备份点同步时间
+                    "async2": null
                 },
                 "info": {                               # 目录时为null
                     "rados": [                          # 对象对应rados信息，格式：iharbor:{cluster_name}/{pool_name}/{rados-key}
@@ -2392,7 +2402,9 @@ class MetadataViewSet(CustomGenericViewSet):
                 "upt": null,
                 "dlc": 0,
                 "download_url": "http://xxx/share/obs/6666/test5",
-                "access_permission": "私有"
+                "access_permission": "私有",
+                "async1": null,  
+                "async2": null
               }
             }
             """
@@ -3393,6 +3405,8 @@ class SearchObjectViewSet(CustomGenericViewSet):
                   "access_permission": "私有",
                   "access_code": 0,
                   "md5": "585e699b26602e7dd6054798d8c22d9b"
+                  "async1": null,
+                  "async2": null
                 }
               ],
               "count": 2,
