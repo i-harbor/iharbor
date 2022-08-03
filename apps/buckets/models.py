@@ -15,6 +15,7 @@ from django.conf import settings
 from utils.storagers import PathParser
 from utils.md5 import EMPTY_HEX_MD5
 from utils.crypto import Encryptor
+from api import exceptions
 
 # debug_logger = logging.getLogger('debug')#这里的日志记录器要和setting中的loggers选项对应，不能随意给参
 
@@ -721,19 +722,30 @@ class BucketFileBase(models.Model):
         对象是否是分享的, 并且在有效分享时间内，即是否可公共访问
         :return: True(是), False(否)
         """
-        # 是否可读
-        if not self.is_read_perms():
-            return False
-
-        # 是否有分享时间限制
-        if not self.has_shared_limit():
-            return True
-
-        # 检查是否已过共享终止时间
-        if self.is_shared_end_time_out():
+        try:
+            self.check_shared_and_in_shared_time()
+        except exceptions.Error as e:
             return False
 
         return True
+
+    def check_shared_and_in_shared_time(self):
+        """
+        对象是否是分享的, 并且在有效分享时间内，即是否可公共访问
+
+        :raises: Error
+        """
+        # 是否可读
+        if not self.is_read_perms():
+            raise exceptions.NotShared(message=_('未公开分享, 或者分享已取消'))
+
+        # 是否有分享时间限制
+        if not self.has_shared_limit():
+            return
+
+        # 检查是否已过共享终止时间
+        if self.is_shared_end_time_out():
+            raise exceptions.SharedExpired(message=_('分享已过期'))
 
     def has_share_password(self):
         """

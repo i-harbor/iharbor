@@ -111,6 +111,12 @@ class NotShared(Error):
     default_status_code = 403
 
 
+class SharedExpired(Error):
+    default_message = '分享已过期.'
+    default_code = 'SharedExpired'
+    default_status_code = 403
+
+
 class NotFound(Error):
     default_message = 'Not found'
     default_code = 'Notfound'

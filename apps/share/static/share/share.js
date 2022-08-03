@@ -352,7 +352,11 @@
                 if (errtype === 'timeout'){
                     show_warning_dialog('请求超时', 'error');
                 }else{
-                    show_warning_dialog('好像出问题了，跑丢了，( T__T ) …', 'error');
+                    let msg = '好像出问题了，跑丢了，( T__T ) …';
+                    try {
+                        msg = xhr.responseJSON.code_text
+                    }catch (e) {}
+                    show_warning_dialog(msg, 'error');
                 }
             }
         });

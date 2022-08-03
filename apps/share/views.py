@@ -27,6 +27,7 @@ from utils.time import time_to_gmt, datetime_from_gmt
 from . import serializers
 from api.harbor import HarborManager
 from api.exceptions import HarborError
+from api import exceptions
 from .forms import SharePasswordForm
 
 
@@ -653,8 +654,8 @@ class ShareDirViewSet(CustomGenericViewSet):
             }
         >>Http Code: 状态码403
             {
-                'code': 403,
-                'code_text': '您没有访问权限'
+                'code': “SharedExpired”,      # NotShared:未分享或者分享已取消；InvalidShareCode：分享密码无效
+                'code_text': '分享已过期'
             }
         >>Http Code: 状态码404：找不到资源;
         >>Http Code: 状态码500：服务器内部错误;
@@ -700,30 +701,32 @@ class ShareDirViewSet(CustomGenericViewSet):
         pp = PathParser(filepath=share_base)
         bucket_name, dir_base = pp.get_bucket_and_dirpath()
         if not bucket_name:
-            return Response(data={'code': 400, 'code_text': _('分享路径无效')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'code': 'NotFound', 'code_text': _('分享路径无效')}, status=status.HTTP_400_BAD_REQUEST)
 
         # 存储桶验证和获取桶对象
         h_manager = HarborManager()
         try:
             bucket = h_manager.get_bucket(bucket_name=bucket_name)
             if not bucket:
-                return Response(data={'code': 404, 'code_text': _('存储桶不存在')}, status=status.HTTP_404_NOT_FOUND)
+                return Response(data={'code': 'NotFound', 'code_text': _('存储桶不存在')}, status=status.HTTP_404_NOT_FOUND)
 
             if dir_base:
                 base_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
-                    return Response(data={'code': 404, 'code_text': _('分享根目录不存在')}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(data={'code': 'NotFound', 'code_text': _('分享根目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
                 base_obj = None
 
             # 是否有文件对象的访问权限
-            if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
-                return Response(data={'code': 403, 'code_text': _('您没有访问权限')}, status=status.HTTP_403_FORBIDDEN)
+            try:
+                self.check_access_permission(bucket=bucket, base_dir_obj=base_obj)
+            except exceptions.Error as exc:
+                return Response(data=exc.err_data_old(), status=status.HTTP_403_FORBIDDEN)
 
             # 分享根路径存在，检查分享密码
             if base_obj and base_obj.has_share_password():
                 if (share_code is None) or (not base_obj.check_share_password(password=share_code)):
-                    return Response(data={'code': 401, 'code_text': _('共享密码无效')}, status=status.HTTP_401_UNAUTHORIZED)
+                    return Response(data={'code': 'InvalidShareCode', 'code_text': _('共享密码无效')}, status=403)
 
             if subpath:     # 是否list子目录
                 if dir_base:
@@ -732,7 +735,7 @@ class ShareDirViewSet(CustomGenericViewSet):
                     sub_path = subpath
                 sub_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=sub_path)
                 if not sub_obj or (sub_obj and sub_obj.is_file()):
-                    return Response(data={'code': 404, 'msg': _('子目录不存在')}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(data={'code': 'NotFound', 'code_text': _('子目录不存在')}, status=status.HTTP_404_NOT_FOUND)
             else:
                 sub_obj = None
         except HarborError as e:
@@ -750,25 +753,26 @@ class ShareDirViewSet(CustomGenericViewSet):
         try:
             files = bfm.get_cur_dir_files(cur_dir_id=list_dir_id)
         except Exception as exc:
-            return Response(data={'code': 404, 'msg': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+            return Response(data={'code': 'NotFound', 'code_text': str(exc)}, status=status.HTTP_404_NOT_FOUND)
 
+        page = self.paginate_queryset(files)
+        return self._wrap_list_response(
+            bucket_name=bucket_name, share_base=share_base, subpath=subpath,
+            share_code=share_code, files=page
+        )
+
+    def _wrap_list_response(self, bucket_name: str, share_base: str, subpath: str, share_code: str, files: list):
         data_dict = OrderedDict([
             ('code', 200),
             ('bucket_name', bucket_name),
             ('subpath', subpath),
             ('share_base', share_base),
         ])
-        page = self.paginate_queryset(files)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True, context={
-                'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
-            data_dict['files'] = serializer.data
-            return self.get_paginated_response(data_dict)
-        else:
-            serializer = self.get_serializer(files, many=True, context={
-                'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
-            data_dict['files'] = serializer.data
-        return Response(data_dict)
+
+        serializer = self.get_serializer(files, many=True, context={
+            'share_base': share_base, 'subpath': subpath, 'share_code': share_code})
+        data_dict['files'] = serializer.data
+        return self.get_paginated_response(data_dict)
 
     def get_serializer_class(self):
         """
@@ -779,29 +783,28 @@ class ShareDirViewSet(CustomGenericViewSet):
         return serializers.ShareObjInfoSerializer
 
     @staticmethod
-    def has_access_permission(bucket, base_dir_obj):
+    def check_access_permission(bucket, base_dir_obj):
         """
         是否有访问对象的权限
 
         :param bucket: 存储桶对象
         :param base_dir_obj: 分享根目录对象, None为分享的存储桶
-        :return: True(可访问)；False（不可访问）
+        :return: None
+        :raises: Error
         """
         obj = base_dir_obj
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
-            return True
+            return
         if not obj:
-            return False
+            raise exceptions.NotShared(message=_('分享已取消'))
 
         if obj.is_file():
-            return False
+            raise exceptions.NotShared(message=_('分享目录不存在'), status_code=404)
 
         # 检查目录读写权限，并且在有效共享事件内
-        if obj.is_shared_and_in_shared_time():
-            return True
-
-        return False
+        obj.check_shared_and_in_shared_time()
+        return
 
 
 class ShareView(View):
@@ -845,9 +848,8 @@ class ShareView(View):
                 base_obj = None
 
             # 是否有文件对象的访问权限
-            if not self.has_access_permission(bucket=bucket, base_dir_obj=base_obj):
-                return render(request, 'info.html', context={'code': 403, 'code_text': _('您没有访问权限')})
-        except HarborError as e:
+            self.check_access_permission(bucket=bucket, base_dir_obj=base_obj)
+        except exceptions.Error as e:
             return render(request, 'info.html', context=e.err_data_old())
 
         # 无分享密码
@@ -886,26 +888,30 @@ class ShareView(View):
         return redirect(to=url)
 
     @staticmethod
-    def has_access_permission(bucket, base_dir_obj):
+    def check_access_permission(bucket, base_dir_obj):
         """
         是否有访问对象的权限
 
         :param bucket: 存储桶对象
         :param base_dir_obj: 分享根目录对象, None为分享的存储桶
-        :return: True(可访问)；False（不可访问）
+        :return: None
+        :raises: Error
         """
         obj = base_dir_obj
         # 存储桶是否是公有权限
         if bucket.is_public_permission():
             return True
         if not obj:
-            return False
+            raise exceptions.NotShared(message=_('分享已取消'))
 
         if obj.is_file():
-            return False
+            raise exceptions.NotShared(message=_('分享目录不存在'), status_code=404)
 
-        # 检查目录读写权限，并且在有效共享事件内
-        if obj.is_shared_and_in_shared_time():
-            return True
+        # 检查目录读写权限，并且在有效共享时间内
+        try:
+            obj.check_shared_and_in_shared_time()
+        except exceptions.NotShared as exc:
+            exc.message += _('分享已取消')
+            raise exc
 
-        return False
+        return True
