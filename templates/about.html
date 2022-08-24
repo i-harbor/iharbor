@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans '关于' %}{% endblock %}
+
+{% block page-content %}
+    <div class="d-flex justify-content-center align-items-center h-100 bg-light">
+        <div class="card border-0 col-md-8 col-lg-6">
+            <div class="card-body">
+                <div class="p-2">
+                    <h5 class="card-title">{% trans '关于iHarbor' %}</h5>
+                    <p>{% trans 'iHarbor是一个大规模分布式、百PB级别、纠删码容错的高性能对象存储系统。' %}</p>
+                </div>
+                <div class="p-2">
+                    <h5>{% trans '版本' %}</h5>
+                    <p>{{ version }} &emsp;
+                        {% if version_timestamp %}
+                            <span>{{ version_timestamp }}</span>&emsp;
+                        {% endif %}
+                        <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
+                            {% trans '变更日志' %}</a>
+                        </span>
+                    </p>
+                </div>
+                <div class="p-2">
+                    <h5>{% trans '关于我们' %}</h5>
+                    <p>{% trans '中国科学院计算机网络信息中心，科技云部。' %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

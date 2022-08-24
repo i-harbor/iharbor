@@ -1,3 +1,55 @@
+## v0.7.1
+* 本地注册用户未激活时，通科技云通行证无法登录的问题，本地登录未激活用户时提示未激活
+* 上传文件临时缓存路径设置
+* 增加home视图重定向到桶列表视图；上导航栏增加'管理控制台'按钮，可设置链接到独立前端服务，默认为桶列表视图
+* 增加独立前端打包文件
+* 测试代码拆分，以tests包方式管理
+* python依赖包升级，升级到python3.9
+* aai jwt testcase
+* 对象元数据字段na和name字符集utf8_bin改为utf8mb4_bin
+
+## v0.7.0
+* 科技云通行证jwt认证支持
+* 更新依赖库，django3.2.12
+* 创建桶时ftp密码未加密修复
+* 重写桶同步脚本，直接sql操作数据库，不再依赖django orm
+* 一些命令优化
+
+## v0.6.0
+* 归档恢复桶功能
+* 桶同步功能
+* PutObjectV2空对象上传支持
+* 上传时临时文件占满磁盘存储空间问题优化
+* django无法得知nginx代理请求是否是https的问题
+* 创建bucket时指定id不再自增
+* 后台bucket列表防删除优化
+* 多ceph集群支持
+* add statsbucket command
+* bucket ftp密码加密
+* TiDB兼容问题修改
+* ListBucketObjects query param 'exclude-dir'
+
+## v0.5.4
+* v2 object upload api
+* 对象上传自动创建父路径
+* ftp同时兼容utf8/gbk乱码,改为只支持utf8
+* 其他优化和bug修复
+
+## v0.5.3
+* 对象上传自动创建父路径，其他代码优化
+* 优化 v2 对象上传接口
+* 增加一些api测试内容
+* 删除 evcloud、 vpn app
+
+## v0.5.2
+* 升级django版本到3.2
+* 修改部分api在线文档内容
+* 优化 ListBucketObjects 和 GetObjectMeta api 
+* 对象部分下载大小不再限制大小，ListDir api增加参数only-obj
+* 添加开机自启服务
+* 优化 ftps
+* 可配置本地登录功能
+
 ## v0.5.1
 * 搜索桶内对象功能
 * ftp支持上传空文件和下载续传

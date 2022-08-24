@@ -17,13 +17,20 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls import i18n
+from django.shortcuts import render
 from django.views.i18n import JavaScriptCatalog
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 from .views import kjy_login_callback, home
+from version import __version__, __version_timestamp__
 from . import admin_site    # admin后台一些设置
+
+
+def about(request):
+    print(__version_timestamp__)
+    return render(request, 'about.html', context={'version': __version__, 'version_timestamp':__version_timestamp__})
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -48,6 +55,7 @@ urlpatterns = [
     path('callback/', kjy_login_callback, name='callback'),
     path('i18n/', include(i18n)),
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
+    path('about/', about, name="about"),
 ]
 
 
