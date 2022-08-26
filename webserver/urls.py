@@ -30,7 +30,7 @@ from . import admin_site    # admin后台一些设置
 
 def about(request):
     print(__version_timestamp__)
-    return render(request, 'about.html', context={'version': __version__, 'version_timestamp':__version_timestamp__})
+    return render(request, 'about.html', context={'version': __version__, 'version_timestamp': __version_timestamp__})
 
 schema_view = get_schema_view(
    openapi.Info(
