@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from . import auth
 from . import views
 from .views_v1.bucketbackup import BackupNodeViewSet
+from .views_v1.admin_bucket_views import AdminBucketViewSet
 from .routers import DetailPostRouter, DetailListPostRouter
 from users.auth.views import ObtainAuthKey
 from . import v2views
@@ -35,6 +36,7 @@ router.register(r'list/bucket',
 
 no_slash_router = DefaultRouter(trailing_slash=False)
 no_slash_router.register(r'backup', BackupNodeViewSet, basename='backup_bucket')
+no_slash_router.register(r'admin/bucket', AdminBucketViewSet, basename='admin-bucket')
 
 dlp_router = DetailListPostRouter()
 dlp_router.register(r'dir/(?P<bucket_name>[a-z0-9-_]{3,64})', views.DirectoryViewSet, basename='dir')

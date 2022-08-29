@@ -8,5 +8,5 @@ class BucketsConfig(AppConfig):
     name = 'buckets'
     verbose_name = '存储桶管理'
 
-    def ready(self):
-        register(checks.check_ceph_settins)
+    # def ready(self):
+    #     register(checks.check_ceph_settins)

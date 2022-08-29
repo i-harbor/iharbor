@@ -55,7 +55,6 @@ urlpatterns = [
     path('callback/', kjy_login_callback, name='callback'),
     path('i18n/', include(i18n)),
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
-    path('about/', about, name="about"),
 ]
 
 

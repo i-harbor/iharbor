@@ -171,7 +171,11 @@ class BucketCreateSerializer(serializers.Serializer):
         if bucket_name.startswith('-') or bucket_name.endswith('-'):
             raise serializers.ValidationError(gettext('存储桶bucket名称不能以“-”开头或结尾'))
 
-        DNSStringValidator(bucket_name)
+        try:
+            DNSStringValidator(bucket_name)
+        except serializers.ValidationError:
+            raise serializers.ValidationError(gettext('存储桶名称只能包含小写英文字母、数字和连接线“-”'))
+
         return bucket_name.lower()
 
     def create(self, validated_data):
@@ -473,3 +477,14 @@ class BucketBackupUpdateSerializer(serializers.Serializer):
         instance.bucket_id = validated_data.get('bucket_id', instance.bucket_id)
         instance.save()
         return instance
+
+
+class AdminBucketCreateSerializer(serializers.Serializer):
+    """
+    创建存储桶序列化器
+    """
+    name = serializers.CharField(
+        label=_('存储桶名称'), min_length=3, max_length=63, required=True,
+        help_text=_('存储桶名称，名称唯一，不可使用已存在的名称，符合DNS标准的存储桶名称，英文字母、数字和-组成，3-63个字符')
+    )
+    username = serializers.CharField(label=_('用户名'), max_length=128, required=True, help_text=_('为此指定用户创建存储桶'))
