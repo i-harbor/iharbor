@@ -3,6 +3,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer, ValidationError
+from rest_framework.decorators import action
 
 from utils.view import CustomGenericViewSet
 from api import permissions
@@ -21,7 +22,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
     """
     queryset = {}
     permission_classes = [permissions.IsSuperOrAppSuperUser]
-    lookup_field = 'id'
+    lookup_field = 'bucket_name'
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('管理员为指定用户创建存储桶'),
@@ -137,6 +138,54 @@ class AdminBucketViewSet(CustomGenericViewSet):
 
         return bucket_name.lower()
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('管理员删除指定用户的存储桶'),
+        responses={
+            200: ""
+        }
+    )
+    @action(methods=['delete'], detail=True, url_path=r'user/(?P<username>[^/]+)', url_name='delete-bucket')
+    def delete_bucket(self, request, *args, **kwargs):
+        """
+        管理员删除指定用户的存储桶； 需要超级用户权限和APP超级用户权限
+
+            http code 204 ok:
+            {}
+
+            http code 400, 403, 409, 500 error:
+            {
+              "code": "NoSuchBucket",
+              "message": "存储桶不存在。"
+            }
+
+            * code:
+            403：
+                AccessDenied： 您没有执行该操作的权限。
+            404：
+                NoSuchBucket：存储桶不存在
+            409：
+                BucketNotOwnedUser：存储桶不属于指定用户。
+            500：
+                InternalError：删除存储桶时错误
+        """
+        bucket_name = kwargs.get(self.lookup_field)
+        username = kwargs.get('username')
+
+        bucket = Bucket.get_bucket_by_name(bucket_name)
+        if not bucket:
+            exc = exceptions.NoSuchBucket(message=_('存储桶不存在。'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if bucket.user.username != username:
+            exc = exceptions.ConflictError(message=_('存储桶不属于指定用户。'), code='BucketNotOwnedUser')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if not bucket.delete_and_archive():  # 删除归档
+            exc = exceptions.Error(message=_('删除存储桶失败'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        return Response(status=204)
+
     def get_serializer_class(self):
         if self.action == 'create':
             return serializers.AdminBucketCreateSerializer
@@ -144,7 +193,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
         return Serializer
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action in ['create', 'delete_bucket']:
             return [permissions.IsSuperAndAppSuperUser()]
 
         return super().get_permissions()

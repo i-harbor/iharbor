@@ -23,7 +23,7 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         self.user = get_or_create_user(username=self.user_username, password=self.user_password)
         set_token_auth_header(self, username=self.user.username, password=self.user_password)
 
-    def test_admin_create_bucket(self):
+    def test_admin_create_delete_bucket(self):
         url = reverse('api:admin-bucket-list')
 
         # AccessDenied
@@ -61,7 +61,7 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         self.assertErrorResponse(status_code=400, code='InvalidUsername', response=r)
 
         # ok
-        username = 'user1'
+        username = 'user1@cnic.cn'
         bucket_name = 'abc1'
         u1 = UserProfile.objects.filter(username=username).first()
         self.assertIsNone(u1)
@@ -76,6 +76,30 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         r = self.client.post(url, data={'name': bucket_name, 'username': username})
         self.assertErrorResponse(status_code=409, code='BucketAlreadyExists', response=r)
 
+        # delete bucket
+        url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': 'bucket1', 'username': username})
+        r = self.client.delete(url)
+        self.assertErrorResponse(status_code=404, code='NoSuchBucket', response=r)
+
+        url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': 'test@cnic.cn'})
+        r = self.client.delete(url)
+        self.assertErrorResponse(status_code=409, code='BucketNotOwnedUser', response=r)
+
+        url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': username})
+        r = self.client.delete(url)
+        self.assertEqual(r.status_code, 204)
+
         # clear bucket
         bucket1.delete_and_archive()
         tests.BucketsAPITests.clear_bucket_archive(bucket_name)
+
+        url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': username})
+        r = self.client.delete(url)
+        self.assertErrorResponse(status_code=404, code='NoSuchBucket', response=r)
+
+        self.user.is_superuser = True
+        self.user.role = UserProfile.ROLE_SUPPER_USER
+        self.user.save(update_fields=['is_superuser', 'role'])
+        url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': username})
+        r = self.client.delete(url)
+        self.assertErrorResponse(status_code=403, code='AccessDenied', response=r)

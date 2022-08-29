@@ -149,6 +149,12 @@ class MethodNotAllowed(Error):
     default_status_code = 405
 
 
+class ConflictError(Error):
+    default_message = '由于和被请求的资源的当前状态之间存在冲突，请求无法完成'
+    default_code = 'Conflict'
+    default_status_code = 409
+
+
 class BucketAlreadyOwnedByYou(Error):
     default_message = 'The bucket you tried to create already exists, and you own it.'
     default_code = 'BucketAlreadyOwnedByYou'
