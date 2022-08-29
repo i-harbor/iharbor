@@ -1,9 +1,9 @@
 from django.utils.translation import gettext_lazy, gettext as _
-from drf_yasg.utils import swagger_auto_schema
-
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer, ValidationError
 from rest_framework.decorators import action
+from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg import openapi
 
 from utils.view import CustomGenericViewSet
 from api import permissions
@@ -186,6 +186,83 @@ class AdminBucketViewSet(CustomGenericViewSet):
 
         return Response(status=204)
 
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('管理员给存储桶加锁或解锁'),
+        request_body=no_body,
+        manual_parameters=[
+            openapi.Parameter(
+                name='bucket_name',
+                in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                required=True,
+                description='存储桶名称'
+            ),
+            openapi.Parameter(
+                name='lock',
+                in_=openapi.IN_PATH,
+                type=openapi.TYPE_STRING,
+                required=True,
+                description='lock-free: 无锁（读写正常）; lock-write: 锁定写（不允许上传删除）; '
+                            'lock-readwrite: 锁定读写（不允许上传下载删除）'
+            ),
+        ],
+        responses={
+            200: ""
+        }
+    )
+    @action(methods=['post'], detail=True, url_path=r'lock/(?P<lock>[^/]+)', url_name='lock-bucket')
+    def lock_bucket(self, request, *args, **kwargs):
+        """
+        管理员给存储桶加锁或解锁； 需要超级用户权限或APP超级用户权限
+
+            http code 204 ok:
+            {}
+
+            http code 400, 403, 404, 500 error:
+            {
+              "code": "NoSuchBucket",
+              "message": "存储桶不存在。"
+            }
+
+            * code:
+            400:
+                InvalidLock: 参数“lock”的值无效，锁选项无效。
+            403：
+                AccessDenied： 您没有执行该操作的权限。
+            404：
+                NoSuchBucket：存储桶不存在
+            500：
+                InternalError：删除存储桶时错误
+        """
+        bucket_name = kwargs.get(self.lookup_field)
+        lock = kwargs.get('lock')
+
+        if lock not in ['lock-free', 'lock-write', 'lock-readwrite']:
+            exc = exceptions.InvalidArgument(message=_('参数“lock”的值无效，锁选项无效。'), code='InvalidLock')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        bucket = Bucket.get_bucket_by_name(bucket_name)
+        if not bucket:
+            exc = exceptions.NoSuchBucket(message=_('存储桶不存在。'))
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        if lock == 'lock-free':
+            bucket_lock = Bucket.LOCK_READWRITE
+        elif lock == 'lock-write':
+            bucket_lock = Bucket.LOCK_READONLY
+        elif lock == 'lock-readwrite':
+            bucket_lock = Bucket.LOCK_NO_READWRITE
+        else:
+            exc = exceptions.InvalidArgument(message=_('参数“lock”的值无效。'), code='InvalidLock')
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        try:
+            bucket.set_lock(bucket_lock)
+        except exceptions.Error as exc:
+            return Response(data=exc.err_data(), status=exc.status_code)
+
+        return Response(status=200)
+
     def get_serializer_class(self):
         if self.action == 'create':
             return serializers.AdminBucketCreateSerializer
@@ -195,5 +272,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
     def get_permissions(self):
         if self.action in ['create', 'delete_bucket']:
             return [permissions.IsSuperAndAppSuperUser()]
+        elif self.action == 'lock_bucket':
+            return [permissions.IsSuperOrAppSuperUser()]
 
         return super().get_permissions()

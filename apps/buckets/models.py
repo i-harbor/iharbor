@@ -450,6 +450,20 @@ class Bucket(BucketBase):
 
         return False
 
+    def set_lock(self, lock: int):
+        """
+        桶读写锁设置
+        :raise: Error
+        """
+        if lock not in [self.LOCK_READWRITE, self.LOCK_READONLY, self.LOCK_NO_READWRITE]:
+            raise exceptions.InvalidArgument(message=_('锁选项无效'))
+
+        try:
+            self.lock = lock
+            self.save(update_fields=['lock'])
+        except Exception as exc:
+            raise exceptions.Error(message=_('存储桶加锁失败。') + str(exc))
+
 
 class Archive(BucketBase):
     """

@@ -103,3 +103,50 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': username})
         r = self.client.delete(url)
         self.assertErrorResponse(status_code=403, code='AccessDenied', response=r)
+
+    def test_lock_bucket(self):
+        bucket_name = 'abs-32'
+
+        # AccessDenied
+        url = reverse('api:admin-bucket-lock-bucket', kwargs={'bucket_name': bucket_name, 'lock': 'test'})
+        r = self.client.post(url)
+        self.assertErrorResponse(status_code=403, code='AccessDenied', response=r)
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        r = self.client.post(url)
+        self.assertErrorResponse(status_code=400, code='InvalidLock', response=r)
+
+        self.user.is_superuser = False
+        self.user.role = UserProfile.ROLE_APP_SUPPER_USER
+        self.user.save(update_fields=['is_superuser', 'role'])
+        r = self.client.post(url, data={'name': '', 'username': 'user1'})
+        self.assertErrorResponse(status_code=400, code='InvalidLock', response=r)
+
+        # NoSuchBucket
+        url = reverse('api:admin-bucket-lock-bucket', kwargs={'bucket_name': bucket_name, 'lock': 'lock-free'})
+        r = self.client.post(url)
+        self.assertErrorResponse(status_code=404, code='NoSuchBucket', response=r)
+
+        bucket = Bucket(name=bucket_name, user=self.user)
+        bucket.save(force_insert=True)
+
+        self.assertEqual(bucket.lock, Bucket.LOCK_READWRITE)
+
+        # set lock
+        url = reverse('api:admin-bucket-lock-bucket', kwargs={'bucket_name': bucket_name, 'lock': 'lock-write'})
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 200)
+        bucket.refresh_from_db()
+        self.assertEqual(bucket.lock, Bucket.LOCK_READONLY)
+
+        url = reverse('api:admin-bucket-lock-bucket', kwargs={'bucket_name': bucket_name, 'lock': 'lock-readwrite'})
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 200)
+        bucket.refresh_from_db()
+        self.assertEqual(bucket.lock, Bucket.LOCK_NO_READWRITE)
+
+        url = reverse('api:admin-bucket-lock-bucket', kwargs={'bucket_name': bucket_name, 'lock': 'lock-free'})
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 200)
+        bucket.refresh_from_db()
+        self.assertEqual(bucket.lock, Bucket.LOCK_READWRITE)
