@@ -32,6 +32,7 @@ def about(request):
     print(__version_timestamp__)
     return render(request, 'about.html', context={'version': __version__, 'version_timestamp': __version_timestamp__})
 
+
 schema_view = get_schema_view(
    openapi.Info(
       title="iHarbor API",
@@ -55,6 +56,7 @@ urlpatterns = [
     path('callback/', kjy_login_callback, name='callback'),
     path('i18n/', include(i18n)),
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
+    path('about/', about, name="about"),
 ]
 
 

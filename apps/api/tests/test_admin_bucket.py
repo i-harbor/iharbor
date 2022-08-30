@@ -1,11 +1,6 @@
-
-from urllib import parse
-
-from django.conf import settings
 from django.urls import reverse
 
-from buckets.models import Bucket, BackupBucket
-from buckets.utils import create_bucket, delete_table_for_model_class, BucketFileManagement
+from buckets.models import Bucket
 from users.models import UserProfile
 from .tests import (
     get_or_create_user, set_token_auth_header, MyAPITransactionTestCase
@@ -19,7 +14,7 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
     def setUp(self):
         # 创建test用户
         self.user_password = 'password'
-        self.user_username = 'test'
+        self.user_username = 'test@cnic.cn'
         self.user = get_or_create_user(username=self.user_username, password=self.user_password)
         set_token_auth_header(self, username=self.user.username, password=self.user_password)
 
@@ -119,7 +114,7 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         self.user.is_superuser = False
         self.user.role = UserProfile.ROLE_APP_SUPPER_USER
         self.user.save(update_fields=['is_superuser', 'role'])
-        r = self.client.post(url, data={'name': '', 'username': 'user1'})
+        r = self.client.post(url)
         self.assertErrorResponse(status_code=400, code='InvalidLock', response=r)
 
         # NoSuchBucket

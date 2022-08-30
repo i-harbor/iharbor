@@ -4,7 +4,8 @@ import datetime
 from django.utils.version import get_version
 
 
-VERSION = (0, 7, 1, 'final', 0)     # 'alpha', 'beta', 'rc', 'final'
+VERSION = (0, 7, 2, 'final', 0)     # 'alpha', 'beta', 'rc', 'final'
+
 
 def get_git_changeset():
     # Repository may not be found if __file__ is undefined, e.g. in a frozen
@@ -27,6 +28,6 @@ def get_git_changeset():
         return None
     return timestamp.strftime("%Y/%m/%d %H:%M:%S")
 
+
 __version__ = get_version(VERSION)
 __version_timestamp__ = get_git_changeset()
-
