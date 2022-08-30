@@ -151,8 +151,7 @@ class V2ObjViewSet(CustomGenericViewSet):
             return [parsers.NoNameFileUploadParser()]
         elif action == 'create_detail':
             self.request.upload_handlers = [
-                storagers.Md5TemporaryFileUploadHandler(request=self.request),
-                storagers.Md5MemoryFileUploadHandler(request=self.request)
+                storagers.AllFileUploadInMemoryHandler(request=self.request)
             ]       # DRF Session auth CRSF 会触发接收请求体，文件上传处理器要提前替换
             return [parsers.NoNameFileUploadParser()]
 

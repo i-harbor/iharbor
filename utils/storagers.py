@@ -260,10 +260,13 @@ class FileUploadToCephHandler(FileUploadHandler):
 
 
 class Md5MemoryFileUploadHandler(MemoryFileUploadHandler):
+
     def new_file(self, *args, **kwargs):
-        super().new_file(*args, **kwargs)
+
         if self.activated:
             self.file_md5_handler = FileMD5Handler()
+
+        super().new_file(*args, **kwargs)
 
     def receive_data_chunk(self, raw_data, start):
         """Add the data to the BytesIO file."""
@@ -296,3 +299,18 @@ class Md5TemporaryFileUploadHandler(TemporaryFileUploadHandler):
         f.file_md5_handler = self.file_md5_handler
         f.file_md5 = self.file_md5_handler.hex_md5
         return f
+
+
+class AllFileUploadInMemoryHandler(Md5MemoryFileUploadHandler):
+    """
+    File upload handler to stream uploads into memory (used for small files).
+    """
+
+    def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
+        """
+        Use the content_length to signal whether or not this handler should be
+        used.
+        """
+        # Check the content-length header to see if we should
+        # If the post is too large, we cannot use the Memory handler.
+        self.activated = True

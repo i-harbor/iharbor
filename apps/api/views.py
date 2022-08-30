@@ -24,6 +24,7 @@ from buckets.utils import (BucketFileManagement, create_table_for_model_class, d
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
+from utils import storagers
 from utils.storagers import PathParser, FileUploadToCephHandler, try_close_file
 from utils.oss import build_harbor_object, RadosError
 from utils.log.decorators import log_used_time
@@ -1552,6 +1553,19 @@ class ObjViewSet(CustomGenericViewSet):
             return []
 
         return super().get_permissions()
+
+    def get_parsers(self):
+        """
+        动态分配请求体解析器
+        """
+        method = self.request.method.lower()
+        action = self.action_map.get(method)
+        if action == 'create_detail':
+            self.request.upload_handlers = [
+                storagers.AllFileUploadInMemoryHandler(request=self.request)
+            ]
+            return super().get_parsers()
+        return super().get_parsers()
 
 
 class DirectoryViewSet(CustomGenericViewSet):

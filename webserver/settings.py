@@ -443,7 +443,7 @@ SWAGGER_SETTINGS = {
 CUSTOM_UPLOAD_MAX_FILE_SIZE = 10 * 2**30  # 10GB; None: 无限制
 
 # 临时缓存文件路径设置
-FILE_UPLOAD_TEMP_DIR = '/dev/shm'
+# FILE_UPLOAD_TEMP_DIR = '/dev/shm'
 
 # bucket备份同步相关自定义设置
 BACKUP_BUCKET_SETTINGS = {
