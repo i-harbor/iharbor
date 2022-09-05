@@ -1,3 +1,7 @@
+## v0.7.3
+* 上传时临时文件缓存改成全部内存缓存。
+* 桶同步备份脚本增加参数以指定按对象大小先同步小的。
+
 ## v0.7.2
 * 取消科技云登录界面，修改成本地登录界面。
 * AdminCreateBucket、AdminBucketLock、AdminDeleteBucket api and testcase

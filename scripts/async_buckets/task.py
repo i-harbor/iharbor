@@ -233,7 +233,7 @@ class AsyncTask:
                 else:
                     kwargs = {'id_gt': last_object_id}
                 objs = query_hand.get_need_async_objects(
-                    bucket_id=bucket_id, limit=1,
+                    bucket_id=bucket_id, limit=limit,
                     backup_nums=[backup_num, ], **kwargs
                 )
                 if len(objs) == 0:
