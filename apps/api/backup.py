@@ -301,10 +301,17 @@ class AsyncBucketManager:
         return qs.order_by('id')[0:limit]
 
     @async_close_old_connections
-    def get_need_async_objects_queryset(self, bucket, id_gt: int = 0, limit: int = 1000, meet_time=None,
-                                        id_mod_div: int = None, id_mod_equal: int = None, backup_num: int = None):
+    def get_need_async_objects_queryset(
+            self, bucket, id_gt: int = None, limit: int = 1000, meet_time=None,
+            id_mod_div: int = None, id_mod_equal: int = None, backup_num: int = None,
+            size_gte: int = None
+    ):
         """
-        获取需要同步的对象的查询集, id正序排序
+        获取需要同步的对象的查询集
+
+            * id_gt和size_gte不能同时使用
+            * 默认按id正序排序；
+            * 当size_gte有效时，先按object size正序，后按id正序排序；
 
         :param bucket: bucket instance
         :param id_gt: 查询id大于id_gt的数据，实现分页续读
@@ -313,9 +320,13 @@ class AsyncBucketManager:
         :param id_mod_div: object id求余的除数，和参数id_mod_equal一起使用
         :param id_mod_equal: object id求余的余数相等的筛选条件，仅在参数id_mod有效时有效
         :param backup_num: 筛选条件，只查询指定备份点编号需要同步的对象，默认查询所有备份点需要同步的对象
+        :param size_gte: 查询object size大于等于size_gte的数据
         :return:
             QuerySet
         """
+        if id_gt is not None and size_gte is not None:
+            raise ValueError('id_gt和size_gte不能同时使用')
+
         table_name = bucket.get_bucket_table_name()
         bfm = BucketFileManagement(collection_name=table_name)
         object_class = bfm.get_obj_model_class()
@@ -335,7 +346,14 @@ class AsyncBucketManager:
         if not backup_nums:
             return object_class.objects.none()
 
-        queryset = object_class.objects.filter(fod=True, id__gt=id_gt).all()
+        order_bys = ['id']
+        if id_gt is not None:
+            queryset = object_class.objects.filter(fod=True, id__gt=id_gt).all()
+        elif size_gte is not None:
+            queryset = object_class.objects.filter(fod=True, si__gte=size_gte).all()
+            order_bys.insert(0, 'si')
+        else:
+            raise ValueError('id_gt和size_gte必须有一个有效')
 
         if meet_time is None:
             meet_time = self._get_meet_time()
@@ -345,15 +363,17 @@ class AsyncBucketManager:
         if backup_nums == [BackupBucket.BackupNum.ONE, ]:
             queryset = queryset.filter(
                 Q(async1__isnull=True) | Q(upt__gt=F('async1'))
-            ).order_by('id')
+            )
         elif backup_nums == [BackupBucket.BackupNum.TWO, ]:
             queryset = queryset.filter(
                 Q(async2__isnull=True) | Q(upt__gt=F('async2'))
-            ).order_by('id')
+            )
         else:
             queryset = queryset.filter(
                 Q(async1__isnull=True) | Q(upt__gt=F('async1')) | Q(async2__isnull=True) | Q(upt__gt=F('async2'))
-            ).order_by('id')
+            )
+
+        queryset = queryset.order_by(*order_bys)
 
         if id_mod_div is not None and id_mod_equal is not None:
             if id_mod_div >= 1 and (0 <= id_mod_equal < id_mod_div):

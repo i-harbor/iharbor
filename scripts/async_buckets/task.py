@@ -11,7 +11,8 @@ from .databases import CanNotConnection
 class AsyncTask:
     def __init__(self, node_num: int = None, node_count: int = 100,
                  in_multi_thread: bool = False, max_threads: int = 10,
-                 test: bool = False, logger=None, buckets: list = None
+                 test: bool = False, logger=None, buckets: list = None,
+                 small_size_first: bool = False
                  ):
         """
         :param node_num: 当前工作节点编号，不指定尝试从hostname获取
@@ -21,6 +22,7 @@ class AsyncTask:
         :param test: 不同步对象，打印一些参数
         :param logger:
         :param buckets: 只同步指定桶
+        :param small_size_first: True(对象小的先同步)
         """
         if logger is None:
             raise ValueError(f"No logger config")
@@ -32,6 +34,7 @@ class AsyncTask:
         self.node_count = node_count
         self.node_num = node_num
         self.buckets = buckets
+        self.small_size_first = small_size_first
 
         try:
             self.validate_params()
@@ -79,6 +82,9 @@ class AsyncTask:
 
         if self.test:
             self.logger.warning('Test Mode.')
+
+        if self.small_size_first:
+            self.logger.warning('Small object size first.')
 
         while True:
             try:
@@ -205,17 +211,12 @@ class AsyncTask:
         bucket_id = bucket["id"]
         bucket_name = bucket["name"]
         self.logger.debug(f'Start async Bucket(id={bucket_id}, name={bucket_name}), Backup number {backup_num}.')
-        # id_mod_div = self.node_count
-        # if self.node_count == self.node_num:
-        #     id_mod_equal = 0
-        # else:
-        #     id_mod_equal = self.node_num
-
         can_not_connection = 0
         failed_count = 0
         ok_count = 0
         query_hand = QueryHandler()
         last_object_id = last_object_id
+        last_object_size = 0
         while True:
             try:
                 if self.in_exiting:     # 退出中
@@ -227,18 +228,23 @@ class AsyncTask:
                 elif backup['status'] != 'start':
                     raise Exception(f'Bucket backup number {backup_num} not start')
 
+                if self.small_size_first:
+                    kwargs = {'size_gte': last_object_size}
+                else:
+                    kwargs = {'id_gt': last_object_id}
                 objs = query_hand.get_need_async_objects(
-                    bucket_id=bucket_id, id_gt=last_object_id, limit=limit,
-                    # id_mod_div=id_mod_div, id_mod_equal=id_mod_equal,
-                    backup_nums=[backup_num, ]
+                    bucket_id=bucket_id, limit=1,
+                    backup_nums=[backup_num, ], **kwargs
                 )
                 if len(objs) == 0:
                     break
 
-                ok_num, l_id, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup)
+                ok_num, l_id, l_size, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup)
                 ok_count += ok_num
                 if l_id is not None:
                     last_object_id = l_id
+                if l_size is not None:
+                    last_object_size = l_size
                 if err is not None:
                     raise err
 
@@ -270,11 +276,13 @@ class AsyncTask:
             (
                 int                 # 成功同步对象数
                 last_object_id,     # int or None, 已同步完成的最后一个对象的id
+                last_object_size,   # int or None, 已同步完成的最后一个对象的size
                 error               # None or Exception, AsyncError, CanNotConnection
             )
         """
         ok_count = 0
         last_object_id = None
+        last_object_size = None
         for obj in objs:
             if self.in_exiting:
                 break
@@ -284,13 +292,14 @@ class AsyncTask:
                 if self.is_meet_async_to_backup(obj=obj, backup=backup):
                     r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
                     if r is not None:
-                        return ok_count, last_object_id, r
+                        return ok_count, last_object_id, last_object_size, r
 
                     ok_count += 1
 
             last_object_id = obj_id
+            last_object_size = obj['si']
 
-        return ok_count, last_object_id, None
+        return ok_count, last_object_id, last_object_size, None
 
     def async_one_object(self, bucket: dict, obj: dict, backup: dict):
         """

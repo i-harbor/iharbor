@@ -70,7 +70,7 @@ class QueryHandler:
     MEET_ASYNC_TIMEDELTA_MINUTES = meet_async_timedelta_minutes
 
     @db_readwrite_lock
-    def select(self,using: str, sql: str, result_type: str = 'all'):
+    def select(self, using: str, sql: str, result_type: str = 'all'):
         """
         :param result_type: one, all
         :return:
@@ -94,7 +94,7 @@ class QueryHandler:
         except Exception as e:
             raise e
 
-    def select_one(self,using: str, sql: str):
+    def select_one(self, using: str, sql: str):
         """
         :return:
             dict or None
@@ -105,7 +105,7 @@ class QueryHandler:
         return self.select(using=using, sql=sql, result_type='all')
 
     @db_readwrite_lock
-    def update(self,using: str, sql: str):
+    def update(self, using: str, sql: str):
         try:
             conn = get_connection(using)
             with conn.cursor() as cursor:
@@ -183,10 +183,17 @@ class QueryHandler:
         )
         return self.select_all(using=DEFAULT, sql=sql)
 
-    def get_need_async_objects_query_sql(self, bucket_id: int, id_gt: int, limit: int, backup_nums: list,
-                                         meet_time=None, id_mod_div: int = None, id_mod_equal: int = None):
+    def get_need_async_objects_query_sql(
+            self, bucket_id: int, id_gt: int, limit: int, backup_nums: list,
+            meet_time=None, id_mod_div: int = None, id_mod_equal: int = None,
+            size_gte: int = None
+    ):
         """
-        获取需要同步的对象的查询sql, id正序排序
+        获取需要同步的对象的查询sql
+
+            * id_gt和size_gte不能同时使用
+            * 默认按id正序排序；
+            * 当size_gte有效时，先按object size正序，后按id正序排序；
 
         :param bucket_id: bucket id
         :param id_gt: 查询id大于id_gt的数据，实现分页续读
@@ -195,9 +202,13 @@ class QueryHandler:
         :param id_mod_div: object id求余的除数，和参数id_mod_equal一起使用
         :param id_mod_equal: object id求余的余数相等的筛选条件，仅在参数id_mod有效时有效
         :param backup_nums: 筛选条件，只查询指定备份点编号需要同步的对象，[int, ]
+        :param size_gte: 查询object size大于等于size_gte的数据
         :return:
             QuerySet
         """
+        if id_gt is not None and size_gte is not None:
+            raise ValueError('id_gt和size_gte不能同时使用')
+
         if not backup_nums:
             return []
 
@@ -227,7 +238,13 @@ class QueryHandler:
         ]
         fields_sql = ', '.join(fields)
 
-        where_list = [f"{tc('fod')} AND {tc('id')} > {id_gt}"]
+        if size_gte is not None:
+            where_list = [f"{tc('fod')} AND {tc('si')} >= {size_gte}"]
+            order_by_list = [f'{tc("si")} ASC', f'{tc("id")} ASC']
+        else:
+            where_list = [f"{tc('fod')} AND {tc('id')} > {id_gt}"]
+            order_by_list = [f'{tc("id")} ASC']
+
         if meet_time is None:
             meet_time = self.get_meet_time()
 
@@ -250,14 +267,22 @@ class QueryHandler:
                 where_list.append(f"MOD({tc('id')}, {id_mod_div}) = {id_mod_equal}")
 
         where = " AND ".join(where_list)
-        sql = f"SELECT {fields_sql} FROM {qn(table_name)} WHERE ({where}) ORDER BY {tc('id')} ASC LIMIT {limit}"
+        order_by = ', '.join(order_by_list)
+        sql = f"SELECT {fields_sql} FROM {qn(table_name)} WHERE ({where}) ORDER BY {order_by} LIMIT {limit}"
 
         return sql
 
-    def get_need_async_objects(self, bucket_id, id_gt: int = 0, limit: int = 100, meet_time=None,
-                               id_mod_div: int = None, id_mod_equal: int = None, backup_nums: list = None):
+    def get_need_async_objects(
+            self, bucket_id, id_gt: int = None, limit: int = 100, meet_time=None,
+            id_mod_div: int = None, id_mod_equal: int = None, backup_nums: list = None,
+            size_gte: int = None
+    ):
         """
-        获取需要同步的对象, id正序排序
+        获取需要同步的对象
+
+            * id_gt和size_gte不能同时使用
+            * 默认按id正序排序；
+            * 当size_gte有效时，先按object size正序，后按id正序排序；
 
         :param bucket_id: bucket id
         :param id_gt: 查询id大于id_gt的数据，实现分页续读
@@ -266,6 +291,7 @@ class QueryHandler:
         :param id_mod_div: object id求余的除数，和参数id_mod_equal一起使用
         :param id_mod_equal: object id求余的余数相等的筛选条件，仅在参数id_mod有效时有效
         :param backup_nums: 筛选条件，只查询指定备份点编号需要同步的对象，
+        :param size_gte: 查询object size大于等于size_gte的数据
         :return: list
         """
         only_backup_nums = BackupNum.values()
@@ -279,7 +305,7 @@ class QueryHandler:
         query_hand = QueryHandler()
         sql = query_hand.get_need_async_objects_query_sql(
             bucket_id=bucket_id, id_gt=id_gt, limit=limit, meet_time=meet_time, id_mod_div=id_mod_div,
-            id_mod_equal=id_mod_equal, backup_nums=backup_nums
+            id_mod_equal=id_mod_equal, backup_nums=backup_nums, size_gte=size_gte
         )
         return self.select_all(using=METADATA, sql=sql)
 

@@ -44,9 +44,10 @@ PARAM_MAX_THREADS = 'max-threads'
 PARAM_STOP = 'stop'
 PARAM_STATUS = 'status'
 PARAM_BUCKETS = 'buckets'
+PARAM_SMALL_SIZE_FIRST = 'small-size-first'
 PARAM_NAME_LIST = [
     PARAM_DEBUG, PARAM_HELP, PARAM_TEST, PARAM_NODE_NUM, PARAM_NODE_COUNT, PARAM_MULTI_THREAD, PARAM_MAX_THREADS,
-    PARAM_STOP, PARAM_STATUS, PARAM_BUCKETS
+    PARAM_STOP, PARAM_STATUS, PARAM_BUCKETS, PARAM_SMALL_SIZE_FIRST
 ]
 
 
@@ -65,6 +66,7 @@ def print_help():
     {PARAM_STOP}:           Stop process
     {PARAM_STATUS}:         Is it running
     {PARAM_BUCKETS}:        Only bucket to async, '["name1","name2"]'
+    {PARAM_SMALL_SIZE_FIRST}:Objects with small sizes are synchronized first.
     
     * daemon mode run cmd:
         nohup cmd >/dev/null 2>&1 &
@@ -282,6 +284,9 @@ def main():
 
     if PARAM_BUCKETS in params:
         kwargs['buckets'] = params[PARAM_BUCKETS]
+
+    if PARAM_SMALL_SIZE_FIRST in params:
+        kwargs['small_size_first'] = True
 
     try:
         check_same_task_run()
