@@ -247,6 +247,8 @@ class AsyncTask:
                     last_object_size = l_size
                 if err is not None:
                     raise err
+                if len(objs) < limit:
+                    break
 
                 can_not_connection = max(can_not_connection - 1, 0)
             except CanNotConnection as exc:

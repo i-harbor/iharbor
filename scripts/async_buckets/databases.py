@@ -232,7 +232,12 @@ class DatabaseWrapper:
             raise e
 
     def commit(self):
-        r = self.connection.commit()
+        try:
+            r = self.connection.commit()
+        except Exception as e:
+            self.errors_occurred = True
+            raise e
+
         self.errors_occurred = False
         return r
 

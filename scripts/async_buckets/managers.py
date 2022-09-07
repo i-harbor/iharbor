@@ -289,8 +289,13 @@ class AsyncBucketManager:
         try:
             ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
             if ok:
-                r = QueryHandler().update_object_async_time(
-                    bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+                try:
+                    r = QueryHandler().update_object_async_time(
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+                except Exception as e:
+                    r = QueryHandler().update_object_async_time(
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+
                 if not r:
                     raise AsyncError(message=f'update async{backup_num} failed', code='UpdateAsyncFailed')
         except AsyncError as e:
