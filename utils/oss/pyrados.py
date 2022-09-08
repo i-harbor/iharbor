@@ -517,7 +517,7 @@ class RadosAPI:
         kwargs['prefix'] = prefix
         kwargs['format'] = format
         try:
-            ret, buf, outs = cluster.mgr_command(json.dumps(kwargs), '', timeout=5)
+            ret, buf, outs = cluster.mgr_command(json.dumps(kwargs), b'', timeout=5)
         except rados.Error as e:
             raise RadosError(str(e), errno=e.errno)
         else:
@@ -538,7 +538,7 @@ class RadosAPI:
         kwargs['prefix'] = prefix
         kwargs['format'] = format
         try:
-            ret, buf, outs = cluster.mon_command(json.dumps(kwargs), '', timeout=5)
+            ret, buf, outs = cluster.mon_command(json.dumps(kwargs), b'', timeout=5)
         except rados.Error as e:
             raise RadosError(str(e), errno=e.errno)
         else:
@@ -1019,7 +1019,10 @@ def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int =
     :param obj_id: 对象在ceph存储池中对应的rados名称
     :param obj_size: 对象的大小
     """
+    print(settings)
+    print(settings.CEPH_RADOS)
     cephs = settings.CEPH_RADOS
+
     if using not in cephs:
         raise RadosError(f'别名为"{using}"的CEPH集群信息未配置，请确认配置文件中的“CEPH_RADOS”配置内容')
 
