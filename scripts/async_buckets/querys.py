@@ -383,3 +383,28 @@ class QueryHandler:
             return True
 
         return False
+
+    # ceph 配置 sql语句
+    def get_ceph_conf_sql(self):
+        """
+        获取数据库中ceph配置信息，并动态更新到 settings 文件中。
+        """
+        table_name = 'ceph_cephcluster'
+        tc = table_columns(table_name=table_name)
+        qn = quote_name
+        fields = [
+            tc('id'),
+            tc('name'),
+            tc('cluster_name'),
+            tc('user_name'),
+            tc('disable_choice'),
+            tc('pool_names'),
+            tc('config_file'),
+            tc('keyring_file'),
+            tc('modified_time'),
+            tc('alias'),
+        ]
+        fields_sql = ', '.join(fields)
+
+        sql = f"SELECT {fields_sql} FROM {qn(table_name)}"
+        return self.select_all(using=DEFAULT, sql=sql)

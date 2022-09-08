@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import threading
@@ -6,6 +7,7 @@ import random
 from .managers import AsyncBucketManager
 from .querys import QueryHandler, BackupNum
 from .databases import CanNotConnection
+from webserver import settings
 
 
 class AsyncTask:
@@ -35,6 +37,7 @@ class AsyncTask:
         self.node_num = node_num
         self.buckets = buckets
         self.small_size_first = small_size_first
+        self.get_ceph_conf()
 
         try:
             self.validate_params()
@@ -419,3 +422,19 @@ class AsyncTask:
                     kwargs={'seconds': random.randint(1, 10), '_self': self, 'in_multithread': True}
                 )
                 worker.start()
+
+
+    def get_ceph_conf(self):
+        data_conf = QueryHandler().get_ceph_conf_sql()
+        ceph_cluster = {}
+        for ceph_conf in data_conf:
+            ceph_pool_conf = {
+                'CLUSTER_NAME': ceph_conf['cluster_name'],
+                'USER_NAME': ceph_conf['user_name'],
+                'DISABLE_CHOICE': True if ceph_conf['disable_choice'] else False,
+                'CONF_FILE_PATH': ceph_conf['config_file'],
+                'KEYRING_FILE_PATH': ceph_conf['keyring_file'],
+                'POOL_NAME': tuple(json.loads(ceph_conf['pool_names'])),
+            }
+            ceph_cluster[ceph_conf['alias']] = ceph_pool_conf
+        settings.CEPH_RADOS = ceph_cluster
