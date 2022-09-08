@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'api',
     'docs',
     'share',
+    'ceph',
 ]
 
 MIDDLEWARE = [

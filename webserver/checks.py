@@ -6,7 +6,7 @@ from django.conf import settings
 from utils.oss.pyrados import build_harbor_object
 
 
-def check_ceph_settins(app_configs, **kwargs):
+def check_ceph_settins():
     errors = []
     cephs = getattr(settings, 'CEPH_RADOS', None)
     if not cephs:
