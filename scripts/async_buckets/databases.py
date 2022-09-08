@@ -272,6 +272,7 @@ DEFAULT = 'default'
 _default_db_lock = threading.Lock()
 _metadata_db_lock = threading.Lock()
 
+
 def _acquire_lock(using):
     if using == METADATA:
         _metadata_db_lock.acquire()

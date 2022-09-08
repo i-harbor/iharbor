@@ -54,14 +54,14 @@ def quote_name(name):
 
 
 def table_columns(table_name: str):
-    def _table_columns(column: str, table_name: str = table_name):
+    def _table_columns(column: str, _table_name: str = table_name):
         """
         :return: str
             `tablename`.`column`
         """
-        table_name = quote_name(table_name)
+        _table_name = quote_name(_table_name)
         column = quote_name(column)
-        return f"{table_name}.{column}"
+        return f"{_table_name}.{column}"
 
     return _table_columns
 
@@ -92,6 +92,7 @@ class QueryHandler:
 
                 return ret
         except Exception as e:
+            conn.errors_occurred = True
             raise e
 
     def select_one(self, using: str, sql: str):
@@ -101,18 +102,19 @@ class QueryHandler:
         """
         return self.select(using=using, sql=sql, result_type='one')
 
-    def select_all(self,using: str, sql: str):
+    def select_all(self, using: str, sql: str):
         return self.select(using=using, sql=sql, result_type='all')
 
     @db_readwrite_lock
     def update(self, using: str, sql: str):
+        conn = get_connection(using)
         try:
-            conn = get_connection(using)
             with conn.cursor() as cursor:
                 rows = cursor.execute(sql)
                 conn.commit()
                 return rows
         except Exception as e:
+            conn.errors_occurred = True
             raise e
 
     @staticmethod
@@ -326,7 +328,11 @@ class QueryHandler:
         fields_set = f"{tc(update_field)} = '{async_time_str}'"
         where = f"{tc('id')} = {obj_id}"
         sql = f"UPDATE {qn(table_name)} SET {fields_set} WHERE {where}"
-        rows = self.update(using=METADATA, sql=sql)
+        try:
+            rows = self.update(using=METADATA, sql=sql)
+        except Exception as exc:
+            rows = self.update(using=METADATA, sql=sql)
+
         if rows == 1:
             return True
 
