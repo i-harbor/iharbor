@@ -177,9 +177,12 @@ class HarborFileSystem(AbstractedFS):
     def open(self, filename, mode):
         """Open a file returning its handler."""
         assert isinstance(filename, str), filename
-        # print('function: open', filename, mode)
         ftp_path = self.fs2ftp(filename)
         mode = mode.lower()
+        if mode == 'ab':
+            # 设置偏移量，追加操作。
+            offset = self.getsize(ftp_path)
+            return FileHandler(self.bucket_name, ftp_path, self.client, mode, offset, )
         return FileHandler(self.bucket_name, ftp_path, self.client, mode)
 
     def mkdir(self, path):
@@ -230,14 +233,14 @@ class HarborFileSystem(AbstractedFS):
 
 
 class FileHandler(object):
-    def __init__(self, bucket_name, ftp_path, client, mode):
+    def __init__(self, bucket_name, ftp_path, client, mode, offset=0):
         self.bucket_name = bucket_name
         self.name = os.path.basename(ftp_path)
         self.ftp_path = ftp_path
         self.client = client
         self.closed = False
         self.file = BytesIO()
-        self.offset = 0             # file pointer position
+        self.offset = offset             # file pointer position
         self.is_breakpoint = False  # 标记是否断点续传
         self.write_generator = None
         self.read_generator = None
@@ -269,6 +272,8 @@ class FileHandler(object):
             raise FilesystemError(error.msg)
 
     def write(self, data):
+        if self.mode == 'ab':
+            self.ensure_init_write_generator(is_break_point=True)
         self.ensure_init_write_generator()
         self.file.write(data)
         if self.file.tell() >= 1024 ** 2 * 32:
@@ -296,6 +301,8 @@ class FileHandler(object):
 
     def seek(self, offset):
         self._sync_cache()      # seek前，同步可能缓存的数据
+        if self.mode == "ab":
+            return
         if self.offset == offset:
             return
 

@@ -1,26 +1,32 @@
-## 1 环境搭建(CentOS7)
-### 1.1 安装python和Git
-请自行安装python3.6和Git。
-使用Git拉取代码： 
+## 1 环境搭建(CentOS9)
+### 1.1 安装软件 
+1. **python**： python3.9 (Centos9默认已安装python3.9版本)  
+2. **Git**
+3. **mysql** (django支持的数据库)
+4. **ceph** 集群 ：版本17.2.3 （自行配置）
+
+### 1.2 使用Git拉取代码： 
 ```
-git clone https://github.com/evobstore/webserver.git
+git clone https://gitee.com/gosc-cnic/iharbor.git
 ```
 * 如果不用python虚拟环境请跳过下面1.2和1.3小节python虚拟环境的搭建内容，直接安装iharbor服务需要的python依赖库：   
-```pip3 install -r requirements.txt```   
-### 1.2 安装python虚拟环境和包管理工具pipenv
+```pip install -r requirements.txt```   
+### 1.3 安装Python依赖管理工具pipenv
 使用pip命令安装pipenv。  
-```pip3 install pipenv```
-### 1.3  使用pipenv搭建python虚拟环境
+```pip install pipenv```
+### 1.4  使用pipenv搭建python虚拟环境
 在代码工程根目录下，即文件Pipfile同目录下运行命令：  
 ```pipenv install```
 
-### 1.4 安全敏感信息配置文件security_settings.py
-创建配置文件security_settings.py，复制项目下webserver/security_settings_demo.py文件为webserver/security_settings.py。
-security_settings.py中定义了一些安全敏感信息，请根据自己情况自行修改完成配置（有关配置下面有关小节有介绍），此文件信息在settings.py文件最后被导入。
+### 1.5 安全敏感信息配置文件security_settings.py
+1. 创建配置文件**security_settings.py**或 复制项目下 **webserver/security_settings_demo.py** 文件为 **webserver/security_settings.py**。  
+2. **security_settings.py** 中定义了一些安全敏感信息，请根据自己情况自行修改完成配置（有关配置下面有关小节有介绍），此文件信息在 **settings.py** 文件最后被导入。
 
-### 1.5 数据库安装
-请自行安装mysql数据库。 
-根据自己的情况修改security_settings.py中有关数据库的配置示例代码
+### 1.6 数据库安装
+1. 请自行安装 **mysql** 数据库，如果使用其他django支持的数据库，请根据官方文档自行配置。  
+2. 安装数据库依赖
+   ``` dnf install mariadb-connector-c-devel ```
+3. 根据自己的情况修改 **security_settings.py** 中有关数据库的配置 **mysql** 示例代码
 ```
 # Mysql
 DATABASES = {
@@ -42,18 +48,19 @@ DATABASES = {
     },
 }
 ```
-### 1.6 ceph配置和依赖库安装
-与ceph的通信使用官方librados的python包python36-rados。  
-* 推荐直接安装ceph客户端，或者只安装python36-rados的rpm包（参考下面命令）,安装成功后，python包会自动安装到系统python3第三方扩展包路径下（/usr/lib64/python3.6/site-packages/）。   
+### 1.7 ceph配置和依赖库安装
+与ceph的通信使用官方librados的python包python3-rados。
+1. 安装 **python3-rados**  
+``` dnf install python3-rados.x86_64 ```
+2. python包会自动安装到系统python3第三方扩展包路径下（/usr/lib64/python3.9/site-packages/）。  
+    注意：在使用虚拟环境时需要将以下文件复制到虚拟环境下对应的目录中。
 ```
-wget http://download.ceph.com/rpm-nautilus/el7/x86_64/librados2-14.2.1-0.el7.x86_64.rpm
-wget http://download.ceph.com/rpm-nautilus/el7/x86_64/python36-rados-14.2.1-0.el7.x86_64.rpm
-yum localinstall -y librados2-14.2.1-0.el7.x86_64.rpm python36-rados-14.2.1-0.el7.x86_64.rpm
+ rados.cpython-39-x86_64-linux-gnu.so 
+ rados-2.0.0-py3.9.egg-info  
 ```
-* 如果使用的是pipenv创建的Python虚拟环境(否则忽略此步骤)，需要把`/usr/lib64/python3.6/site-packages/`路径下的python包文
-件rados-2.0.0-py3.6.egg-info和rados.cpython-36m-x86_64-linux-gnu.so复制到你的虚拟python环境*/site-packages/下。
-
-* ceph的配置, 支持多个ceph集群：   
+3. ceph的配置, 支持多个ceph集群：
+    security_settings.py文件中无需配置ceph参数，在项目在第一次启动后需要登录到后端配置ceph，否则无法使用存储服务。对应的ceph配置文件存储在工程文件 **data** 目录中。配置文件内容大致如下：
+   后端ceph配置中必须有一个 **别名** 为`default`。
 ```
 CEPH_RADOS = {
     'default': {
@@ -75,11 +82,13 @@ CEPH_RADOS = {
 }
 ```
 
-### 1.7 FTP配置
-ftp默认开启TLS加密，需要域名证书文件`/etc/nginx/conf.d/ftp-keycert.pem`。  
-如果不开启TLS加密，需要修改`ftpserver/harbor_handler.py`文件开头部分代码`work_mode_in_tls = False`。
+### 1.8 FTP配置
+1. 不开启TLF加密情况下：  
+需要修改`ftpserver/harbor_handler.py`文件开头部分代码`work_mode_in_tls = False`。
+   
+2. ftp默认开启TLS加密，需要域名证书文件`/etc/nginx/conf.d/ftp-keycert.pem`。  
 
-## 2 运行webserver
+## 2 运行iharbor
 ### 2.1 激活python虚拟环境  
 * 非python虚拟环境忽略此步骤。  
 ```pipenv shell```
