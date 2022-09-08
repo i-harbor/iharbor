@@ -423,7 +423,6 @@ class AsyncTask:
                 )
                 worker.start()
 
-
     def get_ceph_conf(self):
         data_conf = QueryHandler().get_ceph_conf_sql()
         ceph_cluster = {}

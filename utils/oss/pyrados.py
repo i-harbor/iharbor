@@ -1019,8 +1019,6 @@ def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int =
     :param obj_id: 对象在ceph存储池中对应的rados名称
     :param obj_size: 对象的大小
     """
-    print(settings)
-    print(settings.CEPH_RADOS)
     cephs = settings.CEPH_RADOS
 
     if using not in cephs:

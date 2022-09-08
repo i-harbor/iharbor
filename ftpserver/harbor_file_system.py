@@ -182,7 +182,7 @@ class HarborFileSystem(AbstractedFS):
         if mode == 'ab':
             # 设置偏移量，追加操作。
             offset = self.getsize(ftp_path)
-            return FileHandler(self.bucket_name, ftp_path, self.client, mode, offset, )
+            return FileHandler(self.bucket_name, ftp_path, self.client, mode, offset)
         return FileHandler(self.bucket_name, ftp_path, self.client, mode)
 
     def mkdir(self, path):
