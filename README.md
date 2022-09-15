@@ -2,10 +2,10 @@
 ### 1.1 安装软件 
 1. **python**： python3.9 (Centos9默认已安装python3.9版本)  
 2. **Git**
-3. **mysql** (django支持的数据库)
+3. **mysql、mariadb** (django支持的数据库)
 4. **ceph** 集群 ：版本17.2.3 （自行配置）
 5. **python3-rados** (与ceph的通信使用官方librados的python包)
-6. **mariadb-connector-c-devel** 
+6. **mariadb-connector-c-devel**   # mysqlclient依赖
 
 ### 1.2 使用Git拉取代码： 
 ```
