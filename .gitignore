@@ -8,4 +8,5 @@
 *.so
 *.log
 /collect_static/
+/data
 

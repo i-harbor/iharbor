@@ -47,7 +47,7 @@ class CephCluster(models.Model):
         :return: str
         """
         if not self.config_file:
-            self._save_config_to_file()
+            self.save_config_to_file()
 
         return self.config_file
 
@@ -57,11 +57,11 @@ class CephCluster(models.Model):
         :return: str
         """
         if not self.keyring_file:
-            self._save_config_to_file()
+            self.save_config_to_file()
 
         return self.keyring_file
 
-    def _save_config_to_file(self, path=None):
+    def save_config_to_file(self, path=None):
         """
         ceph的配置内容保存到配置文件
 
@@ -95,9 +95,7 @@ class CephCluster(models.Model):
         return True
 
     def save(self, *args, **kwargs):
-        if not self.id:
-            super().save(*args, **kwargs)
-        self._save_config_to_file()
+        self.save_config_to_file()
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -111,7 +109,7 @@ class CephCluster(models.Model):
         校验模型中字段内容
         """
         if not isinstance(self.pool_names, list):
-            raise ValidationError({'pool_names': _('字段类型与需求字段类型不匹配。')})
+            raise ValidationError({'pool_names': _('字段类型必须是一个json格式的数组。')})
 
         if not self.pool_names:
             raise ValidationError({'pool_names': _('该字段不不能为空。')})
@@ -120,9 +118,9 @@ class CephCluster(models.Model):
 
         # 备份路径用于测试ceph连接
         path = f'data/ceph/{self.alias}test/conf'
-        self._save_config_to_file(path=path)
+        self.save_config_to_file(path=path)
 
-        ho = HarborObject(pool_name=self.pool_names[0], obj_id='1', obj_size=2, cluster_name=self.cluster_name,
+        ho = HarborObject(pool_name=self.pool_names[0], obj_id='', obj_size=2, cluster_name=self.cluster_name,
                           user_name=self.user_name, conf_file=self.config_file, keyring_file=self.keyring_file)
         try:
             with ho.rados:
@@ -133,23 +131,19 @@ class CephCluster(models.Model):
             # [errno 5] RADOS I/O error (error connecting to the cluster)
             # [errno 1] RADOS permission error (error connecting to the cluster) user_name
             # [errno 13] RADOS permission denied (error connecting to the cluster) user_name
+            errno = getattr(e, 'errno', None)
+            if not errno:
+                raise ValidationError({_('无法连接ceph集群，请重新查看填写的配置。')})
+            elif errno == 22:
+                raise ValidationError({'config': _('配置文件填写有误： RADOS invalid argument (error calling '
+                                                   'conf_read_file)。'),
+                                       'keyring': _('配置文件填写有误：RADOS invalid argument (error calling '
+                                                    'conf_read_file)。')})
+            elif errno == 1 or errno == 13:
+                raise ValidationError({'user_name': _('该字段填写有误：RADOS permission error/denied (error connecting to '
+                                                      'the cluster)。')})
+            output = _(f'请查看ceph集群是否正常使用，报错：{e}。')
+            raise ValidationError(output)
+        finally:
             # 删除测试的备份路径
             shutil.rmtree(f'data/ceph/{self.alias}test')
-            pattern = re.compile(r'^\[\w+\s[1-9]\d*\]', )
-            content = pattern.match(str(e))
-            if not content:
-                raise ValidationError({_('无法连接ceph集群，请重新查看填写的配置。')})
-
-            # [errno 22] -> list ['errno', '22']
-            content = content.group(0).lstrip('[').rstrip(']').split(' ')
-            if content[0] == 'errno':
-                if content[1] == '22':
-                    raise ValidationError({'config': _('配置文件填写有误： RADOS invalid argument (error calling '
-                                                       'conf_read_file)。'),
-                                           'keyring': _('配置文件填写有误：RADOS invalid argument (error calling '
-                                                        'conf_read_file)。')})
-                if content[1] == '1' or content[1] == '13':
-                    raise ValidationError({'user_name': _('该字段填写有误：RADOS permission error/denied (error connecting to '
-                                                          'the cluster)。')})
-                output = _(f'请查看ceph集群是否正常使用，报错：{e}。')
-                raise ValidationError(output)

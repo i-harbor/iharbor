@@ -38,7 +38,7 @@ schema_view = get_schema_view(
       title="iHarbor API",
       default_version='v1',
    ),
-   public=False,
+   public=True,
    permission_classes=(permissions.AllowAny,),
 )
 

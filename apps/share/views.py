@@ -687,6 +687,18 @@ class ShareDirViewSet(CustomGenericViewSet):
                 type=openapi.TYPE_STRING,
                 description=gettext_lazy("分享密码"),
                 required=False
+            ),
+            openapi.Parameter(
+                name='offset', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description=gettext_lazy("分页查询初始索引"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='limit', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                description=gettext_lazy("每页返回数据数量"),
+                required=False
             )
         ],
         responses={

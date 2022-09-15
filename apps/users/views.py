@@ -72,6 +72,12 @@ def login_user(request):
     else:
         # 保存登陆后跳转地址，如果存在的话
         next_url = request.GET.get('next', None)
+        if request.user.is_authenticated:
+            if not next_url:
+                next_url = reverse('buckets:bucket_view')
+
+            return redirect(to=next_url)
+
         if next_url:
             request.session['next'] = next_url
         form = LoginForm()

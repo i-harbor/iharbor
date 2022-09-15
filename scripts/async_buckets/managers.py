@@ -1,3 +1,4 @@
+import json
 from urllib import parse
 from datetime import datetime
 import requests
@@ -7,6 +8,26 @@ from utils.md5 import FileMD5Handler, EMPTY_HEX_MD5
 
 from .databases import django_settings
 from .querys import QueryHandler
+
+
+def get_ceph_conf():
+    data_conf = QueryHandler().get_ceph_conf_sql()
+    ceph_cluster = {}
+    for ceph_conf in data_conf:
+        ceph_pool_conf = {
+            'CLUSTER_NAME': ceph_conf['cluster_name'],
+            'USER_NAME': ceph_conf['user_name'],
+            'DISABLE_CHOICE': True if ceph_conf['disable_choice'] else False,
+            'CONF_FILE_PATH': ceph_conf['config_file'],
+            'KEYRING_FILE_PATH': ceph_conf['keyring_file'],
+            'POOL_NAME': tuple(json.loads(ceph_conf['pool_names'])),
+        }
+        ceph_cluster[ceph_conf['alias']] = ceph_pool_conf
+
+    return ceph_cluster
+
+
+django_settings.CEPH_RADOS = get_ceph_conf()
 
 
 def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int = 0):

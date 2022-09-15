@@ -215,7 +215,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
         """
         管理员给存储桶加锁或解锁； 需要超级用户权限或APP超级用户权限
 
-            http code 204 ok:
+            http code 200 ok:
             {}
 
             http code 400, 403, 404, 500 error:
@@ -232,7 +232,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
             404：
                 NoSuchBucket：存储桶不存在
             500：
-                InternalError：删除存储桶时错误
+                InternalError：存储桶加锁错误
         """
         bucket_name = kwargs.get(self.lookup_field)
         lock = kwargs.get('lock')
@@ -261,7 +261,7 @@ class AdminBucketViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data(), status=exc.status_code)
 
-        return Response(status=200)
+        return Response(data={}, status=200)
 
     def get_serializer_class(self):
         if self.action == 'create':
