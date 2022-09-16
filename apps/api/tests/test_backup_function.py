@@ -7,7 +7,7 @@ from django.utils import timezone
 from buckets.models import Bucket, BackupBucket
 from buckets.utils import BucketFileManagement
 from api.backup import AsyncBucketManager
-from . import tests
+from . import tests, config_ceph_clustar_settings
 from .tests import (
     random_bytes_io, calculate_md5
 )
@@ -17,6 +17,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user = tests.get_or_create_user(password=self.user_password)
         self.user = user
@@ -83,7 +84,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
 
         abm = AsyncBucketManager()
         meet_time = timezone.now()
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 0)
 
         backup1 = BackupBucket(
@@ -91,37 +92,37 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
             bucket_token='token', status=BackupBucket.Status.START,
             bucket_name='backup1', backup_num=1)
         backup1.save()
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 2)
 
         # test now - obj.upt > timedelta(minutes=meet_async_timedelta_minutes)
-        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=0)
         self.assertEqual(len(qs), 0)
 
         # test param id_mod_div, id_mod_equal
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 2)
         id_mod_div = 1
         id_mod_equal = 0
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time,
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, id_gt=0,
                                                  id_mod_div=id_mod_div, id_mod_equal=id_mod_equal)
         self.assertEqual(len(qs), 2)
 
         id_mod_div = 2
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time,
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, id_gt=0,
                                                  id_mod_div=id_mod_div, id_mod_equal=id_mod_equal)
         self.assertEqual(len(qs), 1)
         for o in qs:
             self.assertEqual(o.id % id_mod_div, id_mod_equal)
 
         # test param backup_num
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1, id_gt=0)
         self.assertEqual(len(qs), 2)
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2, id_gt=0)
         self.assertEqual(len(qs), 2)
 
         # test param in_gt
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=1, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=1, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 1)
         self.assertEqual(qs[0].id, obj1.id)
         qs = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=qs[0].id, limit=1, meet_time=meet_time)
@@ -130,32 +131,32 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
 
         obj1.async1 = timezone.now()
         obj1.save(update_fields=['async1'])
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 1)
         self.assertEqual(qs[0].id, obj2.id)
 
         # test param backup_num
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=1, id_gt=0)
         self.assertEqual(len(qs), 1)
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, limit=2, meet_time=meet_time, backup_num=2, id_gt=0)
         self.assertEqual(len(qs), 2)
 
         # obj1.upt = timezone.now()
         obj1.save(update_fields=['upt'])    # upt会自动更新到now time
         meet_time = timezone.now()
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 2)
 
         backup1.status = backup1.Status.STOP
         backup1.save(update_fields=['status'])
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 0)
 
         backup2 = BackupBucket(bucket=bucket, endpoint_url='https://exemple.com',
                                bucket_token='token', status=BackupBucket.Status.START,
                                bucket_name='backup2', backup_num=2)
         backup2.save()
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 2)
 
         # only obj2 need to backup2
@@ -168,7 +169,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
 
         obj1.async2 = timezone.now()
         obj1.save(update_fields=['async2'])
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 1)
         self.assertEqual(qs[0].id, obj2.id)
 
@@ -176,7 +177,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
         # obj1.upt = timezone.now()           # 不需要
         obj1.save(update_fields=['upt'])    # upt会自动更新到now time
         meet_time = timezone.now()
-        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, meet_time=meet_time, id_gt=0)
         self.assertEqual(len(qs), 2)
 
     def test_other(self):
@@ -231,7 +232,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
 
         """同步两个对象 test"""
         abm.MEET_ASYNC_TIMEDELTA_MINUTES = 0
-        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=0)
         self.assertEqual(len(qs), 2)
         obj_key1 = None
         for obj in qs:
@@ -280,7 +281,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
         self.assertTrue(ok, 'multipart_upload_object failed')
 
         abm.MEET_ASYNC_TIMEDELTA_MINUTES = 0    # 保证查到对象
-        qs2 = abm.get_need_async_objects_queryset(bucket=bucket)
+        qs2 = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=0)
         self.assertEqual(len(qs2), 1)
         obj2 = qs2[0]
         self.assertEqual(obj2.na, key2)
@@ -339,7 +340,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
 
         abm = AsyncBucketManager()
         abm.MEET_ASYNC_TIMEDELTA_MINUTES = 0
-        qs = abm.get_need_async_objects_queryset(bucket=bucket)
+        qs = abm.get_need_async_objects_queryset(bucket=bucket, id_gt=0)
         obj = qs[0]
         self.assertEqual(obj.na, key)
         abm.async_object(bucket_id=bucket.id, bucket_name=bucket.name, object_id=obj.id, object_key=obj.na)

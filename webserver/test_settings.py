@@ -7,6 +7,15 @@ TEST_CASE = {
             'bucket_name': 'akk'
         }
     },
+    'CEPH_CLUSTER': {
+        'alias': 'default',
+        'cluster_name': 'ceph',
+        'username': 'client.admin',
+        'config_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.conf',
+        'keyring_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.keyring',
+        'pool_names': ["obs_test"],
+        'disable_choice': False,                # True: 创建bucket时不选择；
+    }
 }
 
 TEST_CASE.update(TEST_CASE_SECURITY)
