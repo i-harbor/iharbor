@@ -113,18 +113,23 @@ class CephCluster(models.Model):
 
         if not self.pool_names:
             raise ValidationError({'pool_names': _('该字段不不能为空。')})
-        if self.pool_names[0] == '' or self.pool_names == '':
-            raise ValidationError({'pool_names': _('该字段不不能为空。')})
+
+        if not all(self.pool_names):
+            raise ValidationError({'pool_names': _('存储池不能有为空的情况。')})
 
         # 备份路径用于测试ceph连接
         path = f'data/ceph/{self.alias}test/conf'
         self.save_config_to_file(path=path)
 
-        ho = HarborObject(pool_name=self.pool_names[0], obj_id='', obj_size=2, cluster_name=self.cluster_name,
+        ho = HarborObject(pool_name='', obj_id='', obj_size=2, cluster_name=self.cluster_name,
                           user_name=self.user_name, conf_file=self.config_file, keyring_file=self.keyring_file)
         try:
-            with ho.rados:
-                pass
+            list_pool_cluster = ho.rados.get_cluster().list_pools()
+            for pool_name in self.pool_names:
+                if pool_name not in list_pool_cluster:
+                    raise ValidationError({'pool_names': _(f'集群中该存储池 {pool_name} 不存在。')})
+        except ValidationError as exc:
+            raise exc
         except Exception as e:
             # [errno 22] RADOS invalid argument (error calling conf_read_file)
             # [errno 22] RADOS invalid argument (error calling conf_read_file)
