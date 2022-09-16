@@ -69,9 +69,9 @@ THIRD_PARTY_APP_AUTH_SECURITY = {
 # }
 
 # test case settings
-TEST_CASE = {
+TEST_CASE_SECURITY = {
     'BACKUP_BUCKET': {
-        'endpoint_url': 'http://159.226.235.4/',
+        'endpoint_url': 'http://127.0.0.1/',
         'bucket_name': 'xxx',
         'bucket_token': 'xxx'
     }

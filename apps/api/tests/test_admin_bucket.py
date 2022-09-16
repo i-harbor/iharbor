@@ -5,13 +5,14 @@ from users.models import UserProfile
 from .tests import (
     get_or_create_user, set_token_auth_header, MyAPITransactionTestCase
 )
-from . import tests
+from . import tests, config_ceph_clustar_settings
 
 
-class BackupBucketAPITests(MyAPITransactionTestCase):
+class AdminBucketAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         # 创建test用户
         self.user_password = 'password'
         self.user_username = 'test@cnic.cn'
@@ -85,7 +86,6 @@ class BackupBucketAPITests(MyAPITransactionTestCase):
         self.assertEqual(r.status_code, 204)
 
         # clear bucket
-        bucket1.delete_and_archive()
         tests.BucketsAPITests.clear_bucket_archive(bucket_name)
 
         url = reverse('api:admin-bucket-delete-bucket', kwargs={'bucket_name': bucket_name, 'username': username})

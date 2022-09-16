@@ -523,7 +523,7 @@ class BucketViewSet(CustomGenericViewSet):
         try:
             bucket = serializer.save()
         except Exception as e:
-            logger.error(f'创建桶“{bucket.name}”失败, {str(e)}')
+            logger.error(f'创建桶“{bucket_name}”失败, {str(e)}')
             exc = exceptions.Error(message=_('创建桶失败') + str(e))
             return Response(data=exc.err_data_old(), status=exc.status_code)
 
@@ -1978,7 +1978,7 @@ class DirectoryViewSet(CustomGenericViewSet):
 class BucketStatsViewSet(CustomGenericViewSet):
     """
         retrieve:
-            存储桶资源统计
+            存储桶资源统计，普通用户只能查询自己的桶，超级用户和第三方APP超级用户查询所有的桶
 
             统计存储桶对象数量和所占容量，字节
 
@@ -1990,7 +1990,9 @@ class BucketStatsViewSet(CustomGenericViewSet):
                     },
                     "stats_time": "2020-03-04T06:01:50+00:00", # 统计时间
                     "code": 200,
-                    "bucket_name": "xxx"    # 存储桶名称
+                    "bucket_name": "xxx",    # 存储桶名称
+                    "user_id": 1,
+                    "username": "shun"
                 }
 
             >>Http Code: 状态码404:
@@ -2006,6 +2008,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('获取一个存储桶资源统计信息'),
+        responses={}
     )
     def retrieve(self, request, *args, **kwargs):
         bucket_name = kwargs.get(self.lookup_field)
@@ -2014,8 +2017,7 @@ class BucketStatsViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data_old(), status=exc.status_code)
 
-        user = request.user
-        if user.is_superuser:
+        if permissions.IsSuperOrAppSuperUser().has_permission(request=request, view=self):
             bucket = Bucket.get_bucket_by_name(bucket_name)
         else:
             bucket = get_user_own_bucket(bucket_name, request)
@@ -2028,6 +2030,8 @@ class BucketStatsViewSet(CustomGenericViewSet):
         data.update({
             'code': 200,
             'bucket_name': bucket_name,
+            'user_id': bucket.user.id,
+            'username': bucket.user.username
         })
 
         return Response(data)

@@ -18,6 +18,7 @@ from rest_framework.test import APIClient
 from buckets.models import BucketToken, BucketFileBase, Bucket, Archive
 from buckets.management.commands.clearbucket import Command as ClearBucketCommand
 from users.models import UserProfile
+from . import config_ceph_clustar_settings
 
 
 User = get_user_model()
@@ -388,6 +389,7 @@ class BucketsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
         # self.client.force_login(user=user)
@@ -629,6 +631,7 @@ class BucketsAPITests(MyAPITransactionTestCase):
     @staticmethod
     def clear_bucket_archive(bucketname):
         buckets = Archive.objects.filter(name=bucketname, type=Archive.TYPE_COMMON).all()
+        print(f'bucket: {len(buckets)}')
         for b in buckets:
             cmd = ClearBucketCommand()
             cmd._clear_datetime = datetime.utcnow()
@@ -639,6 +642,7 @@ class DirAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
         # self.client.force_login(user=user)
@@ -748,6 +752,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         self.user = get_or_create_user(password=self.user_password)
         set_token_auth_header(self, username=self.user.username, password=self.user_password)
@@ -1072,6 +1077,7 @@ class MetadataAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
         # self.client.force_login(user=user)
@@ -1227,6 +1233,7 @@ class StatsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
         self.user = user
@@ -1303,10 +1310,12 @@ class StatsAPITests(MyAPITransactionTestCase):
         url = reverse('api:stats_bucket-detail', kwargs={'bucket_name': self.bucket_name})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertKeysIn(['stats', 'stats_time', 'bucket_name'], response.data)
+        self.assertKeysIn(['stats', 'stats_time', 'bucket_name', 'user_id', 'username'], response.data)
         self.assertEqual(response.data['stats']['space'], 6 * 1024 ** 2)
         self.assertEqual(response.data['stats']['count'], 1)
         self.assertEqual(response.data['bucket_name'], self.bucket_name)
+        self.assertEqual(response.data['user_id'], self.user.id)
+        self.assertEqual(response.data['username'], self.user.username)
 
     def tearDown(self):
         response = ObjectsAPITests.delete_object_response(self.client, bucket_name=self.bucket_name, key=self.key)
@@ -1473,6 +1482,7 @@ class ListBucketObjectsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
         self.user = user
@@ -1601,6 +1611,7 @@ class ShareAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
         self.user = user
