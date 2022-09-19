@@ -552,7 +552,7 @@ class BucketLimitConfig(models.Model):
     用户可拥有存储桶数量限制配置模型
     """
     id = models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')
-    limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=2)
+    limit = models.IntegerField(verbose_name='可拥有存储桶上限', default=0)
     user = models.OneToOneField(to=User, related_name='bucketlimit', on_delete=models.CASCADE, verbose_name='用户')
 
     class Meta:

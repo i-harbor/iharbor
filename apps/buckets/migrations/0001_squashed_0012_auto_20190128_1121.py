@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
             name='BucketLimitConfig',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('limit', models.IntegerField(default=2, verbose_name='可拥有存储桶上限')),
+                ('limit', models.IntegerField(default=0, verbose_name='可拥有存储桶上限')),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='bucketlimit', to=settings.AUTH_USER_MODEL, verbose_name='用户')),
             ],
             options={
