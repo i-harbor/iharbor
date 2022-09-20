@@ -17,6 +17,7 @@ class BackupFunctionTests(tests.MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user = tests.get_or_create_user(password=self.user_password)

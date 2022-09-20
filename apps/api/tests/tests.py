@@ -389,6 +389,7 @@ class BucketsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -631,7 +632,6 @@ class BucketsAPITests(MyAPITransactionTestCase):
     @staticmethod
     def clear_bucket_archive(bucketname):
         buckets = Archive.objects.filter(name=bucketname, type=Archive.TYPE_COMMON).all()
-        print(f'bucket: {len(buckets)}')
         for b in buckets:
             cmd = ClearBucketCommand()
             cmd._clear_datetime = datetime.utcnow()
@@ -642,6 +642,7 @@ class DirAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -752,6 +753,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         self.user = get_or_create_user(password=self.user_password)
@@ -1077,6 +1079,7 @@ class MetadataAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)
@@ -1233,6 +1236,7 @@ class StatsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
@@ -1304,7 +1308,7 @@ class StatsAPITests(MyAPITransactionTestCase):
     def test_stats_bucket(self):
         url = reverse('api:stats_bucket-detail', kwargs={'bucket_name': 'not-found'})
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
+        self.assertOldErrorResponse(status_code=404, code='NoSuchBucket', response=response)
 
         self.set_bucket_stat_time()
         url = reverse('api:stats_bucket-detail', kwargs={'bucket_name': self.bucket_name})
@@ -1482,6 +1486,7 @@ class ListBucketObjectsAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
@@ -1611,6 +1616,7 @@ class ShareAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         self.user_password = 'password'
         user = get_or_create_user(password=self.user_password)

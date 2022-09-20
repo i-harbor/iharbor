@@ -1,4 +1,5 @@
 from django.urls import reverse
+from django.conf import settings
 
 from buckets.models import Bucket
 from users.models import UserProfile
@@ -12,6 +13,7 @@ class AdminBucketAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
         # 创建test用户
         self.user_password = 'password'

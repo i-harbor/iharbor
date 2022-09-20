@@ -566,8 +566,17 @@ class BucketLimitConfig(models.Model):
         return f'limit<={self.limit}'
 
     @classmethod
-    def get_user_bucket_limit(cls, user:User):
-        obj, created = cls.objects.get_or_create(user=user)
+    def get_user_bucket_limit(cls, user: User):
+        obj = cls.objects.filter(user_id=user.id).first()
+        if obj:
+            return obj.limit
+
+        obj = cls(user_id=user.id)
+        limit = getattr(settings, 'BUCKET_LIMIT_DEFAULT', None)
+        if limit is not None:
+            obj.limit = limit
+
+        obj.save(force_insert=True)
         return obj.limit
 
 

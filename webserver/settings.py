@@ -460,6 +460,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # 前端控制台url设置
 FRONTEND_URL = None
 
+# 允许用户创建桶的数量默认值
+BUCKET_LIMIT_DEFAULT = 0
+
+
 # 导入安全相关的settings
 from .security_settings import *
 

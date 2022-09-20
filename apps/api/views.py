@@ -1995,11 +1995,15 @@ class BucketStatsViewSet(CustomGenericViewSet):
                     "username": "shun"
                 }
 
-            >>Http Code: 状态码404:
+            >>Http Code: 状态码403, 404:
                 {
-                    'code': 404,
+                    'code': "xxx",
                     'code_text': xxx  //错误码描述
                 }
+                403：
+                    AccessDenied：你没有此存储桶的访问权限
+                404：
+                    NoSuchBucket： 存储桶不存在
         """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
@@ -2017,14 +2021,15 @@ class BucketStatsViewSet(CustomGenericViewSet):
         except exceptions.Error as exc:
             return Response(data=exc.err_data_old(), status=exc.status_code)
 
-        if permissions.IsSuperOrAppSuperUser().has_permission(request=request, view=self):
-            bucket = Bucket.get_bucket_by_name(bucket_name)
-        else:
-            bucket = get_user_own_bucket(bucket_name, request)
-
+        bucket = Bucket.get_bucket_by_name(bucket_name)
         if not bucket:
-            return Response(data={'code': 404, 'code_text': _('bucket_name参数有误，存储桶不存在')},
-                            status=status.HTTP_404_NOT_FOUND)
+            exc = exceptions.NoSuchBucket(message=_('存储桶不存在'))
+            return Response(data=exc.err_data_old(), status=404)
+
+        if not permissions.IsSuperOrAppSuperUser().has_permission(request=request, view=self):
+            if not bucket.check_user_own_bucket(user=request.user):
+                exc = exceptions.AccessDenied(message=_('你没有此存储桶的访问权限'))
+                return Response(data=exc.err_data_old(), status=403)
 
         data = bucket.get_stats()
         data.update({

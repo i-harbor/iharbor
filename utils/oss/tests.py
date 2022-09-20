@@ -5,8 +5,9 @@ import random
 import hashlib
 from string import printable
 from utils.md5 import offset_chunks
+from api.tests import config_ceph_clustar_settings
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
+# os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
 from .pyrados import build_harbor_object, get_size
 
 
@@ -32,7 +33,7 @@ def calculate_md5(data: bytes):
 
 
 class TestHarborObject(unittest.TestCase):
-    POOL_NAME = 'obs-test'
+    POOL_NAME = 'obs_test'
     USING = 'default'
 
     def build_data(self):
@@ -104,4 +105,5 @@ class TestHarborObject(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    config_ceph_clustar_settings()
     unittest.main()
