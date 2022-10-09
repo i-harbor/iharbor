@@ -3042,10 +3042,16 @@ class FtpViewSet(CustomGenericViewSet):
                 "ro_password": xxx     # 此项提交时才存在
             }
         }
-        Http Code: 状态码400：参数有误时，返回数据：
-            对应参数错误信息;
-        Http Code: 状态码404;
-        Http Code: 500
+        Http Code: 状态码400, 403, 404, 500:
+        {
+            "code": "NoSuchBucket",
+            "code_text": "存储桶不存在"
+        }
+
+        403:
+            AccessDenied: 你没有此存储桶的访问权限
+        404:
+            NoSuchBucket: 存储桶不存在
     """
     queryset = []
     permission_classes = [permissions.IsAuthenticatedOrBucketToken]
@@ -3106,10 +3112,14 @@ class FtpViewSet(CustomGenericViewSet):
         ro_password = params.get('ro_password')
 
         # 存储桶验证和获取桶对象
-        bucket = get_user_own_bucket(bucket_name=bucket_name, request=request)
+        bucket = Bucket.get_bucket_by_name(bucket_name)
         if not bucket:
-            return Response(data={'code': 404, 'code_text': _('存储桶不存在')},
-                            status=status.HTTP_404_NOT_FOUND)
+            exc = exceptions.NoSuchBucket(message=_('存储桶不存在'))
+            return Response(data=exc.err_data_old(), status=404)
+
+        if not bucket.check_user_own_bucket(user=request.user):
+            exc = exceptions.AccessDenied(message=_('你没有此存储桶的访问权限'))
+            return Response(data=exc.err_data_old(), status=403)
 
         data = {}
         if enable is not None:
