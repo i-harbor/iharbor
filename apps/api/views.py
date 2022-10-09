@@ -2764,85 +2764,6 @@ class UserStatsViewSet(CustomGenericViewSet):
         return super(UserStatsViewSet, self).get_permissions()
 
 
-class CephComponentsViewSet(CustomGenericViewSet):
-    """
-        ceph集群组件信息视图集
-
-        list:
-            ceph的mon，osd，mgr，mds组件信息
-
-            需要超级用户权限
-
-            >>Http Code: 状态码200:
-                {
-                    "code": 200,
-                    "mon": {},
-                    "osd": {},
-                    "mgr": {},
-                    "mds": {}
-                }
-
-            >>Http Code: 状态码404:
-                {
-                    'code': 404,
-                    'code_text': URL中包含无效的版本  //错误码描述
-                }
-        """
-    queryset = []
-    permission_classes = [permissions.IsSuperUser]
-    pagination_class = None
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('ceph的mon，osd，mgr，mds组件信息'),
-    )
-    def list(self, request, *args, **kwargs):
-        return Response({
-            'code': 200,
-            'mon': {},
-            'osd': {},
-            'mgr': {},
-            'mds': {}
-        })
-
-
-class CephErrorViewSet(CustomGenericViewSet):
-    """
-        ceph集群当前故障信息查询
-
-        list:
-            ceph集群当前故障信息查询
-
-            需要超级用户权限
-
-            >>Http Code: 状态码200:
-                {
-                    "code": 200,
-                    'errors': {
-                    }
-                }
-
-            >>Http Code: 状态码404:
-                {
-                    'code': 404,
-                    'code_text': URL中包含无效的版本  //错误码描述
-                }
-        """
-    queryset = []
-    permission_classes = [permissions.IsSuperUser]
-    pagination_class = None
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('ceph集群当前故障信息查询'),
-    )
-    def list(self, request, *args, **kwargs):
-        return Response({
-            'code': 200,
-            'errors': {
-
-            }
-        })
-
-
 class CephPerformanceViewSet(CustomGenericViewSet):
     """
         ceph集群性能，需要超级用户权限
@@ -2914,33 +2835,6 @@ class UserCountViewSet(CustomGenericViewSet):
         return Response({
             'code': 200,
             'count': count
-        })
-
-
-class AvailabilityViewSet(CustomGenericViewSet):
-    """
-        系统可用性
-
-        list:
-            系统可用性查询，需要超级用户权限
-
-            >>Http Code: 状态码200:
-                {
-                    "code": 200,
-                    'availability': '100%'
-                }
-        """
-    queryset = None
-    permission_classes = [permissions.IsSuperUser]
-    pagination_class = None
-
-    @swagger_auto_schema(
-        operation_summary=gettext_lazy('系统可用性查询'),
-    )
-    def list(self, request, *args, **kwargs):
-        return Response({
-            'code': 200,
-            'availability': '100%'
         })
 
 
