@@ -7,7 +7,8 @@
 5. **python3-rados** (与ceph的通信使用官方librados的python包)
 6. **mariadb-connector-c-devel**   # mysqlclient依赖
 
-### 1.2 使用Git拉取代码： 
+### 1.2 使用Git拉取代码   
+创建并切换进入目录/home/uwsgi/，在此路径下拉取代码：
 ```
 git clone https://gitee.com/gosc-cnic/iharbor.git
 ```
