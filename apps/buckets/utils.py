@@ -65,6 +65,7 @@ def get_ceph_poolnames(using: str):
 
     raise ValueError(f'配置文件CEPH_RADOS中别名“{using}”配置中POOL_NAME配置项需要是一个元组tuple')
 
+
 def get_ceph_poolname_rand(using: str):
     """
     从配置的CEPH pool name随机获取一个
@@ -170,7 +171,11 @@ def get_obj_model_class(table_name):
     return type(model_name, (BucketFileBase,), {'Meta': meta, '__module__': BucketFileBase.__module__})
 
 
-def create_bucket(name: str, user, _id: int = None, ceph_using: str = None, pool_name: str = None):
+def create_bucket(
+        name: str, user, _id: int = None,
+        ceph_using: str = None, pool_name: str = None,
+        access_permission: str = None
+):
     """
     创建存储桶
 
@@ -179,7 +184,14 @@ def create_bucket(name: str, user, _id: int = None, ceph_using: str = None, pool
     :param _id: bucket id
     :param ceph_using: 多ceph集群时，指定使用那个ceph集群
     :param pool_name: ceph pool name that bucket objects data storage
+    :param access_permission: 桶访问权限
     """
+    if access_permission:
+        if access_permission not in [Bucket.PUBLIC, Bucket.PRIVATE, Bucket.PUBLIC_READWRITE]:
+            raise exceptions.Error(message=f'指定的存储桶的访问权限无效')
+    else:
+        access_permission = Bucket.PRIVATE
+
     if not ceph_using and pool_name:
         raise exceptions.Error(message=f'指定"pool_name"时必须同时指定"ceph_using"')
 
@@ -199,9 +211,11 @@ def create_bucket(name: str, user, _id: int = None, ceph_using: str = None, pool
         bucket_id = get_next_bucket_max_id()
 
     try:
-        bucket = Bucket(id=bucket_id, name=bucket_name,
-                        ceph_using=ceph_using, pool_name=pool_name,
-                        user=user)
+        bucket = Bucket(
+            id=bucket_id, name=bucket_name,
+            ceph_using=ceph_using, pool_name=pool_name,
+            user=user, access_permission=access_permission
+        )
         bucket.save(force_insert=True)
     except Exception as e:
         raise exceptions.Error(message=f"create bucket metadata failed, {str(e)}.")
@@ -226,7 +240,7 @@ class BucketFileManagement:
     """
     存储桶相关的操作方法类
     """
-    ROOT_DIR_ID = 0 # 根目录ID
+    ROOT_DIR_ID = 0     # 根目录ID
 
     def __init__(self, path='', collection_name='', *args, **kwargs):
         self._path = self._hand_path(path)
@@ -299,7 +313,7 @@ class BucketFileManagement:
                 self.cur_dir_id = obj.id
                 return self.cur_dir_id
             else:
-                raise  exceptions.SameKeyAlreadyExists(message='无效目录，同名对象已存在')
+                raise exceptions.SameKeyAlreadyExists(message='无效目录，同名对象已存在')
 
         raise exceptions.NoParentPath(message='目录路径不存在')
 
