@@ -335,3 +335,46 @@ class AllFileUploadInMemoryHandler(Md5MemoryFileUploadHandler):
         # Check the content-length header to see if we should
         # If the post is too large, we cannot use the Memory handler.
         self.activated = True
+
+
+from utils.md5 import FileMD5Handler, Sha256Handler
+from utils.oss.pyrados import build_harbor_object
+
+
+class PartUploadToCephHandler(FileUploadToCephHandler):
+    """
+    multipart upload直接存储到ceph上传处理器
+    """
+    chunk_size = 5 * 2 ** 20    # 5MB
+    max_size_upload_limit = 2 * 1024 ** 3       # 2GB
+
+    def __init__(self, request, using: str, pool_name='', part_key=''):
+        self.part_key = part_key
+        super().__init__(request=request, using=using, pool_name=pool_name, obj_key=part_key)
+        amz_content_sha256 = self.request.headers.get('X-Amz-Content-SHA256', None)
+        if amz_content_sha256 and amz_content_sha256 != 'UNSIGNED-PAYLOAD':
+            self.file_sha256_handler = Sha256Handler()
+        else:
+            self.file_sha256_handler = None
+
+    def new_file(self, *args, **kwargs):
+        """
+        Create the file object to append to as data is coming in.
+        """
+        super().new_file(*args, **kwargs)
+        # ho = build_harbor_object_part(using=self.using, pool_name=self.pool_name, part_key=self.part_key)
+        # self.file = FileWrapper(ho)
+        # self.file_md5_handler = FileMD5Handler()
+
+    def receive_data_chunk(self, raw_data, start):
+        """
+        :raises: RadosError
+        """
+        super().receive_data_chunk(raw_data=raw_data, start=start)
+        if self.file_sha256_handler is not None:
+            self.file_sha256_handler.update(offset=start, data=raw_data)
+
+    def file_complete(self, file_size):
+        f = super().file_complete(file_size)
+        f.sha256_handler = self.file_sha256_handler
+        return f

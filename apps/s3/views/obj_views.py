@@ -10,6 +10,8 @@ from s3.handlers.head_object import HeadObjectHandler
 from s3.handlers.delete_object import DeleteObjectHandler
 from s3.handlers.put_object import PutObjectHandler
 from s3.handlers.copy_object import CopyObjectHandler
+from s3.handlers.multipart_upload import MultipartUploadHandler
+from s3.models import MultipartUpload
 
 
 class ObjViewSet(S3CustomGenericViewSet):
@@ -64,9 +66,12 @@ class ObjViewSet(S3CustomGenericViewSet):
         CreateMultipartUpload
         CompleteMultipartUpload
         """
-        # uploads = request.query_params.get('uploads', None)
-        # if uploads is not None:
-        #     return self.create_multipart_upload(request=request, args=args, kwargs=kwargs)
+        uploads = request.query_params.get('uploads', None)
+        if uploads is not None:
+            # 创建多部分上传数据表
+            b = MultipartUpload.create_table()
+
+            return MultipartUploadHandler().create_multipart_upload(request=request, view=self)
         #
         # upload_id = request.query_params.get('uploadId', None)
         # if upload_id is not None:
@@ -92,13 +97,15 @@ class ObjViewSet(S3CustomGenericViewSet):
         part_num = request.query_params.get('partNumber', None)
         upload_id = request.query_params.get('uploadId', None)
         if part_num is not None and upload_id is not None:
-            return self.exception_response(request, exceptions.S3NotImplemented(
-                message='UploadPart not implemented'))
+            return MultipartUploadHandler().upload_part(request=request, view=self)
+            # return self.exception_response(request, exceptions.S3NotImplemented(
+            #     message='UploadPart not implemented'))
             # if 'x-amz-copy-source-range' in request.headers or 'x-amz-copy-source' in request.headers:
             #     return self.exception_response(request, exceptions.S3NotImplemented(
             #         message='UploadPartCopy not implemented'))
             #
             # return self.upload_part(request=request, part_num=part_num, upload_id=upload_id)
+
 
         # PutObjectAcl
         if 'acl' in request.query_params:

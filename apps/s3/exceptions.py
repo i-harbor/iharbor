@@ -297,3 +297,9 @@ class S3NotImplemented(S3Error):
     default_message = "Not implemented."
     default_code = 'NotImplemented'
     default_status_code = 501
+
+
+class S3ServerError(S3Error):
+    default_message = "Server Error."
+    default_code = 'Server Error'
+    default_status_code = 500

@@ -62,6 +62,12 @@ class FileMD5Handler:
         self.is_valid = True
 
 
+class Sha256Handler(FileMD5Handler):
+    def __init__(self):
+        super().__init__()
+        self.hash = hashlib.sha256()
+
+
 def chunks(fd, chunk_size=10*1024**2):
     """
     Read the file and yield chunks of ``chunk_size`` bytes
