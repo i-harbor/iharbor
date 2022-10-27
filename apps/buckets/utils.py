@@ -90,18 +90,6 @@ def create_table_for_model_class(model):
         using = router.db_for_write(model)
         with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
             schema_editor.create_model(model)
-            if issubclass(model, BucketFileBase):
-                try:
-                    table_name = schema_editor.quote_name(model._meta.db_table)
-                    sql1 = f"ALTER TABLE {table_name} CHANGE COLUMN `na` `na` LONGTEXT NOT " \
-                           f"NULL COLLATE 'utf8mb4_bin' AFTER `id`;"
-                    sql2 = f"ALTER TABLE {table_name} CHANGE COLUMN `name` `name` VARCHAR(255) " \
-                           f"NOT NULL COLLATE 'utf8mb4_bin' AFTER `na_md5`;"
-                    schema_editor.execute(sql=sql1)
-                    schema_editor.execute(sql=sql2)
-                except Exception as exc:
-                    if delete_table_for_model_class(model):
-                        raise exc       # model table 删除成功，抛出错误
     except Exception as e:
         msg = traceback.format_exc()
         logger.error(msg)

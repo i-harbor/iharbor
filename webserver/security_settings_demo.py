@@ -7,6 +7,8 @@ SECRET_KEY = 'tbfpk*ax#48#^_qzr-cg07&z9&+8j68=x41w5lzv^wsv7xax=v'
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
 
+
+# default，metadata数据库字符集要选择utf8mb4，排序规则推荐utf8mb4_bin，区分字母大小写。
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',   # 数据库引擎
@@ -16,7 +18,14 @@ DATABASES = {
         'HOST': '0.0.0.0',    # 主机
         'PORT': '3306',         # 数据库使用的端口
         'CONN_MAX_AGE': 3600,   # 1h, None用于无限的持久连接
-        'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'charset': 'utf8mb4'
+        },
+        'TEST': {
+            'NAME': 'test_iharbor',     # unit test database
+            'CHARSET': 'utf8mb4'
+        },
     },
     'metadata': {
         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
@@ -26,7 +35,14 @@ DATABASES = {
         'HOST': '0.0.0.0',  # 主机
         'PORT': '3306',  # 数据库使用的端口
         'CONN_MAX_AGE': 3600,   # 1h, None用于无限的持久连接
-        'OPTIONS': {'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"}
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'charset': 'utf8mb4'
+        },
+        'TEST': {
+            'NAME': 'test_iharbor_metadata',     # unit test database
+            'CHARSET': 'utf8mb4'
+        },
     },
 }
 

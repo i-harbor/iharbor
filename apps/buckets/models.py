@@ -649,9 +649,9 @@ class BucketFileBase(models.Model):
     )
 
     id = models.BigAutoField(auto_created=True, primary_key=True)
-    na = models.TextField(verbose_name='全路径文件名或目录名')
+    na = models.TextField(verbose_name='全路径文件名或目录名', db_collation='utf8mb4_bin')
     na_md5 = models.CharField(max_length=32, null=True, default=None, verbose_name='全路径MD5值')
-    name = models.CharField(verbose_name='文件名或目录名', max_length=255)
+    name = models.CharField(verbose_name='文件名或目录名', max_length=255, db_collation='utf8mb4_bin')
     fod = models.BooleanField(default=True, verbose_name='文件或目录') # file_or_dir; True==文件，False==目录
     did = models.BigIntegerField(default=0, verbose_name='父节点id')
     si = models.BigIntegerField(default=0, verbose_name='文件大小') # 字节数
