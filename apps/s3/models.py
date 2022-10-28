@@ -6,6 +6,7 @@ from django.db.backends.mysql.schema import DatabaseSchemaEditor
 from django.utils.translation import gettext_lazy as _
 # Create your models here.
 from django.utils import timezone
+from _datetime import datetime
 
 
 def uuid1_time_hex_string(t):
@@ -15,6 +16,24 @@ def uuid1_time_hex_string(t):
     s += '0' * (len(s) % 4)
     bs = base64.b64encode(s.encode(encoding='utf-8')).decode('ascii')
     return f'{h}_{bs}'
+
+def get_datetime_from_upload_id(upload_id: str):
+    """
+    :return:
+        datetime()
+        None
+    """
+    l = upload_id.split('_', maxsplit=1)
+    if len(l) != 2:
+        return None
+
+    s = base64.b64decode(l[-1]).decode("utf-8")
+    try:
+        f = float(s)
+    except ValueError:
+        return None
+
+    return datetime.fromtimestamp(f, tz=timezone.utc)
 
 
 class MultipartUpload(models.Model):
@@ -33,11 +52,13 @@ class MultipartUpload(models.Model):
     obj_id = models.BigIntegerField(verbose_name='object id', default=0, help_text='组合对象后为对象id, 默认为0表示还未组合对象')
     obj_key = models.CharField(verbose_name='object key', max_length=1024, default='')
     key_md5 = models.CharField(max_length=32, verbose_name='object key MD5')
-    status = models.CharField(max_length=64, verbose_name='状态', choices=UploadStatus.choices,
-                              default=UploadStatus.UPLOADING)
+    obj_etag = models.CharField(max_length=64, verbose_name='object MD5 Etag', default='')
     obj_perms_code = models.SmallIntegerField(verbose_name='对象访问权限', default=0)
     part_num = models.IntegerField(verbose_name='块总数', blank=True, default=0)
     part_json = models.JSONField(verbose_name='块信息', default=dict)
+    chunk_size = models.BigIntegerField(verbose_name='块大小', blank=True, default=0)
+    status = models.CharField(max_length=64, verbose_name='状态', choices=UploadStatus.choices,
+                              default=UploadStatus.UPLOADING)
     create_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     expire_time = models.DateTimeField(verbose_name='对象过期时间', null=True, default=None, help_text='上传过程终止时间')
     last_modified = models.DateTimeField(verbose_name='修改时间', auto_now_add=True)
@@ -79,14 +100,16 @@ class MultipartUpload(models.Model):
                 update_fields.append('create_time')
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
-    # def get_table_name(self):
-    #
-    #     return self.Meta.db_table
-    # def is_completed(self):
-    #     """
-    #     是否是已完成的多部分上传任务
-    #     :return:
-    #         True
-    #         False
-    #     """
-    #     return self.status == self.UploadStatus.COMPLETED
+    def belong_to_bucket(self, bucket):
+        """
+        此多部分上传是否属于bucket, 因为这条记录可能属于已删除的桶名相同的桶
+
+        :param bucket: Bucket()
+        :return:
+            True        # 属于
+            False       # 不属于桶， 无效的多部分上传记录，需删除
+        """
+        if (self.bucket_name == bucket.name) and (self.bucket_id == bucket.id):
+            return True
+
+        return False
