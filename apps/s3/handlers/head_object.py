@@ -1,10 +1,12 @@
+import json
+
 from django.utils.translation import gettext as _
 from rest_framework.response import Response
 from rest_framework import status
 
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions
-from s3.harbor import HarborManager
+from s3.harbor import HarborManager, MultipartUploadManager
 from s3 import serializers
 from .s3object import has_object_access_permission, check_precondition_if_headers
 from .get_object import GetObjectHandler
@@ -102,10 +104,11 @@ class HeadObjectHandler:
         :raises: S3Error
         """
         # multipart object check
-        # parts_qs = ObjectPartManager(bucket=bucket).get_parts_queryset_by_obj_id(obj_id=obj.id)
-        # part = parts_qs.first()
-        part = None
-        headers = self.head_object_common_headers(obj=obj, part=part)
+        parts_qs = MultipartUploadManager().get_multipart_upload_by__bucket_obj(bucket=bucket, obj=obj)
+        if parts_qs:
+            headers = self.head_object_common_headers(obj=obj, part=parts_qs)
+        else:
+            headers = self.head_object_common_headers(obj=obj, part=None)
 
         return Response(status=200, headers=headers)
 
@@ -146,26 +149,35 @@ class HeadObjectHandler:
             offset, end = GetObjectHandler.get_object_offset_and_end(header_range, filesize=obj_size)
 
             # multipart object check
-            # parts_qs = ObjectPartManager(bucket=bucket).get_parts_queryset_by_obj_id(obj_id=obj.id)
-            # part = parts_qs.first()
-            # if part:
-            #     response['ETag'] = part.obj_etag
-            #     response['x-amz-mp-parts-count'] = part.parts_count
-            # else:
-            #     response['ETag'] = obj.md5
+            parts_qs = GetObjectHandler().is_s3_multipart_object(bucket=bucket, obj=obj)
+            if parts_qs:
+                response['ETag'] = parts_qs.obj_etag
+                response['x-amz-mp-parts-count'] = parts_qs.part_num
+            else:
+                response['ETag'] = obj.md5
 
-            response['ETag'] = obj.md5
         elif part_number:
-            part = GetObjectHandler.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
-            if not part:
+            # part = GetObjectHandler.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
+            parts_qs = GetObjectHandler().is_s3_multipart_object(bucket=bucket, obj=obj)
+            part = json.loads(parts_qs.part_json)['Parts']
+            if not part[part_number-1]:
                 content_range = f'bytes 0-{obj_size-1}/{obj_size}'
                 return self.head_object_no_multipart_response(obj, status_code=status.HTTP_206_PARTIAL_CONTENT,
                                                               headers={'Content-Range': content_range})
             response['ETag'] = part.obj_etag
-            response['x-amz-mp-parts-count'] = part.parts_count
-            offset = part.obj_offset
-            size = part.size
-            end = offset + size - 1
+            response['x-amz-mp-parts-count'] = part.part_num
+
+            offset = (part_number-1) * part.chunk_size
+            size = 0
+            end = 0
+            if part_number != part.part_num:
+                # 不是最后一块
+                size = part.chunk_size
+                end = part_number * part.chunk_size -1
+            else:
+                size = part[-1]['Size']
+                end = offset + size - 1
+
         else:
             raise exceptions.S3InvalidRequest()
 
