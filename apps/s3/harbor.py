@@ -1,19 +1,28 @@
+import json
+import time
+from collections import OrderedDict
+
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db.models import BigIntegerField
 
-from buckets.models import Bucket
+from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
+from utils.md5 import S3ObjectMultipartETagHandler, FileMD5Handler
 from utils.oss.pyrados import build_harbor_object
 from utils.storagers import PathParser
 from api import exceptions as iharbor_errors
-from . import exceptions
+from . import exceptions, renders
+from django.conf import settings
+from .models import MultipartUpload
 
 
 class HarborManager:
     """
     操作harbor对象数据和元数据管理接口封装
     """
+
     def get_bucket(self, bucket_name: str, user=None):
         """
         获取存储桶
@@ -185,7 +194,7 @@ class HarborManager:
             raise exceptions.S3InternalError(str(e))
 
         if obj:
-            return obj, bfm   # 目录或对象存在
+            return obj, bfm  # 目录或对象存在
 
         return None, bfm  # 目录或对象不存在
 
@@ -226,7 +235,7 @@ class HarborManager:
         dir1 = object_class(na=dir_path_name,  # 全路经目录名
                             name=dir_name,  # 目录名
                             fod=False,  # 目录
-                            did=p_id)     # 父目录id
+                            did=p_id)  # 父目录id
         try:
             dir1.save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
         except Exception as e:
@@ -314,11 +323,11 @@ class HarborManager:
         bfm = BucketFileManagement(collection_name=table_name)
         paths = PathParser(path).get_path_breadcrumb()
         if len(paths) == 0:
-            return bfm.root_dir()       # 根目录对象
+            return bfm.root_dir()  # 根目录对象
 
         index_paths = list(enumerate(paths))
         index = 0
-        last_exist_dir = None       # 路径中已存在的最后的目录
+        last_exist_dir = None  # 路径中已存在的最后的目录
         for index, item in reversed(index_paths):
             dir_name, dir_path_name = item
             try:
@@ -335,16 +344,16 @@ class HarborManager:
             last_exist_dir = obj
             break
 
-        if index == (len(index_paths) - 1) and last_exist_dir:       # 整个路径已存在
+        if index == (len(index_paths) - 1) and last_exist_dir:  # 整个路径已存在
             return [last_exist_dir]
 
         # 从整个路径上已存在的目录处开始向后创建路径
         if last_exist_dir:
-            now_last_dir = last_exist_dir           # 记录现在已创建的路径上的最后的目录
+            now_last_dir = last_exist_dir  # 记录现在已创建的路径上的最后的目录
             create_paths = index_paths[index + 1:]  # index目录存在不需创建
         else:
-            now_last_dir = bfm.root_dir()           # 根目录对象
-            create_paths = index_paths[index:]      # index目录不存在需创建
+            now_last_dir = bfm.root_dir()  # 根目录对象
+            create_paths = index_paths[index:]  # index目录不存在需创建
 
         dirs = []
         for i, p in create_paths:
@@ -462,16 +471,16 @@ class HarborManager:
         :raise S3Error
         """
         table_name = bucket.get_bucket_table_name()
-        new_obj_name = rename if rename else obj.name   # 移动后对象的名称，对象名称不变或重命名
+        new_obj_name = rename if rename else obj.name  # 移动后对象的名称，对象名称不变或重命名
 
         # 检查是否符合移动或重命名条件，目标路径下是否已存在同名对象或子目录
         try:
-            if move_to is None:     # 仅仅重命名对象，不移动
+            if move_to is None:  # 仅仅重命名对象，不移动
                 path, _ = PathParser(filepath=obj.na).get_path_and_filename()
                 new_na = path + '/' + new_obj_name if path else new_obj_name
                 bfm = BucketFileManagement(path=path, collection_name=table_name)
                 target_obj = bfm.get_obj(path=new_na)
-            else:   # 需要移动对象
+            else:  # 需要移动对象
                 bfm = BucketFileManagement(path=move_to, collection_name=table_name)
                 try:
                     target_obj = bfm.get_dir_or_obj_exists(name=new_obj_name)
@@ -486,7 +495,7 @@ class HarborManager:
             raise exceptions.S3InvalidRequest('无法完成对象的移动操作，指定的目标路径下已存在同名的对象或目录')
 
         # 仅仅重命名对象，不移动
-        if move_to is not None:     # 移动对象或重命名
+        if move_to is not None:  # 移动对象或重命名
             _, did = bfm.get_cur_dir_id()
             obj.did = did
 
@@ -616,7 +625,7 @@ class HarborManager:
 
         if obj is None:
             if not did:
-                _, did = bfm.get_cur_dir_id()
+                did = bfm.get_cur_dir_id()
 
             return None, did
 
@@ -651,10 +660,10 @@ class HarborManager:
         full_filename = bfm.build_dir_full_name(filename)
         now_time = timezone.now()
         obj = obj_model_class(na=full_filename,  # 全路径文件名
-                              name=filename,     # 文件名
-                              fod=True,          # 文件
-                              did=did,           # 父节点id
-                              si=0,              # 文件大小
+                              name=filename,  # 文件名
+                              fod=True,  # 文件
+                              did=did,  # 父节点id
+                              si=0,  # 文件大小
                               ult=now_time, upt=now_time)
         try:
             obj.save()
@@ -869,7 +878,7 @@ class HarborManager:
         :raise S3Error
         """
         if per_size < 0 or per_size > 20 * 1024 ** 2:  # 20Mb
-            per_size = 10 * 1024 ** 2   # 10Mb
+            per_size = 10 * 1024 ** 2  # 10Mb
 
         if offset < 0 or (end is not None and end < 0):
             raise exceptions.S3InvalidRequest('参数有误')
@@ -974,7 +983,7 @@ class HarborManager:
         :raise S3Error
         """
         if all_public:
-            if bucket.is_public_permission():   # 公有桶
+            if bucket.is_public_permission():  # 公有桶
                 return bucket
 
         if user:
@@ -1200,7 +1209,7 @@ class HarborManager:
         not_delete_objects = []
         for item in obj_keys:
             obj_key = key = item.get('Key', '')
-            if key.endswith('/'):       # 目录
+            if key.endswith('/'):  # 目录
                 key_is_dir = True
                 obj_key = key.rstrip('/')
             else:
@@ -1208,7 +1217,7 @@ class HarborManager:
 
             try:
                 try:
-                    obj = self.get_metadata_obj(table_name=table_name, path=obj_key)    # 不检查父路径
+                    obj = self.get_metadata_obj(table_name=table_name, path=obj_key)  # 不检查父路径
                 except Exception as e:
                     if not isinstance(e, exceptions.S3Error):
                         raise exceptions.S3InternalError(f'查询对象元数据错误，{str(e)}')
@@ -1270,3 +1279,224 @@ class HarborManager:
             raise exceptions.S3InternalError('删除对象rados数据时错误')
 
         return True
+
+
+class MultipartUploadManager:
+
+    def get_multipart_upload_by_id(self, upload_id: str):
+        """
+        查询多部分上传记录
+
+        :param upload_id: uuid
+        :return:
+            MultipartUpload() or None
+
+        :raises: S3Error
+        """
+        try:
+            obj = MultipartUpload.objects.filter(id=upload_id).first()
+        except Exception as e:
+            raise exceptions.S3InternalError()
+
+        return obj
+
+    def get_multipart_upload_by__bucket_obj(self, bucket, obj):
+        """
+        通过 桶 对象 多条件查询
+        :param bucket: 桶实例
+        :param obj: 对象实例
+        :return: 多部分上传对象的实例
+        """
+        try:
+            upload = MultipartUpload.objects.filter(bucket_id=bucket.id, bucket_name=bucket.name, obj_id=obj.id,
+                                                    obj_key=obj.na, key_md5=obj.na_md5).first()
+        except Exception as e:
+            raise exceptions.S3InternalError()
+        return upload
+
+    # def part_is_completed(self, upload_id: str):
+    #     try:
+    #         obj = MultipartUpload.objects.filter(id=upload_id).first()
+    #     except Exception as e:
+    #         raise exceptions.S3InternalError()
+    #
+    #     return obj.get().status == MultipartUpload.UploadStatus.COMPLETED.value
+
+    def delete_multipart_upload(self, upload_id: str):
+        try:
+            obj = MultipartUpload.objects.get(id=upload_id)
+        except Exception as e:
+            raise exceptions.S3InternalError()
+        try:
+            obj.delete()
+        except Exception as e:
+            raise exceptions.S3InternalError()
+        return True
+
+    def list_multipart_uploads_queryset(self, bucket_name: str, prefix: str = None, delimiter: str = None):
+        """
+        查询多部分上传记录
+
+        :param bucket_name: 桶名
+        :param prefix: prefix of s3 object key
+        :param delimiter: 暂时不支持
+        :return:
+            Queryset()
+
+        :raises: S3Error
+        """
+        lookups = {}
+        if prefix:
+            lookups['obj_key__startswith'] = prefix
+
+        try:
+            return MultipartUpload.objects.filter(bucket_name=bucket_name, **lookups, status='uploading').order_by(
+                '-create_time').all()
+        except Exception as e:
+            raise exceptions.S3InternalError(extend_msg=str(e))
+
+    def get_multipart_upload_queryset(self, bucket_name: str, obj_path: str):
+        """
+        查询多部分上传记录
+
+        :param bucket_name: 桶名
+        :param obj_path: s3 object key
+        :return:
+            Queryset()
+
+        :raises: S3Error
+        """
+        key_md5 = get_str_hexMD5(obj_path)
+        try:
+            return MultipartUpload.objects.filter(key_md5=key_md5, bucket_name=bucket_name, obj_key=obj_path,
+                                                  status='uploading').first()
+        except Exception as e:
+            raise exceptions.S3InternalError(extend_msg=str(e))
+
+    def get_multipart_upload_delete_invalid(self, bucket, obj_path: str):
+        """
+        获取上传记录，顺便删除无效的上传记录
+
+        :param bucket:
+        :param obj_path:
+        :return:
+            MultipartUpload() or None
+
+        :raises: S3Error
+        """
+        qs = self.get_multipart_upload_queryset(bucket_name=bucket.name, obj_path=obj_path)
+        valid_uploads = []
+        try:
+            for upload in qs:
+                if not upload.belong_to_bucket(bucket):
+                    try:
+                        upload.delete()
+                    except Exception as e:
+                        pass
+                else:
+                    valid_uploads.append(upload)
+        except Exception as e:
+            raise exceptions.S3InternalError(extend_msg='select multipart upload error.')
+
+        if len(valid_uploads) == 0:
+            return None
+
+        return valid_uploads[0]
+
+    @staticmethod
+    def get_upload_parts_and_validate(bucket, upload, complete_parts, complete_numbers):
+        """
+        多部分上传part元数据获取和验证
+
+        :param bucket: 桶对象
+        :param upload: 上传任务实例
+        :param complete_parts:  客户端请求组合提交的part信息，dict
+        :param complete_numbers: 客户端请求组合提交的所有part的编号list，升序
+        :return:
+                (
+                    used_upload_parts: dict,        # complete_parts对应的part元数据实例字典
+                    unused_upload_parts: list,      # 属于同一个多部分上传任务upload的，但不在complete_parts内的part元数据实例列表
+                    object_etag: str                # 对象的ETag
+                )
+        :raises: S3Error
+        """
+        obj_etag_handler = S3ObjectMultipartETagHandler()
+        # used_upload_parts = {}
+        # unused_upload_parts = []
+        last_part_number = complete_numbers[-1]
+
+        for part in json.loads(upload.part_json)['Parts']:
+            num = part['PartNumber']
+            if num in complete_numbers:
+                c_part = complete_parts[num]
+                if part[
+                    'Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
+                    raise exceptions.S3EntityTooSmall()
+
+                if 'ETag' not in c_part:
+                    raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+                if c_part["ETag"].strip('"') != part['ETag']:
+                    raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+
+                obj_etag_handler.update(part['ETag'])
+                # used_upload_parts[num] = part
+            else:
+                # unused_upload_parts.append(part)
+                raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+
+        # obj_parts_count = len(used_upload_parts)
+        if upload.part_num != len(complete_parts):
+            raise exceptions.S3InvalidPart()
+
+        # obj_etag = f'"{obj_etag_handler.hex_md5}-{obj_parts_count}"'
+        obj_etag = f'{obj_etag_handler.hex_md5}'
+        upload.obj_etag = obj_etag
+        upload.last_modified = timezone.now()
+        upload.status = MultipartUpload.UploadStatus.COMPLETED
+        upload.save(update_fields=['obj_etag', 'last_modified', 'status'])
+        # return used_upload_parts, unused_upload_parts, obj_etag
+        return obj_etag
+
+    @staticmethod
+    def handle_validate_complete_parts(parts: list):
+        """
+        检查对象part列表是否是升序排列, 是否有效（1-10000）
+        :return: parts_dict, numbers
+                parts_dict: dict, {PartNumber: parts[index]} 把parts列表转为以PartNumber为键值的有序字典
+                numbers: list, [PartNumber, PartNumber]
+
+        :raises: S3Error
+        """
+        pre_num = 0
+        numbers = []
+        parts_dict = OrderedDict()
+        for part in parts:
+            part_num = part.get('PartNumber', None)
+            etag = part.get('ETag', None)
+            if part_num is None or etag is None:
+                raise exceptions.S3MalformedXML()
+
+            if not (1 <= part_num <= 10000):
+                raise exceptions.S3InvalidPart()
+
+            if part_num <= pre_num:
+                raise exceptions.S3InvalidPartOrder()
+
+            parts_dict[part_num] = part
+            numbers.append(part_num)
+            pre_num = part_num
+
+        return parts_dict, numbers
+
+
+class IterResponse(StreamingHttpResponse):
+    """
+    响应返回数据是迭代器
+    """
+
+    def __init__(self, iter_content, **kwargs):
+        super().__init__(**kwargs)
+        self.iter_content = iter_content
+
+    def __iter__(self):
+        return self.iter_content

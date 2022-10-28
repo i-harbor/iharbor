@@ -1,4 +1,5 @@
 from s3 import renders
+from s3.handlers.multipart_upload import MultipartUploadHandler
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions
 from s3.negotiation import CusContentNegotiation
@@ -50,8 +51,9 @@ class BucketViewSet(S3CustomGenericViewSet):
         """
         uploads = request.query_params.get('uploads', None)
         if uploads is not None:
-            return self.exception_response(request, exceptions.S3NotImplemented(
-                message='ListMultipartUploads not implemented now'))
+            # return self.exception_response(request, exceptions.S3NotImplemented(
+            #     message='ListMultipartUploads not implemented now'))
+            return MultipartUploadHandler().list_multipart_upload(request, view=self)
 
         list_type = request.query_params.get('list-type', '1')
         if list_type == '2':

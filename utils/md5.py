@@ -1,7 +1,6 @@
 import hashlib
 import base64
 
-
 EMPTY_HEX_MD5 = 'd41d8cd98f00b204e9800998ecf8427e'
 EMPTY_BYTES_MD5 = hashlib.md5().digest()
 
@@ -10,9 +9,10 @@ class FileMD5Handler:
     """
     MD5计算
     """
+
     def __init__(self):
         self.md5_hash = hashlib.md5()
-        self.start_offset = 0       # 下次输入数据开始偏移量
+        self.start_offset = 0  # 下次输入数据开始偏移量
         self.is_valid = True
 
     def __getattr__(self, item):
@@ -39,16 +39,16 @@ class FileMD5Handler:
             self.md5_hash.update(data)
             self.start_offset = start_offset + data_len
             return
-        elif start_offset < offset:    # 计算无效
+        elif start_offset < offset:  # 计算无效
             self.set_invalid()
             return
 
         will_offset = offset + data_len
-        if will_offset <= start_offset:   # 数据已输入过了
+        if will_offset <= start_offset:  # 数据已输入过了
             return
 
         cut_len = will_offset - start_offset
-        self.md5_hash.update(data[-cut_len:])   # 输入start_offset开始的部分数据
+        self.md5_hash.update(data[-cut_len:])  # 输入start_offset开始的部分数据
         self.start_offset = will_offset
 
     @property
@@ -62,13 +62,36 @@ class FileMD5Handler:
         self.is_valid = True
 
 
-class Sha256Handler(FileMD5Handler):
+# class Sha256Handler(FileMD5Handler):
+#     def __init__(self):
+#         super().__init__()
+#         self.hash = hashlib.sha256()
+
+
+class S3ObjectMultipartETagHandler:
+    """
+    S3对象多部分上传ETag计算
+    """
+
     def __init__(self):
-        super().__init__()
-        self.hash = hashlib.sha256()
+        self.md5_hash = hashlib.md5()
+
+    def update(self, md5_hex: str):
+        self.md5_hash.update(md5_hex_to_bytes(md5_hex))
+
+    def __getattr__(self, item):
+        return getattr(self.md5_hash, item)
+
+    @property
+    def hex_md5(self):
+        return self.md5_hash.hexdigest()
 
 
-def chunks(fd, chunk_size=10*1024**2):
+def md5_hex_to_bytes(s: str):
+    return bytes.fromhex(s)
+
+
+def chunks(fd, chunk_size=10 * 1024 ** 2):
     """
     Read the file and yield chunks of ``chunk_size`` bytes
     """
@@ -84,7 +107,7 @@ def chunks(fd, chunk_size=10*1024**2):
         yield d
 
 
-def offset_chunks(fd, chunk_size=10*1024**2):
+def offset_chunks(fd, chunk_size=10 * 1024 ** 2):
     """
     Read the file and yield offset and chunk of ``chunk_size`` bytes
     :return:
@@ -127,4 +150,3 @@ def to_b64(s: str):
 def from_b64(s: str):
     bs = base64.b64decode(s.encode("utf-8"))
     return bs.decode("utf-8")
-

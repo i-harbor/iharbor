@@ -6,7 +6,8 @@ from rest_framework.pagination import CursorPagination, Cursor
 from rest_framework.exceptions import NotFound
 
 from . import exceptions
-from .harbor import HarborManager
+from .harbor import HarborManager, MultipartUploadManager
+from .models import get_datetime_from_upload_id
 
 
 def get_query_param(url, key):
@@ -267,7 +268,7 @@ class ListObjectsV1CursorPagination(CursorPagination):
         marker = self.get_marker(request=self.request)
         data['Marker'] = marker if marker else ''
 
-        if delimiter:   # 请求有delimiter才有 NextMarker
+        if delimiter:  # 请求有delimiter才有 NextMarker
             next_marker = self.get_next_marker()
             if next_marker:
                 data['NextMarker'] = next_marker
@@ -301,3 +302,108 @@ class ListObjectsV1CursorPagination(CursorPagination):
             return cursor
 
         return None
+
+
+class ListUploadsCursorPagination(CursorPagination):
+    """
+    按时间倒序
+    """
+    cursor_query_param = 'key-marker'
+    cursor_query_description = 'The pagination key-marker value.'
+    page_size = 1000
+    invalid_cursor_message = 'Invalid key-marker'
+    ordering = '-create_time'
+
+    page_size_query_param = 'max-uploads'
+    page_size_query_description = 'Max number of results to return per page.'
+
+    upload_id_marker_query_param = 'upload-id-marker'
+
+    def __init__(self, context):
+        """
+        :param context:
+            {
+                'bucket': bucket,
+                'bucket_name': bucket_name,
+                ...
+            }
+        """
+        if 'bucket' not in context:
+            raise ValueError('Invalid param "context", "bucket" needs to be in it.')
+
+        self._context = context
+
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        data = super().paginate_queryset(queryset=queryset, request=request, view=view)
+
+        if data is None:
+            data = []
+        self._data = data
+        self.key_count = len(self._data)
+        return self._data
+
+    @property
+    def page_data(self):
+        if hasattr(self, '_data'):
+            return self._data
+
+        raise AssertionError('You must call `.paginate_queryset()` before accessing `.data`.')
+
+    def get_paginated_data(self):
+        is_truncated = 'true' if self.has_next else 'false'
+        next_key_marker, next_upload_id_marker = self.get_next_key_marker_upload_id_marker()
+        return {'IsTruncated': is_truncated,
+                'MaxUploads': self.page_size,
+                'KeyCount': self.key_count,
+                'KeyMarker': self.get_key_marker(request=self.request),
+                'UploadIdMarker': self.get_upload_id_marker(request=self.request),
+                'NextKeyMarker': next_key_marker,
+                'NextUploadIdMarker': next_upload_id_marker}
+
+    def get_key_marker(self, request):
+        return request.query_params.get(self.cursor_query_param, '')
+
+    def get_upload_id_marker(self, request):
+        return request.query_params.get(self.upload_id_marker_query_param, '')
+
+    def get_next_key_marker_upload_id_marker(self):
+        if self.key_count > 0:
+            up = self.page_data[-1]
+            return up.obj_key, up.id
+
+        return '', ''
+
+    def decode_cursor(self, request):
+        bucket = self._context.get('bucket')
+        key_marker = self.get_key_marker(request)
+        position = None
+        if key_marker:
+            try:
+                upload = MultipartUploadManager().get_multipart_upload_delete_invalid(bucket=bucket,
+                                                                                      obj_path=key_marker)
+            except exceptions.S3Error as e:
+                raise e
+
+            if upload:
+                position = upload.create_time
+            else:
+                upload_id_marker = self.get_upload_id_marker(request)
+                if upload_id_marker:
+                    position = get_datetime_from_upload_id(upload_id_marker)
+                else:
+                    raise exceptions.S3NoSuchUpload('key-marker upload not found.')
+
+        return Cursor(offset=0, reverse=False, position=position)
+
+
+class ListUploadsKeyPagination(ListUploadsCursorPagination):
+    """
+    按Key排序
+    """
+    ordering = 'obj_key'
+
+    def decode_cursor(self, request):
+        key_marker = self.get_key_marker(request)
+        position = key_marker if key_marker else None
+        return Cursor(offset=0, reverse=False, position=position)

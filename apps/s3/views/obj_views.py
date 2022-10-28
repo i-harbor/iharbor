@@ -58,6 +58,7 @@ class ObjViewSet(S3CustomGenericViewSet):
         if 'uploadId' in request.query_params:
             return self.exception_response(request, exceptions.S3NotImplemented(
                 message='ListParts not implemented'))
+            # return MultipartUploadHandler().list_part(request, view=self)
 
         return GetObjectHandler().s3_get_object(request=request, view=self)
 
@@ -69,13 +70,14 @@ class ObjViewSet(S3CustomGenericViewSet):
         uploads = request.query_params.get('uploads', None)
         if uploads is not None:
             # 创建多部分上传数据表
-            b = MultipartUpload.create_table()
-
+            try:
+                MultipartUpload.create_table()
+            except Exception as e:
+                return self.exception_response(request, e)
             return MultipartUploadHandler().create_multipart_upload(request=request, view=self)
-        #
-        # upload_id = request.query_params.get('uploadId', None)
-        # if upload_id is not None:
-        #     return self.complete_multipart_upload(request=request, upload_id=upload_id)
+        upload_id = request.query_params.get('uploadId', None)
+        if upload_id is not None:
+            return MultipartUploadHandler().complete_multipart_upload(request=request, view=self, upload_id=upload_id)
 
         return self.exception_response(request, exceptions.S3MethodNotAllowed())
 
@@ -145,9 +147,9 @@ class ObjViewSet(S3CustomGenericViewSet):
         """
         upload_id = request.query_params.get('uploadId', None)
         if upload_id is not None:
-            return self.exception_response(request, exceptions.S3NotImplemented(
-                message='ListParts not implemented'))
-            # return self.abort_multipart_upload(request=request, upload_id=upload_id)
+            # return self.exception_response(request, exceptions.S3NotImplemented(
+            #     message='ListParts not implemented'))
+            return MultipartUploadHandler().abort_multipart_upload(request=request, view=self, upload_id=upload_id)
 
         key = self.get_s3_obj_key(request)
         if key.endswith('/'):
