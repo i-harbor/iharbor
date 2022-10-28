@@ -1,3 +1,4 @@
+import json
 import re
 
 from django.http import FileResponse
@@ -8,7 +9,7 @@ from rest_framework import status
 from utils.md5 import EMPTY_HEX_MD5
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions
-from s3.harbor import HarborManager
+from s3.harbor import HarborManager, MultipartUploadManager
 from s3 import serializers
 from .s3object import has_object_access_permission, check_precondition_if_headers
 
@@ -59,16 +60,16 @@ class GetObjectHandler:
 
             response = GetObjectHandler.s3_get_object_dir(fileobj)
         elif part_number is not None:
-            return view.exception_response(request, exceptions.S3NotImplemented(
-                message='GetObject not implemented param "partNumber"'))
-            # try:
-            #     part_number = int(part_number)
-            #     response = self.s3_get_object_part_response(
-            #         bucket=bucket, obj=fileobj, part_number=part_number)
+            # return view.exception_response(request, exceptions.S3NotImplemented(
+            #     message='GetObject not implemented param "partNumber"'))
+            try:
+                part_number = int(part_number)
+                response = self.s3_get_object_part_response(
+                    bucket=bucket, obj=fileobj, part_number=part_number)
             # except ValueError:
             #     return view.exception_response(request, exceptions.S3InvalidArgument(message=_('无效的参数partNumber.')))
-            # except exceptions.S3Error as e:
-            #     return view.exception_response(request, e)
+            except exceptions.S3Error as e:
+                return view.exception_response(request, e)
         else:
             try:
                 response = self.s3_get_object_range_or_whole_response(
@@ -137,7 +138,7 @@ class GetObjectHandler:
         )
 
     @staticmethod
-    def get_object_part(bucket, obj_id: int, part_number: int):
+    def get_object_part(bucket, obj_id: int, part_number: int):  # 将 obj_id 修改成 obj实例
         """
         获取对象一个part元数据
 
@@ -167,25 +168,51 @@ class GetObjectHandler:
         :raises: S3Error
         """
         obj_size = obj.si
-        part = self.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
-        if part:
-            offset = part.obj_offset
-            size = part.size
+        # 读取的对象是否具有多部分上传记录
+        part = self.is_s3_multipart_object(bucket=bucket, obj=obj)
+        if part is None:
+            # 对象没有多部分上传，就不存在part_number
+            raise exceptions.S3InvalidRequest()
+
+        offset = (part_number - 1) * part.chunk_size
+        size = 0
+        end = 0
+
+        if part.part_num != part_number:
+            # 不是最后一块
+            size = part.chunk_size
             end = offset + size - 1
-            generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
-            response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
-            response['Content-Length'] = end - offset + 1
-            response['ETag'] = part.obj_etag
-            response['x-amz-mp-parts-count'] = part.parts_count
-            response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
-        else:   # 非多部分对象
-            generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj)
-            response = FileResponse(generator)
-            response['Content-Length'] = obj_size
-            response['ETag'] = obj.md5
-            if obj_size > 0:
-                end = max(obj_size - 1, 0)
-                response['Content-Range'] = f'bytes {0}-{end}/{obj_size}'
+        else:
+            part_info = json.loads(part.part_json)['Parts'][-1]
+            size = part_info['Size']
+            end = offset + size - 1
+        generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
+        response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
+        response['Content-Length'] = end - offset + 1
+        response['ETag'] = part.obj_etag
+        response['x-amz-mp-parts-count'] = part.part_num
+        response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
+
+        # part = self.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
+        # if part:
+        #
+        #     offset = part.obj_offset
+        #     size = part.size
+        #     end = offset + size - 1
+        #     generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
+        #     response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
+        #     response['Content-Length'] = end - offset + 1
+        #     response['ETag'] = part.obj_etag
+        #     response['x-amz-mp-parts-count'] = part.parts_count
+        #     response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
+        # else:   # 非多部分对象
+        #     generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj)
+        #     response = FileResponse(generator)
+        #     response['Content-Length'] = obj_size
+        #     response['ETag'] = obj.md5
+        #     if obj_size > 0:
+        #         end = max(obj_size - 1, 0)
+        #         response['Content-Range'] = f'bytes {0}-{end}/{obj_size}'
 
         last_modified = obj.upt if obj.upt else obj.ult
         filename = urlquote(obj.name)  # 中文文件名需要
@@ -225,14 +252,14 @@ class GetObjectHandler:
             obj.download_cound_increase()
 
         # multipart object check
-        # parts_qs = ObjectPartManager(bucket=bucket).get_parts_queryset_by_obj_id(obj_id=obj.id)
-        # part = parts_qs.first()
-        # if part:        #
-        #     response['ETag'] = part.obj_etag
-        #     response['x-amz-mp-parts-count'] = part.parts_count
-        # else:
-        #     response['ETag'] = obj.md5
-        response['ETag'] = obj.md5
+        part = self.is_s3_multipart_object(bucket=bucket, obj=obj)
+
+        if part:        #
+            response['ETag'] = part.obj_etag
+            response['x-amz-mp-parts-count'] = part.part_num
+        else:
+            response['ETag'] = obj.md5
+        # response['ETag'] = obj.md5
 
         last_modified = obj.upt if obj.upt else obj.ult
         filename = urlquote(filename)  # 中文文件名需要
@@ -297,3 +324,18 @@ class GetObjectHandler:
         if isinstance(start, int) and isinstance(end, int) and start > end:
             return None, None
         return start, end
+
+    def is_s3_multipart_object(self, bucket, obj):
+        """
+        对象是否存在多部分上传数据
+        :param bucket:
+        :param obj:
+        :return:
+        """
+        upload = MultipartUploadManager().get_multipart_upload_by__bucket_obj(bucket=bucket, obj=obj)
+        if upload:
+            return upload
+        else:
+            return None
+
+
