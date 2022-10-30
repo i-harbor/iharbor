@@ -104,7 +104,7 @@ class HeadObjectHandler:
         :raises: S3Error
         """
         # multipart object check
-        parts_qs = MultipartUploadManager().get_multipart_upload_by__bucket_obj(bucket=bucket, obj=obj)
+        parts_qs = MultipartUploadManager().get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
         if parts_qs:
             headers = self.head_object_common_headers(obj=obj, part=parts_qs)
         else:
@@ -149,7 +149,7 @@ class HeadObjectHandler:
             offset, end = GetObjectHandler.get_object_offset_and_end(header_range, filesize=obj_size)
 
             # multipart object check
-            parts_qs = GetObjectHandler().is_s3_multipart_object(bucket=bucket, obj=obj)
+            parts_qs = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
             if parts_qs:
                 response['ETag'] = parts_qs.obj_etag
                 response['x-amz-mp-parts-count'] = parts_qs.part_num
@@ -158,7 +158,7 @@ class HeadObjectHandler:
 
         elif part_number:
             # part = GetObjectHandler.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
-            parts_qs = GetObjectHandler().is_s3_multipart_object(bucket=bucket, obj=obj)
+            parts_qs = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
             part = json.loads(parts_qs.part_json)['Parts']
             if not part[part_number-1]:
                 content_range = f'bytes 0-{obj_size-1}/{obj_size}'

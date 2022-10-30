@@ -1262,6 +1262,15 @@ class HarborManager:
             if not BucketFileManagement(collection_name=bucket.get_bucket_table_name()).dir_is_empty(obj):
                 raise exceptions.S3InvalidRequest('无法删除非空目录')
 
+        # multipart object delete
+        if not obj.is_dir():
+            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
+            if s3_obj_multipart_data:
+                try:
+                    s3_obj_multipart_data.delete()
+                except exceptions.S3Error as e:
+                    raise exceptions.S3InternalError('删除对象原数据时错误')
+
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not obj.do_delete():
             raise exceptions.S3InternalError('删除对象原数据时错误')
@@ -1300,7 +1309,7 @@ class MultipartUploadManager:
 
         return obj
 
-    def get_multipart_upload_by__bucket_obj(self, bucket, obj):
+    def get_multipart_upload_by_bucket_obj(self, bucket, obj):
         """
         通过 桶 对象 多条件查询
         :param bucket: 桶实例
@@ -1487,6 +1496,19 @@ class MultipartUploadManager:
             pre_num = part_num
 
         return parts_dict, numbers
+
+    def is_s3_multipart_object(self, bucket, obj):
+        """
+        对象是否存在多部分上传数据
+        :param bucket:
+        :param obj:
+        :return:
+        """
+        upload = self.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+        if upload:
+            return upload
+        else:
+            return None
 
 
 class IterResponse(StreamingHttpResponse):

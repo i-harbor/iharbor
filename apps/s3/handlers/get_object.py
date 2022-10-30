@@ -169,7 +169,7 @@ class GetObjectHandler:
         """
         obj_size = obj.si
         # 读取的对象是否具有多部分上传记录
-        part = self.is_s3_multipart_object(bucket=bucket, obj=obj)
+        part = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
         if part is None:
             # 对象没有多部分上传，就不存在part_number
             raise exceptions.S3InvalidRequest()
@@ -252,7 +252,7 @@ class GetObjectHandler:
             obj.download_cound_increase()
 
         # multipart object check
-        part = self.is_s3_multipart_object(bucket=bucket, obj=obj)
+        part = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
 
         if part:        #
             response['ETag'] = part.obj_etag
@@ -325,17 +325,17 @@ class GetObjectHandler:
             return None, None
         return start, end
 
-    def is_s3_multipart_object(self, bucket, obj):
-        """
-        对象是否存在多部分上传数据
-        :param bucket:
-        :param obj:
-        :return:
-        """
-        upload = MultipartUploadManager().get_multipart_upload_by__bucket_obj(bucket=bucket, obj=obj)
-        if upload:
-            return upload
-        else:
-            return None
+    # def is_s3_multipart_object(self, bucket, obj):
+    #     """
+    #     对象是否存在多部分上传数据
+    #     :param bucket:
+    #     :param obj:
+    #     :return:
+    #     """
+    #     upload = MultipartUploadManager().get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+    #     if upload:
+    #         return upload
+    #     else:
+    #         return None
 
 
