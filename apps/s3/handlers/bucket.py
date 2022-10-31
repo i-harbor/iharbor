@@ -1,4 +1,5 @@
 from django.utils.translation import gettext as _
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
@@ -140,3 +141,8 @@ class BucketHandler:
             return view.exception_response(request, exceptions.S3InternalError(message=str(exc)))
 
         return Response(status=200, headers={'Location': '/' + bucket.name})
+
+    @staticmethod
+    def get_bucket_location(request, view: S3CustomGenericViewSet):
+        view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='LocationConstraint'))
+        return Response(data='null', status=status.HTTP_200_OK)

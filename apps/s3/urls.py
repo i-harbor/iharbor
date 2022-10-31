@@ -5,7 +5,7 @@ from .routers import NoDetailRouter
 
 
 router = NoDetailRouter(trailing_slash=False)
-router.register(r'', MainHostViewSet, basename='main-host')
+router.register(r'.+', MainHostViewSet, basename='main-host')
 
 
 urlpatterns = [
