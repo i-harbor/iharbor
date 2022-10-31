@@ -5,6 +5,8 @@ from pytz import utc
 from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext
+from django.db import DatabaseError, transaction
+from django.db.models import Case, Value, When, F, BigIntegerField
 
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager, MultipartUploadManager
@@ -16,6 +18,8 @@ from utils.oss import build_harbor_object
 
 from rest_framework.response import Response
 from rest_framework import status
+
+from utils.storagers import try_close_file
 
 GMT_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
 
@@ -157,9 +161,9 @@ class MultipartUploadHandler:
         obj = hm.get_object(bucket_name=bucket_name, path_name=obj_key, user=request.user)
         ceph_obj_key = obj.get_obj_key(bucket.id)
         offset = 0
-        part_key = {'Parts': []}
-
-        # # 计算块的偏移量 （顺序传块）
+        # part_key = {'Parts': []}
+        # 
+        # # # 计算块的偏移量 （顺序传块）
         if part_num != 1:
             # 默认最后一块
             # if upload.chunk_size != content_length:
@@ -174,18 +178,27 @@ class MultipartUploadHandler:
         view.kwargs['filename'] = 'filename'
         put_data = request.data
         file = put_data.get('file')
+        part_md5 = self.upload_part_handler(request=request, view=view, upload=upload, part_num=part_num, bucket=bucket,
+                                            obj=obj, uploader=uploader, hm=hm, file=file)
+        data = {'ETag': part_md5}
+        return Response(headers=data, status=status.HTTP_200_OK)
+
+    def upload_part_handler(self, request, view, upload, part_num, bucket, obj, uploader, hm, file):
+
+        part_key = {'Parts': []}
+
+        def clean_put(_uploader):
+            # 删除数据
+            f = getattr(_uploader, 'file', None)
+            if f is not None:
+                try_close_file(f)
+                try:
+                    f.delete()
+                except Exception:
+                    pass
+
         part_md5 = file.file_md5
         part_size = file.size
-
-        # amz_content_sha256 = request.headers.get('X-Amz-Content-SHA256', None)
-        # if amz_content_sha256 is None:
-        #     raise exceptions.S3InvalidContentSha256Digest()
-        #
-        # if amz_content_sha256 != 'UNSIGNED-PAYLOAD':
-        #     part_sha256 = file.sha256_handler.hexdigest()
-        #     if amz_content_sha256 != part_sha256:
-        #         raise exceptions.S3BadContentSha256Digest()
-
         part = {'PartNumber': part_num, 'lastModified': timezone.now(), 'ETag': part_md5, 'Size': part_size}
         if upload.part_json:
             # 非空
@@ -207,9 +220,16 @@ class MultipartUploadHandler:
 
             upload.part_num = len(part_key['Parts'])
             upload.part_json = json.dumps(part_key, cls=DateEncoder)
-            # 最后完成修改时间
-            upload.save(update_fields=['part_json', 'part_num'])
-            obj.save(update_fields=['si'])
+            new_size = obj.si
+
+                # 最后完成修改时间
+            with transaction.atomic():
+                try:
+                    upload.save(update_fields=['part_json', 'part_num'])
+                    hm._update_obj_metadata(obj=obj, size=new_size)
+                except DatabaseError as e:
+                    clean_put(uploader)
+                    return view.exception_response(request, e)
 
         if not upload.part_json:
             # 防止 创建上传时失败
@@ -226,11 +246,17 @@ class MultipartUploadHandler:
             upload.part_json = json.dumps(part_key, cls=DateEncoder)
             upload.key_md5 = obj.na_md5
             upload.chunk_size = part_size
-            upload.save(update_fields=['chunk_size', 'key_md5', 'part_json', 'part_num'])
             obj.si += part_size
-            obj.save(update_fields=['si'])
-        data = {'ETag': part_md5}
-        return Response(headers=data, status=status.HTTP_200_OK)
+            new_size = obj.si
+            with transaction.atomic():
+                try:
+                    upload.save(update_fields=['chunk_size', 'key_md5', 'part_json', 'part_num'])
+                    hm._update_obj_metadata(obj=obj, size=new_size)
+                except DatabaseError as e:
+                    clean_put(uploader)
+                    return view.exception_response(request, e)
+
+        return part_md5
 
     def complete_multipart_upload(self, request, view: S3CustomGenericViewSet, upload_id):
         """
@@ -408,7 +434,8 @@ class MultipartUploadHandler:
             try:
                 part_number_marker = int(part_number_marker)
             except ValueError:
-                return view.exception_response(request, exc=exceptions.S3InvalidArgument('Invalid param PartNumberMarker'))
+                return view.exception_response(request,
+                                               exc=exceptions.S3InvalidArgument('Invalid param PartNumberMarker'))
             upload_part_json = upload_part_json[part_number_marker:max_parts + 1]
             data['PartNumberMarker'] = part_number_marker
             data['NextPartNumberMarker'] = max_parts + 1
