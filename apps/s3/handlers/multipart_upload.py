@@ -6,7 +6,6 @@ from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext
 
-
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager, MultipartUploadManager
 from s3.viewsets import S3CustomGenericViewSet
@@ -169,8 +168,8 @@ class MultipartUploadHandler:
             offset = (part_num - 1) * upload.chunk_size
 
         uploader = storagers.PartUploadToCephHandler(request=request, using=bucket.ceph_using,
-                                                      pool_name=bucket.pool_name,
-                                                      obj_key=ceph_obj_key, offset=offset)
+                                                     pool_name=bucket.pool_name,
+                                                     obj_key=ceph_obj_key, offset=offset)
         request.upload_handlers = [uploader]
         view.kwargs['filename'] = 'filename'
         put_data = request.data
@@ -390,19 +389,35 @@ class MultipartUploadHandler:
                     raise ValueError
             except ValueError:
                 return view.exception_response(request, exc=exceptions.S3AccessDenied())
-
-        upload_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-        if not upload_data:  # None
-            return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
-
-        if not max_parts and not part_number_marker:
-            # 处理不为空的参数
-            pass
+        try:
+            upload_data = MultipartUploadManager().get_multipart_upload_by_id(upload_id=upload_id)
+        except exceptions.S3Error as e:
+            return view.exception_response(request, e)
 
         upload_part_json = json.loads(upload_data.part_json)['Parts']
+        data = {'Bucket': bucket.name, 'Key': obj.na, 'UploadId': upload_id}
+        if max_parts and part_number_marker:
 
+            # 处理不为空的参数
+            # PartNumberMarker 上一部分最后
+            # NextPartNumberMarker 这一部分最后
+            try:
+                max_parts = int(max_parts)
+            except ValueError:
+                return view.exception_response(request, exc=exceptions.S3InvalidArgument('Invalid param MaxParts'))
+            try:
+                part_number_marker = int(part_number_marker)
+            except ValueError:
+                return view.exception_response(request, exc=exceptions.S3InvalidArgument('Invalid param PartNumberMarker'))
+            upload_part_json = upload_part_json[part_number_marker:max_parts + 1]
+            data['PartNumberMarker'] = part_number_marker
+            data['NextPartNumberMarker'] = max_parts + 1
+            data['MaxParts'] = max_parts
+
+        # owner = serializers.ListMultipartUploadsSerializer(upload_data, context={'user': request.user})
+        # data['Owner'] = owner.data
         view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListPartsResult'))
-        data = {'Bucket': bucket.name, 'Key': obj.na, 'Part': upload_part_json}
+        data['Part'] = upload_part_json
 
         return Response(data=data, status=status.HTTP_200_OK)
 

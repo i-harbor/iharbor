@@ -61,12 +61,6 @@ class ObjViewSet(S3CustomGenericViewSet):
             #     message='ListParts not implemented'))
             return MultipartUploadHandler().list_parts(request, view=self)
 
-        #
-        # local_bucket = request.query_params.get('location', None)
-        # print(f'local_bucket = {local_bucket}')
-        # if local_bucket:
-        #     return BucketHandler().get_bucket_location(request, view=self, local_bucket=local_bucket)
-
         return GetObjectHandler().s3_get_object(request=request, view=self)
 
     def create(self, request, *args, **kwargs):
