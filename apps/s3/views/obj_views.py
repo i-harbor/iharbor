@@ -3,6 +3,7 @@ from rest_framework.parsers import FileUploadParser
 from s3 import exceptions
 from s3 import renders
 from s3 import parsers
+from s3.handlers.bucket import BucketHandler
 from s3.negotiation import CusContentNegotiation
 from s3.viewsets import S3CustomGenericViewSet
 from s3.handlers.get_object import GetObjectHandler
@@ -56,9 +57,15 @@ class ObjViewSet(S3CustomGenericViewSet):
 
         # ListParts
         if 'uploadId' in request.query_params:
-            return self.exception_response(request, exceptions.S3NotImplemented(
-                message='ListParts not implemented'))
-            # return MultipartUploadHandler().list_part(request, view=self)
+            # return self.exception_response(request, exceptions.S3NotImplemented(
+            #     message='ListParts not implemented'))
+            return MultipartUploadHandler().list_parts(request, view=self)
+
+        #
+        # local_bucket = request.query_params.get('location', None)
+        # print(f'local_bucket = {local_bucket}')
+        # if local_bucket:
+        #     return BucketHandler().get_bucket_location(request, view=self, local_bucket=local_bucket)
 
         return GetObjectHandler().s3_get_object(request=request, view=self)
 

@@ -370,9 +370,41 @@ class MultipartUploadHandler:
         view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListMultipartUploadsResult'))
         return Response(data=ret_data, status=status.HTTP_200_OK)
 
-    def list_part(self, request, view: S3CustomGenericViewSet):
+    def list_parts(self, request, view: S3CustomGenericViewSet):
+        bucket_name = view.get_bucket_name(request)
 
-        pass
+        obj_key = view.get_s3_obj_key(request)
+        upload_id = request.query_params.get('uploadId', None)
+        max_parts = request.query_params.get('max-parts', None)
+        part_number_marker = request.query_params.get('part-number-marker', None)
+        x_amz_expected_bucket_owner = request.headers.get('x-amz-expected-bucket-owner', None)
+        hm = HarborManager()
+        try:
+            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_key)
+        except exceptions.S3Error as e:
+            return view.exception_response(request, e)
+
+        if x_amz_expected_bucket_owner:
+            try:
+                if bucket.id != int(x_amz_expected_bucket_owner):
+                    raise ValueError
+            except ValueError:
+                return view.exception_response(request, exc=exceptions.S3AccessDenied())
+
+        upload_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
+        if not upload_data:  # None
+            return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
+
+        if not max_parts and not part_number_marker:
+            # 处理不为空的参数
+            pass
+
+        upload_part_json = json.loads(upload_data.part_json)['Parts']
+
+        view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListPartsResult'))
+        data = {'Bucket': bucket.name, 'Key': obj.na, 'Part': upload_part_json}
+
+        return Response(data=data, status=status.HTTP_200_OK)
 
     # ---------------------------------------------------------------------
 
