@@ -7,6 +7,8 @@ from django.db.models import BigIntegerField
 
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
+from s3.harbor import MultipartUploadManager
+from s3 import exceptions
 from utils.storagers import PathParser, try_close_file
 from utils.oss import build_harbor_object, get_size
 from .paginations import BucketFileLimitOffsetPagination
@@ -1148,6 +1150,15 @@ class HarborManager:
         if fileobj is None:
             raise exceptions.HarborError.from_error(
                 exceptions.NoSuchKey(message='文件对象不存在'))
+
+        # multipart object delete # 先删除多部分上传数据
+        if not fileobj.is_dir():
+            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=fileobj)
+            if s3_obj_multipart_data:
+                try:
+                    s3_obj_multipart_data.delete()
+                except exceptions.S3Error as e:
+                    raise exceptions.S3InternalError('删除对象原数据时错误')
 
         obj_key = fileobj.get_obj_key(bucket.id)
         old_id = fileobj.id

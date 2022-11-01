@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
 
-from utils.oss.pyrados import build_harbor_object, FileWrapper
+from utils.oss.pyrados import FileWrapper, build_harbor_object
 from utils.md5 import FileMD5Handler
 
 
@@ -189,14 +189,22 @@ class CephUploadFile(UploadedFile):
     """
     DEFAULT_CHUNK_SIZE = 5 * 2**20     # default 5MB
 
-    def __init__(self, file, field_name, name, content_type, size, charset, file_md5='', content_type_extra=None):
+    def __init__(
+            self, file, field_name, name, content_type, size, charset, file_md5='', content_type_extra=None,
+            md5_handler=None
+    ):
         super().__init__(file, name, content_type, size, charset, content_type_extra)
         self.field_name = field_name
         self.file_md5 = file_md5
+        self.md5_handler = md5_handler
+        self.sha256_handler = None
 
     def open(self, mode=None):
         self.file.seek(0)
         return self
+
+    def delete(self):
+        self.file.delete()
 
 
 class FileUploadToCephHandler(FileUploadHandler):
@@ -204,6 +212,7 @@ class FileUploadToCephHandler(FileUploadHandler):
     直接存储到ceph的自定义文件上传处理器
     """
     chunk_size = 5 * 2 ** 20    # 5MB
+    max_size_upload_limit = None
 
     def __init__(self, request, using, pool_name='', obj_key=''):
         super().__init__(request=request)
@@ -213,15 +222,26 @@ class FileUploadToCephHandler(FileUploadHandler):
         self.file = None
         self.file_md5_handler = None
 
+    def get_max_size_upload_limit(self):
+        if self.max_size_upload_limit:
+            return self.max_size_upload_limit
+
+        return getattr(settings, 'CUSTOM_UPLOAD_MAX_FILE_SIZE', 5 * 2 ** 30)  # default 5GB
+
     def handle_raw_input(self, input_data, META, content_length, boundary, encoding=None):
         """
         Handle the raw input from the client.
         """
-        max_size = getattr(settings, 'CUSTOM_UPLOAD_MAX_FILE_SIZE', 10 * 2 ** 30)    # default 10GB
+        # max_size = getattr(settings, 'CUSTOM_UPLOAD_MAX_FILE_SIZE', 10 * 2 ** 30)    # default 10GB
+        max_size = self.get_max_size_upload_limit()
         if max_size is None:
             return
+
         if content_length > max_size:
             raise RequestDataTooBig(gettext('上传文件超过大小限制'))
+
+        if content_length <= 0:
+            raise Exception(gettext('无效的标头Content-Length'))
 
     def new_file(self, *args, **kwargs):
         """
@@ -248,7 +268,8 @@ class FileUploadToCephHandler(FileUploadHandler):
             size=file_size,
             charset=self.charset,
             file_md5=self.file_md5(),
-            content_type_extra=self.content_type_extra
+            content_type_extra=self.content_type_extra,
+            md5_handler=self.file_md5_handler
         )
 
     def file_md5(self):
@@ -314,3 +335,25 @@ class AllFileUploadInMemoryHandler(Md5MemoryFileUploadHandler):
         # Check the content-length header to see if we should
         # If the post is too large, we cannot use the Memory handler.
         self.activated = True
+
+
+class PartUploadToCephHandler(FileUploadToCephHandler):
+    """
+    multipart upload直接存储到ceph上传处理器
+    """
+    chunk_size = 5 * 2 ** 20    # 5MB
+    max_size_upload_limit = 2 * 1024 ** 3       # 2GB
+
+    def __init__(self, request, using: str, pool_name='', obj_key='', offset=0):
+        self.offset = offset
+        super().__init__(request=request, using=using, pool_name=pool_name, obj_key=obj_key)
+
+    def receive_data_chunk(self, raw_data, start):
+        """
+        :raises: RadosError
+        """
+        start = self.offset
+
+        if self.file_md5_handler:
+            self.file_md5_handler.start_offset = start  # 防止数据计算时无效
+            self.file_md5_handler.update(offset=start, data=raw_data)

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_yasg',
     'ckeditor',
+    'django_hosts',
     # 'ckeditor_uploader',
 
     # 自定义apps
@@ -56,25 +57,19 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django_hosts.middleware.HostsRequestMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_hosts.middleware.HostsResponseMiddleware',
 ]
 
-# 允许所有主机执行跨站点请求
-CORS_ORIGIN_ALLOW_ALL = True
-
-# 有权发出跨站点HTTP请求的源主机名列表
-# CORS_ORIGIN_WHITELIST  =(
-#     'localhost:8000 ',
-#     '10.0.86.213:8000',
-# )
 
 ROOT_URLCONF = 'webserver.urls'
 
@@ -462,6 +457,66 @@ FRONTEND_URL = None
 
 # 允许用户创建桶的数量默认值
 BUCKET_LIMIT_DEFAULT = 0
+
+
+# django-hosts
+ROOT_HOSTCONF = 'webserver.hosts'
+DEFAULT_HOST = 'default'
+
+S3_MULTIPART_UPLOAD_MAX_SIZE = 2 * 1024 ** 3        # 2GB
+S3_MULTIPART_UPLOAD_MIN_SIZE = 5 * 1024 ** 2        # 5MB
+
+
+# 允许所有主机执行跨站点请求
+CORS_ORIGIN_ALLOW_ALL = True
+
+# 有权发出跨站点HTTP请求的源主机名列表
+# CORS_ORIGIN_WHITELIST  =(
+#     'localhost:8000 ',
+#     '10.0.86.213:8000',
+# )
+
+CORS_ALLOW_HEADERS = ['*', ]
+# CORS_ALLOW_HEADERS = list(default_headers) + [
+#     'private',
+#     'range',
+#     'expires',
+#     'content-encoding',
+#     'content-length',
+#     'content-md5',
+#     'date',
+#     'expect',
+#     'host',
+#     'if-match',
+#     'if-none-match',
+#     'if-modified-since',
+#     'if-unmodified-since',
+#     'x-amz-date',
+#     'x-amz-acl',
+#     'x-amz-expected-bucket-owner',
+#     'x-amz-content-sha256',
+#     'x-amz-storage-class',
+#     'x-amz-user-agent'
+# ]
+
+CORS_EXPOSE_HEADERS = [
+    'accept-ranges',
+    'content-length',
+    'content-type',
+    'content-disposition',
+    'content-encoding',
+    'content-range',
+    'connection',
+    'date',
+    'etag',
+    'server',
+    'x-amz-delete-marker',
+    'x-amz-id-2',
+    'x-amz-request-id',
+    'x-amz-version-id',
+    'x-amz-storage-class',
+    'x-amz-mp-parts-count'
+]
 
 
 # 导入安全相关的settings
