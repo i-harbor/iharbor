@@ -221,15 +221,14 @@ class MultipartUploadHandler:
             upload.part_num = len(part_key['Parts'])
             upload.part_json = json.dumps(part_key, cls=DateEncoder)
             new_size = obj.si
-
-                # 最后完成修改时间
-            with transaction.atomic():
-                try:
+            try:
+                with transaction.atomic(using='metadata'):
+                    upload = MultipartUpload.objects.select_for_update().filter(id=upload.id).first()
                     upload.save(update_fields=['part_json', 'part_num'])
                     hm._update_obj_metadata(obj=obj, size=new_size)
-                except DatabaseError as e:
-                    clean_put(uploader)
-                    return view.exception_response(request, e)
+            except DatabaseError as e:
+                clean_put(uploader)
+                return view.exception_response(request, e)
 
         if not upload.part_json:
             # 防止 创建上传时失败
@@ -248,13 +247,15 @@ class MultipartUploadHandler:
             upload.chunk_size = part_size
             obj.si += part_size
             new_size = obj.si
-            with transaction.atomic():
-                try:
+
+            try:
+                with transaction.atomic(using='metadata'):
+                    upload = MultipartUpload.objects.select_for_update().filter(id=upload.id).first()
                     upload.save(update_fields=['chunk_size', 'key_md5', 'part_json', 'part_num'])
                     hm._update_obj_metadata(obj=obj, size=new_size)
-                except DatabaseError as e:
-                    clean_put(uploader)
-                    return view.exception_response(request, e)
+            except DatabaseError as e:
+                clean_put(uploader)
+                return view.exception_response(request, e)
 
         return part_md5
 
