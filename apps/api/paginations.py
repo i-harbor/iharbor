@@ -276,3 +276,21 @@ class ListObjectsCursorPagination(CursorPagination):
             return cursor
 
         return None
+
+
+class ListBucketCursorPagination(CursorPagination):
+    """
+    列举存储桶分页器
+    """
+    cursor_query_param = 'cursor'
+    page_size = 200
+    ordering = ('id', )
+
+    # Client can control the page size using this query parameter.
+    # Default is 'None'. Set to eg 'page_size' to enable usage.
+    page_size_query_param = 'size'
+
+    # Set to an integer to limit the maximum page size the client may request.
+    # Only relevant if 'page_size_query_param' has also been set.
+    max_page_size = 1000
+    offset_cutoff = None

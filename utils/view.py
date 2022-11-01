@@ -2,6 +2,7 @@ from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponseRedirect
 from django.conf import settings
+from django.db.models import QuerySet
 from rest_framework.schemas import AutoSchema
 from rest_framework import viewsets, exceptions as rf_exceptions
 from rest_framework.views import set_rollback
@@ -80,6 +81,7 @@ class CustomGenericViewSet(viewsets.GenericViewSet):
     自定义GenericViewSet类，重写get_serializer方法，以通过context参数传递自定义参数
     """
     serializer_class = serializers.Serializer
+    queryset = QuerySet().none()
 
     def get_serializer(self, *args, **kwargs):
         """

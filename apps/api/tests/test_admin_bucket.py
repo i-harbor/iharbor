@@ -147,3 +147,46 @@ class AdminBucketAPITests(MyAPITransactionTestCase):
         self.assertEqual(r.status_code, 200)
         bucket.refresh_from_db()
         self.assertEqual(bucket.lock, Bucket.LOCK_READWRITE)
+
+    def test_list_bucket(self):
+        user2 = get_or_create_user(username='user2@cnic.cn')
+        bucket1 = Bucket(name='bucket-1', user=self.user)
+        bucket1.save(force_insert=True)
+        bucket2 = Bucket(name='bucket-2', user=user2)
+        bucket2.save(force_insert=True)
+
+        # AccessDenied
+        url = reverse('api:admin-bucket-list')
+        r = self.client.get(url)
+        self.assertErrorResponse(status_code=403, code='AccessDenied', response=r)
+
+        # superuser, ok
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertKeysIn(keys=['next', 'previous', 'results'], container=r.data)
+        self.assertEqual(len(r.data['results']), 2)
+        self.assertKeysIn(keys=[
+            'id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'remarks', 'access_code'
+        ], container=r.data['results'][0])
+        self.assertNotIn(member='ftp_password', container=r.data['results'][0])
+
+        # AccessDenied
+        self.user.is_superuser = False
+        self.user.save(update_fields=['is_superuser'])
+        url = reverse('api:admin-bucket-list')
+        r = self.client.get(url)
+        self.assertErrorResponse(status_code=403, code='AccessDenied', response=r)
+
+        # app superuser, ok
+        self.user.role = UserProfile.ROLE_APP_SUPPER_USER
+        self.user.save(update_fields=['role'])
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertKeysIn(keys=['next', 'previous', 'results'], container=r.data)
+        self.assertEqual(len(r.data['results']), 2)
+        self.assertKeysIn(keys=[
+            'id', 'name', 'user', 'created_time', 'access_permission', 'ftp_enable', 'remarks', 'access_code'
+        ], container=r.data['results'][0])
+        self.assertNotIn(member='ftp_password', container=r.data['results'][0])

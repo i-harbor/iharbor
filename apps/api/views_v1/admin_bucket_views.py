@@ -9,6 +9,7 @@ from utils.view import CustomGenericViewSet
 from api import permissions
 from api import serializers
 from api import exceptions
+from api.paginations import ListBucketCursorPagination
 from api.validators import DNSStringValidator
 from api.views import serializer_error_text
 from buckets.utils import create_bucket
@@ -20,9 +21,45 @@ class AdminBucketViewSet(CustomGenericViewSet):
     """
     管理员
     """
-    queryset = {}
+    pagination_class = ListBucketCursorPagination
     permission_classes = [permissions.IsSuperOrAppSuperUser]
     lookup_field = 'bucket_name'
+
+    @swagger_auto_schema(
+        operation_summary=gettext_lazy('管理员列举存储桶'),
+        responses={
+            200: ""
+        }
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        管理员列举存储桶
+
+            http code 200:
+            {
+              "next": "http://159.226.235.188/api/v1/admin/bucket?cursor=cD0x&size=1",
+              "previous": null,
+              "results": [
+                {
+                  "id": 1,
+                  "name": "test",
+                  "user": {
+                    "id": 1,
+                    "username": "shun"
+                  },
+                  "created_time": "2022-08-03T15:49:13.380915+08:00",
+                  "access_permission": "私有",
+                  "ftp_enable": false,
+                  "access_code": 2,     # 1: 公有（可读）；2： 私有； 3：公有（可读写）
+                  "remarks": ""
+                }
+              ]
+            }
+        """
+        queryset = Bucket.objects.select_related('user').all()
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
     @swagger_auto_schema(
         operation_summary=gettext_lazy('管理员为指定用户创建存储桶'),
@@ -266,6 +303,8 @@ class AdminBucketViewSet(CustomGenericViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return serializers.AdminBucketCreateSerializer
+        elif self.action == 'list':
+            return serializers.BucketNoPasswordSerializer
 
         return Serializer
 
