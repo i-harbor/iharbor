@@ -35,8 +35,6 @@ class MainHostViewSet(S3CustomGenericViewSet):
         </ListAllMyBucketsResult>
         """
 
-        if 'location' in request.query_params:
-            return BucketHandler().get_bucket_location(request, view=self)
         return BucketHandler.list_buckets(request=request, view=self)
 
 
@@ -106,3 +104,8 @@ class BucketViewSet(S3CustomGenericViewSet):
         """
         return BucketHandler.head_bucket(request=request, view=self)
 
+
+class LocationHostViewSet(S3CustomGenericViewSet):
+    def list(self, request, *args, **kwargs):
+        if 'location' in request.query_params:
+            return BucketHandler.get_bucket_location(request, view=self)
