@@ -353,7 +353,8 @@ class PartUploadToCephHandler(FileUploadToCephHandler):
         :raises: RadosError
         """
         start = self.offset
+        self.file_md5_handler.start_offset = start
+        super().receive_data_chunk(raw_data=raw_data, start=start)
+        self.offset += self.chunk_size
 
-        if self.file_md5_handler:
-            self.file_md5_handler.start_offset = start  # 防止数据计算时无效
-            self.file_md5_handler.update(offset=start, data=raw_data)
+

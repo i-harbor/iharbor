@@ -178,12 +178,14 @@ class MultipartUploadHandler:
         view.kwargs['filename'] = 'filename'
         put_data = request.data
         file = put_data.get('file')
-        part_md5 = self.upload_part_handler(request=request, view=view, upload=upload, part_num=part_num, bucket=bucket,
-                                            obj=obj, uploader=uploader, hm=hm, file=file)
-        data = {'ETag': part_md5}
+        part_md5 = file.file_md5
+        part_size = file.size
+        part_etag = self.upload_part_handler(request=request, view=view, upload=upload, part_num=part_num, bucket=bucket,
+                                            obj=obj, uploader=uploader, hm=hm, part_md5=part_md5, part_size=part_size)
+        data = {'ETag': part_etag}
         return Response(headers=data, status=status.HTTP_200_OK)
 
-    def upload_part_handler(self, request, view, upload, part_num, bucket, obj, uploader, hm, file):
+    def upload_part_handler(self, request, view, upload, part_num, bucket, obj, uploader, hm, part_md5, part_size):
 
         def clean_put(_uploader):
             # 删除数据
@@ -195,8 +197,7 @@ class MultipartUploadHandler:
                 except Exception:
                     pass
         part_key = {'Parts': []}
-        part_md5 = file.file_md5
-        part_size = file.size
+
         part = {'PartNumber': part_num, 'lastModified': timezone.now(), 'ETag': part_md5, 'Size': part_size}
         if upload.part_json:
             # 非空
