@@ -1438,8 +1438,7 @@ class MultipartUploadManager:
             num = part['PartNumber']
             if num in complete_numbers:
                 c_part = complete_parts[num]
-                if part[
-                    'Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
+                if part['Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
                     raise exceptions.S3EntityTooSmall()
 
                 if 'ETag' not in c_part:
