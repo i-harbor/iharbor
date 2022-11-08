@@ -86,8 +86,6 @@ git clone https://gitee.com/gosc-cnic/iharbor.git
 在项目根目录下运行如下命令完成数据库迁移。  
 ```
 python manage.py migrate
-
-使用s3服务需要执行如下命令：
 python manage.py create_multipart_upload_table
 ```
 ### 2.3 启动服务

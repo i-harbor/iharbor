@@ -1317,8 +1317,8 @@ class MultipartUploadManager:
         :return: 多部分上传对象的实例
         """
         try:
-            upload = MultipartUpload.objects.filter(bucket_id=bucket.id, bucket_name=bucket.name, obj_id=obj.id,
-                                                    obj_key=obj.na, key_md5=obj.na_md5).first()
+            upload = MultipartUpload.objects.filter(bucket_name=bucket.name, key_md5=obj.na_md5
+                                                    ).filter(bucket_id=bucket.id, obj_id=obj.id, obj_key=obj.na).first()
         except Exception as e:
             raise exceptions.S3InternalError()
         return upload
