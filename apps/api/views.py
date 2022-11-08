@@ -21,7 +21,7 @@ from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 
 from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
-from s3 import exceptions
+from s3 import exceptions as s3exceptions
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
@@ -1178,7 +1178,7 @@ class ObjViewSet(CustomGenericViewSet):
             # 查看 是否存在 s3 多部分上传信息，如果由删除，避免脏数据的产生
             try:
                 hmanager.s3_data_query(bucket=bucket, obj=obj)
-            except exceptions.S3Error as e:
+            except s3exceptions.S3Error as e:
                 return Response({'code': 400, 'code_text': f's3 delete object error, {str(e)}'},
                                 status=status.HTTP_400_BAD_REQUEST)
 

@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 
-from s3 import exceptions
+from s3 import exceptions as s3exceptions
 from utils import storagers
 from utils.oss import build_harbor_object
 from utils.md5 import EMPTY_HEX_MD5
@@ -173,7 +173,7 @@ class V2ObjectHandler:
             # 检查是否存储s3数据
             try:
                 hmanager.s3_data_query(bucket=bucket, obj=obj)
-            except exceptions.S3Error as e:
+            except s3exceptions.S3Error as e:
                 return response_exception(
                     exc=exceptions.Error(message=f's3 delete object error, {str(e)}'))
 

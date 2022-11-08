@@ -8,7 +8,7 @@ from django.db.models import BigIntegerField
 from buckets.models import Bucket
 from buckets.utils import BucketFileManagement
 from s3.harbor import MultipartUploadManager
-from s3 import exceptions
+from s3 import exceptions as s3exceptions
 from utils.storagers import PathParser, try_close_file
 from utils.oss import build_harbor_object, get_size
 from .paginations import BucketFileLimitOffsetPagination
@@ -1534,13 +1534,13 @@ class HarborManager:
 
         try:
             s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-        except exceptions.S3Error as e:
-            raise exceptions.S3InvalidRequest(str(e))
+        except s3exceptions.S3Error as e:
+            raise s3exceptions.S3InvalidRequest(str(e))
         if s3_obj_multipart_data:
             try:
                 s3_obj_multipart_data.delete()
-            except exceptions.S3Error as e:
-                raise exceptions.S3InternalError('删除对象s3多部分上传时错误')
+            except s3exceptions.S3Error as e:
+                raise s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
 
 
 class FtpHarborManager:
