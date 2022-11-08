@@ -50,7 +50,7 @@ class MultipartUpload(models.Model):
     bucket_id = models.BigIntegerField(verbose_name='bucket id')
     bucket_name = models.CharField(verbose_name='bucket name', max_length=63, default='')
     obj_id = models.BigIntegerField(verbose_name='object id', default=0, help_text='组合对象后为对象id, 默认为0表示还未组合对象')
-    obj_key = models.CharField(verbose_name='object key', max_length=1024, default='')
+    obj_key = models.CharField(verbose_name='object key', max_length=1024, db_collation='utf8mb4_bin', default='')
     key_md5 = models.CharField(max_length=32, verbose_name='object key MD5')
     obj_etag = models.CharField(max_length=64, verbose_name='object MD5 Etag', default='')
     obj_perms_code = models.SmallIntegerField(verbose_name='对象访问权限', default=0)

@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'docs',
     'share',
     'ceph',
+    's3',
 ]
 
 MIDDLEWARE = [
