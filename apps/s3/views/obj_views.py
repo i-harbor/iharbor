@@ -3,7 +3,6 @@ from rest_framework.parsers import FileUploadParser
 from s3 import exceptions
 from s3 import renders
 from s3 import parsers
-from s3.handlers.bucket import BucketHandler
 from s3.negotiation import CusContentNegotiation
 from s3.viewsets import S3CustomGenericViewSet
 from s3.handlers.get_object import GetObjectHandler
@@ -12,7 +11,6 @@ from s3.handlers.delete_object import DeleteObjectHandler
 from s3.handlers.put_object import PutObjectHandler
 from s3.handlers.copy_object import CopyObjectHandler
 from s3.handlers.multipart_upload import MultipartUploadHandler
-from s3.models import MultipartUpload
 
 
 class ObjViewSet(S3CustomGenericViewSet):
@@ -70,11 +68,6 @@ class ObjViewSet(S3CustomGenericViewSet):
         """
         uploads = request.query_params.get('uploads', None)
         if uploads is not None:
-            # 创建多部分上传数据表
-            try:
-                MultipartUpload.create_table()
-            except Exception as e:
-                return self.exception_response(request, e)
             return MultipartUploadHandler().create_multipart_upload(request=request, view=self)
         upload_id = request.query_params.get('uploadId', None)
         if upload_id is not None:
