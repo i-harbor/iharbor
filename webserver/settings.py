@@ -183,7 +183,8 @@ REST_FRAMEWORK = {
         'api.authentications.aai.authentication.AAIJWTAuthentication',
         # 'api.authentications.s3v4.S3V4Authentication',
         'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',
+        'utils.authentications.CsrfExemptSessionAuthentication'
     ),
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser', # 支持解析application/json方式的json数据
