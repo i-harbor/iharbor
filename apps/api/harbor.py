@@ -856,6 +856,11 @@ class HarborManager:
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
+                # 检查是否存在s3 的数据
+                self.s3_data_query(bucket=bucket, obj=obj)
+
+        if offset == 0:
+            self.s3_data_query(bucket=bucket, obj=obj)
 
         try:
             if isinstance(data, bytes):
@@ -1153,12 +1158,7 @@ class HarborManager:
 
         # multipart object delete # 先删除多部分上传数据
         if not fileobj.is_dir():
-            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=fileobj)
-            if s3_obj_multipart_data:
-                try:
-                    s3_obj_multipart_data.delete()
-                except exceptions.S3Error as e:
-                    raise exceptions.S3InternalError('删除对象原数据时错误')
+            self.s3_data_query(bucket=bucket, obj=fileobj)
 
         obj_key = fileobj.get_obj_key(bucket.id)
         old_id = fileobj.id
@@ -1529,6 +1529,18 @@ class HarborManager:
             raise exceptions.HarborError(message=str(e))
 
         return bucket, queryset
+
+    def s3_data_query(self, bucket, obj):
+
+        try:
+            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
+        except exceptions.S3Error as e:
+            raise exceptions.S3InvalidRequest(str(e))
+        if s3_obj_multipart_data:
+            try:
+                s3_obj_multipart_data.delete()
+            except exceptions.S3Error as e:
+                raise exceptions.S3InternalError('删除对象s3多部分上传时错误')
 
 
 class FtpHarborManager:
