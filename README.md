@@ -86,9 +86,13 @@ git clone https://gitee.com/gosc-cnic/iharbor.git
 在项目根目录下运行如下命令完成数据库迁移。  
 ```
 python manage.py migrate
+
+使用s3服务需要执行如下命令：
+python manage.py create_multipart_upload_table
 ```
 ### 2.3 启动服务
 #### 2.3.1 开发测试模式运行服务
+注：第一次启动服务后请先在后台配置ceph的集群配置，之后重启服务。
 * 启动WEB服务   
 在代码工程根目录下运行命令：  
 ```python manage.py runserver 0.0.0.0:8000```   
