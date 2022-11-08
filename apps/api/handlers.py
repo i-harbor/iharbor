@@ -174,8 +174,7 @@ class V2ObjectHandler:
             try:
                 hmanager.s3_data_query(bucket=bucket, obj=obj)
             except s3exceptions.S3Error as e:
-                return response_exception(
-                    exc=exceptions.Error(message=f's3 delete object error, {str(e)}'))
+                return s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
 
         return V2ObjectHandler.update_handle(view=view, request=request, bucket=bucket,
                                              obj=obj, rados=rados, created=created)
