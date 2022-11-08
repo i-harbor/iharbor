@@ -1179,8 +1179,7 @@ class ObjViewSet(CustomGenericViewSet):
             try:
                 hmanager.s3_data_query(bucket=bucket, obj=obj)
             except s3exceptions.S3Error as e:
-                return Response({'code': 400, 'code_text': f's3 delete object error, {str(e)}'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                return s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
 
         return self.update_handle(request=request, bucket=bucket, obj=obj, rados=rados, created=created)
 
