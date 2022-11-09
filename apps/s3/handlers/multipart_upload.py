@@ -6,8 +6,6 @@ from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext
 from django.db import DatabaseError, transaction
-from django.db.models import Case, Value, When, F, BigIntegerField
-
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager, MultipartUploadManager
 from s3.viewsets import S3CustomGenericViewSet
@@ -74,9 +72,8 @@ class MultipartUploadHandler:
                                                                  key=key, upload_id=upload.id)
 
         # iharbor原来的数据对象存在(查看是否有s3多部分上传记录)
-        upload_data = MultipartUpload.objects.filter(bucket_name=bucket.name,  key_md5=obj.na_md5
-                                                     ).filter(bucket_id=bucket.id, obj_id=obj.id, obj_key=key,
-                                                              obj_perms_code=obj_perms_code)
+        upload_data = MultipartUpload.objects.filter(key_md5=obj.na_md5, bucket_name=bucket.name, bucket_id=bucket.id,
+                                                     obj_id=obj.id, obj_key=key, obj_perms_code=obj_perms_code)
         rados = build_harbor_object(using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=str(obj.id),
                                     obj_size=obj.si)
         if not upload_data:
@@ -417,8 +414,10 @@ class MultipartUploadHandler:
             upload_data = MultipartUploadManager().get_multipart_upload_by_id(upload_id=upload_id)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
-
-        upload_part_json = json.loads(upload_data.part_json)['Parts']
+        try:
+            upload_part_json = json.loads(upload_data.part_json)['Parts']
+        except exceptions.S3Error as e:
+            return view.exception_response(request, e)
         data = {'Bucket': bucket.name, 'Key': obj.na, 'UploadId': upload_id}
         if max_parts and part_number_marker:
 

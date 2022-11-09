@@ -1434,7 +1434,8 @@ class MultipartUploadManager:
         # unused_upload_parts = []
         last_part_number = complete_numbers[-1]
 
-        for part in json.loads(upload.part_json)['Parts']:
+        part_info = json.loads(upload.part_json)['Parts']
+        for part in part_info:
             num = part['PartNumber']
             if num in complete_numbers:
                 c_part = complete_parts[num]
