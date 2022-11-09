@@ -1,3 +1,10 @@
+## v0.8.0
+* 添加s3 app，添加s3兼容接口;   
+* 修改对象元数据表'na'和'name'字段排序规则的优化，改为model定义字段时通过参数直接指定，db_collation='utf8mb4_bin';  
+* 增加 AdminListBucket 接口和测试用例;   
+* 增加 command 'exportbucket'； 
+* 移除csrf验证中间件，DRF SessionAuthentication不做csrf验证； 
+
 ## v0.7.5
 * BucketFTP api优化错误时返回的错误代码   
 * 用户桶数量限制默认值可通过配置项BUCKET_LIMIT_DEFAULT设置,默认为0，对应的桶数量限制为0时测试用例无法创建
