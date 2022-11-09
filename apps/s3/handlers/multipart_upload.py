@@ -74,8 +74,9 @@ class MultipartUploadHandler:
                                                                  key=key, upload_id=upload.id)
 
         # iharbor原来的数据对象存在(查看是否有s3多部分上传记录)
-        upload_data = MultipartUpload.objects.filter(bucket_id=bucket.id, obj_id=obj.id, bucket_name=bucket.name,
-                                                     obj_key=key, key_md5=obj.na_md5, obj_perms_code=obj_perms_code)
+        upload_data = MultipartUpload.objects.filter(bucket_name=bucket.name,  key_md5=obj.na_md5
+                                                     ).filter(bucket_id=bucket.id, obj_id=obj.id, obj_key=key,
+                                                              obj_perms_code=obj_perms_code)
         rados = build_harbor_object(using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=str(obj.id),
                                     obj_size=obj.si)
         if not upload_data:
@@ -438,11 +439,10 @@ class MultipartUploadHandler:
             data['NextPartNumberMarker'] = max_parts + 1
             data['MaxParts'] = max_parts
 
-        # owner = serializers.ListMultipartUploadsSerializer(upload_data, context={'user': request.user})
-        # data['Owner'] = owner.data
-        view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListPartsResult'))
         data['Part'] = upload_part_json
-
+        data['StorageClass'] = 'STANDARD'
+        data['Owner'] = {'ID': request.user.id, "DisplayName": request.user.username}
+        view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListPartsResult'))
         return Response(data=data, status=status.HTTP_200_OK)
 
     # ---------------------------------------------------------------------

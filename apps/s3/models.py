@@ -74,21 +74,6 @@ class MultipartUpload(models.Model):
         verbose_name = '对象多部分上传'
         verbose_name_plural = verbose_name
 
-    @staticmethod
-    def is_exists(table_name, using):
-        return table_name in connections[using].introspection.table_names()
-
-    @classmethod
-    def create_table(cls):
-        table_name = cls._meta.db_table
-        using = router.db_for_write(cls)
-        if not cls.is_exists(table_name, using):
-            with DatabaseSchemaEditor(connection=connections[using]) as schema_editor:
-                schema_editor.create_model(cls)
-            return True
-        else:
-            return True
-
     def save(self, force_insert=False, force_update=False, using=None,
              update_fields=None):
         t = timezone.now()
