@@ -13,6 +13,10 @@ from harbor_auth import HarborAuthorizer
 from harbor_handler import HarborDTPHandler, HarborFTPHandler, work_mode_in_tls
 
 
+class StopError(BaseException):
+    pass
+
+
 def main():
     
     # Instantiate a dummy authorizer for managing 'virtual' users
@@ -52,7 +56,9 @@ def main():
             init_server_and_run(handler)
         except (KeyboardInterrupt, SystemExit):
             break
-        except Exception:
+        except StopError as e:
+            raise e
+        except Exception as e:
             continue
         else:       # 正常退出
             break
@@ -60,7 +66,11 @@ def main():
 
 def init_server_and_run(handler):
     address = ('0.0.0.0', 21)
-    server = MultiprocessFTPServer(address, handler)
+    try:
+        server = MultiprocessFTPServer(address, handler)
+    except Exception as exc:
+        raise StopError(str(exc))
+
     # set a limit for connections
     server.max_cons = 2048
     server.max_cons_per_ip = 2048
