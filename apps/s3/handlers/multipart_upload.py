@@ -244,8 +244,8 @@ class MultipartUploadHandler:
         if upload.status != MultipartUpload.UploadStatus.UPLOADING.value:
             return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
 
-        upload_time = int(time.mktime(upload.last_modifiedtimetuple()))
-        obj_time = int(time.mktime(upload.part_json['ObjectCreateTime'].timetuple()))
+        upload_time = int(time.mktime(upload.last_modified.timetuple()))
+        obj_time = upload.part_json['ObjectCreateTime']  # 时间戳
 
         # 终止上传 删除文件对象
         mmanger = MultipartUploadManager()
