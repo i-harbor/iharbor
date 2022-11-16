@@ -1,9 +1,7 @@
-import json
 import functools
 import time
 from collections import OrderedDict
 
-from django.http import StreamingHttpResponse
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db.models import BigIntegerField
@@ -11,11 +9,11 @@ from django.utils.translation import gettext
 
 from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
-from utils.md5 import S3ObjectMultipartETagHandler, FileMD5Handler
+from utils.md5 import S3ObjectMultipartETagHandler
 from utils.oss.pyrados import build_harbor_object
 from utils.storagers import PathParser
 from api import exceptions as iharbor_errors
-from . import exceptions, renders
+from . import exceptions
 from django.conf import settings
 from .models import MultipartUpload
 
@@ -1341,8 +1339,8 @@ class MultipartUploadManager:
         :return: 多部分上传对象的实例
         """
         try:
-            upload = MultipartUpload.objects.filter(bucket_name=bucket.name, key_md5=obj.na_md5
-                                                    ).filter(bucket_id=bucket.id, obj_id=obj.id, obj_key=obj.na).first()
+            upload = MultipartUpload.objects.filter(bucket_name=bucket.name, key_md5=obj.na_md5,
+                                                    bucket_id=bucket.id, obj_id=obj.id, obj_key=obj.na).first()
         except Exception as e:
             raise exceptions.S3InternalError()
         return upload
@@ -1462,7 +1460,7 @@ class MultipartUploadManager:
 
                 if 'ETag' not in c_part:
                     raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
-                print(f'Etag = ', c_part["ETag"].strip('"'))
+
                 if c_part["ETag"].strip('"') != part['ETag']:
                     raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
 

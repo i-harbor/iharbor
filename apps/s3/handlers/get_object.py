@@ -325,17 +325,4 @@ class GetObjectHandler:
             return None, None
         return start, end
 
-    # def is_s3_multipart_object(self, bucket, obj):
-    #     """
-    #     对象是否存在多部分上传数据
-    #     :param bucket:
-    #     :param obj:
-    #     :return:
-    #     """
-    #     upload = MultipartUploadManager().get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
-    #     if upload:
-    #         return upload
-    #     else:
-    #         return None
-
 
