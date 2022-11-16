@@ -1,7 +1,7 @@
 
 
 class MultipartPartsManager:
-    # 查询
+    # 二分查询
     def retrieve_part_info(self, arr, num, start, end):
         result = -1
         mid = (start + end) // 2
@@ -24,7 +24,6 @@ class MultipartPartsManager:
         elif arr[mid]['PartNumber'] < num:
             return self.retrieve_part_info(arr, num, mid + 1, end)
 
-
     # 获取某一块
     def query_part_info(self, num, parts):
         if not parts:
@@ -43,7 +42,6 @@ class MultipartPartsManager:
             return True, parts_arr
 
         num = part['PartNumber']
-
         index, p, start, end = self.retrieve_part_info(arr=parts_arr, num=num, start=0, end=len(parts_arr) - 1)
 
         if index > -1:
@@ -52,7 +50,7 @@ class MultipartPartsManager:
 
         # 在该位置的块 大于 插入的块
         elif parts_arr[start]['PartNumber'] > num:
-            #　如果start=0
+            # 如果start=0
             if start - 1 < 0:
                 parts_arr.insert(start, part)
             if num > parts_arr[start-1]['PartNumber']:
@@ -65,8 +63,6 @@ class MultipartPartsManager:
             else:
                 parts_arr.append(part)
 
-        elif start == len(parts_arr) - 1:
-            parts_arr.append(part)
         return True, parts_arr
 
 
