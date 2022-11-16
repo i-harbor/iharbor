@@ -1,4 +1,5 @@
 import json
+import functools
 import time
 from collections import OrderedDict
 
@@ -6,6 +7,7 @@ from django.http import StreamingHttpResponse
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db.models import BigIntegerField
+from django.utils.translation import gettext
 
 from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
@@ -1289,6 +1291,28 @@ class HarborManager:
 
         return True
 
+    # 创建 s3 多部分上传数据
+    def create_multipart_data(self, bucket_id, bucket_name, obj, key, obj_perms_code):
+        object_time = int(time.mktime(obj.ult.timetuple()))
+        part_json = {'Parts': [], 'ObjectCreateTime': object_time}
+        upload = MultipartUpload(bucket_id=bucket_id, bucket_name=bucket_name, obj_id=obj.id,
+                                 obj_key=key, key_md5=obj.na_md5, obj_perms_code=obj_perms_code, part_json=part_json)
+        try:
+            upload.save()
+        except Exception as e:
+            raise exceptions.S3InternalError('新建对象元数据失败')
+        return upload
+
+    # s3 重置对象
+    def s3_reset_upload(self, bucket, obj):
+        rados = build_harbor_object(using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=str(obj.id),
+                                    obj_size=obj.si)
+        # 重置对象
+        try:
+            self._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)  # 重置对象大小
+        except exceptions.S3Error as e:
+            raise exceptions.S3InternalError('重置对象元数据失败')
+
 
 class MultipartUploadManager:
 
@@ -1322,14 +1346,6 @@ class MultipartUploadManager:
         except Exception as e:
             raise exceptions.S3InternalError()
         return upload
-
-    # def part_is_completed(self, upload_id: str):
-    #     try:
-    #         obj = MultipartUpload.objects.filter(id=upload_id).first()
-    #     except Exception as e:
-    #         raise exceptions.S3InternalError()
-    #
-    #     return obj.get().status == MultipartUpload.UploadStatus.COMPLETED.value
 
     def delete_multipart_upload(self, upload_id: str):
         try:
@@ -1430,40 +1446,48 @@ class MultipartUploadManager:
         :raises: S3Error
         """
         obj_etag_handler = S3ObjectMultipartETagHandler()
-        # used_upload_parts = {}
-        # unused_upload_parts = []
+        parts_order_list = []
         last_part_number = complete_numbers[-1]
-
-        part_info = json.loads(upload.part_json)['Parts']
+        part_info = upload.parts_object()
         for part in part_info:
             num = part['PartNumber']
             if num in complete_numbers:
                 c_part = complete_parts[num]
-                if part['Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
+                if part[
+                    'Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
                     raise exceptions.S3EntityTooSmall()
+                # 块大小检测
+                if part['Size'] != upload.chunk_size and num != last_part_number:
+                    raise exceptions.S3InvalidPart(message=gettext('The block information size is inconsistent.'))
 
                 if 'ETag' not in c_part:
                     raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+                print(f'Etag = ', c_part["ETag"].strip('"'))
                 if c_part["ETag"].strip('"') != part['ETag']:
                     raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
 
+                parts_order_list.append(int(num))
                 obj_etag_handler.update(part['ETag'])
-                # used_upload_parts[num] = part
             else:
-                # unused_upload_parts.append(part)
                 raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
 
-        # obj_parts_count = len(used_upload_parts)
-        if upload.part_num != len(complete_parts):
+        if len(part_info) != len(complete_parts):
+            raise exceptions.S3InvalidPart()
+
+        check_add_one = lambda arr: \
+            functools.reduce(lambda x, y: (x + 1 == y if isinstance(x, int) else x[0] and x[1] + 1 == y, y), arr)[0]
+
+        part_list = sorted(parts_order_list)
+        if not check_add_one(part_list):
             raise exceptions.S3InvalidPart()
 
         # obj_etag = f'"{obj_etag_handler.hex_md5}-{obj_parts_count}"'
         obj_etag = f'{obj_etag_handler.hex_md5}'
         upload.obj_etag = obj_etag
         upload.last_modified = timezone.now()
-        upload.status = MultipartUpload.UploadStatus.COMPLETED
-        upload.save(update_fields=['obj_etag', 'last_modified', 'status'])
-        # return used_upload_parts, unused_upload_parts, obj_etag
+        upload.status = MultipartUpload.UploadStatus.COMPLETED.value
+        upload.part_num = len(part_info)
+        upload.save(update_fields=['obj_etag', 'last_modified', 'status', 'part_num'])
         return obj_etag
 
     @staticmethod
@@ -1494,7 +1518,6 @@ class MultipartUploadManager:
             parts_dict[part_num] = part
             numbers.append(part_num)
             pre_num = part_num
-
         return parts_dict, numbers
 
     def is_s3_multipart_object(self, bucket, obj):
@@ -1511,14 +1534,3 @@ class MultipartUploadManager:
             return None
 
 
-class IterResponse(StreamingHttpResponse):
-    """
-    响应返回数据是迭代器
-    """
-
-    def __init__(self, iter_content, **kwargs):
-        super().__init__(**kwargs)
-        self.iter_content = iter_content
-
-    def __iter__(self):
-        return self.iter_content
