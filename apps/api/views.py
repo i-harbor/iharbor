@@ -20,8 +20,7 @@ from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 
-from buckets.utils import (BucketFileManagement, create_table_for_model_class, delete_table_for_model_class)
-from s3 import exceptions as s3exceptions
+from buckets.utils import BucketFileManagement
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
@@ -1156,7 +1155,7 @@ class ObjViewSet(CustomGenericViewSet):
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=self)
         except exceptions.Error as exc:
-            return Response(data=exc.err_data(), status=exc.status_code)
+            return Response(data=exc.err_data_old(), status=exc.status_code)
 
         hmanager = HarborManager()
         try:
@@ -1175,11 +1174,13 @@ class ObjViewSet(CustomGenericViewSet):
             except Exception as e:
                 return Response({'code': 400, 'code_text': f'reset object error, {str(e)}'},
                                 status=status.HTTP_400_BAD_REQUEST)
+
             # 查看 是否存在 s3 多部分上传信息，如果由删除，避免脏数据的产生
             try:
-                hmanager.s3_data_query(bucket=bucket, obj=obj)
-            except s3exceptions.S3Error as e:
-                return s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
+                hmanager.try_delete_s3_multipart_metadata(bucket=bucket, obj=obj)
+            except exceptions.Error as exc:
+                pass
+                # return Response(data={'code': 400, 'code_text': '删除对象s3多部分上传时错误'}, status=exc.status_code)
 
         return self.update_handle(request=request, bucket=bucket, obj=obj, rados=rados, created=created)
 

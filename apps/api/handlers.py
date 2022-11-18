@@ -1,6 +1,5 @@
 from rest_framework.response import Response
 
-from s3 import exceptions as s3exceptions
 from utils import storagers
 from utils.oss import build_harbor_object
 from utils.md5 import EMPTY_HEX_MD5
@@ -170,11 +169,12 @@ class V2ObjectHandler:
             except Exception as e:
                 return response_exception(
                     exc=exceptions.Error(message=f'reset object error, {str(e)}'))
+
             # 检查是否存储s3数据
             try:
-                hmanager.s3_data_query(bucket=bucket, obj=obj)
-            except s3exceptions.S3Error as e:
-                return s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
+                hmanager.try_delete_s3_multipart_metadata(bucket=bucket, obj=obj)
+            except exceptions.Error as exc:
+                return response_exception(exceptions.Error('删除对象s3多部分上传时错误。' + str(exc)))
 
         return V2ObjectHandler.update_handle(view=view, request=request, bucket=bucket,
                                              obj=obj, rados=rados, created=created)

@@ -10,7 +10,7 @@ TEST_CASE = {
     'CEPH_CLUSTER': {
         'alias': 'default',
         'cluster_name': 'ceph',
-        'username': 'client.admin',
+        'username': 'client.developer',
         'config_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.conf',
         'keyring_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.keyring',
         'pool_names': ["obs_test"],

@@ -33,7 +33,7 @@ class HarborManager:
     """
     操作harbor对象数据和元数据管理接口封装
     """
-    def get_bucket(self, bucket_name:str, user=None):
+    def get_bucket(self, bucket_name: str, user=None):
         """
         获取存储桶
 
@@ -856,11 +856,13 @@ class HarborManager:
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
-                # 检查是否存在s3 的数据
-                self.s3_data_query(bucket=bucket, obj=obj)
 
         if offset == 0:
-            self.s3_data_query(bucket=bucket, obj=obj)
+            # 尝试删除s3多部分上传元数据
+            try:
+                self.try_delete_s3_multipart_metadata(bucket=bucket, obj=obj)
+            except Exception as e:
+                pass
 
         try:
             if isinstance(data, bytes):
@@ -1156,10 +1158,6 @@ class HarborManager:
             raise exceptions.HarborError.from_error(
                 exceptions.NoSuchKey(message='文件对象不存在'))
 
-        # multipart object delete # 先删除多部分上传数据
-        if not fileobj.is_dir():
-            self.s3_data_query(bucket=bucket, obj=fileobj)
-
         obj_key = fileobj.get_obj_key(bucket.id)
         old_id = fileobj.id
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
@@ -1174,6 +1172,13 @@ class HarborManager:
             fileobj.id = old_id
             fileobj.do_save(force_insert=True)  # 仅尝试创建文档，不修改已存在文档
             raise exceptions.HarborError(message='删除对象rados数据时错误')
+
+        # 尝试删除多部分上传元数据
+        if not fileobj.is_dir():
+            try:
+                self.try_delete_s3_multipart_metadata(bucket=bucket, obj=fileobj)
+            except Exception as e:
+                pass
 
         return True
 
@@ -1530,17 +1535,23 @@ class HarborManager:
 
         return bucket, queryset
 
-    def s3_data_query(self, bucket, obj):
+    @staticmethod
+    def try_delete_s3_multipart_metadata(bucket, obj):
+        """
+        查询并删除可能存在的对象对应的s3多部分上传元数据
 
+        :raises: Error
+        """
         try:
             s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
         except s3exceptions.S3Error as e:
-            raise s3exceptions.S3InvalidRequest(str(e))
+            raise exceptions.Error(str(e))
+
         if s3_obj_multipart_data:
             try:
                 s3_obj_multipart_data.delete()
             except s3exceptions.S3Error as e:
-                raise s3exceptions.S3InternalError('删除对象s3多部分上传时错误')
+                raise exceptions.Error('删除对象s3多部分上传元数据错误')
 
 
 class FtpHarborManager:

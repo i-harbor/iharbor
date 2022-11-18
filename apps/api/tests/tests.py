@@ -18,7 +18,7 @@ from rest_framework.test import APIClient
 from buckets.models import BucketToken, BucketFileBase, Bucket, Archive
 from buckets.management.commands.clearbucket import Command as ClearBucketCommand
 from users.models import UserProfile
-from . import config_ceph_clustar_settings
+from . import config_ceph_clustar_settings, ensure_s3_multipart_table_exists
 
 
 User = get_user_model()
@@ -755,6 +755,7 @@ class ObjectsAPITests(MyAPITransactionTestCase):
     def setUp(self):
         settings.BUCKET_LIMIT_DEFAULT = 2
         config_ceph_clustar_settings()
+        ensure_s3_multipart_table_exists()
         self.user_password = 'password'
         self.user = get_or_create_user(password=self.user_password)
         set_token_auth_header(self, username=self.user.username, password=self.user_password)

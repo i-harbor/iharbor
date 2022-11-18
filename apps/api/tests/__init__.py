@@ -2,6 +2,8 @@ from django.conf import settings
 
 from ceph.ceph_settings import ceph_settings_update
 from ceph.models import CephCluster
+from s3.models import MultipartUpload
+from buckets.utils import is_model_table_exists, create_table_for_model_class
 
 
 def get_or_create_ceph_cluster():
@@ -36,3 +38,11 @@ def get_or_create_ceph_cluster():
 def config_ceph_clustar_settings():
     get_or_create_ceph_cluster()
     ceph_settings_update()
+
+
+def ensure_s3_multipart_table_exists():
+    ok = is_model_table_exists(model=MultipartUpload)
+    if ok:
+        return
+
+    create_table_for_model_class(model=MultipartUpload)
