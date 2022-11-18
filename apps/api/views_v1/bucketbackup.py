@@ -20,7 +20,7 @@ from utils.view import CustomGenericViewSet
 from buckets.models import Bucket, BackupBucket
 from api import serializers, permissions
 from api import exceptions
-from api.views import check_authenticated_or_bucket_token, serializer_error_text
+from api.views_v1.views import check_authenticated_or_bucket_token, serializer_error_text
 
 
 class BackupNodeViewSet(CustomGenericViewSet):

@@ -1,8 +1,8 @@
-from django.urls import path, include, re_path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import auth
-from . import views
+from .views_v1 import views
 from .views_v1.bucketbackup import BackupNodeViewSet
 from .views_v1.admin_bucket_views import AdminBucketViewSet
 from .routers import DetailPostRouter, DetailListPostRouter

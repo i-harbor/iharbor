@@ -31,13 +31,13 @@ from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
 from utils.view import CustomGenericViewSet
 from utils.time import to_django_timezone
-from .models import User, Bucket, BucketToken
-from . import serializers
-from . import paginations
-from . import permissions
-from . import throttles
-from .harbor import HarborManager
-from . import exceptions
+from api.models import User, Bucket, BucketToken
+from api import serializers
+from api import paginations
+from api import permissions
+from api import throttles
+from api.harbor import HarborManager
+from api import exceptions
 
 
 logger = logging.getLogger('django.request')    # 这里的日志记录器要和setting中的loggers选项对应，不能随意给参

@@ -5,13 +5,12 @@ from rest_framework.authtoken.serializers import AuthTokenSerializer
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from rest_framework.decorators import action
-from drf_yasg.utils import swagger_auto_schema, no_body
+from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from buckets.models import BucketToken
-from .views import CustomGenericViewSet
+from utils.view import CustomGenericViewSet
 from .serializers import AuthTokenDumpSerializer, BucketTokenSerializer
 from . import exceptions
 

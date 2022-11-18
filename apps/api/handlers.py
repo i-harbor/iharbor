@@ -3,9 +3,9 @@ from rest_framework.response import Response
 from utils import storagers
 from utils.oss import build_harbor_object
 from utils.md5 import EMPTY_HEX_MD5
+from api.views_v1.views import check_authenticated_or_bucket_token
 from . import exceptions
 from .harbor import HarborManager
-from .views import check_authenticated_or_bucket_token
 
 
 def response_exception(exc: exceptions.Error):

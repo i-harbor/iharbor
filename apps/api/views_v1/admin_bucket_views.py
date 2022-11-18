@@ -11,7 +11,7 @@ from api import serializers
 from api import exceptions
 from api.paginations import ListBucketCursorPagination
 from api.validators import DNSStringValidator
-from api.views import serializer_error_text
+from api.views_v1.views import serializer_error_text
 from buckets.utils import create_bucket
 from buckets.models import get_next_bucket_max_id, Bucket
 from users.models import UserProfile
