@@ -87,7 +87,7 @@ class S3CustomGenericViewSet(GenericViewSet):
             bucket name     # BucketName.SERVER_HTTP_HOST_NAME
             ''              # SERVER_HTTP_HOST_NAME or other
         """
-        main_hosts = getattr(settings, 'SERVER_HTTP_HOST_NAME', ['s3.obs.cstcloud.cn'])
+        main_hosts = getattr(settings, 'S3_SERVER_HTTP_HOST_NAME', ['s3.obs.cstcloud.cn'])
         host = request.get_host()
         for main_host in main_hosts:
             if host.endswith('.' + main_host):

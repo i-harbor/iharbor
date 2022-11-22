@@ -465,6 +465,14 @@ BUCKET_LIMIT_DEFAULT = 0
 ROOT_HOSTCONF = 'webserver.hosts'
 DEFAULT_HOST = 'default'
 
+# 是否开启S3兼容接口服务
+USE_S3_API = True
+
+# s3接口使用的域名，需要此判断<bucket.host>获取bucket name，需要此域名设置hosts切换到s3接口的路由。
+# s3域名可以设置多个，但是域名不得小于三级域名；也可以在security_settings.py中配置覆盖此设置
+# 当USE_S3_API=True开启S3接口服务时，必须配置一个域名
+S3_SERVER_HTTP_HOST_NAME = ['s3.obs.cstcloud.cn', 's3.obs.casearth.cn']
+
 S3_MULTIPART_UPLOAD_MAX_SIZE = 2 * 1024 ** 3        # 2GB
 S3_MULTIPART_UPLOAD_MIN_SIZE = 5 * 1024 ** 2        # 5MB
 
