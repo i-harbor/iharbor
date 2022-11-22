@@ -1,5 +1,3 @@
-import json
-
 from django.utils.translation import gettext as _
 from rest_framework.response import Response
 from rest_framework import status
@@ -149,35 +147,29 @@ class HeadObjectHandler:
             offset, end = GetObjectHandler.get_object_offset_and_end(header_range, filesize=obj_size)
 
             # multipart object check
-            parts_qs = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-            if parts_qs:
-                response['ETag'] = parts_qs.obj_etag
-                response['x-amz-mp-parts-count'] = parts_qs.part_num
+            upload = MultipartUploadManager.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+            if upload:
+                response['ETag'] = upload.obj_etag
+                response['x-amz-mp-parts-count'] = upload.parts_count
             else:
                 response['ETag'] = obj.md5
 
         elif part_number:
-            # part = GetObjectHandler.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
-            parts_qs = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-            part = json.loads(parts_qs.part_json)['Parts']
-            if not part[part_number-1]:
+            upload = MultipartUploadManager.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+            if upload:
+                part, index = upload.get_part_by_number(number=part_number)
+            else:
+                part = None
+
+            if not part:
                 content_range = f'bytes 0-{obj_size-1}/{obj_size}'
                 return self.head_object_no_multipart_response(obj, status_code=status.HTTP_206_PARTIAL_CONTENT,
                                                               headers={'Content-Range': content_range})
-            response['ETag'] = part.obj_etag
-            response['x-amz-mp-parts-count'] = part.part_num
-
-            offset = (part_number-1) * part.chunk_size
-            size = 0
-            end = 0
-            if part_number != part.part_num:
-                # 不是最后一块
-                size = part.chunk_size
-                end = part_number * part.chunk_size -1
-            else:
-                size = part[-1]['Size']
-                end = offset + size - 1
-
+            response['ETag'] = upload.obj_etag
+            response['x-amz-mp-parts-count'] = upload.parts_count
+            offset = upload.get_part_offset(part_number=part_number)
+            size = part['Size']
+            end = offset + size - 1
         else:
             raise exceptions.S3InvalidRequest()
 

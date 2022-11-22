@@ -1,31 +1,47 @@
 
 
 class MultipartPartsManager:
-    # 二分查询
-    def retrieve_part_info(self, arr, num, start, end):
-        result = -1
+
+    def binary_search(self, arr, num, start, end):
+        """
+        二分法查询
+
+        :return:(
+            index: int,        # -1：未找到； >=0: part在列表中的索引
+            part: dict,        # part信息
+            start: int,         # 查询结束时 搜索的索引位置
+            end: int            # 查询结束时 搜索的索引位置
+        )
+        """
         mid = (start + end) // 2
 
         if start > end:
             if end < 0:
                 end = 0
             start, end = end, start
-            return result, None, start, end
+            return -1, None, start, end
 
         if start == end:
             if arr[mid]['PartNumber'] == num:
                 return mid, arr[mid], start, end
-            return result, None, start, end
+            return -1, None, start, end
 
         if arr[mid]['PartNumber'] == num:
             return mid, arr[mid], start, end
         elif arr[mid]['PartNumber'] > num:
-            return self.retrieve_part_info(arr, num, start, mid - 1)
+            return self.binary_search(arr, num, start, mid - 1)
         elif arr[mid]['PartNumber'] < num:
-            return self.retrieve_part_info(arr, num, mid + 1, end)
+            return self.binary_search(arr, num, mid + 1, end)
 
-    # 获取某一块
-    def query_part_info(self, num, parts):
+    def query_part_info(self, num: int, parts: list):
+        """
+        查询指定编号的part
+
+        :return:(
+            part,       # part信息; None(不存在)
+            int         # part在列表的索引; None(不存在)
+        )
+        """
         if not parts:
             return None, None
 
@@ -33,16 +49,25 @@ class MultipartPartsManager:
             if parts[num - 1]['PartNumber'] == num:
                 return parts[num - 1], num - 1
 
-        index, p, start, end = self.retrieve_part_info(arr=parts, num=num, start=0, end=len(parts) - 1)
+        index, p, start, end = self.binary_search(arr=parts, num=num, start=0, end=len(parts) - 1)
+        if index < 0:
+            index = None
+
         return p, index
 
-    def list_insert_part(self, part, parts_arr):
+    def insert_part_into_list(self, part, parts_arr):
+        """
+        :return: (
+            bool,       # True(插入)；False(替换)
+            list
+        )
+        """
         if not parts_arr:
             parts_arr.append(part)
             return True, parts_arr
 
         num = part['PartNumber']
-        index, p, start, end = self.retrieve_part_info(arr=parts_arr, num=num, start=0, end=len(parts_arr) - 1)
+        index, p, start, end = self.binary_search(arr=parts_arr, num=num, start=0, end=len(parts_arr) - 1)
 
         if index > -1:
             parts_arr[index] = part
@@ -64,8 +89,3 @@ class MultipartPartsManager:
                 parts_arr.append(part)
 
         return True, parts_arr
-
-
-
-
-

@@ -93,15 +93,11 @@ class ObjViewSet(S3CustomGenericViewSet):
         part_num = request.query_params.get('partNumber', None)
         upload_id = request.query_params.get('uploadId', None)
         if part_num is not None and upload_id is not None:
-            return MultipartUploadHandler().upload_part(request=request, view=self)
-            # return self.exception_response(request, exceptions.S3NotImplemented(
-            #     message='UploadPart not implemented'))
-            # if 'x-amz-copy-source-range' in request.headers or 'x-amz-copy-source' in request.headers:
-            #     return self.exception_response(request, exceptions.S3NotImplemented(
-            #         message='UploadPartCopy not implemented'))
-            #
-            # return self.upload_part(request=request, part_num=part_num, upload_id=upload_id)
+            if 'x-amz-copy-source-range' in request.headers or 'x-amz-copy-source' in request.headers:
+                return self.exception_response(request, exceptions.S3NotImplemented(
+                    message='UploadPartCopy not implemented'))
 
+            return MultipartUploadHandler().upload_part(request=request, view=self)
 
         # PutObjectAcl
         if 'acl' in request.query_params:

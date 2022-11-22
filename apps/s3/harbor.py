@@ -1,11 +1,10 @@
-import functools
-import time
 from collections import OrderedDict
 
 from django.utils import timezone
 from django.db.models import Case, Value, When, F
 from django.db.models import BigIntegerField
 from django.utils.translation import gettext
+from django.conf import settings
 
 from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
@@ -14,7 +13,6 @@ from utils.oss.pyrados import build_harbor_object
 from utils.storagers import PathParser
 from api import exceptions as iharbor_errors
 from . import exceptions
-from django.conf import settings
 from .models import MultipartUpload
 
 
@@ -1264,12 +1262,12 @@ class HarborManager:
 
         # multipart object delete
         if not obj.is_dir():
-            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
+            s3_obj_multipart_data = MultipartUploadManager.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
             if s3_obj_multipart_data:
                 try:
                     s3_obj_multipart_data.delete()
                 except exceptions.S3Error as e:
-                    raise exceptions.S3InternalError('删除对象原数据时错误')
+                    raise exceptions.S3InternalError('删除对象多部分上传元数据时错误')
 
         # 先删除元数据，后删除rados对象（删除失败恢复元数据）
         if not obj.do_delete():
@@ -1289,16 +1287,19 @@ class HarborManager:
 
         return True
 
-    # 创建 s3 多部分上传数据
-    def create_multipart_data(self, bucket_id, bucket_name, obj, key, obj_perms_code):
-        object_time = int(time.mktime(obj.ult.timetuple()))
-        part_json = {'Parts': [], 'ObjectCreateTime': object_time}
-        upload = MultipartUpload(bucket_id=bucket_id, bucket_name=bucket_name, obj_id=obj.id,
-                                 obj_key=key, key_md5=obj.na_md5, obj_perms_code=obj_perms_code, part_json=part_json)
+    @staticmethod
+    def create_multipart_data(bucket_id: int, bucket_name: str, obj, obj_perms_code: int):
+        """
+        创建s3多部分上传元数据
+        """
         try:
-            upload.save()
+            upload = MultipartUpload.create_multipart(
+                bucket_id=bucket_id, bucket_name=bucket_name,
+                obj_id=obj.id, obj_key=obj.na, obj_upload_time=obj.ult, obj_perms_code=obj_perms_code
+            )
         except Exception as e:
-            raise exceptions.S3InternalError('新建对象元数据失败')
+            raise exceptions.S3InternalError(f'创建多部分上传元数据错误。{str(e)}')
+
         return upload
 
     # s3 重置对象
@@ -1313,8 +1314,8 @@ class HarborManager:
 
 
 class MultipartUploadManager:
-
-    def get_multipart_upload_by_id(self, upload_id: str):
+    @staticmethod
+    def get_multipart_upload_by_id(upload_id: str) -> MultipartUpload:
         """
         查询多部分上传记录
 
@@ -1331,35 +1332,79 @@ class MultipartUploadManager:
 
         return obj
 
-    def get_multipart_upload_by_bucket_obj(self, bucket, obj):
+    @staticmethod
+    def get_multipart_upload_by_bucket_obj(bucket, obj) -> MultipartUpload:
         """
         通过 桶 对象 多条件查询
         :param bucket: 桶实例
         :param obj: 对象实例
-        :return: 多部分上传对象的实例
+        :return:
+            MultipartUpload()   # 多部分上传对象的实例
+            or None
         """
         try:
-            upload = MultipartUpload.objects.filter(bucket_name=bucket.name, key_md5=obj.na_md5,
-                                                    bucket_id=bucket.id, obj_id=obj.id, obj_key=obj.na).first()
+            upload = MultipartUpload.objects.filter(
+                bucket_name=bucket.name, key_md5=obj.na_md5, bucket_id=bucket.id,
+                obj_id=obj.id, obj_key=obj.na
+            ).first()
         except Exception as e:
-            raise exceptions.S3InternalError()
+            raise exceptions.S3InternalError(message=f'查询对象多部分上传元数据错误，{str(e)}')
+
         return upload
 
-    def delete_multipart_upload(self, upload_id: str):
+    @staticmethod
+    def delete_multipart_upload_by_bucket_obj(bucket, obj) -> MultipartUpload:
+        """
+        通过 桶 对象 删除可能存在的多部分上传记录
+        :param bucket: 桶实例
+        :param obj: 对象实例
+        :return:
+            int     # 删除的数量
+        """
         try:
-            obj = MultipartUpload.objects.get(id=upload_id)
+            count, d = MultipartUpload.objects.filter(
+                key_md5=obj.na_md5, bucket_name=bucket.name, bucket_id=bucket.id,
+                obj_id=obj.id, obj_key=obj.na
+            ).delete()
         except Exception as e:
-            raise exceptions.S3InternalError()
-        try:
-            obj.delete()
-        except Exception as e:
-            raise exceptions.S3InternalError()
-        return True
+            raise exceptions.S3InternalError(message=f'删除对象多部分上传元数据错误，{str(e)}')
 
-    def list_multipart_uploads_queryset(self, bucket_name: str, prefix: str = None, delimiter: str = None):
+        return count
+
+    @staticmethod
+    def get_multipart_upload(bucket, obj_key: str):
+        """
+        通过 桶 对象key 查询多部分上传元数据
+
+        :param bucket: 桶实例
+        :param obj_key: 对象key
+        :return:
+            MultipartUpload() or None
+        """
+        try:
+            key_md5 = get_str_hexMD5(obj_key)
+            upload = MultipartUpload.objects.filter(
+                key_md5=key_md5, bucket_name=bucket.name, bucket_id=bucket.id, obj_key=obj_key).first()
+        except Exception as e:
+            raise exceptions.S3InternalError()
+
+        return upload
+
+    # @staticmethod
+    # def delete_multipart_upload(upload_id: str):
+    #     try:
+    #         MultipartUpload.objects.get(id=upload_id).delete()
+    #     except Exception as e:
+    #         raise exceptions.S3InternalError()
+    #
+    #     return True
+
+    @staticmethod
+    def list_multipart_uploads_queryset(bucket_id: int, bucket_name: str, prefix: str = None, delimiter: str = None):
         """
         查询多部分上传记录
 
+        :param bucket_id: 用于过滤掉删除归档的同名的桶
         :param bucket_name: 桶名
         :param prefix: prefix of s3 object key
         :param delimiter: 暂时不支持
@@ -1373,12 +1418,15 @@ class MultipartUploadManager:
             lookups['obj_key__startswith'] = prefix
 
         try:
-            return MultipartUpload.objects.filter(bucket_name=bucket_name, **lookups, status='uploading').order_by(
-                '-create_time').all()
+            return MultipartUpload.objects.filter(
+                bucket_name=bucket_name, bucket_id=bucket_id, **lookups,
+                status=MultipartUpload.UploadStatus.UPLOADING.value
+            ).order_by('-create_time').all()
         except Exception as e:
             raise exceptions.S3InternalError(extend_msg=str(e))
 
-    def get_multipart_upload_queryset(self, bucket_name: str, obj_path: str):
+    @staticmethod
+    def get_multipart_upload_queryset(bucket_name: str, obj_path: str):
         """
         查询多部分上传记录
 
@@ -1427,65 +1475,56 @@ class MultipartUploadManager:
         return valid_uploads[0]
 
     @staticmethod
-    def get_upload_parts_and_validate(bucket, upload, complete_parts, complete_numbers):
+    def get_upload_parts_and_validate(upload, complete_parts: dict, complete_numbers: list):
         """
         多部分上传part元数据获取和验证
 
-        :param bucket: 桶对象
         :param upload: 上传任务实例
         :param complete_parts:  客户端请求组合提交的part信息，dict
         :param complete_numbers: 客户端请求组合提交的所有part的编号list，升序
         :return:
-                (
-                    used_upload_parts: dict,        # complete_parts对应的part元数据实例字典
-                    unused_upload_parts: list,      # 属于同一个多部分上传任务upload的，但不在complete_parts内的part元数据实例列表
-                    object_etag: str                # 对象的ETag
-                )
+                object_etag: str                # 对象的ETag
         :raises: S3Error
         """
         obj_etag_handler = S3ObjectMultipartETagHandler()
-        parts_order_list = []
         last_part_number = complete_numbers[-1]
-        part_info = upload.parts_object()
-        for part in part_info:
+        parts = upload.get_parts()
+
+        # 请求合并的part和已上传的part数量必须一致
+        obj_parts_count = len(parts)
+        if obj_parts_count != len(complete_parts):
+            raise exceptions.S3InvalidPart(message=gettext('请求合并的part和已上传的part数量不一致。'))
+
+        first_part_size = parts[0]['Size']        # 第一part大小
+        pre_part_number = 0
+        for part in parts:
             num = part['PartNumber']
-            if num in complete_numbers:
-                c_part = complete_parts[num]
-                if part[
-                    'Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:  # part最小限制，最后一个part除外
-                    raise exceptions.S3EntityTooSmall()
-                # 块大小检测
-                if part['Size'] != upload.chunk_size and num != last_part_number:
-                    raise exceptions.S3InvalidPart(message=gettext('The block information size is inconsistent.'))
-
-                if 'ETag' not in c_part:
-                    raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
-
-                if c_part["ETag"].strip('"') != part['ETag']:
-                    raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
-
-                parts_order_list.append(int(num))
-                obj_etag_handler.update(part['ETag'])
-            else:
+            if num not in complete_numbers:
                 raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
 
-        if len(part_info) != len(complete_parts):
-            raise exceptions.S3InvalidPart()
+            # part编号必须从1开始，并且连续
+            pre_part_number += 1
+            if num != pre_part_number:
+                raise exceptions.S3InvalidPart(message=gettext('Part编号必须从1开始，并且连续。'), extend_msg=f'PartNumber={num}')
 
-        check_add_one = lambda arr: \
-            functools.reduce(lambda x, y: (x + 1 == y if isinstance(x, int) else x[0] and x[1] + 1 == y, y), arr)[0]
+            c_part = complete_parts[num]
+            # part最小限制，最后一个part除外
+            if part['Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:
+                raise exceptions.S3EntityTooSmall()
 
-        part_list = sorted(parts_order_list)
-        if not check_add_one(part_list):
-            raise exceptions.S3InvalidPart()
+            # 块大小检测
+            if part['Size'] != first_part_size and num != last_part_number:
+                raise exceptions.S3InvalidPart(message=gettext('The block information size is inconsistent.'))
 
-        # obj_etag = f'"{obj_etag_handler.hex_md5}-{obj_parts_count}"'
-        obj_etag = f'{obj_etag_handler.hex_md5}'
-        upload.obj_etag = obj_etag
-        upload.last_modified = timezone.now()
-        upload.status = MultipartUpload.UploadStatus.COMPLETED.value
-        upload.part_num = len(part_info)
-        upload.save(update_fields=['obj_etag', 'last_modified', 'status', 'part_num'])
+            if 'ETag' not in c_part:
+                raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+
+            if c_part["ETag"].strip('"') != part['ETag']:
+                raise exceptions.S3InvalidPart(extend_msg=f'PartNumber={num}')
+
+            obj_etag_handler.update(part['ETag'])
+
+        obj_etag = f'"{obj_etag_handler.hex_md5}-{obj_parts_count}"'
         return obj_etag
 
     @staticmethod
@@ -1516,19 +1555,5 @@ class MultipartUploadManager:
             parts_dict[part_num] = part
             numbers.append(part_num)
             pre_num = part_num
+
         return parts_dict, numbers
-
-    def is_s3_multipart_object(self, bucket, obj):
-        """
-        对象是否存在多部分上传数据
-        :param bucket:
-        :param obj:
-        :return:
-        """
-        upload = self.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
-        if upload:
-            return upload
-        else:
-            return None
-
-

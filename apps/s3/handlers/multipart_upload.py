@@ -1,20 +1,19 @@
-import json
-import time
 from datetime import datetime
 from pytz import utc
 
 from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext
-from django.db import DatabaseError, transaction
+from django.db import transaction
+from rest_framework.exceptions import UnsupportedMediaType
+
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager, MultipartUploadManager
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions, renders, paginations, serializers
-from s3.multiparts import MultipartPartsManager
 from s3.models import MultipartUpload
 from utils import storagers
-
+from utils.oss.pyrados import RadosError
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -41,56 +40,44 @@ class MultipartUploadHandler:
     def create_multipart_upload(self, request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
         key = view.get_s3_obj_key(request)
-        expires = request.headers.get('Expires', None)
+        # expires = request.headers.get('Expires', None)
         # 访问权限  'public-read': BucketFileBase.SHARE_ACCESS_READONLY 公有读不赋予上传权限
         acl_choices = {'private': BucketFileBase.SHARE_ACCESS_NO,
                        'public-read-write': BucketFileBase.SHARE_ACCESS_READWRITE,
                        'public-read': BucketFileBase.SHARE_ACCESS_READONLY
                        }
         x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
-
         if x_amz_acl not in acl_choices:
             return view.exception_response(
-                request, exc=exceptions.S3InvalidRequest(message=gettext(f'The value {x_amz_acl} '
-                                                                         f'of header "x-amz-acl" is not supported.')))
+                request, exc=exceptions.S3InvalidRequest(
+                    message=gettext(f'The value {x_amz_acl} of header "x-amz-acl" is not supported.')))
 
         obj_perms_code = acl_choices[x_amz_acl]
-
-        if obj_perms_code != BucketFileBase.SHARE_ACCESS_NO:
-            return view.exception_response(
-                request, exc=exceptions.S3InvalidRequest(message=gettext(f'The value {x_amz_acl} '
-                                                                         f'of header "x-amz-acl" is no permission.')))
-
         hm = HarborManager()
         # 查看桶和对象是否存在
         try:
             bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=key)
+            # 多部分上传表的查询：
+            upload_data = MultipartUploadManager.get_multipart_upload(bucket=bucket, obj_key=key)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
         bucket_table = bucket.get_bucket_table_name()
-        # 多部分上传表的查询：
-        upload_data = MultipartUpload.objects.filter(bucket_name=bucket.name, bucket_id=bucket.id, obj_key=key).first()
-
         if upload_data:
-            self.rest_or_create_object(bucket=bucket, obj=obj, hm=hm, key=key, bucket_table=bucket_table)
-            # 删除重新创建
             upload_data.delete()
-            upload_data = hm.create_multipart_data(bucket_id=bucket.id, bucket_name=bucket.name, obj=obj,
-                                                   key=key, obj_perms_code=obj_perms_code)
-            return self.create_multipart_upload_response_handler(request=request, view=view,
-                                                                 bucket_name=bucket.name,
-                                                                 key=key, upload_id=upload_data.id)
-        # upload_data is None
-        obj = self.rest_or_create_object(bucket=bucket, obj=obj, hm=hm, key=key, bucket_table=bucket_table)
-        upload_data = hm.create_multipart_data(bucket_id=bucket.id, bucket_name=bucket.name, obj=obj,
-                                               key=key, obj_perms_code=obj_perms_code)
 
-        return self.create_multipart_upload_response_handler(request=request, view=view,
-                                                             bucket_name=bucket.name,
-                                                             key=key, upload_id=upload_data.id)
+        obj = self.reset_or_create_object(bucket=bucket, obj=obj, hm=hm, key=key, bucket_table=bucket_table)
+        if obj.share != obj_perms_code:
+            obj.set_shared(share=obj_perms_code)
 
-    def create_multipart_upload_response_handler(self, request, view, bucket_name, key, upload_id):
+        upload_data = hm.create_multipart_data(
+            bucket_id=bucket.id, bucket_name=bucket.name, obj=obj, obj_perms_code=obj_perms_code)
+
+        return self.create_multipart_upload_response_handler(
+            request=request, view=view, bucket_name=bucket.name, key=key, upload_id=upload_data.id)
+
+    @staticmethod
+    def create_multipart_upload_response_handler(request, view, bucket_name, key, upload_id):
         view.set_renderer(request, renders.CusXMLRenderer(root_tag_name='InitiateMultipartUploadResult'))
         data = {
             'Bucket': bucket_name,
@@ -107,12 +94,14 @@ class MultipartUploadHandler:
         upload_id = request.query_params.get('uploadId', None)
         obj_key = view.get_s3_obj_key(request)
 
-        # int
-        content_length, part_num = self.upload_part_handler_header(content_length=content_length,
-                                                                   part_num=part_num, view=view, request=request)
+        try:
+            content_length, part_num = self.upload_part_validate_header(
+                content_length=content_length, part_num=part_num
+            )
+        except exceptions.S3Error as exc:
+            return view.exception_response(request, exc=exc)
 
         try:
-            # 如果终止上传 报错
             upload, bucket = self.get_upload_and_bucket(request=request, upload_id=upload_id,
                                                         bucket_name=bucket_name, view=view)
         except exceptions.S3Error as e:
@@ -122,41 +111,21 @@ class MultipartUploadHandler:
         if upload.status != MultipartUpload.UploadStatus.UPLOADING.value:
             return view.exception_response(request, exc=exceptions.S3CompleteMultipartAlreadyInProgress())
 
-        # 检查是否上传第一块
-        if not upload.check_first_part(num=part_num):
-            return view.exception_response(request, exc=exceptions.S3InvalidRequest(
-                                                        message=gettext('Upload the first block first')))
-
-        hm = HarborManager()
-        offset = 0
-
+        # 确保编号为1的块先上传
         if part_num != 1:
-            offset = (part_num - 1) * upload.chunk_size
-            # 如果重传的大小与原先的不一致， 必须先修改第一块,重传文件
-            parts = upload.parts_object()  #list
-            part_info, index = MultipartPartsManager().query_part_info(num=part_num, parts=parts)
-            if part_info and content_length != part_info['Size']:
-                return view.exception_response(request, exc=exceptions.S3InvalidPart(
-                    message=gettext('The block information is different from the original block size. '
-                                    'Please upload the block again or retransmit the file')))
+            if not upload.is_part1_uploaded:
+                return view.exception_response(request, exc=exceptions.S3InvalidRequest(
+                    message=gettext('The part numbered 1 must be uploaded first.')))
 
-        obj = hm.get_object(bucket_name=bucket_name, path_name=obj_key, user=request.user)
-        ceph_obj_key = obj.get_obj_key(bucket.id)
-        uploader = storagers.PartUploadToCephHandler(request=request, using=bucket.ceph_using,
-                                                     pool_name=bucket.pool_name, obj_key=ceph_obj_key, offset=offset)
-        request.upload_handlers = [uploader]
-        view.kwargs['filename'] = 'filename'
-        put_data = request.data
-        file = put_data.get('file')
-        part_md5 = file.file_md5
-        part_size = file.size
-        part_etag = self.upload_part_handler(request=request, view=view, upload=upload, part_num=part_num,
-                                             bucket=bucket, obj=obj, uploader=uploader, hm=hm, part_md5=part_md5,
-                                             part_size=part_size)
-        data = {'ETag': part_etag}
-        return Response(headers=data, status=status.HTTP_200_OK)
+        try:
+            return self.upload_part_handle(
+                request=request, view=view, upload=upload, part_number=part_num,
+                bucket=bucket, obj_key=obj_key
+            )
+        except Exception as exc:
+            return view.exception_response(request=request, exc=exc)
 
-    def upload_part_handler(self, request, view, upload, part_num, bucket, obj, uploader, hm, part_md5, part_size):
+    def upload_part_handle(self, request, view, upload, part_number, bucket, obj_key: str):
 
         def clean_put(_uploader):
             # 删除数据
@@ -168,20 +137,76 @@ class MultipartUploadHandler:
                 except Exception:
                     pass
 
-        part = {'PartNumber': part_num, 'lastModified': timezone.now(), 'ETag': part_md5, 'Size': part_size}
+        offset = upload.get_part_offset(part_number=part_number)
+        obj = HarborManager().get_object(bucket_name=bucket.name, path_name=obj_key, user=request.user)
+        ceph_obj_key = obj.get_obj_key(bucket.id)
+        uploader = storagers.PartUploadToCephHandler(request=request, using=bucket.ceph_using,
+                                                     pool_name=bucket.pool_name, obj_key=ceph_obj_key, offset=offset)
+        request.upload_handlers = [uploader]
 
+        try:
+            upload, part = self.upload_part_handle_save(
+                request=request, view=view, upload=upload, part_number=part_number, obj=obj, offset=offset)
+        except exceptions.S3Error as e:
+            clean_put(uploader)
+            return view.exception_response(request, e)
+        except Exception as exc:
+            clean_put(uploader)
+            return view.exception_response(request, exceptions.S3InvalidRequest(extend_msg=str(exc)))
+
+        return Response(status=status.HTTP_200_OK, headers={'ETag': f'"{part["ETag"]}"'})
+
+    @staticmethod
+    def upload_part_handle_save(request, view, upload: MultipartUpload, part_number: int, obj, offset: int):
+        """
+        :return:
+
+        :raises: S3Error
+        """
+        try:
+            view.kwargs['filename'] = 'filename'
+            put_data = request.data
+        except UnsupportedMediaType:
+            raise exceptions.S3UnsupportedMediaType()
+        except RadosError as e:
+            raise exceptions.S3InternalError(extend_msg=str(e))
+        except Exception as exc:
+            raise exceptions.S3InvalidRequest(extend_msg=str(exc))
+
+        file = put_data.get('file')
+        part_md5 = file.file_md5
+        part_size = file.size
+
+        if not file:
+            raise exceptions.S3InvalidRequest('Request body is empty.')
+
+        amz_content_sha256 = request.headers.get('X-Amz-Content-SHA256', None)
+        if amz_content_sha256 is None:
+            raise exceptions.S3InvalidContentSha256Digest()
+
+        if amz_content_sha256 != 'UNSIGNED-PAYLOAD':
+            part_sha256 = file.sha256_handler.hexdigest()
+            if amz_content_sha256 != part_sha256:
+                raise exceptions.S3BadContentSha256Digest()
+
+        part = MultipartUpload.build_part_item(
+            part_number=part_number, last_modified=timezone.now(), etag=part_md5, size=part_size
+        )
         try:
             with transaction.atomic(using='metadata'):
                 upload = MultipartUpload.objects.select_for_update().get(id=upload.id)
-                flag = upload.insert_part(part_num, part, part_size)
-                if flag:
-                    obj.si += part_size
-                hm._update_obj_metadata(obj=obj, size=obj.si)
-        except DatabaseError as e:
-            clean_put(uploader)
-            return view.exception_response(request, e)
+                upload.insert_part(part)
+                # 写入part后，对象大小增大了才需更新
+                new_obj_size = offset + part_size
+                if new_obj_size > obj.si:
+                    obj.si = new_obj_size
+                    ok = HarborManager._update_obj_metadata(obj=obj, size=obj.si)
+                    if not ok:
+                        raise exceptions.S3Error('更新对象元数据大小错误。')
+        except Exception as e:
+            raise exceptions.S3Error(f'更新对象和多部分上传元数据错误，{str(e)}')
 
-        return part_md5
+        return upload, part
 
     def complete_multipart_upload(self, request, view: S3CustomGenericViewSet, upload_id):
         """
@@ -189,7 +214,11 @@ class MultipartUploadHandler:
         """
         bucket_name = view.get_bucket_name(request)
         obj_key = view.get_s3_obj_key(request)
-        complete_parts_list = self.handler_complete_multipart_handers(request=request, view=view)
+
+        try:
+            complete_parts_list = self._get_request_complete_parts(request=request, view=view)
+        except exceptions.S3Error as exc:
+            return view.exception_response(request, exc=exc)
 
         try:
             upload, bucket = self.get_upload_and_bucket(request=request, upload_id=upload_id, bucket_name=bucket_name,
@@ -202,7 +231,6 @@ class MultipartUploadHandler:
 
         # 查看文件是否存在
         hm = HarborManager()
-
         try:
             obj = hm.get_object(bucket_name=bucket_name, path_name=obj_key, user=request.user)
         except exceptions.S3Error as e:
@@ -219,9 +247,10 @@ class MultipartUploadHandler:
             complete_parts_dict, complete_part_numbers = mmanger.handle_validate_complete_parts(complete_parts_list)
             # 获取需要组合的所有part元数据和对象ETag，和没有用到的part元数据列表
             obj_etag = mmanger.get_upload_parts_and_validate(
-                bucket=bucket, upload=upload, complete_parts=complete_parts_dict,
+                upload=upload, complete_parts=complete_parts_dict,
                 complete_numbers=complete_part_numbers
             )
+            upload.set_completed(obj_etag=obj_etag)
         except exceptions.S3Error as e:
             # 如果组合失败 返回原状态
             upload.status = MultipartUpload.UploadStatus.UPLOADING.value
@@ -244,26 +273,23 @@ class MultipartUploadHandler:
         if upload.status != MultipartUpload.UploadStatus.UPLOADING.value:
             return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
 
-        upload_time = int(time.mktime(upload.last_modified.timetuple()))
-        obj_time = upload.part_json['ObjectCreateTime']  # 时间戳
-
         # 终止上传 删除文件对象
-        mmanger = MultipartUploadManager()
+        try:
+            upload.delete()
+        except Exception as e:
+            return view.exception_response(
+                request, exc=exceptions.S3Error(message=f'删除多部分上传元数据失败，{str(e)}'))
 
         try:
-            # 删除多部分上传数据
-            is_del_obj = mmanger.delete_multipart_upload(upload_id=upload_id)
+            table_name = bucket.get_bucket_table_name()
+            obj = HarborManager.get_metadata_obj(table_name=table_name, path=upload.obj_key)
+            if obj is not None and obj.is_file():
+                multipart_obj_ts = upload.get_obj_upload_timestamp()  # 时间戳
+                obj_ts = int(obj.ult.timestamp())
+                if multipart_obj_ts == obj_ts:
+                    HarborManager().do_delete_obj_or_dir(bucket=bucket, obj=obj)
         except exceptions.S3Error as e:
-            return view.exception_response(request, exc=exceptions.S3Error)
-
-        hm = HarborManager()
-
-        if obj_time <= upload_time:
-            try:
-                # 删除元数据 （误删）obj 时间戳
-                obj = hm.delete_object(bucket_name=bucket_name, obj_path=upload.obj_key, user=request.user)
-            except exceptions.S3Error as e:
-                return view.exception_response(request, e)
+            return view.exception_response(request, e)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -284,13 +310,13 @@ class MultipartUploadHandler:
 
         try:
             bucket = HarborManager().get_public_or_user_bucket(name=bucket_name, user=request.user)
+            self.check_header_x_amz_expected_bucket_owner(
+                x_amz_expected_bucket_owner=x_amz_expected_bucket_owner, bucket_user_id=bucket.user_id)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
-        self.handler_expected_bucket_owner(x_amz_expected_bucket_owner=x_amz_expected_bucket_owner,
-                                           bucket_id=bucket.id, request=request, view=view)
         mmanger = MultipartUploadManager()
-        queryset = mmanger.list_multipart_uploads_queryset(bucket_name=bucket_name, prefix=prefix)
+        queryset = mmanger.list_multipart_uploads_queryset(bucket_id=bucket.id, bucket_name=bucket_name, prefix=prefix)
         paginator = paginations.ListUploadsKeyPagination(context={'bucket': bucket})
         ret_data = {
             'Bucket': bucket_name,
@@ -315,79 +341,113 @@ class MultipartUploadHandler:
         max_parts = request.query_params.get('max-parts', None)
         part_number_marker = request.query_params.get('part-number-marker', None)
         x_amz_expected_bucket_owner = request.headers.get('x-amz-expected-bucket-owner', None)
-        hm = HarborManager()
 
         try:
-            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=obj_key)
+            max_parts, part_number_marker = self._list_parts_validate_params(
+                max_parts=max_parts, part_number_marker=part_number_marker
+            )
+        except exceptions.S3Error as exc:
+            return view.exception_response(request, exc=exc)
+
+        try:
+            upload = MultipartUploadManager().get_multipart_upload_by_id(upload_id=upload_id)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
-        self.handler_expected_bucket_owner(x_amz_expected_bucket_owner=x_amz_expected_bucket_owner, bucket_id=bucket.id,
-                                           request=request, view=view)
+        if upload is None:
+            return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
 
-        try:
-            upload_data = MultipartUploadManager().get_multipart_upload_by_id(upload_id=upload_id)
-        except exceptions.S3Error as e:
-            return view.exception_response(request, e)
+        if upload.status == upload.UploadStatus.COMPLETED.value:
+            return view.exception_response(request, exc=exceptions.S3NoSuchUpload())
 
-        try:
-            upload_part_json = json.loads(upload_data.part_json)['Parts']
-        except exceptions.S3Error as e:
-            return view.exception_response(request, e)
-
-        data = {'Bucket': bucket.name, 'Key': obj.na, 'UploadId': upload_id}
-
-        if max_parts and part_number_marker:
-            # 处理不为空的参数 PartNumberMarker 上一部分最后 NextPartNumberMarker 这一部分最后
+        if x_amz_expected_bucket_owner:
             try:
-                max_parts = int(max_parts)
-            except ValueError:
-                return view.exception_response(request, exc=exceptions.S3InvalidArgument('Invalid param MaxParts'))
+                bucket = HarborManager().get_public_or_user_bucket(name=bucket_name, user=request.user)
+                self.check_header_x_amz_expected_bucket_owner(
+                    x_amz_expected_bucket_owner=x_amz_expected_bucket_owner, bucket_user_id=bucket.user_id)
+            except exceptions.S3Error as e:
+                return view.exception_response(request, e)
 
-            try:
-                part_number_marker = int(part_number_marker)
-            except ValueError:
-                return view.exception_response(request, exc=exceptions.S3InvalidArgument(
-                                                                'Invalid param PartNumberMarker'))
+        parts, is_truncated = upload.get_range_parts(part_number_marker=part_number_marker, max_parts=max_parts)
+        if parts:
+            next_part_number_marker = parts[-1]['PartNumber']
+        else:
+            next_part_number_marker = 0
 
-            upload_part_json = upload_part_json[part_number_marker:max_parts + 1]
-            data['PartNumberMarker'] = part_number_marker
-            data['NextPartNumberMarker'] = max_parts + 1
-            data['MaxParts'] = max_parts
+        owner = {'ID': request.user.id, "DisplayName": request.user.username}
+        data = {
+            'Bucket': bucket_name,
+            'Key': obj_key,
+            'UploadId': upload_id,
+            'PartNumberMarker': part_number_marker,
+            'NextPartNumberMarker': next_part_number_marker,
+            'MaxParts': max_parts,
+            'IsTruncated': is_truncated,
+            'Part': parts,
+            'StorageClass': 'STANDARD',
+            'Initiator': owner,
+            'Owner': owner
+        }
 
-        data['Part'] = upload_part_json
-        data['StorageClass'] = 'STANDARD'
-        data['Owner'] = {'ID': request.user.id, "DisplayName": request.user.username}
         view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListPartsResult'))
         return Response(data=data, status=status.HTTP_200_OK)
 
     # ---------------------------------------------------------------------
+    @staticmethod
+    def _list_parts_validate_params(max_parts: str, part_number_marker: str):
+        if max_parts:
+            try:
+                max_parts = int(max_parts)
+            except ValueError:
+                raise exceptions.S3InvalidArgument('Invalid param "max-parts"')
 
-    def handler_expected_bucket_owner(self, x_amz_expected_bucket_owner, bucket_id, request, view):
+            if max_parts > 1000 or max_parts < 1:
+                raise exceptions.S3InvalidArgument('参数"max-parts"的值必须在1至1000之内。')
+        else:
+            max_parts = 1000
 
+        if part_number_marker:
+            try:
+                part_number_marker = int(part_number_marker)
+            except ValueError:
+                raise exceptions.S3InvalidArgument('Invalid param "part-number-marker"')
+
+            if part_number_marker < 0 or part_number_marker > 10000:
+                raise exceptions.S3InvalidArgument('参数"part-number-marker"的值必须在0至10000之内。')
+        else:
+            part_number_marker = 0
+
+        return max_parts, part_number_marker
+
+    @staticmethod
+    def check_header_x_amz_expected_bucket_owner(x_amz_expected_bucket_owner: str, bucket_user_id: int):
         if x_amz_expected_bucket_owner:
             try:
-                if bucket_id != int(x_amz_expected_bucket_owner):
+                if bucket_user_id != int(x_amz_expected_bucket_owner):
                     raise ValueError
             except ValueError:
-                return view.exception_response(request, exc=exceptions.S3AccessDenied())
+                raise exceptions.S3AccessDenied()
 
-    def handler_complete_multipart_handers(self, request, view):
+    @staticmethod
+    def _get_request_complete_parts(request, view) -> list:
+        """
+        请求要合并的对象part列表
 
+        :return: parts: list
+        :raises: S3Error
+        """
         try:
             data = request.data
         except Exception as e:
-            return view.exception_response(request, exc=exceptions.S3MalformedXML())
+            raise exceptions.S3MalformedXML()
 
         root = data.get('CompleteMultipartUpload')
-
         if not root:
-            return view.exception_response(request, exc=exceptions.S3MalformedXML())
+            raise exceptions.S3MalformedXML()
 
         complete_parts_list = root.get('Part')
-
         if not complete_parts_list:
-            return view.exception_response(request, exc=exceptions.S3MalformedXML())
+            raise exceptions.S3MalformedXML()
 
         # XML解析器行为有关，只有一个part时不是list
         if not isinstance(complete_parts_list, list):
@@ -395,16 +455,16 @@ class MultipartUploadHandler:
 
         return complete_parts_list
 
-    def get_upload_and_bucket(self, request, upload_id: str, bucket_name: str, view: S3CustomGenericViewSet):
+    @staticmethod
+    def get_upload_and_bucket(request, upload_id: str, bucket_name: str, view: S3CustomGenericViewSet):
         """
         :return:
             upload, bucket
         :raises: S3Error
         """
         obj_path_name = view.get_s3_obj_key(request)
-        mu_mgr = MultipartUploadManager()
-        upload = mu_mgr.get_multipart_upload_by_id(upload_id=upload_id)
 
+        upload = MultipartUploadManager.get_multipart_upload_by_id(upload_id=upload_id)
         if not upload:
             raise exceptions.S3NoSuchUpload()
 
@@ -418,36 +478,42 @@ class MultipartUploadHandler:
             raise exceptions.S3NoSuchBucket()
 
         if not upload.belong_to_bucket(bucket):
-            raise exceptions.S3NoSuchUpload(f'UploadId conflicts with this bucket.'
-                                            f'Please bucket "{bucket.name}".Maybe the UploadId is created for deleted bucket.')
+            raise exceptions.S3NoSuchUpload(
+                f'UploadId conflicts with this bucket.'
+                f'Please bucket "{bucket.name}".Maybe the UploadId is created for deleted bucket.'
+            )
 
         return upload, bucket
 
-    def upload_part_handler_header(self, content_length, part_num, view, request):
-
+    @staticmethod
+    def upload_part_validate_header(content_length, part_num):
+        """
+        :raies: S3Error
+        """
         try:
             content_length = int(content_length)
         except exceptions.S3Error as e:
-            return view.exception_response(request, exc=exceptions.S3InvalidContentLength())
+            raise exceptions.S3InvalidContentLength()
 
         if content_length == 0:
-            return view.exception_response(request, exc=exceptions.S3EntityTooSmall())
+            raise exceptions.S3EntityTooSmall()
 
         if content_length > settings.S3_MULTIPART_UPLOAD_MAX_SIZE:
-            return view.exception_response(request, exc=exceptions.S3EntityTooLarge())
+            raise exceptions.S3EntityTooLarge()
 
         try:
             part_num = int(part_num)
         except ValueError:
-            return view.exception_response(request, exc=exceptions.S3InvalidArgument('Invalid param PartNumber'))
+            raise exceptions.S3InvalidArgument('Invalid param PartNumber')
 
         if not (0 < part_num <= 10000):
-            return view.exception_response(request, exc=exceptions.S3InvalidArgument(
-                                    'Invalid param PartNumber,must be a positive integer between 1 and 10,000.'))
+            raise exceptions.S3InvalidArgument(
+                'Invalid param PartNumber,must be a positive integer between 1 and 10,000.')
 
         return content_length, part_num
 
-    def rest_or_create_object(self, bucket, obj, hm, key, bucket_table):
+    @staticmethod
+    def reset_or_create_object(bucket, obj, hm, key, bucket_table):
 
         if obj:
             # 重置对象

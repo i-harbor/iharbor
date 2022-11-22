@@ -4,7 +4,7 @@ from django.utils.translation import gettext as _
 from utils.time import datetime_from_gmt
 from utils.oss.pyrados import build_harbor_object
 from buckets.models import BucketFileBase
-from s3.harbor import HarborManager, MultipartUploadManager
+from s3.harbor import HarborManager
 from s3 import exceptions
 from s3.viewsets import S3CustomGenericViewSet
 
@@ -153,16 +153,5 @@ def create_object_metadata(request, view: S3CustomGenericViewSet):
             h_manager._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)  # 重置对象大小
         except Exception as exc:
             raise exceptions.S3InvalidRequest(f'reset object error, {str(exc)}')
-
-        # 同名文件 不同大小 容易产生脏数据 删除
-        try:
-            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-        except exceptions.S3Error as e:
-            raise exceptions.S3InvalidRequest(str(e))
-        if s3_obj_multipart_data:
-            try:
-                s3_obj_multipart_data.delete()
-            except exceptions.S3Error as e:
-                raise exceptions.S3InternalError('删除对象s3多部分上传时错误')
 
     return bucket, obj, rados, created

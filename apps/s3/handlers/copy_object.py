@@ -28,6 +28,10 @@ class CopyObjectHandler:
         except exceptions.S3Error as exc:
             return view.exception_response(request, exc)
 
+        if obj_path_name == source_key:
+            return view.exception_response(
+                request, exc=exceptions.S3InvalidRequest(message=f'对象的key和复制的源对象key不能相同。'))
+
         if version_id:
             return view.exception_response(request, exceptions.S3NotImplemented(
                 message='CopyObject unsupported copy the specified version of the object '

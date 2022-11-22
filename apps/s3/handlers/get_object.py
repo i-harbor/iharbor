@@ -1,4 +1,3 @@
-import json
 import re
 
 from django.http import FileResponse
@@ -60,14 +59,12 @@ class GetObjectHandler:
 
             response = GetObjectHandler.s3_get_object_dir(fileobj)
         elif part_number is not None:
-            # return view.exception_response(request, exceptions.S3NotImplemented(
-            #     message='GetObject not implemented param "partNumber"'))
             try:
                 part_number = int(part_number)
                 response = self.s3_get_object_part_response(
                     bucket=bucket, obj=fileobj, part_number=part_number)
-            # except ValueError:
-            #     return view.exception_response(request, exceptions.S3InvalidArgument(message=_('无效的参数partNumber.')))
+            except ValueError:
+                return view.exception_response(request, exceptions.S3InvalidArgument(message=_('无效的参数partNumber.')))
             except exceptions.S3Error as e:
                 return view.exception_response(request, e)
         else:
@@ -138,27 +135,7 @@ class GetObjectHandler:
         )
 
     @staticmethod
-    def get_object_part(bucket, obj_id: int, part_number: int):  # 将 obj_id 修改成 obj实例
-        """
-        获取对象一个part元数据
-
-        :return:
-            part
-            None    # part_number == 1时，非多部分对象
-
-        :raises: S3Error
-        """
-        if not (1 <= part_number <= 10000):
-            raise exceptions.S3InvalidPartNumber()
-
-        return None
-
-        # if part_number == 1:
-        #     return None
-        #
-        # raise exceptions.S3InvalidPartNumber()
-
-    def s3_get_object_part_response(self, bucket, obj, part_number: int):
+    def s3_get_object_part_response(bucket, obj, part_number: int):
         """
         读取对象一个part的响应
 
@@ -168,51 +145,32 @@ class GetObjectHandler:
         :raises: S3Error
         """
         obj_size = obj.si
+
         # 读取的对象是否具有多部分上传记录
-        part = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-        if part is None:
-            # 对象没有多部分上传，就不存在part_number
-            raise exceptions.S3InvalidRequest()
-
-        offset = (part_number - 1) * part.chunk_size
-        size = 0
-        end = 0
-
-        if part.part_num != part_number:
-            # 不是最后一块
-            size = part.chunk_size
-            end = offset + size - 1
+        upload = MultipartUploadManager.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+        if upload:
+            part, index = upload.get_part_by_number(number=part_number)
         else:
-            part_info = json.loads(part.part_json)['Parts'][-1]
-            size = part_info['Size']
-            end = offset + size - 1
-        generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
-        response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
-        response['Content-Length'] = end - offset + 1
-        response['ETag'] = part.obj_etag
-        response['x-amz-mp-parts-count'] = part.part_num
-        response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
+            part = None
 
-        # part = self.get_object_part(bucket=bucket, obj_id=obj.id, part_number=part_number)
-        # if part:
-        #
-        #     offset = part.obj_offset
-        #     size = part.size
-        #     end = offset + size - 1
-        #     generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
-        #     response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
-        #     response['Content-Length'] = end - offset + 1
-        #     response['ETag'] = part.obj_etag
-        #     response['x-amz-mp-parts-count'] = part.parts_count
-        #     response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
-        # else:   # 非多部分对象
-        #     generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj)
-        #     response = FileResponse(generator)
-        #     response['Content-Length'] = obj_size
-        #     response['ETag'] = obj.md5
-        #     if obj_size > 0:
-        #         end = max(obj_size - 1, 0)
-        #         response['Content-Range'] = f'bytes {0}-{end}/{obj_size}'
+        if part:
+            offset = upload.get_part_offset(part_number=part_number)
+            size = part['Size']
+            end = offset + size - 1
+            generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj, offset=offset, end=end)
+            response = FileResponse(generator, status=status.HTTP_206_PARTIAL_CONTENT)
+            response['Content-Length'] = end - offset + 1
+            response['ETag'] = upload.obj_etag
+            response['x-amz-mp-parts-count'] = upload.parts_count
+            response['Content-Range'] = f'bytes {offset}-{end}/{obj_size}'
+        else:  # 非多部分对象
+            generator = HarborManager()._get_obj_generator(bucket=bucket, obj=obj)
+            response = FileResponse(generator)
+            response['Content-Length'] = obj_size
+            response['ETag'] = obj.md5
+            if obj_size > 0:
+                end = max(obj_size - 1, 0)
+                response['Content-Range'] = f'bytes {0}-{end}/{obj_size}'
 
         last_modified = obj.upt if obj.upt else obj.ult
         filename = urlquote(obj.name)  # 中文文件名需要
@@ -252,14 +210,12 @@ class GetObjectHandler:
             obj.download_cound_increase()
 
         # multipart object check
-        part = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
-
-        if part:        #
-            response['ETag'] = part.obj_etag
-            response['x-amz-mp-parts-count'] = part.part_num
+        upload = MultipartUploadManager.get_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+        if upload:
+            response['ETag'] = upload.obj_etag
+            response['x-amz-mp-parts-count'] = upload.parts_count
         else:
             response['ETag'] = obj.md5
-        # response['ETag'] = obj.md5
 
         last_modified = obj.upt if obj.upt else obj.ult
         filename = urlquote(filename)  # 中文文件名需要
@@ -324,5 +280,3 @@ class GetObjectHandler:
         if isinstance(start, int) and isinstance(end, int) and start > end:
             return None, None
         return start, end
-
-

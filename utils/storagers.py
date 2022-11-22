@@ -9,7 +9,7 @@ from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
 
 from utils.oss.pyrados import FileWrapper, build_harbor_object
-from utils.md5 import FileMD5Handler
+from utils.md5 import FileMD5Handler, Sha256Handler
 
 
 def try_close_file(f):
@@ -347,14 +347,27 @@ class PartUploadToCephHandler(FileUploadToCephHandler):
     def __init__(self, request, using: str, pool_name='', obj_key='', offset=0):
         self.offset = offset
         super().__init__(request=request, using=using, pool_name=pool_name, obj_key=obj_key)
+        amz_content_sha256 = self.request.headers.get('X-Amz-Content-SHA256', None)
+        if amz_content_sha256 and amz_content_sha256 != 'UNSIGNED-PAYLOAD':
+            self.file_sha256_handler = Sha256Handler()
+        else:
+            self.file_sha256_handler = None
 
     def receive_data_chunk(self, raw_data, start):
         """
         :raises: RadosError
         """
-        start = self.offset
-        self.file_md5_handler.start_offset = start
-        super().receive_data_chunk(raw_data=raw_data, start=start)
-        self.offset += self.chunk_size
+        # self.file_md5_handler.start_offset = start
+        # super().receive_data_chunk(raw_data=raw_data, start=start)
+        self.file.write(raw_data, offset=self.offset)
+        self.offset += len(raw_data)
+        if self.file_md5_handler:
+            self.file_md5_handler.update(offset=start, data=raw_data)
 
+        if self.file_sha256_handler is not None:
+            self.file_sha256_handler.update(offset=start, data=raw_data)
 
+    def file_complete(self, file_size):
+        f = super().file_complete(file_size)
+        f.sha256_handler = self.file_sha256_handler
+        return f

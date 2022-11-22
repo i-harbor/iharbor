@@ -8,6 +8,6 @@ from .models import CephCluster
 @admin.register(CephCluster)
 class CephClusterAdmin(admin.ModelAdmin):
     list_display_links = ('name',)
-    list_display = ('id', 'name', 'cluster_name', 'user_name', 'disable_choice', 'pool_names', 'config_file',
-                    'keyring_file', 'modified_time', 'alias', 'remarks')
+    list_display = ('id', 'name', 'alias', 'cluster_name', 'user_name', 'disable_choice', 'pool_names', 'config_file',
+                    'keyring_file', 'modified_time', 'remarks')
     search_fields = ['name']

@@ -1540,18 +1540,17 @@ class HarborManager:
         """
         查询并删除可能存在的对象对应的s3多部分上传元数据
 
+        :return:
+            int     # 删除的数量
+
         :raises: Error
         """
         try:
-            s3_obj_multipart_data = MultipartUploadManager().is_s3_multipart_object(bucket=bucket, obj=obj)
+            count = MultipartUploadManager.delete_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
         except s3exceptions.S3Error as e:
-            raise exceptions.Error(str(e))
+            raise exceptions.Error(f'删除对象s3多部分上传元数据错误, {str(e)}')
 
-        if s3_obj_multipart_data:
-            try:
-                s3_obj_multipart_data.delete()
-            except s3exceptions.S3Error as e:
-                raise exceptions.Error('删除对象s3多部分上传元数据错误')
+        return count
 
 
 class FtpHarborManager:
