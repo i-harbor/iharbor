@@ -56,7 +56,7 @@ class MultipartUploadHandler:
         hm = HarborManager()
         # 查看桶和对象是否存在
         try:
-            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=key)
+            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=key, user=request.user)
             # 多部分上传表的查询：
             upload_data = MultipartUploadManager.get_multipart_upload(bucket=bucket, obj_key=key)
         except exceptions.S3Error as e:
@@ -73,11 +73,11 @@ class MultipartUploadHandler:
         upload_data = hm.create_multipart_data(
             bucket_id=bucket.id, bucket_name=bucket.name, obj=obj, obj_perms_code=obj_perms_code)
 
-        return self.create_multipart_upload_response_handler(
+        return self.create_multipart_upload_response(
             request=request, view=view, bucket_name=bucket.name, key=key, upload_id=upload_data.id)
 
     @staticmethod
-    def create_multipart_upload_response_handler(request, view, bucket_name, key, upload_id):
+    def create_multipart_upload_response(request, view, bucket_name, key, upload_id):
         view.set_renderer(request, renders.CusXMLRenderer(root_tag_name='InitiateMultipartUploadResult'))
         data = {
             'Bucket': bucket_name,
