@@ -3,9 +3,7 @@ from urllib import parse
 from django.utils import timezone
 from rest_framework.response import Response
 
-from buckets.models import BucketFileBase
 from utils.storagers import FileMD5Handler
-from utils.oss.pyrados import build_harbor_object
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions
 from s3.harbor import HarborManager
@@ -162,14 +160,16 @@ class CopyObjectHandler:
         """
         :return: response
         """
-        if bucket_name == source_bucket.name:
-            bucket, obj, obj_rados, created = self.create_object_metadata(
-                request=request, bucket_or_name=source_bucket, obj_key=obj_key)
-        else:
-            bucket, obj, obj_rados, created = self.create_object_metadata(
-                request=request, bucket_or_name=bucket_name, obj_key=obj_key)
+        x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
 
-        source_rados = self.build_object_rados(bucket=source_bucket, obj=source_object)
+        if bucket_name == source_bucket.name:
+            bucket, obj, obj_rados, created = s3object.create_object_metadata(
+                user=request.user, bucket_or_name=source_bucket, obj_key=obj_key, x_amz_acl=x_amz_acl)
+        else:
+            bucket, obj, obj_rados, created = s3object.create_object_metadata(
+                user=request.user, bucket_or_name=bucket_name, obj_key=obj_key, x_amz_acl=x_amz_acl)
+
+        source_rados = s3object.build_object_rados(bucket=source_bucket, obj=source_object)
         try:
             write_size, md5 = self.copy_object_rados(obj_rados=obj_rados, source_rados=source_rados)
             if write_size != source_object.obj_size:
@@ -227,52 +227,3 @@ class CopyObjectHandler:
             offset = offset + len(data)
 
         return offset, md5_handler.hex_md5
-
-    def create_object_metadata(self, request, bucket_or_name, obj_key: str):
-        """
-        :param request:
-        :param bucket_or_name: bucket name or bucket instance
-        :param obj_key: object key
-        :return: (
-            bucket,         # bucket instance
-            obj,            # object instance
-            rados,          # ceph rados of object
-            created         # True: new created; False: not new
-        )
-        :raises: S3Error
-        """
-        h_manager = HarborManager()
-        if isinstance(bucket_or_name, str):
-            bucket, obj, created = h_manager.create_empty_obj(
-                bucket_name=bucket_or_name, obj_path=obj_key, user=request.user)
-        else:
-            bucket = bucket_or_name
-            collection_name = bucket.get_bucket_table_name()
-            obj, created = h_manager.get_or_create_obj(collection_name, obj_key)
-
-        # 访问权限
-        acl_choices = {'private': BucketFileBase.SHARE_ACCESS_NO,
-                       'public-read': BucketFileBase.SHARE_ACCESS_READONLY,
-                       'public-read-write': BucketFileBase.SHARE_ACCESS_READWRITE}
-        x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
-        if x_amz_acl not in acl_choices:
-            raise exceptions.S3InvalidRequest(f'The value {x_amz_acl} of header "x-amz-acl" is not supported.')
-
-        if x_amz_acl != 'private':
-            share_code = acl_choices[x_amz_acl]
-            obj.set_shared(share=share_code)
-
-        rados = self.build_object_rados(bucket=bucket, obj=obj)
-        if created is False:  # 对象已存在，不是新建的
-            try:
-                h_manager._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)  # 重置对象大小
-            except Exception as exc:
-                raise exceptions.S3InvalidRequest(f'reset object error, {str(exc)}')
-
-        return bucket, obj, rados, created
-
-    @staticmethod
-    def build_object_rados(bucket, obj):
-        pool_name = bucket.get_pool_name()
-        obj_key = obj.get_obj_key(bucket.id)
-        return build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)

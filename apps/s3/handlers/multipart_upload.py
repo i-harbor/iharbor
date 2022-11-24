@@ -12,6 +12,7 @@ from s3.harbor import HarborManager, MultipartUploadManager
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions, renders, paginations, serializers
 from s3.models import MultipartUpload
+from s3.handlers.s3object import create_object_metadata
 from utils import storagers
 from utils.oss.pyrados import RadosError
 from rest_framework.response import Response
@@ -40,38 +41,25 @@ class MultipartUploadHandler:
     def create_multipart_upload(self, request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
         key = view.get_s3_obj_key(request)
-        # expires = request.headers.get('Expires', None)
-        # 访问权限  'public-read': BucketFileBase.SHARE_ACCESS_READONLY 公有读不赋予上传权限
-        acl_choices = {'private': BucketFileBase.SHARE_ACCESS_NO,
-                       'public-read-write': BucketFileBase.SHARE_ACCESS_READWRITE,
-                       'public-read': BucketFileBase.SHARE_ACCESS_READONLY
-                       }
         x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
-        if x_amz_acl not in acl_choices:
-            return view.exception_response(
-                request, exc=exceptions.S3InvalidRequest(
-                    message=gettext(f'The value {x_amz_acl} of header "x-amz-acl" is not supported.')))
+        # expires = request.headers.get('Expires', None)
 
-        obj_perms_code = acl_choices[x_amz_acl]
         hm = HarborManager()
         # 查看桶和对象是否存在
         try:
-            bucket, obj = hm.get_bucket_and_obj_or_dir(bucket_name=bucket_name, path=key, user=request.user)
+            bucket, obj, rados, created = create_object_metadata(
+                user=request.user, bucket_or_name=bucket_name, obj_key=key, x_amz_acl=x_amz_acl
+            )
             # 多部分上传表的查询：
-            upload_data = MultipartUploadManager.get_multipart_upload(bucket=bucket, obj_key=key)
+            upload = MultipartUploadManager.get_multipart_upload(bucket=bucket, obj_key=key)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
-        bucket_table = bucket.get_bucket_table_name()
-        if upload_data:
-            upload_data.delete()
-
-        obj = self.reset_or_create_object(bucket=bucket, obj=obj, hm=hm, key=key, bucket_table=bucket_table)
-        if obj.share != obj_perms_code:
-            obj.set_shared(share=obj_perms_code)
+        if upload:
+            upload.delete()
 
         upload_data = hm.create_multipart_data(
-            bucket_id=bucket.id, bucket_name=bucket.name, obj=obj, obj_perms_code=obj_perms_code)
+            bucket_id=bucket.id, bucket_name=bucket.name, obj=obj, obj_perms_code=obj.share)
 
         return self.create_multipart_upload_response(
             request=request, view=view, bucket_name=bucket.name, key=key, upload_id=upload_data.id)

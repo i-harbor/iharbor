@@ -62,14 +62,21 @@ class PutObjectHandler:
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def put_object(self, request, view: S3CustomGenericViewSet):
+        bucket_name = view.get_bucket_name(request)
+        obj_path_name = view.get_obj_path_name(request)
+        x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
+
         try:
-            bucket, obj, rados, created = s3object.create_object_metadata(request=request, view=view)
+            bucket, obj, rados, created = s3object.create_object_metadata(
+                user=request.user, bucket_or_name=bucket_name, obj_key=obj_path_name, x_amz_acl=x_amz_acl
+            )
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
         return self.put_object_handle(request=request, view=view, bucket=bucket, obj=obj, rados=rados, created=created)
 
-    def put_object_handle(self, request, view: S3CustomGenericViewSet, bucket, obj, rados, created):
+    @staticmethod
+    def put_object_handle(request, view: S3CustomGenericViewSet, bucket, obj, rados, created):
         pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
         uploader = FileUploadToCephHandler(using=bucket.ceph_using, request=request,

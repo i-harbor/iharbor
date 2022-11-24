@@ -1390,15 +1390,6 @@ class MultipartUploadManager:
 
         return upload
 
-    # @staticmethod
-    # def delete_multipart_upload(upload_id: str):
-    #     try:
-    #         MultipartUpload.objects.get(id=upload_id).delete()
-    #     except Exception as e:
-    #         raise exceptions.S3InternalError()
-    #
-    #     return True
-
     @staticmethod
     def list_multipart_uploads_queryset(bucket_id: int, bucket_name: str, prefix: str = None, delimiter: str = None):
         """

@@ -6,7 +6,6 @@ from utils.oss.pyrados import build_harbor_object
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager
 from s3 import exceptions
-from s3.viewsets import S3CustomGenericViewSet
 
 
 MULTIPART_UPLOAD_MAX_SIZE = getattr(settings, 'S3_MULTIPART_UPLOAD_MAX_SIZE', 2 * 1024 ** 3)        # default 2GB
@@ -125,29 +124,42 @@ def check_precondition_if_headers(headers: dict, last_modified, etag: str, key_m
             raise exceptions.S3NotModified()
 
 
-def create_object_metadata(request, view: S3CustomGenericViewSet):
-    bucket_name = view.get_bucket_name(request)
-    obj_path_name = view.get_obj_path_name(request)
-
+def create_object_metadata(user, bucket_or_name, obj_key: str, x_amz_acl: str):
+    """
+    :param user:
+    :param bucket_or_name: bucket name or bucket instance
+    :param obj_key: object key
+    :param x_amz_acl: 访问权限
+    :return: (
+        bucket,         # bucket instance
+        obj,            # object instance
+        rados,          # ceph rados of object
+        created         # True: new created; False: not new
+    )
+    :raises: S3Error
+    """
     # 访问权限
-    acl_choices = {'private': BucketFileBase.SHARE_ACCESS_NO, 'public-read': BucketFileBase.SHARE_ACCESS_READONLY,
+    acl_choices = {'private': BucketFileBase.SHARE_ACCESS_NO,
+                   'public-read': BucketFileBase.SHARE_ACCESS_READONLY,
                    'public-read-write': BucketFileBase.SHARE_ACCESS_READWRITE}
-    x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
+
     if x_amz_acl not in acl_choices:
         raise exceptions.S3InvalidRequest(f'The value {x_amz_acl} of header "x-amz-acl" is not supported.')
 
     h_manager = HarborManager()
-    bucket, obj, created = h_manager.create_empty_obj(bucket_name=bucket_name, obj_path=obj_path_name,
-                                                      user=request.user)
+    if isinstance(bucket_or_name, str):
+        bucket, obj, created = h_manager.create_empty_obj(
+            bucket_name=bucket_or_name, obj_path=obj_key, user=user)
+    else:
+        bucket = bucket_or_name
+        collection_name = bucket.get_bucket_table_name()
+        obj, created = h_manager.get_or_create_obj(collection_name, obj_key)
 
     if x_amz_acl != 'private':
         share_code = acl_choices[x_amz_acl]
         obj.set_shared(share=share_code)
 
-    pool_name = bucket.get_pool_name()
-    obj_key = obj.get_obj_key(bucket.id)
-
-    rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+    rados = build_object_rados(bucket=bucket, obj=obj)
     if created is False:  # 对象已存在，不是新建的
         try:
             h_manager._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)  # 重置对象大小
@@ -155,3 +167,9 @@ def create_object_metadata(request, view: S3CustomGenericViewSet):
             raise exceptions.S3InvalidRequest(f'reset object error, {str(exc)}')
 
     return bucket, obj, rados, created
+
+
+def build_object_rados(bucket, obj):
+    pool_name = bucket.get_pool_name()
+    obj_ceph_key = obj.get_obj_key(bucket.id)
+    return build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_ceph_key, obj_size=obj.si)
