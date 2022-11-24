@@ -32,6 +32,10 @@ class GetObjectHandler:
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            return view.exception_response(request, exc=exceptions.S3BucketLockRead())
+
         if fileobj is None:
             return view.exception_response(request, exceptions.S3NoSuchKey())
 

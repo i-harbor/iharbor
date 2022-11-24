@@ -385,6 +385,10 @@ class HarborManager:
         if not isinstance(bucket, Bucket):
             raise exceptions.S3NoSuchBucket('存储桶不存在')
 
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise exceptions.S3BucketLockWrite()
+
         table_name = bucket.get_bucket_table_name()
         dir1, bfm = self._get_obj_or_dir_and_bfm(table_name=table_name, path=path, name=dir_name)
 
@@ -549,6 +553,10 @@ class HarborManager:
         bucket = self.get_bucket(bucket_name, user=user)
         if not bucket:
             raise exceptions.S3NoSuchBucket('存储桶不存在')
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise exceptions.S3BucketLockWrite()
 
         collection_name = bucket.get_bucket_table_name()
         obj, created = self.get_or_create_obj(collection_name, obj_path)
@@ -809,6 +817,10 @@ class HarborManager:
 
         # 存储桶验证和获取桶对象
         bucket, fileobj = self.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
+
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise exceptions.S3BucketLockWrite()
 
         if fileobj is None:
             raise exceptions.S3NoSuchKey('文件对象不存在')
@@ -1199,8 +1211,14 @@ class HarborManager:
 
             deleted_objs like [{"Key": "xxx"},...]
             err_deleted_objs like [{"Code": "xxx", "Message": "xxx", "Key": "xxx"}, ]
+
+        :raises: S3Error
         """
         bucket = self.get_public_or_user_bucket(name=bucket_name, user=user)
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise exceptions.S3BucketLockWrite()
+
         table_name = bucket.get_bucket_table_name()
 
         deleted_objects = []

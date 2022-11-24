@@ -55,8 +55,6 @@ class ObjViewSet(S3CustomGenericViewSet):
 
         # ListParts
         if 'uploadId' in request.query_params:
-            # return self.exception_response(request, exceptions.S3NotImplemented(
-            #     message='ListParts not implemented'))
             return MultipartUploadHandler().list_parts(request, view=self)
 
         return GetObjectHandler().s3_get_object(request=request, view=self)
@@ -69,6 +67,7 @@ class ObjViewSet(S3CustomGenericViewSet):
         uploads = request.query_params.get('uploads', None)
         if uploads is not None:
             return MultipartUploadHandler().create_multipart_upload(request=request, view=self)
+
         upload_id = request.query_params.get('uploadId', None)
         if upload_id is not None:
             return MultipartUploadHandler().complete_multipart_upload(request=request, view=self, upload_id=upload_id)

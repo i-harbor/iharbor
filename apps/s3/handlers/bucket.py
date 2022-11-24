@@ -61,6 +61,10 @@ class BucketHandler:
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            return view.exception_response(request, exc=exceptions.S3BucketLockWrite())
+
         try:
             not_empty = qs.filter(fod=True).exists()        # 有无对象，忽略目录
         except Exception as e:

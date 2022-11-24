@@ -152,6 +152,10 @@ def create_object_metadata(user, bucket_or_name, obj_key: str, x_amz_acl: str):
             bucket_name=bucket_or_name, obj_path=obj_key, user=user)
     else:
         bucket = bucket_or_name
+        # 桶锁操作检查
+        if not bucket.lock_writeable():
+            raise exceptions.S3BucketLockWrite()
+
         collection_name = bucket.get_bucket_table_name()
         obj, created = h_manager.get_or_create_obj(collection_name, obj_key)
 

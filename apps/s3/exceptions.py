@@ -112,6 +112,18 @@ class S3AccessDenied(S3Error):
     default_status_code = 403
 
 
+class S3BucketLockWrite(S3Error):
+    default_message = '存储桶已锁定写操作.'
+    default_code = 'BucketLockWrite'
+    default_status_code = 403
+
+
+class S3BucketLockRead(S3Error):
+    default_message = '存储桶已锁定读操作.'
+    default_code = 'BucketLockRead'
+    default_status_code = 403
+
+
 class S3BucketNotEmpty(S3Error):
     default_message = 'The bucket is not empty.'
     default_code = 'BucketNotEmpty'
