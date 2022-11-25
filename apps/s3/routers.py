@@ -14,7 +14,8 @@ class NoDetailRouter(SimpleRouter):
                 'post': 'create',
                 'put': 'update',
                 'patch': 'partial_update',
-                'delete': 'destroy'
+                'delete': 'destroy',
+                'head': 'head'
             },
             name='{basename}-list',
             detail=False,
