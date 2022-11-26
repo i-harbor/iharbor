@@ -61,6 +61,10 @@ class GetObjectHandler:
                 return view.exception_response(
                     request, exceptions.S3InvalidArgument(message=_('无效的参数partNumber.')))
 
+            ranges = request.headers.get('range', None)
+            if ranges is not None:
+                return view.exception_response(request, exceptions.S3InvalidRange())
+
             response = GetObjectHandler.s3_get_object_dir(fileobj)
         elif part_number is not None:
             try:
@@ -116,7 +120,8 @@ class GetObjectHandler:
         response['ETag'] = f'"{EMPTY_HEX_MD5}"'
         response['Last-Modified'] = serializers.time_to_gmt(last_modified)
         response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
-        response['Content-Type'] = 'application/x-directory; charset=UTF-8'  # 注意格式, dir
+        # response['Content-Type'] = 'application/x-directory; charset=UTF-8'  # 注意格式, dir
+        response['Content-Type'] = 'binary/octet-stream'
         return response
 
     @staticmethod

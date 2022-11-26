@@ -2,6 +2,7 @@ from django.utils.translation import gettext as _
 from rest_framework.response import Response
 from rest_framework import status
 
+from utils.md5 import EMPTY_HEX_MD5
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions
 from s3.harbor import HarborManager, MultipartUploadManager
@@ -13,7 +14,8 @@ from .get_object import GetObjectHandler
 class HeadObjectHandler:
     def head_object(self, request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
-        obj_path_name = view.get_obj_path_name(request)
+        s3_obj_key = view.get_s3_obj_key(request)
+        obj_path_name = s3_obj_key.strip('/')
         part_number = request.query_params.get('partNumber', None)
         ranges = request.headers.get('range', None)
 
@@ -23,8 +25,9 @@ class HeadObjectHandler:
         # 存储桶验证和获取桶对象
         hm = HarborManager()
         try:
-            bucket, fileobj = hm.get_bucket_and_obj(bucket_name=bucket_name, obj_path=obj_path_name,
-                                                    user=request.user, all_public=True)
+            bucket, fileobj = hm.get_bucket_and_obj_or_dir(
+                bucket_name=bucket_name, path=obj_path_name, user=request.user, all_public=True
+            )
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
@@ -35,13 +38,34 @@ class HeadObjectHandler:
         if fileobj is None:
             return view.exception_response(request, exceptions.S3NoSuchKey())
 
+        if s3_obj_key.endswith('/'):  # dir
+            if fileobj.is_file():
+                return view.exception_response(request, exceptions.S3NoSuchKey())
+
+            is_dir = True
+        else:                          # object
+            if not fileobj.is_file():
+                return view.exception_response(request, exceptions.S3NoSuchKey())
+
+            is_dir = False
+
         # 是否有文件对象的访问权限
         try:
             has_object_access_permission(request=request, bucket=bucket, obj=fileobj)
         except exceptions.S3Error as e:
             return view.exception_response(request, e)
 
-        if part_number is not None or ranges is not None:
+        if is_dir:
+            if part_number is not None and part_number != '1':
+                return view.exception_response(
+                    request, exceptions.S3InvalidArgument(message=_('无效的参数partNumber.')))
+
+            ranges = request.headers.get('range', None)
+            if ranges is not None:
+                return view.exception_response(request, exceptions.S3InvalidRange())
+
+            response = self.s3_head_object_dir(fileobj)
+        elif part_number is not None or ranges is not None:
             if part_number:
                 try:
                     part_number = int(part_number)
@@ -183,4 +207,21 @@ class HeadObjectHandler:
         response['Last-Modified'] = serializers.time_to_gmt(last_modified)
         response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
         response['Content-Type'] = 'binary/octet-stream'  # 注意格式
+        return response
+
+    @staticmethod
+    def s3_head_object_dir(obj):
+        """
+        head的是一个目录
+        :return:
+            Response()
+        """
+        last_modified = obj.upt if obj.upt else obj.ult
+        response = Response(status=status.HTTP_200_OK)
+        response['Content-Length'] = 0
+        response['ETag'] = f'"{EMPTY_HEX_MD5}"'
+        response['Last-Modified'] = serializers.time_to_gmt(last_modified)
+        response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
+        # response['Content-Type'] = 'application/x-directory; charset=UTF-8'  # 注意格式, dir
+        response['Content-Type'] = 'binary/octet-stream'
         return response
