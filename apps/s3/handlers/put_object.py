@@ -50,9 +50,13 @@ class PutObjectHandler:
     @staticmethod
     def delete_dir(request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
-        dir_path_name = view.get_obj_path_name(request)
-        if not dir_path_name:
-            return view.exception_response(request, exceptions.S3InvalidSuchKey())
+
+        try:
+            dir_path_name = view.get_obj_path_name(request)
+            if not dir_path_name:
+                raise exceptions.S3InvalidSuchKey()
+        except exceptions.S3Error as exc:
+            return view.exception_response(request, exc=exc)
 
         try:
             HarborManager().rmdir(bucket_name=bucket_name, dirpath=dir_path_name, user=request.user)
@@ -63,10 +67,10 @@ class PutObjectHandler:
 
     def put_object(self, request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
-        obj_path_name = view.get_obj_path_name(request)
         x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
 
         try:
+            obj_path_name = view.get_obj_path_name(request)
             bucket, obj, rados, created = s3object.create_object_metadata(
                 user=request.user, bucket_or_name=bucket_name, obj_key=obj_path_name, x_amz_acl=x_amz_acl
             )

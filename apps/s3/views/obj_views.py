@@ -136,8 +136,6 @@ class ObjViewSet(S3CustomGenericViewSet):
         """
         upload_id = request.query_params.get('uploadId', None)
         if upload_id is not None:
-            # return self.exception_response(request, exceptions.S3NotImplemented(
-            #     message='ListParts not implemented'))
             return MultipartUploadHandler().abort_multipart_upload(request=request, view=self, upload_id=upload_id)
 
         key = self.get_s3_obj_key(request)

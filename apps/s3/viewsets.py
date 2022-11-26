@@ -109,8 +109,6 @@ class S3CustomGenericViewSet(GenericViewSet):
         if len(s3_key) > 1024:
             raise exceptions.S3KeyTooLongError()
 
-        S3CustomGenericViewSet.validate_object_key(key=s3_key)
-
         return s3_key
 
     def get_obj_path_name(self, request):
@@ -118,10 +116,12 @@ class S3CustomGenericViewSet(GenericViewSet):
         获取对象路径
 
         :return: str
-        :raises: S3KeyTooLongError
+        :raises: S3KeyTooLongError, S3InvalidSuchKey
         """
         key = self.get_s3_obj_key(request)
-        return key.strip('/')
+        key = key.strip('/')
+        S3CustomGenericViewSet.validate_object_key(key=key)
+        return key
 
     @staticmethod
     def validate_object_key(key: str):

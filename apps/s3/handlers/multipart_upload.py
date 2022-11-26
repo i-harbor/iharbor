@@ -7,7 +7,6 @@ from django.utils.translation import gettext
 from django.db import transaction
 from rest_framework.exceptions import UnsupportedMediaType
 
-from buckets.models import BucketFileBase
 from s3.harbor import HarborManager, MultipartUploadManager
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions, renders, paginations, serializers
@@ -40,13 +39,13 @@ class MultipartUploadHandler:
 
     def create_multipart_upload(self, request, view: S3CustomGenericViewSet):
         bucket_name = view.get_bucket_name(request)
-        key = view.get_s3_obj_key(request)
         x_amz_acl = request.headers.get('X-Amz-Acl', 'private').lower()
         # expires = request.headers.get('Expires', None)
 
         hm = HarborManager()
         # 查看桶和对象是否存在
         try:
+            key = view.get_obj_path_name(request)
             bucket, obj, rados, created = create_object_metadata(
                 user=request.user, bucket_or_name=bucket_name, obj_key=key, x_amz_acl=x_amz_acl
             )
