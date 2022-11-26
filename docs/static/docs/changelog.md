@@ -5,6 +5,7 @@
 * S3接口检查存储桶的读写锁；  
 * 科技云通行证jwt中单位为null时，创建用户失败，无法完成认证的bug修复。
 * 固定依赖包cryptography==37.0.4版本，解决ftp启动错误的问题;
+* drf路由map没有head方法，无法访问S3 HeadObject问题修复;
 
 ## v0.8.0
 * 添加s3 app，添加s3兼容接口;   
