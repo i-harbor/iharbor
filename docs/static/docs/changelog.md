@@ -1,3 +1,9 @@
+## v0.8.2
+2022-11-27
+* s3接口检查object key的有效性优化;   
+* s3接口GetObject、HeadObject兼容key是个目录的优化；  
+* S3接口ListObjects，ListObjectsV2返回结果中未包含prefix目录对象的问题修复； 
+
 ## v0.8.1
 2022-11-24
 * S3多部分上传接口重构，其他与多部分有关的S3接口优化和bug修复;
