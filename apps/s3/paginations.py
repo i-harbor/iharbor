@@ -42,7 +42,7 @@ class ListObjectsV2CursorPagination(CursorPagination):
 
     start_after_query_param = 'start-after'  # used if no cursor_query_param
 
-    def __init__(self, context):
+    def __init__(self, context, prefix_obj=None):
         """
         :param context:
             {
@@ -55,12 +55,19 @@ class ListObjectsV2CursorPagination(CursorPagination):
             raise ValueError('Invalid param "context", one of "bucket" and "bucket_name" needs to be in it.')
 
         self._context = context
+        self.prefix_obj = prefix_obj  # 目录在s3中是一个空对象, 是否第一页添加prefix目录
 
     def paginate_queryset(self, queryset, request, view=None):
         self.request = request
         data = super().paginate_queryset(queryset=queryset, request=request, view=view)
         if data is None:
             data = []
+
+        marker = self.get_continuation_token(request=request)
+        if marker is None:  # 第一页
+            if self.prefix_obj is not None:
+                data.insert(0, self.prefix_obj)
+
         self._data = data
         self.key_count = len(self._data)
         return self._data
@@ -80,8 +87,11 @@ class ListObjectsV2CursorPagination(CursorPagination):
             for obj in data:
                 if obj.is_file():
                     objects.append(obj)
+                elif self.prefix_obj and obj.id == self.prefix_obj.id:     # prefix目录要当成对象
+                    objects.append(obj)
                 else:
                     dirs.append(obj)
+
             self.objects = objects
             self.dirs = dirs
 
@@ -93,7 +103,7 @@ class ListObjectsV2CursorPagination(CursorPagination):
             na = d.na
             if not na.endswith(delimiter):
                 na = na + delimiter
-            common_prefix.append({"Prefix": na})
+            common_prefix.append({"Prefix": parse.quote(na)})
 
         return common_prefix
 
@@ -208,17 +218,24 @@ class ListObjectsV1CursorPagination(CursorPagination):
     max_page_size = 1000
     offset_cutoff = 0
 
-    def __init__(self, context=None):
+    def __init__(self, context=None, prefix_obj=None):
         """
         :param context: {}
         """
         self._context = context if context else {}
+        self.prefix_obj = prefix_obj      # 目录在s3中是一个空对象, 是否第一页添加prefix目录
 
     def paginate_queryset(self, queryset, request, view=None):
         self.request = request
         data = super().paginate_queryset(queryset=queryset, request=request, view=view)
         if data is None:
             data = []
+
+        marker = self.get_marker(request=request)
+        if marker is None:  # 第一页
+            if self.prefix_obj is not None:
+                data.insert(0, self.prefix_obj)
+
         self._data = data
         self.key_count = len(self._data)
         return self._data
@@ -238,8 +255,11 @@ class ListObjectsV1CursorPagination(CursorPagination):
             for obj in data:
                 if obj.is_file():
                     objects.append(obj)
+                elif self.prefix_obj and obj.id == self.prefix_obj.id:     # prefix目录要当成对象
+                    objects.append(obj)
                 else:
                     dirs.append(obj)
+
             self.objects = objects
             self.dirs = dirs
 
@@ -254,7 +274,8 @@ class ListObjectsV1CursorPagination(CursorPagination):
             na = d.na
             if not na.endswith(delimiter):
                 na = na + delimiter
-            common_prefix.append({"Prefix": na})
+
+            common_prefix.append({"Prefix": parse.quote(na)})
 
         return common_prefix
 

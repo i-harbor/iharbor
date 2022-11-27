@@ -1,3 +1,5 @@
+import urllib.parse
+
 from django.utils.timezone import utc
 from rest_framework import serializers
 
@@ -45,8 +47,11 @@ class ObjectListSerializer(serializers.Serializer):
     @staticmethod
     def get_key(obj):
         if obj.is_dir():
-            return obj.na + '/'
-        return obj.na
+            key = obj.na + '/'
+        else:
+            key = obj.na
+
+        return urllib.parse.quote(key)
 
     @staticmethod
     def get_last_modified(obj):

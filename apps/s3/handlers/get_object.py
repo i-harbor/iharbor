@@ -1,7 +1,7 @@
 import re
+import urllib.parse
 
 from django.http import FileResponse
-from django.utils.http import urlquote
 from django.utils.translation import gettext as _
 from rest_framework import status
 
@@ -182,7 +182,7 @@ class GetObjectHandler:
                 response['Content-Range'] = f'bytes {0}-{end}/{obj_size}'
 
         last_modified = obj.upt if obj.upt else obj.ult
-        filename = urlquote(obj.name)  # 中文文件名需要
+        filename = urllib.parse.quote(obj.name)  # 中文文件名需要
         response['Last-Modified'] = serializers.time_to_gmt(last_modified)
         response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传
         response['Content-Type'] = 'binary/octet-stream'  # 注意格式
@@ -227,7 +227,7 @@ class GetObjectHandler:
             response['ETag'] = obj.md5
 
         last_modified = obj.upt if obj.upt else obj.ult
-        filename = urlquote(filename)  # 中文文件名需要
+        filename = urllib.parse.quote(filename)  # 中文文件名需要
 
         response['Last-Modified'] = serializers.time_to_gmt(last_modified)
         response['Accept-Ranges'] = 'bytes'  # 接受类型，支持断点续传

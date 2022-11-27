@@ -1,3 +1,5 @@
+import urllib.parse
+
 from django.utils.translation import gettext
 from rest_framework.response import Response
 
@@ -37,12 +39,13 @@ class ListObjectsHandler:
             return self.list_objects_v1_no_match(view=view, request=request, prefix=prefix, delimiter=delimiter,
                                                  bucket_name=bucket_name)
 
-        paginator = paginations.ListObjectsV1CursorPagination()
+        # 添加prefix目录到返回结果中，目录在s3中是一个空对象
+        paginator = paginations.ListObjectsV1CursorPagination(prefix_obj=obj)
         max_keys = paginator.get_page_size(request=request)
         ret_data = {
             'IsTruncated': 'false',  # can not use bool
             'Name': bucket_name,
-            'Prefix': prefix,
+            'Prefix': urllib.parse.quote(prefix),
             'EncodingType': 'url',
             'MaxKeys': max_keys,
             'Delimiter': delimiter
@@ -56,7 +59,6 @@ class ListObjectsHandler:
             objs_qs = hm.list_dir_queryset(bucket=bucket, dir_obj=obj)
             paginator.paginate_queryset(objs_qs, request=request)
             objs, _ = paginator.get_objects_and_dirs()
-
             serializer = serializers.ObjectListWithOwnerSerializer(objs, many=True, context={'user': request.user})
             data = paginator.get_paginated_data(common_prefixes=True, delimiter=delimiter)
             ret_data.update(data)
@@ -95,7 +97,7 @@ class ListObjectsHandler:
         data = paginator.get_paginated_data(delimiter='')
         data['Contents'] = serializer.data
         data['Name'] = bucket_name
-        data['Prefix'] = prefix
+        data['Prefix'] = urllib.parse.quote(prefix),
         data['EncodingType'] = 'url'
 
         view.set_renderer(request, renders.ListObjectsV1XMLRenderer())
@@ -108,7 +110,7 @@ class ListObjectsHandler:
         ret_data = {
             'IsTruncated': 'false',     # can not use bool True, need use string
             'Name': bucket_name,
-            'Prefix': prefix,
+            'Prefix': urllib.parse.quote(prefix),
             'EncodingType': 'url',
             'MaxKeys': max_keys,
             'KeyCount': 0
@@ -146,12 +148,13 @@ class ListObjectsHandler:
             return self.list_objects_v2_no_match(
                 request=request, view=view, prefix=prefix, delimiter=delimiter, bucket=bucket)
 
-        paginator = paginations.ListObjectsV2CursorPagination(context={'bucket': bucket})
+        # 添加prefix目录到返回结果中，目录在s3中是一个空对象
+        paginator = paginations.ListObjectsV2CursorPagination(context={'bucket': bucket}, prefix_obj=obj)
         max_keys = paginator.get_page_size(request=request)
         ret_data = {
             'IsTruncated': 'false',     # can not use bool
             'Name': bucket_name,
-            'Prefix': prefix,
+            'Prefix': urllib.parse.quote(prefix),
             'EncodingType': 'url',
             'MaxKeys': max_keys,
             'Delimiter': delimiter
@@ -239,7 +242,7 @@ class ListObjectsHandler:
         ret_data = {
             'IsTruncated': 'false',     # can not use True
             'Name': bucket_name,
-            'Prefix': prefix,
+            'Prefix': urllib.parse.quote(prefix),
             'EncodingType': 'url',
             'MaxKeys': max_keys,
             'KeyCount': 0
