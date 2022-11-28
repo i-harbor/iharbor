@@ -55,7 +55,12 @@ class ListObjectsV2CursorPagination(CursorPagination):
             raise ValueError('Invalid param "context", one of "bucket" and "bucket_name" needs to be in it.')
 
         self._context = context
-        self.prefix_obj = prefix_obj  # 目录在s3中是一个空对象, 是否第一页添加prefix目录
+        if prefix_obj is not None and prefix_obj.id > 0:    # id=0是虚拟的根目录
+            _obj = prefix_obj
+        else:
+            _obj = None
+
+        self.prefix_obj = _obj  # 目录在s3中是一个空对象, 是否第一页添加prefix目录
 
     def paginate_queryset(self, queryset, request, view=None):
         self.request = request
@@ -233,7 +238,12 @@ class ListObjectsV1CursorPagination(CursorPagination):
         :param context: {}
         """
         self._context = context if context else {}
-        self.prefix_obj = prefix_obj      # 目录在s3中是一个空对象, 是否第一页添加prefix目录
+        if prefix_obj is not None and prefix_obj.id > 0:    # id=0是虚拟的根目录
+            _obj = prefix_obj
+        else:
+            _obj = None
+
+        self.prefix_obj = _obj      # 目录在s3中是一个空对象, 是否第一页添加prefix目录
 
     def paginate_queryset(self, queryset, request, view=None):
         self.request = request

@@ -47,7 +47,7 @@ class ListObjectsHandler:
             return self.list_objects_v1_no_match(view=view, request=request, prefix=prefix, delimiter=delimiter,
                                                  bucket_name=bucket_name)
 
-        # 添加prefix目录到返回结果中，目录在s3中是一个空对象
+        # 添加prefix目录到返回结果中，目录在s3中是一个空对象，根目录是个虚拟的对象，不返回
         paginator = paginations.ListObjectsV1CursorPagination(prefix_obj=obj)
         max_keys = paginator.get_page_size(request=request)
         ret_data = {
