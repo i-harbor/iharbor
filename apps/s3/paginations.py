@@ -97,17 +97,27 @@ class ListObjectsV2CursorPagination(CursorPagination):
 
         return self.objects, self.dirs
 
-    def get_common_prefix(self, delimiter='/'):
+    def get_common_prefix(self, encoding_type: str, delimiter='/'):
+        if encoding_type == 'url':
+            need_encoding = True
+        else:
+            need_encoding = False
+
         common_prefix = []
         for d in self.dirs:
             na = d.na
             if not na.endswith(delimiter):
                 na = na + delimiter
-            common_prefix.append({"Prefix": parse.quote(na)})
+
+            prefix = na
+            if need_encoding:
+                prefix = parse.quote(na)
+
+            common_prefix.append({"Prefix": prefix})
 
         return common_prefix
 
-    def get_paginated_data(self, common_prefixes=False, delimiter='/'):
+    def get_paginated_data(self, encoding_type: str, common_prefixes=False, delimiter='/'):
         is_truncated = 'true' if self.has_next else 'false'
         data = {
             'IsTruncated': is_truncated,  # can not use True
@@ -123,7 +133,7 @@ class ListObjectsV2CursorPagination(CursorPagination):
             data['NextContinuationToken'] = nc_token
 
         if common_prefixes:
-            data['CommonPrefixes'] = self.get_common_prefix(delimiter)
+            data['CommonPrefixes'] = self.get_common_prefix(delimiter=delimiter, encoding_type=encoding_type)
 
         return data
 
@@ -265,7 +275,12 @@ class ListObjectsV1CursorPagination(CursorPagination):
 
         return self.objects, self.dirs
 
-    def get_common_prefix(self, delimiter='/'):
+    def get_common_prefix(self, encoding_type: str, delimiter='/'):
+        if encoding_type == 'url':
+            need_encoding = True
+        else:
+            need_encoding = False
+
         if not delimiter:
             delimiter = '/'
 
@@ -275,11 +290,15 @@ class ListObjectsV1CursorPagination(CursorPagination):
             if not na.endswith(delimiter):
                 na = na + delimiter
 
-            common_prefix.append({"Prefix": parse.quote(na)})
+            prefix = na
+            if need_encoding:
+                prefix = parse.quote(na)
+
+            common_prefix.append({"Prefix": prefix})
 
         return common_prefix
 
-    def get_paginated_data(self, common_prefixes=False, delimiter=None):
+    def get_paginated_data(self, encoding_type: str, common_prefixes=False, delimiter=None):
         is_truncated = 'true' if self.has_next else 'false'
         data = {
             'IsTruncated': is_truncated,  # can not use True
@@ -295,7 +314,7 @@ class ListObjectsV1CursorPagination(CursorPagination):
                 data['NextMarker'] = next_marker
 
         if common_prefixes:
-            data['CommonPrefixes'] = self.get_common_prefix(delimiter)
+            data['CommonPrefixes'] = self.get_common_prefix(delimiter=delimiter, encoding_type=encoding_type)
 
         return data
 

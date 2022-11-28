@@ -44,14 +44,20 @@ class ObjectListSerializer(serializers.Serializer):
     Size = serializers.SerializerMethodField(method_name='get_size')
     StorageClass = serializers.SerializerMethodField(method_name='get_storage_class')
 
-    @staticmethod
-    def get_key(obj):
+    def __init__(self, instance=None, encoding_type: str = '', **kwargs):
+        self.encoding_type = encoding_type
+        super().__init__(instance=instance, **kwargs)
+
+    def get_key(self, obj):
         if obj.is_dir():
             key = obj.na + '/'
         else:
             key = obj.na
 
-        return urllib.parse.quote(key)
+        if self.encoding_type == 'url':
+            return urllib.parse.quote(key)
+
+        return key
 
     @staticmethod
     def get_last_modified(obj):
