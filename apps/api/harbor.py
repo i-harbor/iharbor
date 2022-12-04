@@ -1174,6 +1174,7 @@ class HarborManager:
             raise exceptions.HarborError(message='删除对象rados数据时错误')
 
         # 尝试删除多部分上传元数据
+        fileobj.id = old_id
         if not fileobj.is_dir():
             try:
                 self.try_delete_s3_multipart_metadata(bucket=bucket, obj=fileobj)
