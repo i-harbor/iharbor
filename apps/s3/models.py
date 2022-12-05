@@ -164,10 +164,10 @@ class MultipartUpload(models.Model):
         is_insert, arr = MultipartPartsManager().insert_part_into_list(part=part_info, parts_arr=parts_arr)
 
         update_fields = ['part_json']
-        # 第一块
-        if part_info['PartNumber'] == 1:
-            self.chunk_size = part_info['Size']
-            update_fields.append('chunk_size')
+        # 第一块 并发会修正偏移量，导致后续合并无法找到位置
+        # if part_info['PartNumber'] == 1:
+        #     self.chunk_size = part_info['Size']
+        #     update_fields.append('chunk_size')
 
         self.save(update_fields=update_fields)
         return is_insert
@@ -237,15 +237,38 @@ class MultipartUpload(models.Model):
 
         return 0
 
-    def set_completed(self, obj_etag: str):
+    def set_completed(self, obj_etag: str, obj=None, chunk_size=None):
         self.obj_etag = obj_etag
         self.last_modified = timezone.now()
         self.status = MultipartUpload.UploadStatus.COMPLETED.value
+        update_fields = []
         try:
+            if obj:
+                self.obj_id = obj.id
+                self.key_md5 = obj.na_md5
+                self.chunk_size = chunk_size
+                update_fields.extend(['obj_id', 'key_md5', 'chunk_size'])
+
             self.parts_count = self.get_parts_length()
-            self.save(update_fields=['obj_etag', 'last_modified', 'status', 'parts_count'])
+            update_fields.extend(['obj_etag', 'last_modified', 'status', 'parts_count'])
+            self.save(update_fields=update_fields)
         except Exception as e:
             raise exceptions.S3Error(message=f'更新多部分上传记录错误, {str(e)}')
+
+    def set_uploading(self):
+        """
+        正在多部分上传
+        :return:
+            True or False
+        """
+        if self.status != MultipartUpload.UploadStatus.UPLOADING.value:
+            self.status = MultipartUpload.UploadStatus.UPLOADING.value
+            try:
+                self.save(update_fields=['status'])
+            except Exception as e:
+                return False
+
+        return True
 
     def get_range_parts(self, part_number_marker: int, max_parts: int):
         """
@@ -280,13 +303,39 @@ class MultipartUpload(models.Model):
         if part_number == 1:
             return 0
 
-        if self.chunk_size > 0:
-            chunk_size = self.chunk_size
-        else:
-            part = self.get_part_by_index(index=0)
-            if isinstance(part, dict) and part['PartNumber'] == 1:
-                chunk_size = part['Size']
-            else:
-                raise exceptions.S3Error(message='必须先上传第一个part。')
+        # if self.chunk_size > 0:
+        #     chunk_size = self.chunk_size
+        # else:
+        #     part = self.get_part_by_index(index=0)
+        #     if isinstance(part, dict) and part['PartNumber'] == 1:
+        #         chunk_size = part['Size']
+        #     else:
+        #         raise exceptions.S3Error(message='必须先上传第一个part。')
+        if not self.chunk_size:
+            raise exceptions.S3Error(message='上传过程记录块大小失败。')
 
-        return (part_number - 1) * chunk_size
+        return (part_number - 1) * self.chunk_size
+
+    def set_upload_first_part_and_chunk_size(self, part_number: int, chunk_size: int):
+        """
+        第一块上传设置块参数 chunk_size
+        标记第一块上传，用以合并是检查
+        """
+        self.part_json['UploadFirstPart'] = part_number
+        self.chunk_size = chunk_size
+        try:
+            self.save(update_fields=['chunk_size', 'part_json'])
+        except Exception as e:
+            raise exceptions.S3Error(message=f'更新多部分上传第一块上传记录错误, {str(e)}')
+
+    def get_upload_first_part_info(self):
+        """
+        获取上传第一块的信息，用于合并使的判断（文件的最后一块是不是第一个上传）
+        """
+        parts_length = self.get_parts_length()
+        last_part = self.get_part_by_index(parts_length - 1)  # 获取最后一块的信息
+
+        if last_part['Size'] != self.chunk_size:
+            return None
+        return last_part
+

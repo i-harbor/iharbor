@@ -8,6 +8,7 @@ from django.db import transaction
 from rest_framework.exceptions import UnsupportedMediaType
 
 from s3.harbor import HarborManager, MultipartUploadManager
+from s3.responses import IterResponse
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions, renders, paginations, serializers
 from s3.models import MultipartUpload
@@ -99,10 +100,21 @@ class MultipartUploadHandler:
             return view.exception_response(request, exc=exceptions.S3CompleteMultipartAlreadyInProgress())
 
         # 确保编号为1的块先上传
-        if part_num != 1:
-            if not upload.is_part1_uploaded:
-                return view.exception_response(request, exc=exceptions.S3InvalidRequest(
-                    message=gettext('The part numbered 1 must be uploaded first.')))
+        # if part_num != 1:
+        #     if not upload.is_part1_uploaded:
+        #         return view.exception_response(request, exc=exceptions.S3InvalidRequest(
+        #             message=gettext('The part numbered 1 must be uploaded first.')))
+
+        # 检查是否设置 chunk_size 如果 多个同时获取的uplod实例，chunk_size 为None
+        if not upload.chunk_size:
+            try:
+                with transaction.atomic(using='metadata'):
+                    # 加锁
+                    upload = MultipartUpload.objects.select_for_update().get(id=upload.id)
+                    upload.chunk_size = content_length
+                    upload.save(update_fields=['chunk_size'])
+            except Exception as e:
+                raise exceptions.S3Error(f'更新多部分上传元数据块大小错误，{str(e)}')
 
         try:
             return self.upload_part_handle(
@@ -182,6 +194,7 @@ class MultipartUploadHandler:
         try:
             with transaction.atomic(using='metadata'):
                 upload = MultipartUpload.objects.select_for_update().get(id=upload.id)
+                # 不更新 chunk_size
                 upload.insert_part(part)
                 # 写入part后，对象大小增大了才需更新
                 new_obj_size = offset + part_size
@@ -237,17 +250,77 @@ class MultipartUploadHandler:
                 upload=upload, complete_parts=complete_parts_dict,
                 complete_numbers=complete_part_numbers
             )
-            upload.set_completed(obj_etag=obj_etag)
         except exceptions.S3Error as e:
             # 如果组合失败 返回原状态
-            upload.status = MultipartUpload.UploadStatus.UPLOADING.value
-            upload.save(update_fields=['status'])
+            upload.set_uploading()
             return view.exception_response(request, exc=e)
 
-        location = request.build_absolute_uri()
-        data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
-        view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListMultipartUploadsResult'))
-        return Response(data=data, status=status.HTTP_200_OK)
+        # 检查最后一块是否先上传
+        get_upload_first_part = upload.get_upload_first_part_info()
+
+        if not get_upload_first_part:
+            try:
+                upload.set_completed(obj_etag=obj_etag)
+            except exceptions.S3Error as e:
+                upload.set_uploading()
+                return view.exception_response(request, exc=e)
+
+            location = request.build_absolute_uri()
+            data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
+            view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListMultipartUploadsResult'))
+            return Response(data=data, status=status.HTTP_200_OK)
+
+        return self.complete_multipart_upload_handle(get_upload_first_part=get_upload_first_part, view=view,
+                                                     upload=upload, hm=hm, bucket=bucket, obj_key=obj_key,
+                                                     old_obj=obj, complete_numbers=complete_part_numbers,
+                                                     obj_etag=obj_etag, request=request)
+
+    def complete_multipart_upload_handle(self, get_upload_first_part, view, upload, hm, bucket, obj_key, old_obj,
+                                         complete_numbers, obj_etag, request):
+        """
+        处理 s3fs 最后一块先上传
+        :param view:
+        :param get_upload_first_part: 第一个上传的块信息
+        :param upload: 上传实例
+        :param hm: HarborManager()
+        :param bucket: 桶实例
+        :param obj_key: 当前上传的 key
+        :param old_obj: 当前上传的对象
+        :param complete_numbers: 当前对象的块编号列表
+        :param obj_etag: 当前对象的etag
+        :param request:
+        :return:
+        """
+
+        get_list_first_part = upload.get_part_by_index(0)  # 通过索引查询到块编号 1 的块信息
+        get_upload_first_part_size = get_upload_first_part['Size']
+        get_list_first_part_size = get_list_first_part['Size']
+
+        if get_upload_first_part_size > get_list_first_part_size:
+            # 文件有 空隙
+            # 文件实际大小
+            new_obj_size = get_list_first_part_size * (get_upload_first_part['PartNumber'] - 1) + \
+                           get_upload_first_part_size
+            hmanage = MultipartUploadManager()
+            # 创建新的文件对象
+            bucket, obj, created, obj_rados = hmanage.handle_new_create_obj(hm=hm,
+                                                                            bucket=bucket, old_obj_key=obj_key,
+                                                                            upload=upload, new_obj_size=new_obj_size,
+                                                                            user=request.user)
+
+            return IterResponse(iter_content=hmanage.handler_complete_iter(bucket=bucket, obj=obj, old_obj=old_obj,
+                                                                           complete_numbers=complete_numbers,
+                                                                           new_chunk_size=get_list_first_part_size,
+                                                                           new_obj_size=new_obj_size,
+                                                                           old_chunk_size=get_upload_first_part_size,
+                                                                           upload=upload, hm=hm, new_obj_rados=obj_rados,
+                                                                           obj_etag=obj_etag, request=request))
+
+        elif get_upload_first_part_size < get_list_first_part_size:
+            # 文件块出现覆盖
+            return view.exception_response(request, exc=exceptions.S3InvalidPart(
+                message=gettext('The last block is uploaded first, and the merge cannot '
+                                'be completed. Please upload again.')))
 
     def abort_multipart_upload(self, request, view: S3CustomGenericViewSet, upload_id):
         bucket_name = view.get_bucket_name(request)
@@ -293,7 +366,7 @@ class MultipartUploadHandler:
 
         if delimiter is not None:
             return view.exception_response(request, exc=exceptions.S3InvalidArgument(
-                                               message=gettext('参数“delimiter”暂时不支持')))
+                message=gettext('参数“delimiter”暂时不支持')))
 
         try:
             bucket = HarborManager().get_public_or_user_bucket(name=bucket_name, user=request.user)
