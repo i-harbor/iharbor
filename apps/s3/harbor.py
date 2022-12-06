@@ -697,10 +697,12 @@ class HarborManager:
         # 更新文件上传时间
         old_ult = obj.ult
         old_size = obj.si
+        old_md5 = obj.md5
 
         obj.ult = timezone.now()
         obj.si = 0
-        if not obj.do_save(update_fields=['ult', 'si']):
+        obj.md5 = ''
+        if not obj.do_save(update_fields=['ult', 'si', 'md5']):
             raise exceptions.S3InternalError('修改对象元数据失败')
 
         # multipart parts delete need
@@ -710,7 +712,8 @@ class HarborManager:
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size
-            obj.do_save(update_fields=['ult', 'si'])
+            obj.md5 = old_md5
+            obj.do_save(update_fields=['ult', 'si', 'md5'])
             raise exceptions.S3InternalError('rados文件对象删除失败')
 
         return True
