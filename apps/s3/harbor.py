@@ -1581,7 +1581,7 @@ class MultipartUploadManager:
         :param user:
         :return:
         """
-        new_key = old_obj_key + '_' + str(upload.get_obj_upload_timestamp())
+        new_key = old_obj_key + '_' + str(time.time() * 1000) + '_' + upload.id
         bucket, obj, created = hm.create_empty_obj(
             bucket_name=bucket.name, obj_path=new_key, user=user)
 

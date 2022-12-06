@@ -334,8 +334,15 @@ class MultipartUpload(models.Model):
         """
         parts_length = self.get_parts_length()
         last_part = self.get_part_by_index(parts_length - 1)  # 获取最后一块的信息
+        first_part = self.get_part_by_index(0)  # 获取第一块信息
 
+        # 如果最后一块大小和chunk_size不相等，说明最后一块不是第一个上传的
         if last_part['Size'] != self.chunk_size:
             return None
+
+        # 如果最后一块大小和第一块大小相等，说明文件分块大小都一样
+        if last_part['Size'] == first_part['Size']:
+            return None
+
         return last_part
 
