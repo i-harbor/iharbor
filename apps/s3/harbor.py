@@ -1,4 +1,3 @@
-import time
 from collections import OrderedDict
 
 from django.utils import timezone
@@ -6,16 +5,14 @@ from django.db.models import Case, Value, When, F
 from django.db.models import BigIntegerField
 from django.utils.translation import gettext
 from django.conf import settings
-from rest_framework import status
-from rest_framework.response import Response
 
 from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
-from utils.md5 import S3ObjectMultipartETagHandler, FileMD5Handler
-from utils.oss.pyrados import build_harbor_object
+from utils.md5 import S3ObjectMultipartETagHandler
+from utils.oss.pyrados import build_harbor_object, HarborObject
 from utils.storagers import PathParser
 from api import exceptions as iharbor_errors
-from . import exceptions, renders
+from . import exceptions
 from .models import MultipartUpload
 
 
@@ -861,9 +858,7 @@ class HarborManager:
         if size == 0:
             return bytes(), obj.si
 
-        obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = self.get_obj_rados(bucket=bucket, obj=obj)
         ok, chunk = rados.read(offset=offset, size=size)
         if not ok:
             raise exceptions.S3InternalError('文件块读取失败')
@@ -926,10 +921,7 @@ class HarborManager:
                     do something
         :raise S3Error
         """
-        # 读取文件对象生成器
-        obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = HarborManager.get_obj_rados(bucket=bucket, obj=obj)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
     def get_write_generator(self, bucket_name: str, obj_path: str, user=None):
@@ -1277,7 +1269,6 @@ class HarborManager:
 
         :raises: S3Error
         """
-        obj_key = obj.get_obj_key(bucket.id)
         old_id = obj.id
 
         if obj.is_dir():
@@ -1300,9 +1291,8 @@ class HarborManager:
         if obj.is_dir():
             return True
 
-        pool_name = bucket.get_pool_name()
-        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
-        ok, _ = ho.delete()
+        rados = HarborManager.get_obj_rados(bucket=bucket, obj=obj)
+        ok, _ = rados.delete()
         if not ok:
             # 恢复元数据
             obj.id = old_id
@@ -1328,13 +1318,19 @@ class HarborManager:
 
     # s3 重置对象
     def s3_reset_upload(self, bucket, obj):
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=str(obj.id),
-                                    obj_size=obj.si)
+        rados = self.get_obj_rados(bucket=bucket, obj=obj)
         # 重置对象
         try:
             self._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)  # 重置对象大小
         except exceptions.S3Error as e:
             raise exceptions.S3InternalError('重置对象元数据失败')
+
+    @staticmethod
+    def get_obj_rados(bucket: Bucket, obj) -> HarborObject:
+        obj_raods_key = obj.get_obj_key(bucket.id)
+        obj_rados = build_harbor_object(
+            using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=obj_raods_key, obj_size=obj.si)
+        return obj_rados
 
 
 class MultipartUploadManager:
@@ -1572,182 +1568,3 @@ class MultipartUploadManager:
             pre_num = part_num
 
         return parts_dict, numbers
-
-    def handle_new_create_obj(self, hm, bucket, old_obj_key, upload, new_obj_size, user):
-        """
-        合并时有空洞的文件，创建新的文件
-        :param hm: HarborManager()
-        :param bucket: 桶实例
-        :param old_obj_key: 上的对象视为旧的
-        :param upload:
-        :param new_obj_size: 对象的实际大小
-        :param user:
-        :return:
-        """
-        new_key = old_obj_key + '_' + str(time.time() * 1000) + '_' + upload.id
-        bucket, obj, created = hm.create_empty_obj(
-            bucket_name=bucket.name, obj_path=new_key, user=user)
-
-        # bucketid_newobjid
-        obj_raods_key = obj.get_obj_key(bucket.id)
-        obj_rados = build_harbor_object(using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=obj_raods_key,
-                                        obj_size=new_obj_size)
-
-        return bucket, obj, created, obj_rados
-
-    def handler_complete_iter(self, bucket, obj, old_obj, complete_numbers, new_obj_size, new_chunk_size, upload,
-                              old_chunk_size, hm, new_obj_rados, obj_etag, request):
-        """
-
-        :param new_obj_rados:
-        :param bucket: 桶
-        :param obj: 新对象
-        :param old_obj: 旧对象
-        :param complete_numbers: 块编号列表
-        :param new_obj_size: 新对象大小
-        :param new_chunk_size: 新块的大小
-        :param upload:
-        :param old_chunk_size: 旧块的大小
-        :param hm:
-        :param obj_etag:
-        :param request:
-        :return:
-        """
-        white_space_bytes = b' '
-        xml_declaration_bytes = b'<?xml version="1.0" encoding="UTF-8"?>\n'
-        start_time = time.time()
-        yielded_doctype = False
-
-        md5_handler = FileMD5Handler()
-
-        # 重命名
-        rename = old_obj.na
-        rename_name = old_obj.name
-
-        try:
-            for num in complete_numbers:
-                part = upload.get_part_by_index(num - 1)
-                for yield_bool in self.save_part_to_object_iter(part=part, chunk_size=new_chunk_size,
-                                                                old_chunk_size=old_chunk_size, bucket=bucket,
-                                                                old_obj=old_obj, new_obj_roads=new_obj_rados,
-                                                                md5_handler=md5_handler, hm=hm):
-                    if yield_bool is None:
-                        if not yielded_doctype:
-                            yielded_doctype = True
-                            yield xml_declaration_bytes
-                        else:
-                            yield white_space_bytes
-                    elif yield_bool is True:
-                        break
-                    elif isinstance(yield_bool, exceptions.S3Error):
-                        raise yield_bool
-
-                    # 间隔不断发送空字符防止客户端连接超时
-                    now_time = time.time()
-                    if now_time - start_time < 10:
-                        start_time = now_time
-                        continue
-                    if not yielded_doctype:
-                        yielded_doctype = True
-                        yield xml_declaration_bytes
-                    else:
-                        yield white_space_bytes
-        except exceptions.S3Error as e:
-            upload.set_uploading()  # 上传状态改变
-            obj.do_delete()  # 新对象删除
-            content = renders.CommonXMLRenderer(root_tag_name='Error',
-                                                with_xml_declaration=not yielded_doctype).render(e)
-            yield content.encode(encoding='utf-8')
-
-        except Exception as e:
-            upload.set_uploading()
-            obj.do_delete()
-            content = renders.CommonXMLRenderer(root_tag_name='Error', with_xml_declaration=not yielded_doctype
-                                                ).render(exceptions.S3InternalError(message=str(e)).err_data())
-            yield content.encode(encoding='utf-8')
-
-        # 删除旧的元数据
-        try:
-            # hm.do_delete_obj_or_dir(bucket=bucket, obj=old_obj)
-            old_obj.do_delete()
-        except exceptions.S3Error as e:
-            raise exceptions.S3Error(message=f'删除旧对象和多部分上传元数据失败，{str(e)}')
-
-        # 对象重命名
-        try:
-            obj, bucket = self.new_obj_rename(hm=hm, bucket=bucket, obj=obj, rename=rename_name)
-            obj.si = new_obj_size
-            obj.md5 = md5_handler.hex_md5
-            obj.save(update_fields=['si', 'md5'])
-        except exceptions.S3Error as e:
-            raise exceptions.S3Error(message=f'重命名对象失败，{str(e)}')
-
-        # s3多部数据修改
-        try:
-            upload.set_completed(obj_etag=obj_etag, obj=obj, chunk_size=new_chunk_size)
-        except exceptions.S3Error as e:
-            raise exceptions.S3Error(message=str(e))
-
-        location = request.build_absolute_uri()
-        data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
-        content = renders.CommonXMLRenderer(root_tag_name='CompleteMultipartUploadResult',
-                                            with_xml_declaration=not yielded_doctype).render(data)
-        yield content.encode(encoding='utf-8')
-
-    def save_part_to_object_iter(self, part, chunk_size, old_chunk_size, bucket, old_obj,
-                                 new_obj_roads, md5_handler, hm):
-        """
-
-        :param old_obj: 旧对象
-        :param bucket: 桶实例
-        :param old_chunk_size: 旧对象设置的块大小
-        :param hm:
-        :param md5_handler: 计算md5
-        :param new_obj_roads: 新对象 rodas
-        :param part: 旧数据块信息
-        :param chunk_size: 要写入块数据的大小
-        :return:
-        """
-        # 旧块数据偏移量
-        old_offset = (part['PartNumber'] - 1) * old_chunk_size
-        old_end = old_offset + part['Size'] - 1
-        # 新块的偏移量
-        offset = (part['PartNumber'] - 1) * chunk_size
-
-        start_time = time.time()
-        # generator = self.get_old_part_data(hm=hm, bucket=bucket, old_obj=old_obj, offset=old_offset, end=old_end)
-        generator = hm._get_obj_generator(bucket=bucket, obj=old_obj, offset=old_offset, end=old_end)
-
-        for data in generator:
-            if not data:
-                break
-
-            ok, msg = new_obj_roads.write(offset=offset, data_block=data)
-            if not ok:
-                ok, msg = new_obj_roads.write(offset=offset, data_block=data)
-
-            if not ok:
-                yield exceptions.S3InternalError(extend_msg=msg)
-
-            md5_handler.update(offset=offset, data=data)
-            offset = offset + len(data)
-
-            now_time = time.time()
-            if now_time - start_time < 10:
-                start_time = now_time
-                continue
-
-            yield None
-
-        # if md5_handler.hex_md5 != part['ETag']:
-        #     yield exceptions.S3InternalError()
-
-        yield True
-
-    def new_obj_rename(self, hm, bucket, obj, rename):
-        try:
-            obj, bucket = hm.move_rename(bucket_name=bucket.name, obj_path=obj.na, rename=rename)
-        except exceptions.S3Error as e:
-            raise e
-
-        return obj, bucket

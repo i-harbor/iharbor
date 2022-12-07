@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from pytz import utc
 
@@ -6,6 +7,8 @@ from django.conf import settings
 from django.utils.translation import gettext
 from django.db import transaction
 from rest_framework.exceptions import UnsupportedMediaType
+from rest_framework import status
+from rest_framework.response import Response
 
 from s3.harbor import HarborManager, MultipartUploadManager
 from s3.responses import IterResponse
@@ -14,11 +17,10 @@ from s3 import exceptions, renders, paginations, serializers
 from s3.models import MultipartUpload
 from s3.handlers.s3object import create_object_metadata
 from utils import storagers
-from utils.oss.pyrados import RadosError
-from rest_framework.response import Response
-from rest_framework import status
-
+from utils.oss.pyrados import RadosError, build_harbor_object, HarborObject
 from utils.storagers import try_close_file
+from utils.md5 import FileMD5Handler
+
 
 GMT_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
 
@@ -99,26 +101,16 @@ class MultipartUploadHandler:
         if upload.status != MultipartUpload.UploadStatus.UPLOADING.value:
             return view.exception_response(request, exc=exceptions.S3CompleteMultipartAlreadyInProgress())
 
-        # 确保编号为1的块先上传
-        # if part_num != 1:
-        #     if not upload.is_part1_uploaded:
-        #         return view.exception_response(request, exc=exceptions.S3InvalidRequest(
-        #             message=gettext('The part numbered 1 must be uploaded first.')))
-
-        # 检查是否设置 chunk_size 如果 多个同时获取的uplod实例，chunk_size 为None
-        if not upload.chunk_size:
-            try:
-                with transaction.atomic(using='metadata'):
-                    # 加锁
-                    upload = MultipartUpload.objects.select_for_update().get(id=upload.id)
-                    upload.chunk_size = content_length
-                    upload.save(update_fields=['chunk_size'])
-            except Exception as e:
-                raise exceptions.S3Error(f'更新多部分上传元数据块大小错误，{str(e)}')
+        # 并发上传，确保已经设置了分块大小
+        try:
+            now_upload = self.ensure_upload_chunk_size_set(
+                upload=upload, part_number=part_num, part_size=content_length)
+        except exceptions.S3Error as exc:
+            return view.exception_response(request=request, exc=exc)
 
         try:
             return self.upload_part_handle(
-                request=request, view=view, upload=upload, part_number=part_num,
+                request=request, view=view, upload=now_upload, part_number=part_num,
                 bucket=bucket, obj_key=obj_key
             )
         except Exception as exc:
@@ -255,10 +247,8 @@ class MultipartUploadHandler:
             upload.set_uploading()
             return view.exception_response(request, exc=e)
 
-        # 检查最后一块是否先上传
-        get_upload_first_part = upload.get_upload_first_part_info()
-
-        if not get_upload_first_part:
+        # 分块大小正确，块的存储偏移量是正确的
+        if upload.is_chunk_size_equal_part1_size():
             try:
                 upload.set_completed(obj_etag=obj_etag)
             except exceptions.S3Error as e:
@@ -269,58 +259,48 @@ class MultipartUploadHandler:
             data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
             view.set_renderer(request, renders.CommonXMLRenderer(root_tag_name='ListMultipartUploadsResult'))
             return Response(data=data, status=status.HTTP_200_OK)
+        # 块离散存储（先上传的最后一个块，且大于分块大小），需要移动块
+        elif upload.is_chunk_size_gt_part1_size():
+            return self.complete_multipart_upload_handle(
+                view=view, upload=upload, hm=hm, bucket=bucket,
+                old_obj=obj, obj_etag=obj_etag, request=request
+            )
 
-        return self.complete_multipart_upload_handle(get_upload_first_part=get_upload_first_part, view=view,
-                                                     upload=upload, hm=hm, bucket=bucket, obj_key=obj_key,
-                                                     old_obj=obj, complete_numbers=complete_part_numbers,
-                                                     obj_etag=obj_etag, request=request)
+        return view.exception_response(request, exc=exceptions.S3InvalidPart(
+            message=gettext('The last block is uploaded first, and the merge cannot '
+                            'be completed. Please upload again.')))
 
-    def complete_multipart_upload_handle(self, get_upload_first_part, view, upload, hm, bucket, obj_key, old_obj,
-                                         complete_numbers, obj_etag, request):
+    def complete_multipart_upload_handle(
+            self, view: S3CustomGenericViewSet, request, upload, hm, bucket, old_obj, obj_etag):
         """
         处理 s3fs 最后一块先上传
+
         :param view:
-        :param get_upload_first_part: 第一个上传的块信息
+        :param request:
         :param upload: 上传实例
         :param hm: HarborManager()
         :param bucket: 桶实例
-        :param obj_key: 当前上传的 key
         :param old_obj: 当前上传的对象
-        :param complete_numbers: 当前对象的块编号列表
         :param obj_etag: 当前对象的etag
-        :param request:
-        :return:
+        :return: Response
         """
 
-        get_list_first_part = upload.get_part_by_index(0)  # 通过索引查询到块编号 1 的块信息
-        get_upload_first_part_size = get_upload_first_part['Size']
-        get_list_first_part_size = get_list_first_part['Size']
+        part1 = upload.get_part_by_index(0)  # 通过索引查询到块编号 1 的块信息
+        new_chunk_size = part1['Size']
 
-        if get_upload_first_part_size > get_list_first_part_size:
-            # 文件有 空隙
-            # 文件实际大小
-            new_obj_size = get_list_first_part_size * (get_upload_first_part['PartNumber'] - 1) + \
-                           get_upload_first_part_size
-            hmanage = MultipartUploadManager()
-            # 创建新的文件对象
-            bucket, obj, created, obj_rados = hmanage.handle_new_create_obj(hm=hm,
-                                                                            bucket=bucket, old_obj_key=obj_key,
-                                                                            upload=upload, new_obj_size=new_obj_size,
-                                                                            user=request.user)
+        # 创建新的文件对象
+        try:
+            bucket, obj, created, obj_rados = self._create_temp_obj(
+                hm=hm, bucket=bucket, old_obj_key=old_obj.na)
+        except exceptions.S3Error as exc:
+            return view.exception_response(request=request, exc=exc)
 
-            return IterResponse(iter_content=hmanage.handler_complete_iter(bucket=bucket, obj=obj, old_obj=old_obj,
-                                                                           complete_numbers=complete_numbers,
-                                                                           new_chunk_size=get_list_first_part_size,
-                                                                           new_obj_size=new_obj_size,
-                                                                           old_chunk_size=get_upload_first_part_size,
-                                                                           upload=upload, hm=hm, new_obj_rados=obj_rados,
-                                                                           obj_etag=obj_etag, request=request))
-
-        elif get_upload_first_part_size < get_list_first_part_size:
-            # 文件块出现覆盖
-            return view.exception_response(request, exc=exceptions.S3InvalidPart(
-                message=gettext('The last block is uploaded first, and the merge cannot '
-                                'be completed. Please upload again.')))
+        return IterResponse(iter_content=self.handler_complete_iter(
+            bucket=bucket, obj=obj, old_obj=old_obj,
+            new_chunk_size=new_chunk_size,
+            old_chunk_size=upload.chunk_size,
+            upload=upload, hm=hm, new_obj_rados=obj_rados,
+            obj_etag=obj_etag, request=request))
 
     def abort_multipart_upload(self, request, view: S3CustomGenericViewSet, upload_id):
         bucket_name = view.get_bucket_name(request)
@@ -584,4 +564,246 @@ class MultipartUploadHandler:
         else:
             obj, _ = hm.get_or_create_obj(table_name=bucket_table, obj_path_name=key)
 
+        return obj
+
+    @staticmethod
+    def ensure_upload_chunk_size_set(upload: MultipartUpload, part_number: int, part_size: int) -> MultipartUpload:
+        """
+        确保多部分上传分块大小设置，要加锁，防止并发问题
+        只能设置一次，合并时要检查，以防止先上传了最后一个块，导致计算块偏移量不对，上传对象不对的问题。
+
+        :raises: S3Error
+        """
+        if upload.chunk_size > 0:
+            return upload
+
+        try:
+            with transaction.atomic('metadata'):
+                now_upload = MultipartUpload.objects.select_for_update().filter(id=upload.id).first()
+                # 加锁后检查是否已设置了分块大小，已设置直接返回，不能再修改。因为其他块可能已经按此分块大小上传了
+                if now_upload.chunk_size > 0:
+                    return now_upload
+
+                if part_size < 5 * 1024 ** 2:  # 多部分除了最后一块不得小于5MiB；当前是最后一个块先上传的
+                    if part_number != 1:    # 块编号为1时允许，多部分上传只有一个块的情况
+                        raise exceptions.S3EntityTooSmall(message=gettext('最后一个part不得先上传。'))
+
+                now_upload.chunk_size = part_size
+                now_upload.save(update_fields=['chunk_size'])
+                return now_upload
+        except Exception as e:
+            raise exceptions.S3Error(message=str(e))
+
+    @staticmethod
+    def _create_temp_obj(hm: HarborManager, bucket, old_obj_key: str):
+        """
+        合并有空洞的文件时，创建新的临时文件
+
+        :param hm: HarborManager()
+        :param bucket: 桶实例
+        :param old_obj_key: 上的对象视为旧的
+        :return:
+            bucket, obj, created, obj_rados
+
+        :raises: S3Error
+        """
+        ts = int(time.time() * 1000)
+        new_key = old_obj_key + '_' + str(ts) + '_temp'
+        obj, created = hm.get_or_create_obj(table_name=bucket.get_bucket_table_name(), obj_path_name=new_key)
+        obj_rados = hm.get_obj_rados(bucket=bucket, obj=obj)
+        return bucket, obj, created, obj_rados
+
+    def handler_complete_iter(
+            self, bucket, obj, old_obj, new_chunk_size,
+            upload: MultipartUpload, old_chunk_size, hm: HarborManager,
+            new_obj_rados: HarborObject, obj_etag, request
+    ):
+        """
+
+        :param new_obj_rados:
+        :param bucket: 桶
+        :param obj: 新对象
+        :param old_obj: 旧对象
+        :param new_chunk_size: 新的分块大小
+        :param upload:
+        :param old_chunk_size: 旧的分块大小
+        :param hm:
+        :param obj_etag:
+        :param request:
+        :return:
+        """
+        white_space_bytes = b' '
+        xml_declaration_bytes = b'<?xml version="1.0" encoding="UTF-8"?>\n'
+        start_time = time.time()
+        yielded_doctype = False
+
+        md5_handler = FileMD5Handler()
+        try:
+            old_obj_rados = hm.get_obj_rados(bucket=bucket, obj=old_obj)
+            parts = upload.get_parts()
+            for part in parts:
+                for yield_bool in self.save_part_to_object_iter(
+                        part=part, chunk_size=new_chunk_size, old_chunk_size=old_chunk_size,
+                        old_obj_rados=old_obj_rados, new_obj_rados=new_obj_rados, md5_handler=md5_handler
+                ):
+                    if yield_bool is None:
+                        if not yielded_doctype:
+                            yielded_doctype = True
+                            yield xml_declaration_bytes
+                        else:
+                            yield white_space_bytes
+                    elif yield_bool is True:
+                        break
+                    elif isinstance(yield_bool, exceptions.S3Error):
+                        raise yield_bool
+
+                    # 间隔不断发送空字符防止客户端连接超时
+                    now_time = time.time()
+                    if now_time - start_time < 10:
+                        start_time = now_time
+                        continue
+                    if not yielded_doctype:
+                        yielded_doctype = True
+                        yield xml_declaration_bytes
+                    else:
+                        yield white_space_bytes
+
+            # ----块数据写入新的对象完成，删除旧的缓存的对象元数据和ceph rados数据，重命名新的对象 ----
+            if not yielded_doctype:
+                yielded_doctype = True
+                yield xml_declaration_bytes
+            else:
+                yield white_space_bytes
+
+            # 删除旧的元数据
+            old_obj_id = old_obj.id
+            try:
+                old_obj.delete()
+            except Exception as e:
+                # 清除新的临时对象
+                self._try_clear_temp_obj_and_rados(obj=obj, rados=new_obj_rados)
+                raise exceptions.S3Error(message=f'删除旧对象和多部分上传元数据失败，{str(e)}')
+
+            # 对象重命名
+            try:
+                new_obj_size = upload.calculate_obj_size_by_chunk_size(chunk_size=new_chunk_size)
+                self._update_obj_key_size(
+                    obj=obj, new_key=old_obj.na, name=old_obj.name,
+                    new_obj_size=new_obj_size, obj_md5=md5_handler.hex_md5
+                )
+            except Exception as e:
+                # 清除新的临时对象
+                self._try_clear_temp_obj_and_rados(obj=obj, rados=new_obj_rados)
+                old_obj.id = old_obj_id
+                old_obj.do_save()       # 恢复旧对象元数据
+                raise exceptions.S3Error(message=f'重命名对象失败，{str(e)}')
+
+            # s3多部数据修改
+            try:
+                upload.set_completed(obj_etag=obj_etag, obj=obj, chunk_size=new_chunk_size)
+            except exceptions.S3Error as e:
+                raise exceptions.S3Error(message=str(e))
+
+            location = request.build_absolute_uri()
+            data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
+            content = renders.CommonXMLRenderer(root_tag_name='CompleteMultipartUploadResult',
+                                                with_xml_declaration=not yielded_doctype).render(data)
+            yield content.encode(encoding='utf-8')
+        except exceptions.S3Error as e:
+            upload.set_uploading()  # 上传状态改变
+            content = renders.CommonXMLRenderer(root_tag_name='Error',
+                                                with_xml_declaration=not yielded_doctype).render(e)
+            yield content.encode(encoding='utf-8')
+
+        except Exception as e:
+            upload.set_uploading()
+            content = renders.CommonXMLRenderer(root_tag_name='Error', with_xml_declaration=not yielded_doctype
+                                                ).render(exceptions.S3InternalError(message=str(e)).err_data())
+            yield content.encode(encoding='utf-8')
+
+    @staticmethod
+    def save_part_to_object_iter(
+            part, chunk_size, old_chunk_size,
+            new_obj_rados: HarborObject, old_obj_rados: HarborObject, md5_handler):
+        """
+        把一个part数据写入新对象
+
+        :param old_chunk_size: 旧对象设置的块大小
+        :param md5_handler: 计算md5
+        :param new_obj_rados: 新对象 rados
+        :param old_obj_rados: 旧对象 rados
+        :param part: 旧数据块信息
+        :param chunk_size: 要写入块数据的大小
+        :return:
+            yield True          # success
+            yield None          # continue
+            yield S3Error       # error
+        """
+        # 旧块数据偏移量
+        old_offset = (part['PartNumber'] - 1) * old_chunk_size
+        old_end = old_offset + part['Size'] - 1
+        # 新块的偏移量
+        offset = (part['PartNumber'] - 1) * chunk_size
+
+        start_time = time.time()
+        generator = old_obj_rados.read_obj_generator(offset=old_offset, end=old_end)
+
+        for data in generator:
+            if not data:
+                break
+
+            ok, msg = new_obj_rados.write(offset=offset, data_block=data)
+            if not ok:
+                ok, msg = new_obj_rados.write(offset=offset, data_block=data)
+
+            if not ok:
+                yield exceptions.S3InternalError(extend_msg=msg)
+
+            md5_handler.update(offset=offset, data=data)
+            offset = offset + len(data)
+
+            now_time = time.time()
+            if now_time - start_time < 10:
+                start_time = now_time
+                continue
+
+            yield None
+
+        yield True
+
+    @staticmethod
+    def _try_clear_temp_obj_and_rados(obj, rados: HarborObject):
+        """
+        尽可能清除临时创建的对象和ceph rados数据
+
+        :return:
+            True    # success
+            False   # failed
+        """
+        ret = True
+        # 删除元数据
+        try:
+            obj.do_delete()
+        except Exception:
+            ret = False
+
+        try:
+            rados.delete()
+        except Exception:
+            ret = False
+
+        return ret
+
+    @staticmethod
+    def _update_obj_key_size(obj, new_obj_size: int, new_key: str, name: str, obj_md5: str):
+        """
+        更新对象元数据，key，size，md5
+        """
+        obj.na = new_key
+        obj.na_md5 = ''
+        obj.name = name
+        obj.si = new_obj_size
+        obj.md5 = obj_md5
+        obj.upt = timezone.now()
+        obj.save(update_fields=['na', 'name', 'na_md5', 'si', 'md5', 'upt'])
         return obj

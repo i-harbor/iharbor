@@ -162,14 +162,7 @@ class MultipartUpload(models.Model):
         """
         parts_arr = self.get_parts()
         is_insert, arr = MultipartPartsManager().insert_part_into_list(part=part_info, parts_arr=parts_arr)
-
-        update_fields = ['part_json']
-        # 第一块 并发会修正偏移量，导致后续合并无法找到位置
-        # if part_info['PartNumber'] == 1:
-        #     self.chunk_size = part_info['Size']
-        #     update_fields.append('chunk_size')
-
-        self.save(update_fields=update_fields)
+        self.save(update_fields=['part_json'])
         return is_insert
 
     @property
@@ -303,14 +296,6 @@ class MultipartUpload(models.Model):
         if part_number == 1:
             return 0
 
-        # if self.chunk_size > 0:
-        #     chunk_size = self.chunk_size
-        # else:
-        #     part = self.get_part_by_index(index=0)
-        #     if isinstance(part, dict) and part['PartNumber'] == 1:
-        #         chunk_size = part['Size']
-        #     else:
-        #         raise exceptions.S3Error(message='必须先上传第一个part。')
         if not self.chunk_size:
             raise exceptions.S3Error(message='上传过程记录块大小失败。')
 
@@ -328,21 +313,39 @@ class MultipartUpload(models.Model):
         except Exception as e:
             raise exceptions.S3Error(message=f'更新多部分上传第一块上传记录错误, {str(e)}')
 
-    def get_upload_first_part_info(self):
+    def is_chunk_size_equal_part1_size(self):
         """
-        获取上传第一块的信息，用于合并使的判断（文件的最后一块是不是第一个上传）
+        所有已上传part所使用分块大小是否和编号1的part大小一致
+
+        * 上传的分块大小和编号1的part大小一致，块的存储偏移量是正确的，不需要处理,（包含所有块大小都一致的情况）。
+
+        :return:
+            True    # 上传的分块大小不是按最后一个块确定的
+            False   # 上传的分块大小可能是按最后一个块大小确定的
         """
-        parts_length = self.get_parts_length()
-        last_part = self.get_part_by_index(parts_length - 1)  # 获取最后一块的信息
         first_part = self.get_part_by_index(0)  # 获取第一块信息
+        return self.chunk_size == first_part['Size']
 
-        # 如果最后一块大小和chunk_size不相等，说明最后一块不是第一个上传的
-        if last_part['Size'] != self.chunk_size:
-            return None
+    def is_chunk_size_gt_part1_size(self):
+        """
+        所有已上传part所使用分块大小是否大于编号1的part大小
 
-        # 如果最后一块大小和第一块大小相等，说明文件分块大小都一样
-        if last_part['Size'] == first_part['Size']:
-            return None
+        * 上传的分块大小大于编号1的part大小，块是离散（块之间有空隙）存储的
 
-        return last_part
+        :return:
+            True    # 上传的分块大小大于编号1的part大小，块是离散（块之间有空隙）存储的
+            False   # 小于
+        """
+        first_part = self.get_part_by_index(0)  # 获取第一块信息
+        return self.chunk_size > first_part['Size']
 
+    def calculate_obj_size_by_chunk_size(self, chunk_size: int):
+        """
+        通过最后一个块和给定的分块大小计算对象大小
+        """
+        parts = self.get_parts()
+        if not parts:
+            return 0
+
+        last_part = parts[-1]
+        return (last_part['PartNumber'] - 1) * chunk_size + last_part['Size']
