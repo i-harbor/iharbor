@@ -342,7 +342,7 @@ class PartUploadToCephHandler(FileUploadToCephHandler):
     multipart upload直接存储到ceph上传处理器
     """
     chunk_size = 5 * 2 ** 20    # 5MB
-    max_size_upload_limit = 2 * 1024 ** 3       # 2GB
+    max_size_upload_limit = 5 * 1024 ** 3       # 5GB
 
     def __init__(self, request, using: str, pool_name='', obj_key='', offset=0):
         self.offset = offset
@@ -357,8 +357,6 @@ class PartUploadToCephHandler(FileUploadToCephHandler):
         """
         :raises: RadosError
         """
-        # self.file_md5_handler.start_offset = start
-        # super().receive_data_chunk(raw_data=raw_data, start=start)
         self.file.write(raw_data, offset=self.offset)
         self.offset += len(raw_data)
         if self.file_md5_handler:

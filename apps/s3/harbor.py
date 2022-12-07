@@ -16,6 +16,10 @@ from . import exceptions
 from .models import MultipartUpload
 
 
+S3_MULTIPART_UPLOAD_MAX_SIZE = getattr(settings, 'S3_MULTIPART_UPLOAD_MAX_SIZE', 5 * 1024 ** 3)     # default 5GB
+S3_MULTIPART_UPLOAD_MIN_SIZE = getattr(settings, 'S3_MULTIPART_UPLOAD_MIN_SIZE', 5 * 1024 ** 2)     # default 5MB
+
+
 class HarborManager:
     """
     操作harbor对象数据和元数据管理接口封装
@@ -1520,7 +1524,7 @@ class MultipartUploadManager:
 
             c_part = complete_parts[num]
             # part最小限制，最后一个part除外
-            if part['Size'] < settings.S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:
+            if part['Size'] < S3_MULTIPART_UPLOAD_MIN_SIZE and num != last_part_number:
                 raise exceptions.S3EntityTooSmall()
 
             # 块大小检测

@@ -473,7 +473,7 @@ USE_S3_API = True
 # 当USE_S3_API=True开启S3接口服务时，必须配置一个域名
 S3_SERVER_HTTP_HOST_NAME = ['s3.obs.cstcloud.cn', 's3.obs.casearth.cn']
 
-S3_MULTIPART_UPLOAD_MAX_SIZE = 2 * 1024 ** 3        # 2GB
+S3_MULTIPART_UPLOAD_MAX_SIZE = 5 * 1024 ** 3        # 5GB
 S3_MULTIPART_UPLOAD_MIN_SIZE = 5 * 1024 ** 2        # 5MB
 
 

@@ -3,21 +3,20 @@ from datetime import datetime
 from pytz import utc
 
 from django.utils import timezone
-from django.conf import settings
 from django.utils.translation import gettext
 from django.db import transaction
 from rest_framework.exceptions import UnsupportedMediaType
 from rest_framework import status
 from rest_framework.response import Response
 
-from s3.harbor import HarborManager, MultipartUploadManager
+from s3.harbor import HarborManager, MultipartUploadManager, S3_MULTIPART_UPLOAD_MAX_SIZE
 from s3.responses import IterResponse
 from s3.viewsets import S3CustomGenericViewSet
 from s3 import exceptions, renders, paginations, serializers
 from s3.models import MultipartUpload
 from s3.handlers.s3object import create_object_metadata
 from utils import storagers
-from utils.oss.pyrados import RadosError, build_harbor_object, HarborObject
+from utils.oss.pyrados import RadosError, HarborObject
 from utils.storagers import try_close_file
 from utils.md5 import FileMD5Handler
 
@@ -77,7 +76,7 @@ class MultipartUploadHandler:
         return Response(data=data, status=status.HTTP_200_OK)
 
     def upload_part(self, request, view: S3CustomGenericViewSet):
-        # 先上传第一块， 合并检查块大小，创建多部md5, 合并时 计算块数量，
+
         bucket_name = view.get_bucket_name(request)
         content_length = request.headers.get('Content-Length', 0)
         part_num = request.query_params.get('partNumber', None)
@@ -538,7 +537,7 @@ class MultipartUploadHandler:
         if content_length == 0:
             raise exceptions.S3EntityTooSmall()
 
-        if content_length > settings.S3_MULTIPART_UPLOAD_MAX_SIZE:
+        if content_length > S3_MULTIPART_UPLOAD_MAX_SIZE:
             raise exceptions.S3EntityTooLarge()
 
         try:
