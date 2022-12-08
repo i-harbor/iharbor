@@ -1295,6 +1295,7 @@ class HarborManager:
         if obj.is_dir():
             return True
 
+        obj.id = old_id  # obj为None的情况
         rados = HarborManager.get_obj_rados(bucket=bucket, obj=obj)
         ok, _ = rados.delete()
         if not ok:
