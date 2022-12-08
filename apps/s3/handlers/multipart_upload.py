@@ -618,6 +618,9 @@ class MultipartUploadHandler:
             new_obj_rados: HarborObject, obj_etag, request
     ):
         """
+        合并过程大文件耗时很长，合并过程中，先发送xml文件声明内容，
+        之后再不断向客户端发送“空格” 防止与客户端连接超时中断，
+        最后根据合并结果发送"成功"或者“错误”的xml内容
 
         :param new_obj_rados:
         :param bucket: 桶
@@ -691,10 +694,10 @@ class MultipartUploadHandler:
                     new_obj_size=new_obj_size, obj_md5=md5_handler.hex_md5
                 )
             except Exception as e:
+                old_obj.id = old_obj_id
+                old_obj.do_save()  # 恢复旧对象元数据
                 # 清除新的临时对象
                 self._try_clear_temp_obj_and_rados(obj=obj, rados=new_obj_rados)
-                old_obj.id = old_obj_id
-                old_obj.do_save()       # 恢复旧对象元数据
                 raise exceptions.S3Error(message=f'重命名对象失败，{str(e)}')
 
             # s3多部数据修改
@@ -702,6 +705,15 @@ class MultipartUploadHandler:
                 upload.set_completed(obj_etag=obj_etag, obj=obj, chunk_size=new_chunk_size)
             except exceptions.S3Error as e:
                 raise exceptions.S3Error(message=str(e))
+
+            if not yielded_doctype:
+                yielded_doctype = True
+                yield xml_declaration_bytes
+            else:
+                yield white_space_bytes
+
+            # 删除旧对象的ceph数据
+            old_obj_rados.delete()
 
             location = request.build_absolute_uri()
             data = {'Location': location, 'Bucket': bucket.name, 'Key': obj.na, 'ETag': obj_etag}
