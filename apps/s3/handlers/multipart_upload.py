@@ -552,20 +552,6 @@ class MultipartUploadHandler:
         return content_length, part_num
 
     @staticmethod
-    def reset_or_create_object(bucket, obj, hm, key, bucket_table):
-
-        if obj:
-            # 重置对象
-            try:
-                hm.s3_reset_upload(bucket=bucket, obj=obj)
-            except exceptions.S3Error as e:
-                raise exceptions.S3InternalError()
-        else:
-            obj, _ = hm.get_or_create_obj(table_name=bucket_table, obj_path_name=key)
-
-        return obj
-
-    @staticmethod
     def ensure_upload_chunk_size_set(upload: MultipartUpload, part_number: int, part_size: int) -> MultipartUpload:
         """
         确保多部分上传分块大小设置，要加锁，防止并发问题

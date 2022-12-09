@@ -706,16 +706,19 @@ class HarborManager:
         if not obj.do_save(update_fields=['ult', 'si', 'md5']):
             raise exceptions.S3InternalError('修改对象元数据失败')
 
-        # multipart parts delete need
-
-        ok, _ = rados.delete()
-        if not ok:
+        # multipart delete need
+        try:
+            MultipartUploadManager.delete_multipart_upload_by_bucket_obj(bucket=bucket, obj=obj)
+            ok, _ = rados.delete()
+            if not ok:
+                raise exceptions.S3InternalError('rados文件对象删除失败')
+        except exceptions.S3Error as exc:
             # 恢复元数据
             obj.ult = old_ult
             obj.si = old_size
             obj.md5 = old_md5
             obj.do_save(update_fields=['ult', 'si', 'md5'])
-            raise exceptions.S3InternalError('rados文件对象删除失败')
+            raise exc
 
         return True
 
@@ -801,7 +804,7 @@ class HarborManager:
         try:
             obj.save(update_fields=['ult', 'upt'])
         except Exception as e:
-            raise exceptions.S3InternalError(f'删除对象part元数据失败, {str(e)}')
+            raise exceptions.S3InternalError(f'更新对象元数据上传和修改时间失败, {str(e)}')
 
         return obj
 
