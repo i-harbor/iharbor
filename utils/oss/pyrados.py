@@ -8,6 +8,7 @@ import rados
 
 from django.conf import settings
 
+from utils.oss.connection_pool import RadosConnectionPoolManager
 
 class RadosError(rados.Error):
     """def __init__(self, message, errno=None)"""
@@ -189,12 +190,13 @@ class RadosAPI:
     ceph cluster rados对象接口封装
     """
 
-    def __init__(self, cluster_name, user_name, pool_name, conf_file, keyring_file='', *args, **kwargs):
+    def __init__(self, cluster_name, user_name, pool_name, conf_file, keyring_file='', alise_cluster="default", *args, **kwargs):
         """:raises: class:`RadosError`"""
         self._cluster_name = cluster_name
         self._user_name = user_name
         self._pool_name = pool_name
         self._cluster = None  # rados.Rados()
+        self.alise_cluster = alise_cluster
 
         if not os.path.exists(conf_file):
             raise RadosError("参数有误，配置文件路径不存在")
@@ -224,23 +226,23 @@ class RadosAPI:
         :raises: class:`RadosError`
         """
         if not self._cluster:
+            rados_connect = RadosConnectionPoolManager()
             conf = dict(keyring=self._keyring_file) if self._keyring_file else None
-            self._cluster = rados.Rados(name=self._user_name, clustername=self._cluster_name, conffile=self._conf_file,
-                                        conf=conf)
             try:
-                self._cluster.connect(timeout=5)
+                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster, cluster_name=self._cluster_name,
+                                     user_name=self._user_name, conf_file=self._conf_file, conf=conf)
             except rados.Error as e:
-                msg = e.args[0] if e.args else 'error connecting to the cluster'
-                raise RadosError(msg, errno=e.errno)
-
+                raise e
         return self._cluster
 
     def clear_cluster(self, cluster=None):
+        rados_connect = RadosConnectionPoolManager()
         if cluster:
-            cluster.shutdown()
+            # 释放连接
+            rados_connect.put_connection(conn=cluster, ceph_cluster_alias=self.alise_cluster)
 
         if self._cluster is not None:
-            self._cluster.shutdown()
+            rados_connect.put_connection(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
             self._cluster = None
 
     def _open_ioctx(self, pool_name: str, try_times: int = 0):
@@ -682,7 +684,7 @@ class HarborObject:
     iHarbor对象操作接口封装，
     """
     def __init__(self, pool_name: str, obj_id: str, obj_size: int, cluster_name: str,  user_name: str, conf_file: str,
-                 keyring_file: str, *args, **kwargs):
+                 keyring_file: str, alise_cluster:str,*args, **kwargs):
         self._cluster_name = cluster_name
         self._user_name = user_name
         self._conf_file = conf_file
@@ -691,6 +693,7 @@ class HarborObject:
         self._obj_id = obj_id
         self._obj_size = obj_size
         self._rados = None
+        self.alise_cluster = alise_cluster
 
     def reset_obj_id_and_size(self, obj_id=None, obj_size=None):
         if obj_id is not None:
@@ -722,7 +725,8 @@ class HarborObject:
             try:
                 self._rados = RadosAPI(cluster_name=self._cluster_name, user_name=self._user_name,
                                        pool_name=self._pool_name,
-                                       conf_file=self._conf_file, keyring_file=self._keyring_file)
+                                       conf_file=self._conf_file, keyring_file=self._keyring_file,
+                                       alise_cluster=self.alise_cluster)
             except RadosError as e:
                 raise e
 
@@ -1036,4 +1040,4 @@ def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int =
     conf_file = ceph['CONF_FILE_PATH']
     keyring_file = ceph['KEYRING_FILE_PATH']
     return HarborObject(pool_name=pool_name, obj_id=obj_id, obj_size=obj_size, cluster_name=cluster_name,
-                        user_name=user_name, conf_file=conf_file, keyring_file=keyring_file)
+                        user_name=user_name, conf_file=conf_file, keyring_file=keyring_file, alise_cluster=using)
