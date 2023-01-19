@@ -27,6 +27,7 @@ psutil = "*"
 django-hosts = "==5.1"
 djangorestframework-xml = "==2.0.0"
 cryptography = "==37.0.4"
+func-timeout = "==4.3.5"
 
 [dev-packages]
 

@@ -231,7 +231,7 @@ class RadosAPI:
             try:
                 self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster, cluster_name=self._cluster_name,
                                      user_name=self._user_name, conf_file=self._conf_file, conf=conf)
-            except rados.Error as e:
+            except (rados.Error, Exception) as e:
                 raise e
         return self._cluster
 
