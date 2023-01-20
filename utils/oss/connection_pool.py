@@ -19,7 +19,6 @@ class RadosConnectionPool:
         self.rados_pool_upper_limit = getattr(settings, 'RADOS_POOL_UPPER_LIMIT', 0.8 * self.max_connect_num) # rados 最大的连接数量上限
         self.rados_pool_lower_limit = getattr(settings, 'RADOS_POOL_LOWER_LIMIT', 0.2 * self.max_connect_num) # rados 最小的连接数量下限
         self.alias_queue = {}  # {cluster_alise: queue}
-        self.create_rados_connect_num = 0  # 记录每个进程中的 创建rados连接数
 
     @func_set_timeout(10)
     def create_new_connect(self, cluster_name, user_name, conf_file, conf):
@@ -35,7 +34,7 @@ class RadosConnectionPool:
         except rados.Error as e:
             msg = e.args[0] if e.args else 'error connecting to the cluster'
             raise rados.Error(msg, errno=e.errno)
-        self.create_rados_connect_num += 1
+
         return rados_conncet
 
     def add_rados_to_queue(self, connect, ceph_cluster_alias):
@@ -50,9 +49,8 @@ class RadosConnectionPool:
         except queue.Full as e:
             self.close(conn=connect)
 
-        # 创建连接的数量 和 队列中的数量 大于 预期值 关闭部分数量的raods连接
-        if self.create_rados_connect_num >= self.rados_pool_upper_limit and \
-                self.alias_queue[ceph_cluster_alias].qsize() > self.rados_pool_upper_limit:
+        #  队列中的数量 大于 预期值 关闭部分数量的raods连接
+        if self.alias_queue[ceph_cluster_alias].qsize() > self.rados_pool_upper_limit:
 
             self.close_queue_part_connect(ceph_cluster_alias=ceph_cluster_alias)
 
@@ -102,18 +100,16 @@ class RadosConnectionPool:
 
     def close(self, conn):
         """关闭一个连接"""
-        self.create_rados_connect_num -= 1
         conn.shutdown()
 
-    def close_queue_part_connect(self, ceph_cluster_alias=None):
+    def close_queue_part_connect(self, ceph_cluster_alias):
         """关闭部分连接， 降低队列的峰值"""
-        if ceph_cluster_alias:
-            while True:
-                # 创建rados 连接数 和 队列目前数量 小于 队列的最大存放数 和 rados连接的下限数量 （将峰值降下）
-                if self.create_rados_connect_num <= self.max_connect_num and \
-                        self.alias_queue[ceph_cluster_alias].qsize() < self.rados_pool_lower_limit:
-                    break
-                self.close_rados_connection(ceph_cluster_alias)
+
+        while True:
+            # 队列目前数量 小于 rados连接的下限数量 （将峰值降下）
+            if self.alias_queue[ceph_cluster_alias].qsize() < self.rados_pool_lower_limit:
+                break
+            self.close_rados_connection(ceph_cluster_alias)
 
     def close_all(self):
         """关闭所有连接"""
