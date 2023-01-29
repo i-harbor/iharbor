@@ -9,30 +9,32 @@ from func_timeout import func_set_timeout
 class RadosConnectionPool:
     """
     rados连接池
-    {   cluster_alise: Queue() -- >Rados()...,
-        cluster_alise2: Queue()
-    }
+    Queue() -- >Rados()...,
+
     uwsgi 中 每个进程对应独立的 连接池
     """
-
-    def __init__(self):
+    def __init__(self, cluster_name, user_name, conf_file, conf):
         # 队列最大的空间数量
         self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 100)
         # rados 最大的连接数量上限
         self.rados_pool_upper_limit = getattr(settings, 'RADOS_POOL_UPPER_LIMIT', 0.8 * self.max_connect_num)
         # rados 最小的连接数量下限
         self.rados_pool_lower_limit = getattr(settings, 'RADOS_POOL_LOWER_LIMIT', 0.2 * self.max_connect_num)
-        self.alias_queue = {}  # {cluster_alise: queue}
+        self.pool_queue = queue.Queue(maxsize=self.max_connect_num)
+        self.cluster_name = cluster_name
+        self.user_name = user_name
+        self.conf_file = conf_file
+        self.conf = conf
 
     @func_set_timeout(10)
-    def create_new_connect(self, cluster_name, user_name, conf_file, conf):
+    def create_new_connect(self):
         """
         创建新的Rados连接
         :param ceph配置
         :return: Rados()
         """
-        rados_conncet = rados.Rados(name=user_name, clustername=cluster_name, conffile=conf_file,
-                                    conf=conf)
+        rados_conncet = rados.Rados(name=self.user_name, clustername=self.cluster_name, conffile=self.conf_file,
+                                    conf=self.conf)
         try:
             rados_conncet.connect(timeout=5)
         except rados.Error as e:
@@ -41,63 +43,68 @@ class RadosConnectionPool:
 
         return rados_conncet
 
-    def add_rados_to_queue(self, connect, ceph_cluster_alias):
-        """
-        向队列中添加Rados连接
-        {cluster_alise: queue}
-        :return:Queue() --> Rados().....
-        """
-        try:
-            # 超时3s 无法向队列中添加报错
-            self.alias_queue[ceph_cluster_alias].put(item=connect, timeout=3)
-        except queue.Full as e:
-            self.close(conn=connect)
-
-        #  队列中的数量 大于 预期值 关闭部分数量的raods连接
-        if self.alias_queue[ceph_cluster_alias].qsize() > self.rados_pool_upper_limit:
-
-            self.close_queue_part_connect(ceph_cluster_alias=ceph_cluster_alias)
-
-        return self.alias_queue[ceph_cluster_alias]
-
-    def get_connection(self, ceph_cluster_alias, cluster_name, user_name, conf_file, conf):
+    def get_connection(self):
         """
         获取连接
-        :param ceph配置参数
         :return: Rados(), bool rados连接是否可用
         """
 
         try:
-            conn = self.alias_queue[ceph_cluster_alias]
-        except KeyError as e:
-            self.alias_queue[ceph_cluster_alias] = queue.Queue(maxsize=self.max_connect_num)
-            rados_connect = self.create_new_connect(cluster_name, user_name, conf_file, conf)
-            conn = self.add_rados_to_queue(rados_connect, ceph_cluster_alias)
-
-        try:
-            rados_conn = conn.get(timeout=3)
+            rados_conn = self.pool_queue.get(timeout=1)
         except queue.Empty as e:
-            rados_connect = self.create_new_connect(cluster_name, user_name, conf_file, conf)
-            conn = self.add_rados_to_queue(rados_connect, ceph_cluster_alias)
-            rados_conn = conn.get(timeout=3)
+            rados_conn = self.create_new_connect()
 
         # 检查rados连接状态
         flag = self.connect_state_check(rados_conncet=rados_conn)
         return rados_conn, flag
 
-    def put_connection(self, conn, ceph_cluster_alias):
+    def put_connection(self, conn):
         """"释放rados连接到队列中"""
-
         try:
-            alias_queue = self.add_rados_to_queue(connect=conn, ceph_cluster_alias=ceph_cluster_alias)
+            self.release_rados_connect(connect=conn)
         except func_timeout.exceptions.FunctionTimedOut as e:
             pass
 
         return
 
-    def get_rados_pool_num(self, ceph_cluster_alias):
-        """获取缓存池连接数量"""
-        return self.alias_queue[ceph_cluster_alias].qsize()
+    def release_rados_connect(self, connect):
+        """
+        向队列中添加Rados连接
+        :return:Queue() --> Rados().....
+        """
+        try:
+            # 超时3s 无法向队列中添加报错
+            self.pool_queue.put(item=connect, timeout=3)
+        except queue.Full as e:
+            self.close(conn=connect)
+
+        #  队列中的数量 大于 预期值 关闭部分数量的raods连接
+        if self.pool_queue.qsize() > self.rados_pool_upper_limit:
+
+            self.close_queue_part_connect()
+
+        print(f"进程 {os.getpid()} 释放后的连接数量： {self.pool_queue.qsize()} ")
+
+        return self.pool_queue
+
+    def close_queue_part_connect(self):
+        """关闭部分连接， 降低队列的峰值"""
+
+        while True:
+            # 队列目前数量 小于 rados连接的下限数量 （将峰值降下）
+            if self.pool_queue.qsize() < self.rados_pool_lower_limit:
+                break
+            self.close_rados_connection()
+
+    def close_rados_connection(self):
+        try:
+            conn = self.pool_queue.get(timeout=3)
+            if conn:
+                self.close(conn=conn)
+        except queue.Empty as e:
+            pass
+        except func_timeout.exceptions.FunctionTimedOut as e:
+            pass
 
     @staticmethod
     def connect_state_check(rados_conncet):
@@ -111,85 +118,71 @@ class RadosConnectionPool:
         """关闭一个连接"""
         conn.shutdown()
 
-    def close_queue_part_connect(self, ceph_cluster_alias):
-        """关闭部分连接， 降低队列的峰值"""
-
-        while True:
-            # 队列目前数量 小于 rados连接的下限数量 （将峰值降下）
-            if self.alias_queue[ceph_cluster_alias].qsize() < self.rados_pool_lower_limit:
-                break
-            self.close_rados_connection(ceph_cluster_alias)
-
     def close_all(self):
         """关闭所有连接"""
-        for ceph_cluster_alias in self.alias_queue:
-            while True:
-                if self.alias_queue[ceph_cluster_alias].qsize() == 0:
-                    break
-                self.close_rados_connection(ceph_cluster_alias=ceph_cluster_alias)
-
-    def close_rados_connection(self, ceph_cluster_alias):
-        try:
-            conn = self.alias_queue[ceph_cluster_alias].get(timeout=3)
-            if conn:
-                self.close(conn=conn)
-        except queue.Empty as e:
-            pass
-        except func_timeout.exceptions.FunctionTimedOut as e:
-            pass
+        while True:
+            self.close_rados_connection()
 
 
 # 单例模式
 class RadosConnectionPoolManager:
+    """
+    管理多个 pool
+    """
+
     _instance = None
-    _init_flag = False
-    _pool = None
+    _pool = {}
 
     def __new__(cls, *args, **kw):
         if not cls._instance:
             cls._instance = object.__new__(cls)
         return cls._instance
 
-    def __init__(self):
-        if self.__class__._init_flag:
+    def __init__(self, ceph_cluster_alias, cluster_name, user_name, conf_file, conf):
+        if ceph_cluster_alias in self._pool:
             return
+        self._pool[ceph_cluster_alias] = RadosConnectionPool(cluster_name=cluster_name, user_name=user_name,
+                                                             conf_file=conf_file, conf=conf)
 
-        self._pool = RadosConnectionPool()
-        self.__class__._init_flag = True
+    def connection(self, ceph_cluster_alias):
 
-    def connection(self, ceph_cluster_alias, cluster_name, user_name, conf_file, conf):
-
-        while True:
+        for i in range(3):
             # flag 为 rados 连接是的参数验证标记，该连接是否可用
             try:
-                rados_connect, flag = self._pool.get_connection(ceph_cluster_alias=ceph_cluster_alias,
-                                                                cluster_name=cluster_name, user_name=user_name,
-                                                                conf_file=conf_file, conf=conf)
+                rados_connect, flag = self._pool[ceph_cluster_alias].get_connection()
             except rados.Error as e:
                 raise e
             except func_timeout.exceptions.FunctionTimedOut as e:
                 raise ValueError("ceph 连接或关闭连接超时。")
-            except queue.Empty as e:
-                pass
             except Exception as e:
                 raise e
 
             if flag:
-                # print(f"进程{os.getpid()} 集群 {ceph_cluster_alias} 大约连接数量 {self.get_rados_pool_num(ceph_cluster_alias)}")
                 return rados_connect
+        raise ValueError("无法获取连接")
 
     def put_connection(self, conn, ceph_cluster_alias):
         """释放连接"""
-        return self._pool.put_connection(conn=conn, ceph_cluster_alias=ceph_cluster_alias)
 
-    def close(self, conn):
+        try:
+            self._pool[ceph_cluster_alias].put_connection(conn=conn)
+        except func_timeout.exceptions.FunctionTimedOut as e:
+            pass
+        return
+
+    def close(self, conn, ceph_cluster_alias):
         """关闭一个连接"""
-        self._pool.close(conn=conn)
+        try:
+            self._pool[ceph_cluster_alias].close(conn=conn)
+        except func_timeout.exceptions.FunctionTimedOut as e:
+            pass
+
+    def close_connect_ceph_cluster(self, ceph_cluster_alias):
+        """关闭一个集群连接"""
+        self._pool[ceph_cluster_alias].close_all()
 
     def close_all(self):
         """关闭所有连接"""
-        self._pool.close_all()
+        for ceph_cluster_alias in self._pool:
+            self._pool[ceph_cluster_alias].close_all()
 
-    def get_rados_pool_num(self, ceph_cluster_alias):
-        """获取缓存池连接数量"""
-        return self._pool.get_rados_pool_num(ceph_cluster_alias=ceph_cluster_alias)

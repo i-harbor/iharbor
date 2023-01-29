@@ -226,17 +226,21 @@ class RadosAPI:
         :raises: class:`RadosError`
         """
         if not self._cluster:
-            rados_connect = RadosConnectionPoolManager()
             conf = dict(keyring=self._keyring_file) if self._keyring_file else None
+            rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster,
+                                                       cluster_name=self._cluster_name,
+                                                       user_name=self._user_name, conf_file=self._conf_file, conf=conf)
+
             try:
-                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster, cluster_name=self._cluster_name,
-                                     user_name=self._user_name, conf_file=self._conf_file, conf=conf)
+                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster)
             except (rados.Error, Exception) as e:
                 raise e
         return self._cluster
 
     def clear_cluster(self, cluster=None):
-        rados_connect = RadosConnectionPoolManager()
+        conf = dict(keyring=self._keyring_file) if self._keyring_file else None
+        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster, cluster_name=self._cluster_name,
+                                                    user_name=self._user_name, conf_file=self._conf_file, conf=conf)
         if cluster:
             # 释放连接
             rados_connect.put_connection(conn=cluster, ceph_cluster_alias=self.alise_cluster)
