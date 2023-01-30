@@ -15,16 +15,12 @@ class RadosConnectionPool:
     """
     def __init__(self):
         # 队列最大的空间数量
-        self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 100)
-        # rados 最大的连接数量上限
-        self.rados_pool_upper_limit = getattr(settings, 'RADOS_POOL_UPPER_LIMIT', 0.8 * self.max_connect_num)
-        # rados 最小的连接数量下限
-        self.rados_pool_lower_limit = getattr(settings, 'RADOS_POOL_LOWER_LIMIT', 0.2 * self.max_connect_num)
+        self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 4)
         self.pool_queue = queue.Queue(maxsize=self.max_connect_num)
-        self.cluster_name = cluster_name
-        self.user_name = user_name
-        self.conf_file = conf_file
-        self.conf = conf
+        # # rados 最大的连接数量上限
+        # self.rados_pool_upper_limit = getattr(settings, 'RADOS_POOL_UPPER_LIMIT', 0.8 * self.max_connect_num)
+        # # rados 最小的连接数量下限
+        # self.rados_pool_lower_limit = getattr(settings, 'RADOS_POOL_LOWER_LIMIT', 0.2 * self.max_connect_num)
 
     @func_set_timeout(10)
     def create_new_connect(self, user_name, cluster_name, conf_file, conf):
@@ -79,12 +75,10 @@ class RadosConnectionPool:
         except queue.Full as e:
             self.close(conn=connect)
 
-        #  队列中的数量 大于 预期值 关闭部分数量的raods连接
-        if self.pool_queue.qsize() >= self.rados_pool_upper_limit:
-
-            self.close_queue_part_connect()
-
-        # print(f"进程 {os.getpid()} 释放后的连接数量： {self.pool_queue.qsize()} ")
+        # #  队列中的数量 大于 预期值 关闭部分数量的raods连接     暂不使用
+        # if self.pool_queue.qsize() >= self.rados_pool_upper_limit:
+        #
+        #     self.close_queue_part_connect()
 
         return self.pool_queue
 
