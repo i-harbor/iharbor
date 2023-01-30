@@ -13,7 +13,7 @@ class RadosConnectionPool:
 
     uwsgi 中 每个进程对应独立的 连接池
     """
-    def __init__(self, cluster_name, user_name, conf_file, conf):
+    def __init__(self):
         # 队列最大的空间数量
         self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 100)
         # rados 最大的连接数量上限
@@ -27,14 +27,14 @@ class RadosConnectionPool:
         self.conf = conf
 
     @func_set_timeout(10)
-    def create_new_connect(self):
+    def create_new_connect(self, user_name, cluster_name, conf_file, conf):
         """
         创建新的Rados连接
         :param ceph配置
         :return: Rados()
         """
-        rados_conncet = rados.Rados(name=self.user_name, clustername=self.cluster_name, conffile=self.conf_file,
-                                    conf=self.conf)
+        rados_conncet = rados.Rados(name=user_name, clustername=cluster_name, conffile=conf_file,
+                                    conf=conf)
         try:
             rados_conncet.connect(timeout=5)
         except rados.Error as e:
@@ -43,7 +43,7 @@ class RadosConnectionPool:
 
         return rados_conncet
 
-    def get_connection(self):
+    def get_connection(self, user_name, cluster_name, conf_file, conf):
         """
         获取连接
         :return: Rados(), bool rados连接是否可用
@@ -52,7 +52,8 @@ class RadosConnectionPool:
         try:
             rados_conn = self.pool_queue.get(timeout=1)
         except queue.Empty as e:
-            rados_conn = self.create_new_connect()
+            rados_conn = self.create_new_connect(user_name=user_name, cluster_name=cluster_name, conf_file=conf_file,
+                                                 conf=conf)
 
         # 检查rados连接状态
         flag = self.connect_state_check(rados_conncet=rados_conn)
@@ -79,11 +80,11 @@ class RadosConnectionPool:
             self.close(conn=connect)
 
         #  队列中的数量 大于 预期值 关闭部分数量的raods连接
-        if self.pool_queue.qsize() > self.rados_pool_upper_limit:
+        if self.pool_queue.qsize() >= self.rados_pool_upper_limit:
 
             self.close_queue_part_connect()
 
-        print(f"进程 {os.getpid()} 释放后的连接数量： {self.pool_queue.qsize()} ")
+        # print(f"进程 {os.getpid()} 释放后的连接数量： {self.pool_queue.qsize()} ")
 
         return self.pool_queue
 
@@ -92,7 +93,7 @@ class RadosConnectionPool:
 
         while True:
             # 队列目前数量 小于 rados连接的下限数量 （将峰值降下）
-            if self.pool_queue.qsize() < self.rados_pool_lower_limit:
+            if self.pool_queue.qsize() <= self.rados_pool_lower_limit:
                 break
             self.close_rados_connection()
 
@@ -138,18 +139,19 @@ class RadosConnectionPoolManager:
             cls._instance = object.__new__(cls)
         return cls._instance
 
-    def __init__(self, ceph_cluster_alias, cluster_name, user_name, conf_file, conf):
+    def __init__(self, ceph_cluster_alias):
         if ceph_cluster_alias in self._pool:
             return
-        self._pool[ceph_cluster_alias] = RadosConnectionPool(cluster_name=cluster_name, user_name=user_name,
-                                                             conf_file=conf_file, conf=conf)
+        self._pool[ceph_cluster_alias] = RadosConnectionPool()
 
-    def connection(self, ceph_cluster_alias):
+    def connection(self, ceph_cluster_alias, user_name, cluster_name, conf_file, conf):
 
         for i in range(3):
             # flag 为 rados 连接是的参数验证标记，该连接是否可用
             try:
-                rados_connect, flag = self._pool[ceph_cluster_alias].get_connection()
+                rados_connect, flag = self._pool[ceph_cluster_alias].get_connection(user_name=user_name,
+                                                                                    cluster_name=cluster_name,
+                                                                                    conf_file=conf_file, conf=conf)
             except rados.Error as e:
                 raise e
             except func_timeout.exceptions.FunctionTimedOut as e:

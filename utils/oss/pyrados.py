@@ -227,20 +227,18 @@ class RadosAPI:
         """
         if not self._cluster:
             conf = dict(keyring=self._keyring_file) if self._keyring_file else None
-            rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster,
-                                                       cluster_name=self._cluster_name,
-                                                       user_name=self._user_name, conf_file=self._conf_file, conf=conf)
+            rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
 
             try:
-                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster)
+                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster,
+                                                         user_name=self._user_name, cluster_name=self._cluster_name,
+                                                         conf_file=self._conf_file, conf=conf)
             except (rados.Error, Exception) as e:
                 raise e
         return self._cluster
 
     def clear_cluster(self, cluster=None):
-        conf = dict(keyring=self._keyring_file) if self._keyring_file else None
-        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster, cluster_name=self._cluster_name,
-                                                    user_name=self._user_name, conf_file=self._conf_file, conf=conf)
+        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
         if cluster:
             # 释放连接
             rados_connect.put_connection(conn=cluster, ceph_cluster_alias=self.alise_cluster)
@@ -688,7 +686,7 @@ class HarborObject:
     iHarbor对象操作接口封装，
     """
     def __init__(self, pool_name: str, obj_id: str, obj_size: int, cluster_name: str,  user_name: str, conf_file: str,
-                 keyring_file: str, alise_cluster:str,*args, **kwargs):
+                 keyring_file: str, alise_cluster: str, *args, **kwargs):
         self._cluster_name = cluster_name
         self._user_name = user_name
         self._conf_file = conf_file
