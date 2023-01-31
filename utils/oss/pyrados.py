@@ -3,10 +3,11 @@ import math
 import json
 import datetime
 import pytz
-
 import rados
 
 from django.conf import settings
+from func_timeout import func_set_timeout
+from func_timeout.exceptions import FunctionTimedOut
 
 from utils.oss.connection_pool import RadosConnectionPoolManager
 
@@ -234,7 +235,7 @@ class RadosAPI:
                                                          user_name=self._user_name, cluster_name=self._cluster_name,
                                                          conf_file=self._conf_file, conf=conf)
             except (rados.Error, Exception) as e:
-                raise e
+                raise RadosError(e)
         return self._cluster
 
     def clear_cluster(self, cluster=None):
@@ -245,6 +246,15 @@ class RadosAPI:
 
         if self._cluster is not None:
             rados_connect.put_connection(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
+            self._cluster = None
+
+    def close_cluster_connect(self, cluster=None):
+        """关闭连接"""
+        if cluster:
+            cluster.shutdown()
+
+        if self._cluster is not None:
+            self._cluster.shutdown()
             self._cluster = None
 
     def _open_ioctx(self, pool_name: str, try_times: int = 0):
@@ -262,7 +272,7 @@ class RadosAPI:
         try:
             return cluster.open_ioctx(pool_name)
         except rados.Error as e:
-            self.clear_cluster(cluster)
+            self.close_cluster_connect(cluster)
             if try_times >= 2:
                 raise RadosError(f'Failed to open_ioctx, pool={pool_name},{str(e)}')
         except Exception as e:
@@ -271,7 +281,18 @@ class RadosAPI:
         return self._open_ioctx(pool_name=pool_name, try_times=(try_times + 1))
 
     @staticmethod
-    def _io_write(ioctx, obj_id, offset, data: bytes):
+    @func_set_timeout(10)
+    def ioctx_write(ioctx, obj_key, data, offset):
+        try:
+            r = ioctx.write(obj_key, data, offset=offset)
+        except rados.Error as e:
+            msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
+            raise RadosError(msg, errno=e.errno)
+
+        if r != 0:
+            raise RadosError('Failed to write bytes to rados object')
+
+    def _io_write(self, ioctx, obj_id, offset, data: bytes):
         """
         向对象写入数据
 
@@ -286,12 +307,16 @@ class RadosAPI:
 
         for obj_key, off, start, end in tasks:
             try:
-                r = ioctx.write(obj_key, data[start:end], offset=off)
+                self.ioctx_write(ioctx=ioctx, obj_key=obj_key, data=data[start:end], offset=off)
+                # r = ioctx.write(obj_key, data[start:end], offset=off)
             except rados.Error as e:
                 msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
                 raise RadosError(msg, errno=e.errno)
-            if r != 0:
-                raise RadosError('Failed to write bytes to rados object')
+            except FunctionTimedOut as e:
+                msg = 'Failed to write bytes to rados object timeout'
+                raise RadosError(msg)
+            # if r != 0:
+            #     raise RadosError('Failed to write bytes to rados object')
 
         return True
 
@@ -434,6 +459,18 @@ class RadosAPI:
             except Exception as e:
                 raise RadosError(str(e))
 
+    @func_set_timeout(10)
+    def ioctx_delete(self, ioctx, part_id):
+        try:
+            ok = ioctx.remove_object(part_id)
+            if ok is True:
+                pass
+        except rados.ObjectNotFound:
+            pass
+        except rados.Error as e:
+            msg = e.args[0] if e.args else f'Failed to remove rados object {part_id}'
+            raise RadosError(msg, errno=e.errno)
+
     def delete(self, obj_id, obj_size):
         """
         删除对象
@@ -448,15 +485,21 @@ class RadosAPI:
             with self._open_ioctx(self._pool_name) as ioctx:
                 hos = HarborObjectStructure(obj_id=obj_id, obj_size=obj_size)
                 for part_id in hos.parts_id:
+                    # try:
+                    #     ok = ioctx.remove_object(part_id)
+                    #     if ok is True:
+                    #         continue
+                    # except rados.ObjectNotFound:
+                    #     continue
+                    # except rados.Error as e:
+                    #     msg = e.args[0] if e.args else f'Failed to remove rados object {part_id}'
+                    #     raise RadosError(msg, errno=e.errno)
                     try:
-                        ok = ioctx.remove_object(part_id)
-                        if ok is True:
-                            continue
-                    except rados.ObjectNotFound:
-                        continue
+                        self.ioctx_delete(ioctx=ioctx, part_id=part_id)
                     except rados.Error as e:
-                        msg = e.args[0] if e.args else f'Failed to remove rados object {part_id}'
-                        raise RadosError(msg, errno=e.errno)
+                        raise RadosError(e, errno=e.errno)
+                    except FunctionTimedOut as e:
+                        raise RadosError(f'Failed to remove rados object {part_id} timeout', errno=e.errno)
 
                 return True
 
@@ -791,10 +834,12 @@ class HarborObject:
                 break
             chunk = data_block[start:end]
             if chunk:
+                rados_ = None
                 try:
                     rados_ = self.get_rados_api()
                     rados_.write(obj_id=self._obj_id, offset=offset, data=chunk)
                 except (RadosError, Exception) as e:
+                    rados_.close_cluster_connect()
                     return False, str(e)
 
                 start += len(chunk)
@@ -814,10 +859,12 @@ class HarborObject:
                 （True, msg）无误
                  (False msg) 错误
         """
+        rados_ = None
         try:
             rados_ = self.get_rados_api()
             rados_.write_file(obj_id=self._obj_id, offset=offset, file=file)
         except (RadosError, Exception) as e:
+            rados_.close_cluster_connect()
             return False, str(e)
 
         file_size = get_size(file)
@@ -832,11 +879,12 @@ class HarborObject:
             错误时：(False, str) str是错误描述
         """
         size = obj_size if isinstance(obj_size, int) else self.get_obj_size()
-
+        rados_ = None
         try:
             rados_ = self.get_rados_api()
             rados_.delete(obj_id=self._obj_id, obj_size=size)
         except (RadosError, Exception) as e:
+            rados_.close_cluster_connect()
             return False, str(e)
 
         self._obj_size = 0
@@ -966,6 +1014,7 @@ class FileWrapper:
         try:
             self._ho.get_rados_api().get_cluster()
         except Exception as e:
+            self._ho.get_rados_api().close_cluster_connect()
             raise ValueError("The file cannot be reopened.")
 
         self.closed = False

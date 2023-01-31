@@ -1,4 +1,3 @@
-import os
 import queue
 import rados
 from django.conf import settings
@@ -147,15 +146,13 @@ class RadosConnectionPoolManager:
                                                                                     cluster_name=cluster_name,
                                                                                     conf_file=conf_file, conf=conf)
             except rados.Error as e:
-                raise e
+                raise rados.Error(e)
             except func_timeout.exceptions.FunctionTimedOut as e:
-                raise ValueError("ceph 连接或关闭连接超时。")
-            except Exception as e:
-                raise e
+                raise rados.Error('ceph连接获取超时')
 
             if flag:
                 return rados_connect
-        raise ValueError("无法获取连接")
+        raise rados.Error("无法获取连接")
 
     def put_connection(self, conn, ceph_cluster_alias):
         """释放连接"""
