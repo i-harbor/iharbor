@@ -16,10 +16,6 @@ class RadosConnectionPool:
         # 队列最大的空间数量
         self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 4)
         self.pool_queue = queue.Queue(maxsize=self.max_connect_num)
-        # # rados 最大的连接数量上限
-        # self.rados_pool_upper_limit = getattr(settings, 'RADOS_POOL_UPPER_LIMIT', 0.8 * self.max_connect_num)
-        # # rados 最小的连接数量下限
-        # self.rados_pool_lower_limit = getattr(settings, 'RADOS_POOL_LOWER_LIMIT', 0.2 * self.max_connect_num)
 
     @func_set_timeout(10)
     def create_new_connect(self, user_name, cluster_name, conf_file, conf):
@@ -74,21 +70,7 @@ class RadosConnectionPool:
         except queue.Full as e:
             self.close(conn=connect)
 
-        # #  队列中的数量 大于 预期值 关闭部分数量的raods连接     暂不使用
-        # if self.pool_queue.qsize() >= self.rados_pool_upper_limit:
-        #
-        #     self.close_queue_part_connect()
-
         return self.pool_queue
-
-    def close_queue_part_connect(self):
-        """关闭部分连接， 降低队列的峰值"""
-
-        while True:
-            # 队列目前数量 小于 rados连接的下限数量 （将峰值降下）
-            if self.pool_queue.qsize() <= self.rados_pool_lower_limit:
-                break
-            self.close_rados_connection()
 
     def close_rados_connection(self):
         try:
@@ -136,6 +118,9 @@ class RadosConnectionPoolManager:
         if ceph_cluster_alias in self._pool:
             return
         self._pool[ceph_cluster_alias] = RadosConnectionPool()
+
+    def __del__(self):
+        self.close_all()
 
     def connection(self, ceph_cluster_alias, user_name, cluster_name, conf_file, conf):
 

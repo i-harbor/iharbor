@@ -308,15 +308,12 @@ class RadosAPI:
         for obj_key, off, start, end in tasks:
             try:
                 self.ioctx_write(ioctx=ioctx, obj_key=obj_key, data=data[start:end], offset=off)
-                # r = ioctx.write(obj_key, data[start:end], offset=off)
             except rados.Error as e:
                 msg = e.args[0] if e.args else 'Failed to write bytes to rados object'
                 raise RadosError(msg, errno=e.errno)
             except FunctionTimedOut as e:
                 msg = 'Failed to write bytes to rados object timeout'
                 raise RadosError(msg)
-            # if r != 0:
-            #     raise RadosError('Failed to write bytes to rados object')
 
         return True
 
@@ -398,6 +395,7 @@ class RadosAPI:
         return True
 
     @staticmethod
+    @func_set_timeout(20)
     def _rados_read(ioctx, obj_id, offset, read_size):
         """
         从rados对象指定偏移量开始读取指定长度的字节数据
@@ -456,6 +454,8 @@ class RadosAPI:
             except rados.Error as e:
                 msg = e.args[0] if e.args else f'Failed to open_ioctx({self._pool_name})'
                 raise RadosError(msg, errno=e.errno)
+            except FunctionTimedOut as e:
+                raise RadosError(str(e))
             except Exception as e:
                 raise RadosError(str(e))
 
@@ -485,15 +485,6 @@ class RadosAPI:
             with self._open_ioctx(self._pool_name) as ioctx:
                 hos = HarborObjectStructure(obj_id=obj_id, obj_size=obj_size)
                 for part_id in hos.parts_id:
-                    # try:
-                    #     ok = ioctx.remove_object(part_id)
-                    #     if ok is True:
-                    #         continue
-                    # except rados.ObjectNotFound:
-                    #     continue
-                    # except rados.Error as e:
-                    #     msg = e.args[0] if e.args else f'Failed to remove rados object {part_id}'
-                    #     raise RadosError(msg, errno=e.errno)
                     try:
                         self.ioctx_delete(ioctx=ioctx, part_id=part_id)
                     except rados.Error as e:
