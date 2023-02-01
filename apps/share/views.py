@@ -123,6 +123,11 @@ class ObsViewSet(viewsets.GenericViewSet):
         except HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            exc = exceptions.BucketLockWrite(message=_('存储桶已锁定读操作。'))
+            return Response(data=exc.err_data_old(), status=exc.status_code)
+
         if fileobj is None:
             return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
@@ -461,6 +466,11 @@ class ShareDownloadViewSet(CustomGenericViewSet):
         except HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
+        # 桶锁操作检查
+        if not bucket.lock_readable():
+            exc = exceptions.BucketLockWrite(message=_('存储桶已锁定读操作。'))
+            return Response(data=exc.err_data_old(), status=exc.status_code)
+
         if fileobj is None:
             return Response(data={'code': 404, 'code_text': _('文件对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
@@ -722,6 +732,11 @@ class ShareDirViewSet(CustomGenericViewSet):
             if not bucket:
                 return Response(data={'code': 'NotFound', 'code_text': _('存储桶不存在')}, status=status.HTTP_404_NOT_FOUND)
 
+            # 桶锁操作检查
+            if not bucket.lock_readable():
+                exc = exceptions.BucketLockWrite(message=_('存储桶已锁定读操作。'))
+                return Response(data=exc.err_data_old(), status=exc.status_code)
+
             if dir_base:
                 base_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
                 if not base_obj:
@@ -851,6 +866,10 @@ class ShareView(View):
             bucket = h_manager.get_bucket(bucket_name=bucket_name)
             if not bucket:
                 return render(request, 'info.html', context={'code': 404, 'code_text': _('存储桶不存在')})
+
+            # 桶锁操作检查
+            if not bucket.lock_readable():
+                return render(request, 'info.html', context={'code': 403, 'code_text': _('存储桶已锁定读操作')})
 
             if dir_base:
                 base_obj = h_manager.get_metadata_obj(table_name=bucket.get_bucket_table_name(), path=dir_base)
