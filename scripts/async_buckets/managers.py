@@ -50,7 +50,7 @@ def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int =
     conf_file = ceph['CONF_FILE_PATH']
     keyring_file = ceph['KEYRING_FILE_PATH']
     return HarborObject(pool_name=pool_name, obj_id=obj_id, obj_size=obj_size, cluster_name=cluster_name,
-                        user_name=user_name, conf_file=conf_file, keyring_file=keyring_file)
+                        user_name=user_name, conf_file=conf_file, keyring_file=keyring_file, alise_cluster=using)
 
 
 def get_utcnow():

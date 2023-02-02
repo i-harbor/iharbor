@@ -122,7 +122,8 @@ class CephCluster(models.Model):
         self.save_config_to_file(path=path)
 
         ho = HarborObject(pool_name='', obj_id='', obj_size=2, cluster_name=self.cluster_name,
-                          user_name=self.user_name, conf_file=self.config_file, keyring_file=self.keyring_file)
+                          user_name=self.user_name, conf_file=self.config_file, keyring_file=self.keyring_file,
+                          alise_cluster=self.alias)
         try:
             list_pool_cluster = ho.rados.get_cluster().list_pools()
             for pool_name in self.pool_names:
