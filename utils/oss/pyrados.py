@@ -9,7 +9,8 @@ from django.conf import settings
 from func_timeout import func_set_timeout
 from func_timeout.exceptions import FunctionTimedOut
 
-from utils.oss.connection_pool import RadosConnectionPoolManager
+from utils.oss.connection_pool import conn_pool_manager     # 模块import就是单例模式
+
 
 class RadosError(rados.Error):
     """def __init__(self, message, errno=None)"""
@@ -191,7 +192,8 @@ class RadosAPI:
     ceph cluster rados对象接口封装
     """
 
-    def __init__(self, cluster_name, user_name, pool_name, conf_file, keyring_file='', alise_cluster="default", *args, **kwargs):
+    def __init__(self, cluster_name, user_name, pool_name, conf_file, keyring_file='',
+                 alise_cluster="default", *args, **kwargs):
         """:raises: class:`RadosError`"""
         self._cluster_name = cluster_name
         self._user_name = user_name
@@ -228,34 +230,31 @@ class RadosAPI:
         """
         if not self._cluster:
             conf = dict(keyring=self._keyring_file) if self._keyring_file else None
-            rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
-
             try:
-                self._cluster = rados_connect.connection(ceph_cluster_alias=self.alise_cluster,
-                                                         user_name=self._user_name, cluster_name=self._cluster_name,
-                                                         conf_file=self._conf_file, conf=conf)
+                self._cluster = conn_pool_manager.connection(
+                    ceph_cluster_alias=self.alise_cluster,
+                    user_name=self._user_name, cluster_name=self._cluster_name,
+                    conf_file=self._conf_file, conf=conf)
             except (rados.Error, Exception) as e:
                 raise RadosError(e)
         return self._cluster
 
     def clear_cluster(self, cluster=None):
-        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
         if cluster:
             # 释放连接
-            rados_connect.put_connection(conn=cluster, ceph_cluster_alias=self.alise_cluster)
+            conn_pool_manager.put_connection(conn=cluster, ceph_cluster_alias=self.alise_cluster)
 
         if self._cluster is not None:
-            rados_connect.put_connection(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
+            conn_pool_manager.put_connection(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
             self._cluster = None
 
     def close_cluster_connect(self, cluster=None):
         """关闭连接"""
-        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
         if cluster:
-            rados_connect.close(conn=cluster, ceph_cluster_alias=self.alise_cluster)
+            conn_pool_manager.close(conn=cluster, ceph_cluster_alias=self.alise_cluster)
 
         if self._cluster is not None:
-            rados_connect.close(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
+            conn_pool_manager.close(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
             self._cluster = None
 
     def _open_ioctx(self, pool_name: str, try_times: int = 0):
@@ -491,7 +490,7 @@ class RadosAPI:
                     except rados.Error as e:
                         raise RadosError(e, errno=e.errno)
                     except FunctionTimedOut as e:
-                        raise RadosError(f'Failed to remove rados object {part_id} timeout', errno=e.errno)
+                        raise RadosError(f'Failed to remove rados object {part_id} timeout')
 
                 return True
 
