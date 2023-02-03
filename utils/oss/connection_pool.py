@@ -41,7 +41,7 @@ class RadosConnectionPool:
         """
 
         try:
-            rados_conn = self.pool_queue.get(timeout=1)
+            rados_conn = self.pool_queue.get_nowait()
         except queue.Empty as e:
             rados_conn = self.create_new_connect(user_name=user_name, cluster_name=cluster_name, conf_file=conf_file,
                                                  conf=conf)
@@ -65,8 +65,8 @@ class RadosConnectionPool:
         :return:Queue() --> Rados().....
         """
         try:
-            # 超时3s 无法向队列中添加报错
-            self.pool_queue.put(item=connect, timeout=3)
+            # 队列中没有可以存放的卡槽，直接 full错误
+            self.pool_queue.put_nowait(item=connect)
         except queue.Full as e:
             self.close(conn=connect)
 
