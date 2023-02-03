@@ -250,11 +250,12 @@ class RadosAPI:
 
     def close_cluster_connect(self, cluster=None):
         """关闭连接"""
+        rados_connect = RadosConnectionPoolManager(ceph_cluster_alias=self.alise_cluster)
         if cluster:
-            cluster.shutdown()
+            rados_connect.close(conn=cluster, ceph_cluster_alias=self.alise_cluster)
 
         if self._cluster is not None:
-            self._cluster.shutdown()
+            rados_connect.close(conn=self._cluster, ceph_cluster_alias=self.alise_cluster)
             self._cluster = None
 
     def _open_ioctx(self, pool_name: str, try_times: int = 0):
@@ -830,7 +831,8 @@ class HarborObject:
                     rados_ = self.get_rados_api()
                     rados_.write(obj_id=self._obj_id, offset=offset, data=chunk)
                 except (RadosError, Exception) as e:
-                    rados_.close_cluster_connect()
+                    if rados_ is not None:
+                        rados_.close_cluster_connect()
                     return False, str(e)
 
                 start += len(chunk)
@@ -855,7 +857,8 @@ class HarborObject:
             rados_ = self.get_rados_api()
             rados_.write_file(obj_id=self._obj_id, offset=offset, file=file)
         except (RadosError, Exception) as e:
-            rados_.close_cluster_connect()
+            if rados_ is not None:
+                rados_.close_cluster_connect()
             return False, str(e)
 
         file_size = get_size(file)
@@ -875,7 +878,8 @@ class HarborObject:
             rados_ = self.get_rados_api()
             rados_.delete(obj_id=self._obj_id, obj_size=size)
         except (RadosError, Exception) as e:
-            rados_.close_cluster_connect()
+            if rados_ is not None:
+                rados_.close_cluster_connect()
             return False, str(e)
 
         self._obj_size = 0
