@@ -236,7 +236,8 @@ class QueryHandler:
             tc('md5'),
             tc('share'),
             tc('async1'),
-            tc('async2')
+            tc('async2'),
+            tc('pool_id')
         ]
         fields_sql = ', '.join(fields)
 
@@ -402,7 +403,8 @@ class QueryHandler:
             tc('config_file'),
             tc('keyring_file'),
             tc('modified_time'),
-            tc('alias'),
+            tc('priority_stored_value')
+            # tc('alias'),
         ]
         fields_sql = ', '.join(fields)
 

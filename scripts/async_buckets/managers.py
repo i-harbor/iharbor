@@ -21,8 +21,9 @@ def get_ceph_conf():
             'CONF_FILE_PATH': ceph_conf['config_file'],
             'KEYRING_FILE_PATH': ceph_conf['keyring_file'],
             'POOL_NAME': tuple(json.loads(ceph_conf['pool_names'])),
+            'PORIORITY_STORED_VALUE': ceph_conf['priority_stored_value'],
         }
-        ceph_cluster[ceph_conf['alias']] = ceph_pool_conf
+        ceph_cluster[str(ceph_conf['id'])] = ceph_pool_conf
 
     return ceph_cluster
 
@@ -136,7 +137,7 @@ class IharborBucketClient:
         :return:
             True:               success
         """
-        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
         url = self._build_object_metadata_base_url(
             endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key)
         headers = {
@@ -165,7 +166,7 @@ class IharborBucketClient:
             None:               md5 invalid, try async by chunk
         :raises: AsyncError
         """
-        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
         api = self._build_object_base_url(endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key)
         headers = {
             'Authorization': f'BucketToken {bucket_token}',
@@ -202,7 +203,7 @@ class IharborBucketClient:
 
         :raises: AsyncError
         """
-        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_name}"
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
         file = FileWrapper(ho=ho).open()
         while True:
             offset = file.offset
@@ -263,8 +264,12 @@ class AsyncBucketManager:
             HarborObject()
         """
         obj_key = f"{str(bucket['id'])}_{str(obj['id'])}"
-        pool_name = bucket['pool_name']
-        return build_harbor_object(using=bucket['ceph_using'], pool_name=pool_name,
+        # 获取 默认的ceph 配置
+        cephs = django_settings.CEPH_RADOS
+        ceph_config = cephs[str(obj['pool_id'])]
+        pool_name = ceph_config['POOL_NAME'][0]
+
+        return build_harbor_object(using=str(obj['pool_id']), pool_name=pool_name,
                                    obj_id=obj_key, obj_size=obj['si'])
 
     def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict):
