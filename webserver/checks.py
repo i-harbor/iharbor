@@ -12,8 +12,8 @@ def check_ceph_settings(**kwargs):
     if not cephs:
         errors.append(Warning('未配置CEPH集群信息，配置文件中配置“CEPH_RADOS”', hint='CEPH_RADOS'))
 
-    if 'default' not in cephs:
-        errors.append(Warning('配置文件中CEPH集群信息配置“CEPH_RADOS”中必须存在一个别名“default”', hint='CEPH_RADOS.default'))
+    # if 'default' not in cephs:
+    #     errors.append(Warning('配置文件中CEPH集群信息配置“CEPH_RADOS”中必须存在一个别名“default”', hint='CEPH_RADOS.default'))
 
     enable_choices = []
     for using in cephs:
@@ -44,7 +44,7 @@ def check_ceph_settings(**kwargs):
                 pass
         except Exception as e:
             errors.append(Warning(f'无法连接ceph，别名为“{using}”的CEPH集群连接错误，{str(e)}'))
-
+        ho.rados.close_cluster_connect()
         if ('DISABLE_CHOICE' in ceph) and (ceph['DISABLE_CHOICE'] is True):
             continue
 
