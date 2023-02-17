@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='archive',
             name='ceph_using',
-            field=models.CharField(default='default', max_length=16, verbose_name='CEPH集群配置别名'),
+            field=models.CharField(default='', max_length=16, verbose_name='CEPH集群配置别名'),
         ),
         migrations.AddField(
             model_name='bucket',
             name='ceph_using',
-            field=models.CharField(default='default', max_length=16, verbose_name='CEPH集群配置别名'),
+            field=models.CharField(default='', max_length=16, verbose_name='CEPH集群配置别名'),
         ),
     ]

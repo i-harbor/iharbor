@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='archive',
             name='pool_name',
-            field=models.CharField(default='obs', max_length=32, verbose_name='PoolName'),
+            field=models.CharField(default='', max_length=32, verbose_name='PoolName'),
         ),
         migrations.AddField(
             model_name='bucket',
             name='pool_name',
-            field=models.CharField(default='obs', max_length=32, verbose_name='PoolName'),
+            field=models.CharField(default='', max_length=32, verbose_name='PoolName'),
         ),
     ]

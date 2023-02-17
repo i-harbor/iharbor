@@ -91,9 +91,9 @@ class BucketBase(models.Model):
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=128, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=128, blank=True)
-    pool_name = models.CharField(verbose_name='PoolName', max_length=32, null=True, default=None)
+    pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='')
     type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
-    ceph_using = models.CharField(verbose_name=_('CEPH集群配置别名'), max_length=16, null=True, default=None)
+    ceph_using = models.CharField(verbose_name=_('CEPH集群配置别名'), max_length=16, default='')
 
     class Meta:
         abstract = True

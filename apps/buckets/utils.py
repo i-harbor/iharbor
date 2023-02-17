@@ -161,7 +161,7 @@ def get_obj_model_class(table_name):
 
 def create_bucket(
         name: str, user, _id: int = None,
-        ceph_using: str = None, pool_name: str = None,
+        ceph_using: str = '', pool_name: str = '',
         access_permission: str = None
 ):
     """
