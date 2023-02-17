@@ -965,14 +965,17 @@ class HarborManager:
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_or_create_path_obj(collection_name, path, filename)
         obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
+
+        pool_ = obj.get_pool_info()
+        pool_name = pool_.pool_names[0]
 
         return self.__write_generator(bucket=bucket, pool_name=pool_name, obj_rados_key=obj_key,
                                       obj=obj, created=created)
 
     def __write_generator(self, bucket, pool_name, obj_rados_key, obj, created):
         ok = True
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_rados_key, obj_size=obj.si)
+        ceph_config = obj.get_pool_info()
+        rados = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_rados_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的,重置对象大小
             self._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)
 
@@ -1336,8 +1339,11 @@ class HarborManager:
     @staticmethod
     def get_obj_rados(bucket: Bucket, obj) -> HarborObject:
         obj_raods_key = obj.get_obj_key(bucket.id)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
         obj_rados = build_harbor_object(
-            using=bucket.ceph_using, pool_name=bucket.pool_name, obj_id=obj_raods_key, obj_size=obj.si)
+            using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_raods_key, obj_size=obj.si)
+
         return obj_rados
 
 

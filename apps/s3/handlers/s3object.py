@@ -174,6 +174,7 @@ def create_object_metadata(user, bucket_or_name, obj_key: str, x_amz_acl: str):
 
 
 def build_object_rados(bucket, obj):
-    pool_name = bucket.get_pool_name()
     obj_ceph_key = obj.get_obj_key(bucket.id)
-    return build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_ceph_key, obj_size=obj.si)
+    ceph_config = obj.get_pool_info()
+    pool_name = ceph_config.pool_names[0]
+    return build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_ceph_key, obj_size=obj.si)
