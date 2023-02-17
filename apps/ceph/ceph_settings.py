@@ -19,7 +19,7 @@ def ceph_settings_update():
 
     for ceph_cluster_info in ceph_cluster_list:
         # 将配置文先保存到本地
-        ceph_cluster_info.save_config_to_file()
+        ceph_cluster_info.save()
         # 默认是最新的配置文件
         ceph_pool_conf = {
             'CLUSTER_NAME': ceph_cluster_info.cluster_name,
@@ -29,7 +29,7 @@ def ceph_settings_update():
             'KEYRING_FILE_PATH': ceph_cluster_info.keyring_file,
             'POOL_NAME': tuple(ceph_cluster_info.pool_names),
         }
-        ceph_cluster[ceph_cluster_info.alias] = ceph_pool_conf
+        ceph_cluster[str(ceph_cluster_info.id)] = ceph_pool_conf
 
     settings.CEPH_RADOS = ceph_cluster
     return errors

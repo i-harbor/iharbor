@@ -1,5 +1,4 @@
 import os
-import re
 import shutil
 
 from django.conf import settings
@@ -15,7 +14,7 @@ class CephCluster(models.Model):
     ceph 集群配置信息
     """
     id = models.AutoField(primary_key=True)
-    name = models.CharField(verbose_name='集群名称', max_length=50, unique=True, blank=False)
+    name = models.CharField(verbose_name='存储池名称', max_length=50, unique=True, blank=False)
     cluster_name = models.CharField(verbose_name='CLUSTER_NAME配置名称', max_length=50, blank=False)
     user_name = models.CharField(verbose_name='用户名称(USER_NAME)', max_length=50, blank=False)
     disable_choice = models.BooleanField(verbose_name='禁用选择(DISABLE_CHOICE)', default=False,
@@ -30,7 +29,11 @@ class CephCluster(models.Model):
     keyring_file = models.CharField(max_length=200, editable=False, blank=True, verbose_name='keyring文件保存路径',
                                     help_text="点击保存，keyring文本会存储到这个文件, 此字段自动填充")
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
-    alias = models.CharField(verbose_name='CEPH集群配置别名', max_length=16, blank=False, default='default', unique=True)
+    # 优先存储值
+    priority_stored_value = models.IntegerField(verbose_name='优先值', blank=True, null=True, default=None,
+                                                help_text='根据排序，选择最大值为默认的存储池,请合理填入'
+                                                          '（-2147483648 到 2147483647）')
+    # alias = models.CharField(verbose_name='CEPH集群配置别名', max_length=16, blank=False, default='default', unique=True)
     remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
 
     class Meta:
@@ -73,8 +76,9 @@ class CephCluster(models.Model):
             path = os.path.join(settings.BASE_DIR, 'data/ceph/conf/')
         else:
             path = os.path.join(settings.BASE_DIR, path)
-        self.config_file = os.path.join(path, f'{self.alias}.conf')
-        self.keyring_file = os.path.join(path, f'{self.alias}.keyring')
+
+        self.config_file = os.path.join(path, f'{self.id}.conf')
+        self.keyring_file = os.path.join(path, f'{self.id}.keyring')
 
         try:
             # 目录路径不存在存在则创建
@@ -118,12 +122,12 @@ class CephCluster(models.Model):
             raise ValidationError({'pool_names': _('存储池不能有为空的情况。')})
 
         # 备份路径用于测试ceph连接
-        path = f'data/ceph/{self.alias}test/conf'
+        path = f'data/ceph/{self.id}test/conf'
         self.save_config_to_file(path=path)
 
         ho = HarborObject(pool_name='', obj_id='', obj_size=2, cluster_name=self.cluster_name,
                           user_name=self.user_name, conf_file=self.config_file, keyring_file=self.keyring_file,
-                          alise_cluster=self.alias)
+                          alise_cluster=self.id)
         try:
             list_pool_cluster = ho.rados.get_cluster().list_pools()
             for pool_name in self.pool_names:
@@ -151,5 +155,6 @@ class CephCluster(models.Model):
             output = _(f'请查看ceph集群是否正常使用，报错：{e}。')
             raise ValidationError(output)
         finally:
+            ho.rados.close_cluster_connect()
             # 删除测试的备份路径
-            shutil.rmtree(f'data/ceph/{self.alias}test')
+            shutil.rmtree(f'data/ceph/{self.id}test')
