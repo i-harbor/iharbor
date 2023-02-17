@@ -252,8 +252,13 @@ class BackupBucketAPITests(tests.MyAPITransactionTestCase):
 
     @staticmethod
     def add_data(BackupModel, bucket_id, bucket_name, bucket_token, backup_num):
+        test_settings_securty = getattr(settings, 'TEST_CASE_SECURITY', None)
+        if test_settings_securty is None:
+            raise Exception("Please configure the securty_settings.py file")
+
+        endpoint_url = test_settings_securty['BACKUP_BUCKET']['endpoint_url']
         backup = BackupModel.objects.create(
-            endpoint_url='https://xxx.cn/',
+            endpoint_url=endpoint_url,
             bucket_name=bucket_name,
             bucket_token=bucket_token,
             backup_num=backup_num,

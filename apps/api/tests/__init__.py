@@ -7,32 +7,31 @@ from buckets.utils import is_model_table_exists, create_table_for_model_class
 
 
 def get_or_create_ceph_cluster():
-    cluster = CephCluster.objects.filter(alias='default').first()
-    if cluster:
-        return cluster
-
-    ceph = settings.TEST_CASE.get('CEPH_CLUSTER', None)
-    if not ceph:
+    ceph_configs = settings.TEST_CASE.get('CEPH_CLUSTER', None)
+    if not ceph_configs:
         raise ValueError('test配置文件中未配置”TEST_CASE.CEPH_CLUSTER“')
 
-    with open(ceph['config_filename'], 'rt') as f:
-        config_text = f.read()
+    for id, ceph_config in ceph_configs.items():
 
-    with open(ceph['keyring_filename'], 'rt') as f:
-        keyring_text = f.read()
+        with open(ceph_config['config_filename'], 'rt') as f:
+            config_text = f.read()
 
-    cluster = CephCluster(
-        name='test ceph',
-        alias=ceph['alias'],
-        cluster_name=ceph['cluster_name'],
-        user_name=ceph['username'],
-        pool_names=ceph['pool_names'],
-        disable_choice=ceph['disable_choice'],
-        config=config_text,
-        keyring=keyring_text
-    )
-    cluster.save(force_insert=True)
-    return cluster
+        with open(ceph_config['keyring_filename'], 'rt') as f:
+            keyring_text = f.read()
+
+        cluster = CephCluster(
+            id=int(id),
+            name=ceph_config['name'],
+            # alias=ceph['alias'],
+            cluster_name=ceph_config['cluster_name'],
+            user_name=ceph_config['username'],
+            pool_names=ceph_config['pool_names'],
+            disable_choice=ceph_config['disable_choice'],
+            config=config_text,
+            keyring=keyring_text,
+            priority_stored_value=ceph_config['priority_stored_value']
+        )
+        cluster.save(force_insert=True)
 
 
 def config_ceph_clustar_settings():

@@ -17,6 +17,8 @@ from rest_framework.test import APIClient
 
 from buckets.models import BucketToken, BucketFileBase, Bucket, Archive
 from buckets.management.commands.clearbucket import Command as ClearBucketCommand
+from buckets.utils import BucketFileManagement
+from ceph.models import CephCluster
 from users.models import UserProfile
 from . import config_ceph_clustar_settings, ensure_s3_multipart_table_exists
 
@@ -862,9 +864,48 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         file_md5 = calculate_md5(file)
         key = 'test.pdf'
         key2 = 'a/b/c/D/大家/test.txt'
+        key3 = 'test3.pdf'
+        key4 = 'test4.pdf'
+        ceph1 = CephCluster.objects.filter(id=3).first()
+        ceph2 = CephCluster.objects.filter(id=4).first()
         response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['created'], True)
+        # 查询对象
+        collection_name = self.bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path="", collection_name=collection_name)
+        obj = bfm.get_obj(path=key)
+        obj_id = obj.get_pool_id()
+        self.assertEqual(ceph1.id, obj_id)
+
+        # 优先值修改
+        ceph1.priority_stored_value = 3
+        ceph1.save(update_fields=['priority_stored_value'])
+        ceph1.refresh_from_db()
+
+        response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key3, file=file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], True)
+        # 查询对象
+        collection_name = self.bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path="", collection_name=collection_name)
+        obj = bfm.get_obj(path=key3)
+        obj_id = obj.get_pool_id()
+        self.assertEqual(ceph2.id, obj_id)
+
+        # 将获取到的ceph 优先值存储 禁用
+        ceph2.disable_choice = True
+        ceph2.save(update_fields=['disable_choice'])
+        ceph2.refresh_from_db()
+        response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key4, file=file)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], True)
+
+        collection_name = self.bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path="", collection_name=collection_name)
+        obj = bfm.get_obj(path=key4)
+        obj_id = obj.get_pool_id()
+        self.assertEqual(ceph1.id, obj_id)
 
         response = self.download_object_response(bucket_name=self.bucket_name, key=key,
                                                  offset=0, size=10)
@@ -898,6 +939,12 @@ class ObjectsAPITests(MyAPITransactionTestCase):
 
         response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key)
         self.assertEqual(response.status_code, 404)
+
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key3)
+        self.assertEqual(response.status_code, 204)
+
+        response = self.delete_object_response(self.client, bucket_name=self.bucket_name, key=key4)
+        self.assertEqual(response.status_code, 204)
 
     def test_multipart_upload_download_delete(self):
         file = random_bytes_io(mb_num=16)
@@ -982,14 +1029,17 @@ class ObjectsAPITests(MyAPITransactionTestCase):
         response = self.put_object_response(self.client, bucket_name=self.bucket_name, key=key, file=file)
         self.assertEqual(response.status_code, 200)
 
-        # get object rados
+        collection_name = self.bucket.get_bucket_table_name()
+        bfm = BucketFileManagement(path="", collection_name=collection_name)
+        obj = bfm.get_obj(path=key)
+        pool_id = obj.get_pool_id()
         url = reverse('api:obj-rados-detail', kwargs={
             'bucket_name': self.bucket_name, 'objpath': key})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertKeysIn(['rados', 'chunk_size', 'size', 'filename'], response.data['info'])
-        self.assertIn(f"iharbor:{settings.CEPH_RADOS[self.bucket.ceph_using]['CLUSTER_NAME']}"
-                      f"/{self.bucket.pool_name}/{self.bucket.id}_",
+        self.assertIn(f"iharbor:{settings.CEPH_RADOS[str(pool_id)]['CLUSTER_NAME']}"
+                      f"/{settings.CEPH_RADOS[str(pool_id)]['POOL_NAME'][0]}/{self.bucket.id}_",
                       response.data['info']['rados'][0])
         info: dict = response.data['info']
         info.pop('rados', None)
@@ -1185,6 +1235,8 @@ class SearchBucketAPITests(MyAPITransactionTestCase):
     databases = {'default', 'metadata'}
 
     def setUp(self):
+        settings.BUCKET_LIMIT_DEFAULT = 2
+        config_ceph_clustar_settings()
         self.user_password = 'password'
         user: UserProfile = get_or_create_user(password=self.user_password)
         self.user = user
