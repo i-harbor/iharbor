@@ -168,13 +168,11 @@ class Command(BaseCommand):
         # 已删除归档的桶不满足删除时间条件，直接返回不清理
         if not self.is_meet_delete_time(bucket):
             return
-
-        pool_name = bucket.get_pool_name()
         try:
             times = 0
             while True:
                 times += 1
-                ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id='')
+                # ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id='')
                 objs = self.get_objs_and_dirs(model_class=model_class)
                 if objs is None or len(objs) <= 0:
                     break
@@ -182,6 +180,9 @@ class Command(BaseCommand):
                 for obj in objs:
                     if obj.is_file():
                         obj_key = obj.get_obj_key(bucket.id)
+                        ceph_config = obj.get_pool_info()
+                        pool_name = ceph_config.pool_names[0]
+                        ho = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id='')
                         ho.reset_obj_id_and_size(obj_id=obj_key, obj_size=obj.si)
                         ok, err = ho.delete(obj_size=obj.si)
                         if ok:
