@@ -33,8 +33,9 @@ def calculate_md5(data: bytes):
 
 
 class TestHarborObject(unittest.TestCase):
-    POOL_NAME = 'obs_test'
-    USING = 'default'
+    # 根据test_settings.py TEST_CASE 配置手动修改
+    POOL_NAME = "obstest"
+    USING = "3"
 
     def build_data(self):
         data_io = random_bytes_io(60)  # 60MB

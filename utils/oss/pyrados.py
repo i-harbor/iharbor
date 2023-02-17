@@ -720,7 +720,7 @@ class HarborObject:
     iHarbor对象操作接口封装，
     """
     def __init__(self, pool_name: str, obj_id: str, obj_size: int, cluster_name: str,  user_name: str, conf_file: str,
-                 keyring_file: str, alise_cluster: str, *args, **kwargs):
+                 keyring_file: str, alise_cluster, *args, **kwargs):
         self._cluster_name = cluster_name
         self._user_name = user_name
         self._conf_file = conf_file

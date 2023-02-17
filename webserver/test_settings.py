@@ -7,15 +7,31 @@ TEST_CASE = {
             'bucket_name': 'akk'
         }
     },
+    # 结构修改测试需手动修改
     'CEPH_CLUSTER': {
-        'alias': 'default',
-        'cluster_name': 'ceph',
-        'username': 'client.developer',
-        'config_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.conf',
-        'keyring_filename': '/home/uwsgi/iharbor/data/ceph/conf/default.keyring',
-        'pool_names': ["obs_test"],
-        'disable_choice': False,                # True: 创建bucket时不选择；
+        '3': {
+            'name': 'obstest',
+            'cluster_name': 'ceph',
+            'username': 'client.admin',
+            'config_filename': '/home/uwsgi/iharbor/data/ceph/conf/3.conf',
+            'keyring_filename': '/home/uwsgi/iharbor/data/ceph/conf/3.keyring',
+            'pool_names': ["obstest"],
+            'disable_choice': False,  # True: 创建bucket时不选择；
+            'priority_stored_value': 1,
+        },
+        '4': {
+            'name': 'obstest2',
+            'cluster_name': 'ceph',
+            'username': 'client.admin',
+            'config_filename': '/home/uwsgi/iharbor/data/ceph/conf/4.conf',
+            'keyring_filename': '/home/uwsgi/iharbor/data/ceph/conf/4.keyring',
+            'pool_names': ["obstest2"],
+            'disable_choice': False,  # True: 创建bucket时不选择；
+            'priority_stored_value': 2,
+        }
+
     }
+
 }
 
 TEST_CASE.update(TEST_CASE_SECURITY)

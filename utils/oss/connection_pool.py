@@ -1,6 +1,6 @@
 import queue
 import rados
-from django.conf import settings
+from webserver import settings as django_settings
 import func_timeout
 from func_timeout import func_set_timeout
 
@@ -14,7 +14,7 @@ class RadosConnectionPool:
     """
     def __init__(self):
         # 队列最大的空间数量
-        self.max_connect_num = getattr(settings, 'RADOS_POOL_MAX_CONNECT_NUM', 4)
+        self.max_connect_num = getattr(django_settings, 'RADOS_POOL_MAX_CONNECT_NUM', 4)
         self.pool_queue = queue.Queue(maxsize=self.max_connect_num)
 
     @func_set_timeout(10)
