@@ -180,18 +180,18 @@ def create_bucket(
     else:
         access_permission = Bucket.PRIVATE
 
-    if not ceph_using and pool_name:
-        raise exceptions.Error(message=f'指定"pool_name"时必须同时指定"ceph_using"')
-
-    if not ceph_using:
-        ceph_using = get_ceph_alias_rand()
-
-    if pool_name:
-        pools = get_ceph_poolnames(ceph_using)
-        if pool_name not in pools:
-            raise exceptions.Error(message=f'指定"pool_name"（{pool_name}）不在"ceph_using"（{ceph_using}）中')
-    else:
-        pool_name = get_ceph_poolname_rand(ceph_using)
+    # if not ceph_using and pool_name:
+    #     raise exceptions.Error(message=f'指定"pool_name"时必须同时指定"ceph_using"')
+    #
+    # if not ceph_using:
+    #     ceph_using = get_ceph_alias_rand()
+    #
+    # if pool_name:
+    #     pools = get_ceph_poolnames(ceph_using)
+    #     if pool_name not in pools:
+    #         raise exceptions.Error(message=f'指定"pool_name"（{pool_name}）不在"ceph_using"（{ceph_using}）中')
+    # else:
+    #     pool_name = get_ceph_poolname_rand(ceph_using)
 
     bucket_id = _id
     bucket_name = name
