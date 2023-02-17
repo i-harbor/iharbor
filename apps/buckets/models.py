@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy, gettext as _
 from ckeditor.fields import RichTextField
 from django.conf import settings
+from ceph.models import CephCluster
 
 from utils.storagers import PathParser
 from utils.md5 import EMPTY_HEX_MD5
@@ -90,9 +91,9 @@ class BucketBase(models.Model):
     ftp_enable = models.BooleanField(verbose_name='FTP可用状态', default=False)  # 桶是否开启FTP访问功能
     ftp_password = models.CharField(verbose_name='FTP访问密码', max_length=128, blank=True)
     ftp_ro_password = models.CharField(verbose_name='FTP只读访问密码', max_length=128, blank=True)
-    pool_name = models.CharField(verbose_name='PoolName', max_length=32, default='obs')
+    pool_name = models.CharField(verbose_name='PoolName', max_length=32, null=True, default=None)
     type = models.SmallIntegerField(choices=TYPE_CHOICES, default=TYPE_COMMON, verbose_name='桶类型')
-    ceph_using = models.CharField(verbose_name=_('CEPH集群配置别名'), max_length=16, default='default')
+    ceph_using = models.CharField(verbose_name=_('CEPH集群配置别名'), max_length=16, null=True, default=None)
 
     class Meta:
         abstract = True
@@ -667,6 +668,7 @@ class BucketFileBase(models.Model):
     share = models.SmallIntegerField(verbose_name='分享访问权限', choices=SHARE_ACCESS_CHOICES, default=SHARE_ACCESS_NO)
     async1 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第1备份点备份时间')
     async2 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第2备份点备份时间')
+    pool_id = models.IntegerField(verbose_name='指定使用的存储池')
 
     class Meta:
         abstract = True
@@ -937,9 +939,24 @@ class BucketFileBase(models.Model):
         na = self.na if self.na else ''
         self.na_md5 = get_str_hexMD5(na)
 
+    def get_default_pool(self):
+        """
+        获取指定的pool
+        先根据优先值排序，在筛选出不能使用的ceph
+        """
+        try:
+            pool_ = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+        except Exception as e:
+            raise e
+        self.pool_id = pool_.id
+
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.na_md5:
             self.reset_na_md5()
+
+        if not self.pool_id:
+            self.get_default_pool()
+
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def do_save(self, **kwargs):
@@ -983,6 +1000,21 @@ class BucketFileBase(models.Model):
             pass
 
         return self.SHARE_ACCESS_NO
+
+    def get_pool_id(self):
+        """
+        获取 文件指定的pool_id
+        :return: int (指定的pool_id)
+        """
+        return self.pool_id
+
+    def get_pool_info(self):
+        pool_obj = CephCluster.objects.filter(id=self.pool_id).first()
+
+        return pool_obj
+
+    def get_pool_id_name(self):
+        return self.get_pool_info().pool_names[0]
 
 
 class BucketToken(models.Model):
