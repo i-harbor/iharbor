@@ -159,10 +159,11 @@ class V2ObjectHandler:
         except exceptions.HarborError as exc:
             return response_exception(exc)
 
-        pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
 
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             try:
                 hmanager._pre_reset_upload(obj=obj, rados=rados)  # 重置对象大小
@@ -181,9 +182,11 @@ class V2ObjectHandler:
 
     @staticmethod
     def update_handle(view, request, bucket, obj, rados, created):
-        pool_name = bucket.get_pool_name()
+
         obj_key = obj.get_obj_key(bucket.id)
-        uploader = storagers.FileUploadToCephHandler(request, using=bucket.ceph_using, pool_name=pool_name, obj_key=obj_key)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+        uploader = storagers.FileUploadToCephHandler(request, using=str(ceph_config.id), pool_name=pool_name, obj_key=obj_key)
         request.upload_handlers = [uploader]
 
         def clean_put(_uploader, _obj, _created, _rados):

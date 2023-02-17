@@ -21,6 +21,7 @@ from drf_yasg.utils import swagger_auto_schema, no_body
 from drf_yasg import openapi
 
 from buckets.utils import BucketFileManagement
+from ceph.models import CephCluster
 from users.views import send_active_url_email
 from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
@@ -1164,10 +1165,11 @@ class ObjViewSet(CustomGenericViewSet):
         except exceptions.HarborError as e:
             return Response(data=e.err_data_old(), status=e.status_code)
 
-        pool_name = bucket.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
-
-        rados = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        # 获取文件 pool_id
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+        rados = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的
             try:
                 hmanager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
@@ -1185,9 +1187,11 @@ class ObjViewSet(CustomGenericViewSet):
         return self.update_handle(request=request, bucket=bucket, obj=obj, rados=rados, created=created)
 
     def update_handle(self, request, bucket, obj, rados, created):
-        pool_name = bucket.get_pool_name()
+        pool_ = obj.get_pool_info()
+        pool_name = pool_.pool_names[0]
         obj_key = obj.get_obj_key(bucket.id)
-        uploader = FileUploadToCephHandler(request, using=bucket.ceph_using, pool_name=pool_name, obj_key=obj_key)
+
+        uploader = FileUploadToCephHandler(request, using=str(pool_.id), pool_name=pool_name, obj_key=obj_key)
         request.upload_handlers = [uploader]
 
         def clean_put(_uploader, _obj, _created, _rados):
@@ -2384,9 +2388,10 @@ class MetadataViewSet(CustomGenericViewSet):
 
         if obj.is_file():
             obj_key = obj.get_obj_key(bucket.id)
-            pool_name = bucket.get_pool_name()
+            ceph_config = obj.get_pool_info()
+            pool_name = ceph_config.pool_names[0]
             chunk_size, keys = build_harbor_object(
-                using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
+                using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
             ).get_rados_key_info()
 
             info = {
@@ -2466,8 +2471,10 @@ class MetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('创建失败，对象已存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+
+        ho = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         rados_key = ho.get_rados_key_info()
         info = {
             'rados': rados_key,
@@ -2555,8 +2562,9 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        ho = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+        ho = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
         ok, ret = ho.get_rados_stat(obj_id=obj_key)
         if not ok:
             return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'},
@@ -2628,7 +2636,8 @@ class CephStatsViewSet(CustomGenericViewSet):
     )
     def list(self, request, *args, **kwargs):
         try:
-            stats = build_harbor_object(using='default', pool_name='', obj_id='').get_cluster_stats()
+            ceph_config = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+            stats = build_harbor_object(using=str(ceph_config.id), pool_name='', obj_id='').get_cluster_stats()
         except RadosError as e:
             return Response(data={'code': 500, 'code_text': _('获取ceph集群信息错误：') + str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2804,7 +2813,8 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         operation_summary=gettext_lazy('ceph集群的IOPS，I/O带宽'),
     )
     def list(self, request, *args, **kwargs):
-        ok, data = build_harbor_object(using='default', pool_name='', obj_id='').get_ceph_io_status()
+        ceph_config = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+        ok, data = build_harbor_object(using=str(ceph_config.id), pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
             return Response(data={'code': 500, 'code_text': 'Get io status error:' + data},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -3175,10 +3185,13 @@ class ObjKeyViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        chunk_size, keys = build_harbor_object(using=bucket.ceph_using, pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size).get_rados_key_info()
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+        chunk_size, keys = build_harbor_object(
+            using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
+        ).get_rados_key_info()
         info = {
-            'ceph_using': bucket.ceph_using,
+            'ceph_using': str(ceph_config.id),
             'rados': keys,
             'chunk_size': chunk_size,
             'size': obj.obj_size,

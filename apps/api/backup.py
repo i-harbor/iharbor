@@ -275,9 +275,10 @@ class AsyncBucketManager:
             HarborObject()
         """
         obj_key = obj.get_obj_key(bucket.id)
-        pool_name = bucket.get_pool_name()
-        return build_harbor_object(using=bucket.ceph_using, pool_name=pool_name,
-                                   obj_id=obj_key, obj_size=obj.obj_size)
+        ceph_config = obj.get_pool_info()
+        pool_name = ceph_config.pool_names[0]
+
+        return build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
 
     @async_close_old_connections
     def get_need_async_bucket_queryset(self, id_gt: int = 0, limit: int = 1000, names: list = None):
