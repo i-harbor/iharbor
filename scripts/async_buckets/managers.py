@@ -31,12 +31,11 @@ def get_ceph_conf():
 django_settings.CEPH_RADOS = get_ceph_conf()
 
 
-def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int = 0):
+def build_harbor_object(using: str, obj_id: str, obj_size: int = 0):
     """
     构建iharbor对象对应的ceph读写接口
 
     :param using: ceph集群配置别名，对应对象数据所在ceph集群
-    :param pool_name: ceph存储池名称，对应对象数据所在存储池名称
     :param obj_id: 对象在ceph存储池中对应的rados名称
     :param obj_size: 对象的大小
     """
@@ -50,6 +49,7 @@ def build_harbor_object(using: str, pool_name: str, obj_id: str, obj_size: int =
     user_name = ceph['USER_NAME']
     conf_file = ceph['CONF_FILE_PATH']
     keyring_file = ceph['KEYRING_FILE_PATH']
+    pool_name = ceph['POOL_NAME'][0]
     return HarborObject(pool_name=pool_name, obj_id=obj_id, obj_size=obj_size, cluster_name=cluster_name,
                         user_name=user_name, conf_file=conf_file, keyring_file=keyring_file, alise_cluster=using)
 
@@ -264,13 +264,7 @@ class AsyncBucketManager:
             HarborObject()
         """
         obj_key = f"{str(bucket['id'])}_{str(obj['id'])}"
-        # 获取 默认的ceph 配置
-        cephs = django_settings.CEPH_RADOS
-        ceph_config = cephs[str(obj['pool_id'])]
-        pool_name = ceph_config['POOL_NAME'][0]
-
-        return build_harbor_object(using=str(obj['pool_id']), pool_name=pool_name,
-                                   obj_id=obj_key, obj_size=obj['si'])
+        return build_harbor_object(using=str(obj['pool_id']), obj_id=obj_key, obj_size=obj['si'])
 
     def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict):
         """

@@ -2,7 +2,7 @@ import os
 import shutil
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
@@ -30,10 +30,8 @@ class CephCluster(models.Model):
                                     help_text="点击保存，keyring文本会存储到这个文件, 此字段自动填充")
     modified_time = models.DateTimeField(auto_now=True, verbose_name='修改时间')
     # 优先存储值
-    priority_stored_value = models.IntegerField(verbose_name='优先值', blank=True, null=True, default=None,
-                                                help_text='根据排序，选择最大值为默认的存储池,请合理填入'
-                                                          '（-2147483648 到 2147483647）')
-    # alias = models.CharField(verbose_name='CEPH集群配置别名', max_length=16, blank=False, default='default', unique=True)
+    priority_stored_value = models.IntegerField(
+        verbose_name='优先值', default=0, help_text='根据排序，选择最小值为默认的存储池,请合理填入（-2147483648 到 2147483647）')
     remarks = models.CharField(verbose_name='备注', max_length=255, blank=True, default='')
 
     class Meta:
@@ -99,8 +97,13 @@ class CephCluster(models.Model):
         return True
 
     def save(self, *args, **kwargs):
-        self.save_config_to_file()
-        super().save(*args, **kwargs)
+        old_config_file = self.config_file
+        old_keyring_file = self.keyring_file
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            self.save_config_to_file()
+            if self.config_file != old_config_file or self.keyring_file != old_keyring_file:
+                super().save(update_fields=['config_file', 'config_file'])
 
     def delete(self, *args, **kwargs):
         # 删除配置文件
@@ -112,6 +115,14 @@ class CephCluster(models.Model):
         """
         校验模型中字段内容
         """
+        if self.id:     # change
+            if CephCluster.objects.filter(
+                    priority_stored_value=self.priority_stored_value).exclude(id=self.id).exists():
+                raise ValidationError({'priority_stored_value': _('优先权数值不能与其他ceph存储池的值相同。')})
+        else:   # add new
+            if CephCluster.objects.filter(priority_stored_value=self.priority_stored_value).exists():
+                raise ValidationError({'priority_stored_value': _('优先权数值不能与其他ceph存储池的值相同。')})
+
         if not isinstance(self.pool_names, list):
             raise ValidationError({'pool_names': _('字段类型必须是一个json格式的数组。')})
 
@@ -158,3 +169,6 @@ class CephCluster(models.Model):
             ho.rados.close_cluster_connect()
             # 删除测试的备份路径
             shutil.rmtree(f'data/ceph/{self.id}test')
+
+    def get_pool_name(self):
+        return self.pool_names[0]

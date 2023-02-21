@@ -11,7 +11,7 @@ def get_or_create_ceph_cluster():
     if not ceph_configs:
         raise ValueError('test配置文件中未配置”TEST_CASE.CEPH_CLUSTER“')
 
-    for id, ceph_config in ceph_configs.items():
+    for _id, ceph_config in ceph_configs.items():
 
         with open(ceph_config['config_filename'], 'rt') as f:
             config_text = f.read()
@@ -20,9 +20,8 @@ def get_or_create_ceph_cluster():
             keyring_text = f.read()
 
         cluster = CephCluster(
-            id=int(id),
+            id=int(_id),
             name=ceph_config['name'],
-            # alias=ceph['alias'],
             cluster_name=ceph_config['cluster_name'],
             user_name=ceph_config['username'],
             pool_names=ceph_config['pool_names'],

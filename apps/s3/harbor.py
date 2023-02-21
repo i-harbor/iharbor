@@ -9,7 +9,8 @@ from django.conf import settings
 from buckets.models import Bucket, get_str_hexMD5
 from buckets.utils import BucketFileManagement
 from utils.md5 import S3ObjectMultipartETagHandler
-from utils.oss.pyrados import build_harbor_object, HarborObject
+from utils.oss.pyrados import HarborObject
+from utils.oss.shortcuts import build_harbor_object
 from utils.storagers import PathParser
 from api import exceptions as iharbor_errors
 from . import exceptions
@@ -965,17 +966,15 @@ class HarborManager:
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_or_create_path_obj(collection_name, path, filename)
         obj_key = obj.get_obj_key(bucket.id)
-
-        pool_ = obj.get_pool_info()
-        pool_name = pool_.pool_names[0]
+        pool_name = obj.get_pool_name()
 
         return self.__write_generator(bucket=bucket, pool_name=pool_name, obj_rados_key=obj_key,
                                       obj=obj, created=created)
 
     def __write_generator(self, bucket, pool_name, obj_rados_key, obj, created):
         ok = True
-        ceph_config = obj.get_pool_info()
-        rados = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_rados_key, obj_size=obj.si)
+        pool_id = obj.get_pool_id()
+        rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_rados_key, obj_size=obj.si)
         if created is False:  # 对象已存在，不是新建的,重置对象大小
             self._pre_reset_upload(bucket=bucket, obj=obj, rados=rados)
 
@@ -1339,10 +1338,10 @@ class HarborManager:
     @staticmethod
     def get_obj_rados(bucket: Bucket, obj) -> HarborObject:
         obj_raods_key = obj.get_obj_key(bucket.id)
-        ceph_config = obj.get_pool_info()
-        pool_name = ceph_config.pool_names[0]
+        pool_id = obj.get_pool_id()
+        pool_name = obj.get_pool_name()
         obj_rados = build_harbor_object(
-            using=str(ceph_config.id), pool_name=pool_name, obj_id=obj_raods_key, obj_size=obj.si)
+            using=str(pool_id), pool_name=pool_name, obj_id=obj_raods_key, obj_size=obj.si)
 
         return obj_rados
 

@@ -8,7 +8,8 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import RequestDataTooBig
 from django.utils.translation import gettext
 
-from utils.oss.pyrados import FileWrapper, build_harbor_object
+from utils.oss.pyrados import FileWrapper
+from utils.oss.shortcuts import build_harbor_object
 from utils.md5 import FileMD5Handler, Sha256Handler
 
 

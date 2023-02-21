@@ -7,7 +7,7 @@ from django.db.utils import ProgrammingError
 
 from buckets.utils import BucketFileManagement, delete_table_for_model_class
 from buckets.models import Archive
-from utils.oss import build_harbor_object
+from utils.oss.shortcuts import build_harbor_object
 
 
 class Command(BaseCommand):
@@ -180,9 +180,9 @@ class Command(BaseCommand):
                 for obj in objs:
                     if obj.is_file():
                         obj_key = obj.get_obj_key(bucket.id)
-                        ceph_config = obj.get_pool_info()
-                        pool_name = ceph_config.pool_names[0]
-                        ho = build_harbor_object(using=str(ceph_config.id), pool_name=pool_name, obj_id='')
+                        pool_id = obj.get_pool_id()
+                        pool_name = obj.get_pool_name()
+                        ho = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id='')
                         ho.reset_obj_id_and_size(obj_id=obj_key, obj_size=obj.si)
                         ok, err = ho.delete(obj_size=obj.si)
                         if ok:

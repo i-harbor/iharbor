@@ -1,4 +1,3 @@
-import os
 import unittest
 import io
 import random
@@ -8,7 +7,8 @@ from utils.md5 import offset_chunks
 from api.tests import config_ceph_clustar_settings
 
 # os.environ.setdefault("DJANGO_SETTINGS_MODULE", "webserver.settings")
-from .pyrados import build_harbor_object, get_size
+from .pyrados import get_size
+from .shortcuts import build_harbor_object
 
 
 def random_string(length: int = 10):

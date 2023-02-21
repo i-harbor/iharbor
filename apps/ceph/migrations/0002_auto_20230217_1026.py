@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='cephcluster',
             name='priority_stored_value',
-            field=models.IntegerField(blank=True, default=None, help_text='根据排序，选择最大值为默认的存储池,请合理填入（-2147483648 到 2147483647）', null=True, verbose_name='优先值'),
+            field=models.IntegerField(blank=True, default=None, help_text='根据排序，选择最小值为默认的存储池,请合理填入（-2147483648 到 2147483647）', null=True, verbose_name='优先值'),
         ),
         migrations.AlterField(
             model_name='cephcluster',

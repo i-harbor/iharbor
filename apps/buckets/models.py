@@ -939,15 +939,19 @@ class BucketFileBase(models.Model):
         na = self.na if self.na else ''
         self.na_md5 = get_str_hexMD5(na)
 
-    def get_default_pool(self):
+    def _get_default_pool(self):
         """
         获取指定的pool
         先根据优先值排序，在筛选出不能使用的ceph
         """
         try:
-            pool_ = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+            pool_ = CephCluster.objects.order_by('priority_stored_value').filter(disable_choice=False).first()
         except Exception as e:
             raise e
+
+        if pool_ is None:
+            raise Exception(_('没有配置可用的存储池。'))
+
         self.pool_id = pool_.id
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
@@ -955,7 +959,7 @@ class BucketFileBase(models.Model):
             self.reset_na_md5()
 
         if not self.pool_id:
-            self.get_default_pool()
+            self._get_default_pool()
 
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
@@ -1008,13 +1012,24 @@ class BucketFileBase(models.Model):
         """
         return self.pool_id
 
-    def get_pool_info(self):
-        pool_obj = CephCluster.objects.filter(id=self.pool_id).first()
+    def get_pool_name(self):
+        ins = self.get_ceph_pool_instance()
+        return ins.get_pool_name()
 
-        return pool_obj
+    def get_ceph_pool_instance(self) -> CephCluster:
+        """
+        :raises: Exception
+        """
+        ins = getattr(self, 'ceph_pool_instance', None)
+        if ins:
+            return ins
 
-    def get_pool_id_name(self):
-        return self.get_pool_info().pool_names[0]
+        ins = CephCluster.objects.filter(id=self.pool_id).first()
+        if ins is None:
+            raise Exception(_('对象对应的存储池不存在。') + f"Pool id {self.pool_id}")
+
+        setattr(self, 'ceph_pool_instance', ins)
+        return ins
 
 
 class BucketToken(models.Model):

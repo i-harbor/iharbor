@@ -82,9 +82,9 @@ class PutObjectHandler:
     @staticmethod
     def put_object_handle(request, view: S3CustomGenericViewSet, bucket, obj, rados, created):
         obj_key = obj.get_obj_key(bucket.id)
-        ceph_config = obj.get_pool_info()
-        pool_name = ceph_config.pool_names[0]
-        uploader = FileUploadToCephHandler(using=str(obj.pool_id), request=request,
+        pool_id = obj.get_pool_id()
+        pool_name = obj.get_pool_name()
+        uploader = FileUploadToCephHandler(using=str(pool_id), request=request,
                                            pool_name=pool_name, obj_key=obj_key)
         request.upload_handlers = [uploader]
 

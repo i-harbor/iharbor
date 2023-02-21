@@ -3,7 +3,7 @@ import os
 from django.core.checks import Warning
 from django.conf import settings
 
-from utils.oss.pyrados import build_harbor_object
+from utils.oss.shortcuts import build_harbor_object
 
 
 def check_ceph_settings(**kwargs):
