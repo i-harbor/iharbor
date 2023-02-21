@@ -84,8 +84,8 @@ class Command(BaseCommand):
 
     def action_buckets(self, buckets, options):
         name_contains = options['name-contains']        # None or [str, ]
-        async = options['async']
-        if async and async not in ['async1', 'async2']:
+        asyncoption = options['async']
+        if asyncoption and asyncoption not in ['async1', 'async2']:
             raise CommandError("async must in ['async1', 'async2']")
 
         no_empty_bucket = 0
@@ -100,16 +100,16 @@ class Command(BaseCommand):
 
             if count > 0:
                 no_empty_bucket += 1
-                if async:
-                    updates = {async: None}
+                if asyncoption:
+                    updates = {asyncoption: None}
                     qs = self.get_queryset(bucket=bucket, name_contains=name_contains)
                     try:
                         rows = qs.update(**updates)
                         self.stdout.write(self.style.SUCCESS(
-                            f'[Action] {rows} objects na contains "{name_contains}" update {async} to null, bucket named {bucket.name}'))
+                            f'[Action] {rows} objects na contains "{name_contains}" update {asyncoption} to null, bucket named {bucket.name}'))
                     except Exception as e:
                         self.stdout.write(self.style.ERROR(
-                            f'update object {async} to null, bucket({bucket.name}, id={bucket.id}) error: {e}'))
+                            f'update object {asyncoption} to null, bucket({bucket.name}, id={bucket.id}) error: {e}'))
 
             last_id = bucket.id
 
