@@ -131,9 +131,9 @@ class MultipartUploadHandler:
         obj = HarborManager().get_object(bucket_name=bucket.name, path_name=obj_key, user=request.user)
         ceph_obj_key = obj.get_obj_key(bucket.id)
         pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
+        # pool_name = obj.get_pool_name()
         uploader = storagers.PartUploadToCephHandler(request=request, using=str(pool_id),
-                                                     pool_name=pool_name, obj_key=ceph_obj_key, offset=offset)
+                                                     pool_name=None, obj_key=ceph_obj_key, offset=offset)
         request.upload_handlers = [uploader]
 
         try:

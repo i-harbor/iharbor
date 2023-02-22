@@ -11,7 +11,7 @@ from s3.harbor import MultipartUploadManager
 from s3 import exceptions as s3exceptions
 from utils.storagers import PathParser, try_close_file
 from utils.oss.pyrados import get_size
-from utils.oss.shortcuts import build_harbor_object
+from utils.oss.shortcuts import build_rados_harbor_object
 from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
 from utils.md5 import FileMD5Handler
@@ -852,9 +852,7 @@ class HarborManager:
         """
         bucket, obj, created = self.create_empty_obj(bucket_name=bucket_name, obj_path=obj_path, user=user)
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         if created is False:  # 对象已存在，不是新建的
             if reset:  # 重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
@@ -1166,9 +1164,7 @@ class HarborManager:
         if not fileobj.do_delete():
             raise exceptions.HarborError(message='删除对象原数据时错误')
 
-        pool_id = fileobj.get_pool_id()
-        pool_name = fileobj.get_pool_name()
-        ho = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=fileobj.si)
+        ho = build_rados_harbor_object(obj=fileobj, obj_rados_key=obj_key)
         ok, _ = ho.delete()
         if not ok:
             # 恢复元数据
@@ -1224,9 +1220,7 @@ class HarborManager:
             return bytes(), obj.si
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         ok, chunk = rados.read(offset=offset, size=size)
         if not ok:
             raise exceptions.HarborError(message='文件块读取失败')
@@ -1298,9 +1292,7 @@ class HarborManager:
         """
         # 读取文件对象生成器
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         return rados.read_obj_generator(offset=offset, end=end, block_size=per_size)
 
     def get_write_generator(self, bucket_name: str, obj_path: str, is_break_point: bool = False, user=None):
@@ -1345,12 +1337,10 @@ class HarborManager:
         collection_name = bucket.get_bucket_table_name()
         obj, created = self._get_obj_and_check_limit_or_create(collection_name, path, filename)
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
 
         def generator():
             ok = True
-            rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+            rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
             if (created is False) and (not is_break_point):  # 对象已存在，不是新建的,非断点续传，重置对象大小
                 self._pre_reset_upload(obj=obj, rados=rados)
 

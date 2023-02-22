@@ -27,7 +27,7 @@ from users.models import AuthKey
 from users.auth.serializers import AuthKeyDumpSerializer
 from utils import storagers
 from utils.storagers import PathParser, FileUploadToCephHandler, try_close_file
-from utils.oss.shortcuts import build_harbor_object
+from utils.oss.shortcuts import build_harbor_object, build_rados_harbor_object
 from utils.oss.pyrados import RadosError
 from utils.log.decorators import log_used_time
 from utils.jwt_token import JWTokenTool2
@@ -1167,10 +1167,7 @@ class ObjViewSet(CustomGenericViewSet):
             return Response(data=e.err_data_old(), status=e.status_code)
 
         obj_key = obj.get_obj_key(bucket.id)
-        # 获取文件 pool_id
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        rados = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.si)
+        rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         if created is False:  # 对象已存在，不是新建的
             try:
                 hmanager._pre_reset_upload(obj=obj, rados=rados)    # 重置对象大小
@@ -1189,10 +1186,9 @@ class ObjViewSet(CustomGenericViewSet):
 
     def update_handle(self, request, bucket, obj, rados, created):
         pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
         obj_key = obj.get_obj_key(bucket.id)
 
-        uploader = FileUploadToCephHandler(request, using=str(pool_id), pool_name=pool_name, obj_key=obj_key)
+        uploader = FileUploadToCephHandler(request, using=str(pool_id), pool_name=None, obj_key=obj_key)
         request.upload_handlers = [uploader]
 
         def clean_put(_uploader, _obj, _created, _rados):
@@ -2389,12 +2385,8 @@ class MetadataViewSet(CustomGenericViewSet):
 
         if obj.is_file():
             obj_key = obj.get_obj_key(bucket.id)
-            pool_id = obj.get_pool_id()
-            pool_name = obj.get_pool_name()
-            chunk_size, keys = build_harbor_object(
-                using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
-            ).get_rados_key_info()
-
+            rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
+            chunk_size, keys = rados.get_rados_key_info()
             info = {
                 'rados': keys,
                 'chunk_size': chunk_size,
@@ -2472,10 +2464,7 @@ class MetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('创建失败，对象已存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-
-        ho = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ho = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         rados_key = ho.get_rados_key_info()
         info = {
             'rados': rados_key,
@@ -2563,9 +2552,7 @@ class RefreshMetadataViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        ho = build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        ho = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         ok, ret = ho.get_rados_stat(obj_id=obj_key)
         if not ok:
             return Response(data={'code': 400, 'code_text': f'failed to get size of rados object，{ret}'},
@@ -2637,7 +2624,7 @@ class CephStatsViewSet(CustomGenericViewSet):
     )
     def list(self, request, *args, **kwargs):
         try:
-            ceph_config = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+            ceph_config = CephCluster.objects.order_by('priority_stored_value').filter(disable_choice=False).first()
             stats = build_harbor_object(using=str(ceph_config.id), pool_name='', obj_id='').get_cluster_stats()
         except RadosError as e:
             return Response(data={'code': 500, 'code_text': _('获取ceph集群信息错误：') + str(e)},
@@ -3186,11 +3173,9 @@ class ObjKeyViewSet(CustomGenericViewSet):
             return Response(data={'code': 404, 'code_text': _('对象不存在')}, status=status.HTTP_404_NOT_FOUND)
 
         obj_key = obj.get_obj_key(bucket.id)
+        rados = build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
         pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-        chunk_size, keys = build_harbor_object(
-            using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size
-        ).get_rados_key_info()
+        chunk_size, keys = rados.get_rados_key_info()
         info = {
             'ceph_using': str(pool_id),
             'rados': keys,

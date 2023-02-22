@@ -10,7 +10,7 @@ from django.conf import settings
 from buckets.models import Bucket, BackupBucket
 from buckets.utils import BucketFileManagement
 from utils.oss.pyrados import FileWrapper, HarborObject
-from utils.oss.shortcuts import build_harbor_object
+from utils.oss.shortcuts import build_rados_harbor_object
 from utils.md5 import FileMD5Handler, EMPTY_HEX_MD5
 
 
@@ -276,10 +276,7 @@ class AsyncBucketManager:
             HarborObject()
         """
         obj_key = obj.get_obj_key(bucket.id)
-        pool_id = obj.get_pool_id()
-        pool_name = obj.get_pool_name()
-
-        return build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_key, obj_size=obj.obj_size)
+        return build_rados_harbor_object(obj=obj, obj_rados_key=obj_key)
 
     @async_close_old_connections
     def get_need_async_bucket_queryset(self, id_gt: int = 0, limit: int = 1000, names: list = None):

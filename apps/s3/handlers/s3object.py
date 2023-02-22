@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils.translation import gettext as _
 
 from utils.time import datetime_from_gmt
-from utils.oss.shortcuts import build_harbor_object
+from utils.oss.shortcuts import build_rados_harbor_object
 from buckets.models import BucketFileBase
 from s3.harbor import HarborManager
 from s3 import exceptions
@@ -175,6 +175,4 @@ def create_object_metadata(user, bucket_or_name, obj_key: str, x_amz_acl: str):
 
 def build_object_rados(bucket, obj):
     obj_ceph_key = obj.get_obj_key(bucket.id)
-    pool_id = obj.get_pool_id()
-    pool_name = obj.get_pool_name()
-    return build_harbor_object(using=str(pool_id), pool_name=pool_name, obj_id=obj_ceph_key, obj_size=obj.si)
+    return build_rados_harbor_object(obj=obj, obj_rados_key=obj_ceph_key)
