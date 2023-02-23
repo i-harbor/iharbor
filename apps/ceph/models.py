@@ -103,7 +103,7 @@ class CephCluster(models.Model):
             super().save(*args, **kwargs)
             self.save_config_to_file()
             if self.config_file != old_config_file or self.keyring_file != old_keyring_file:
-                super().save(update_fields=['config_file', 'config_file'])
+                super().save(update_fields=['config_file', 'keyring_file'])
 
     def delete(self, *args, **kwargs):
         # 删除配置文件
