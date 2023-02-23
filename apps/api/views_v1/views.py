@@ -2801,7 +2801,7 @@ class CephPerformanceViewSet(CustomGenericViewSet):
         operation_summary=gettext_lazy('ceph集群的IOPS，I/O带宽'),
     )
     def list(self, request, *args, **kwargs):
-        ceph_config = CephCluster.objects.all().order_by('priority_stored_value').filter(disable_choice=False).first()
+        ceph_config = CephCluster.objects.order_by('priority_stored_value').filter(disable_choice=False).first()
         ok, data = build_harbor_object(using=str(ceph_config.id), pool_name='', obj_id='').get_ceph_io_status()
         if not ok:
             return Response(data={'code': 500, 'code_text': 'Get io status error:' + data},
