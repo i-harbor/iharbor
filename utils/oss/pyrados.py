@@ -555,7 +555,7 @@ class RadosAPI:
         """
         cluster = self.get_cluster()
         kwargs['prefix'] = prefix
-        kwargs['format'] = format
+        kwargs['format'] = format_
         try:
             ret, buf, outs = cluster.mgr_command(json.dumps(kwargs), b'', timeout=5)
         except rados.Error as e:
