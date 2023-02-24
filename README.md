@@ -13,7 +13,10 @@
 git clone https://gitee.com/gosc-cnic/iharbor.git
 ```
 * 如果不用python虚拟环境请跳过下面1.3和1.4小节python虚拟环境的搭建内容，直接安装iharbor服务需要的python依赖库：   
-```pip install -r requirements.txt```   
+```pip install -r requirements.txt```
+  
+* 环境依赖包  
+```dnf install gcc python3-devel -y```
 ### 1.3 安装Python依赖管理工具pipenv
 使用pip命令安装pipenv。  
 ```pip install pipenv```
@@ -40,7 +43,7 @@ git clone https://gitee.com/gosc-cnic/iharbor.git
 ```
 3. ceph的配置, 支持多个ceph集群：  
    1. 在项目在第一次启动后需要登录到后端配置ceph，否则无法使用存储服务。
-   2. 对应的ceph配置文件存储在工程文件 **data** 目录中。配置文件内容大致如下：
+   2. 对应的ceph配置文件存储在工程文件 **data** 目录中。
    后端ceph配置中必须有一个 **别名** 为`default`。
 
 
@@ -76,6 +79,18 @@ git clone https://gitee.com/gosc-cnic/iharbor.git
 需要修改`ftpserver/harbor_handler.py`文件开头部分代码`work_mode_in_tls = False`。
    
 2. ftp默认开启TLS加密，需要域名证书文件`/etc/nginx/conf.d/ftp-keycert.pem`。  
+
+### 1.9 特定需求配置
+1. 连接池的配置
+```shell
+路径：webserver/settings.py
+配置参数：
+RADOS_POOL_MAX_CONNECT_NUM = 1
+```
+2. iharbro_uwsgi.ini
+```shell
+如果使用uwsgi http 启动方式 需修改配置（默认socket）
+```
 
 ## 2 运行iharbor服务
 ### 2.1 激活python虚拟环境  
@@ -113,4 +128,24 @@ systemctl start/reload/stop iharbor.service
 systemctl start/reload/stop iharbor_ftp.service
 ```
 
+## 3. nginx 配置
+```shell
+socket配置
+ server {
+        listen 80;
+        server_name  localhost; #改为自己的域名，没域名修改为127.0.0.1:80
+        charset utf-8;
+        client_max_body_size 1024M;
+        location / {
+           include uwsgi_params;
+           uwsgi_pass unix:///home/uwsgi/iharbor/iharbor.sock;  #端口要和uwsgi里配置的一样
+           uwsgi_param UWSGI_SCRIPT webserve.wsgi;  #wsgi.py所在的目录名+.wsgi
+           uwsgi_param UWSGI_CHDIR /home/uwsgi/iharbor/; #项目路径
 
+        }
+        location /static/ {
+        alias /home/uwsgi/iharbor/static/; #静态资源路径
+        }
+    }
+
+```
