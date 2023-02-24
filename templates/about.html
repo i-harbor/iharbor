@@ -13,14 +13,44 @@
                 </div>
                 <div class="p-2">
                     <h5>{% trans '版本' %}</h5>
-                    <p>{{ version }} &emsp;
-                        {% if version_timestamp %}
-                            <span>{{ version_timestamp }}</span>&emsp;
-                        {% endif %}
-                        <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
-                            {% trans '变更日志' %}</a>
-                        </span>
-                    </p>
+
+                    {%  if version_git_change_set  %}
+
+                        {% for tag, value in version_git_change_set.items %}
+                            <P>
+                                {{ tag }}
+                                <span>
+                                    {{ value.0 }}
+                                </span>
+                                <span>
+                                    {{ value.1 | date:"Y-m-d H:i:s" }}
+                                </span>
+                                <span>
+                                    {{ value.2 }}
+                                </span>
+                              <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
+                                    {% trans '变更日志' %}</a>
+                              </span>
+                            </P>
+                            <p>
+                                {% for log in value.3 %}
+                                    <span>（{{ forloop.counter }}）{{ log}}</span>&emsp;
+                                    <br/>
+                                {% endfor %}
+                            </p>
+
+                        {% endfor %}
+
+                        {% else %}
+                        <p>
+                            无法获取版本日志， 详情请查看：
+                            <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
+                                    {% trans '变更日志' %}</a>
+                            </span>
+                        </p>
+
+                    {%  endif %}
+
                 </div>
                 <div class="p-2">
                     <h5>{% trans '关于我们' %}</h5>

@@ -24,13 +24,13 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 from .views import kjy_login_callback, home
-from version import __version__, __version_timestamp__
+from version import __version__, __version_git_change_set_
 from . import admin_site    # admin后台一些设置
 
 
 def about(request):
-    print(__version_timestamp__)
-    return render(request, 'about.html', context={'version': __version__, 'version_timestamp': __version_timestamp__})
+    # print(__version_git_change_set_)
+    return render(request, 'about.html', context={'version': __version__, 'version_git_change_set': __version_git_change_set_})
 
 
 schema_view = get_schema_view(
