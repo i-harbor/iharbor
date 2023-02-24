@@ -33,14 +33,15 @@ def get_git_changeset():
             git_tag_info[tag] = [info[1], info[2], t]  # [作者,邮箱,时间]
 
             get_tag_desc = subprocess.run(
-                f'git tag --sort="-*authordate" -n3 -l {tag}',
+                f'git tag --sort="-*authordate" -n10 -l {tag}',
                 capture_output=True,
                 shell=True,
                 cwd=repo_dir,
                 text=True,
             )
-            cmd_output_tag_doc = get_tag_desc.stdout.split('\n')[0:3]
-            tag_doc_list = [" ".join(item.split()).replace("*", "").replace(tag, "") for item in cmd_output_tag_doc]
+            cmd_output_tag_doc = get_tag_desc.stdout.split('\n')
+            tag_doc_list = [" ".join(item.split()).replace("*", "").replace(tag, "")
+                            for item in cmd_output_tag_doc[0:len(cmd_output_tag_doc) -1]]
             git_tag_info[tag].append(tag_doc_list)
 
     except Exception:
