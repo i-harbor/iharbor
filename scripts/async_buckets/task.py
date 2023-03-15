@@ -44,6 +44,7 @@ class AsyncTask:
 
         self.pool_sem = threading.Semaphore(self.max_threads)  # 定义最多同时启用多少个线程
         self.in_exiting = False         # 多线程时标记是否正在退出
+        # self._stop = threading.Event()
 
     def validate_params(self):
         """
@@ -95,6 +96,8 @@ class AsyncTask:
             except KeyboardInterrupt:
                 self.in_exiting = True
                 self.logger.error('Quit soon, because KeyboardInterrupt')
+            except Exception as e:
+                self.logger.error(f'Error, async Bucket failed: {str(e)}')
 
             key_ipt_count = 0
             while self.in_multi_thread:     # 多线程模式下，等待所有线程结束
@@ -111,7 +114,8 @@ class AsyncTask:
                     self.logger.debug(f'You need to enter CTL + C {3 - key_ipt_count} times, will be forced to exit.')
                     if key_ipt_count >= 3:
                         break
-
+                # if self._stop.isSet():
+                #     break
             break
 
         self.logger.warning('Exit')
@@ -196,7 +200,8 @@ class AsyncTask:
         try:
             self.async_one_bucket(bucket=bucket, last_object_id=last_object_id, limit=limit, backup=backup)
         except Exception as e:
-            pass
+            # self._stop.set()
+            self.in_exiting = True
         finally:
             self.pool_sem.release()  # 可用线程数+1
 
@@ -264,7 +269,8 @@ class AsyncTask:
                 if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
                     self.logger.debug(f"Skip bukcet(id={bucket_id}, name={bucket_name}), async unusual, "
                                       f"failed: {failed_count}, ok: {ok_count}.")
-                    break
+                    # break
+                    self.in_exiting = True
 
                 self.logger.error(f"Error, async_bucket,{str(err)}")
                 continue
@@ -321,7 +327,7 @@ class AsyncTask:
                 self.logger.debug(f"Test async {msg}")
                 time.sleep(1)
             else:
-                AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup)
+                AsyncBucketManager().async_bucket_object_time_condition(bucket=bucket, obj=obj, backup=backup)
         except Exception as e:
             ret = e
             self.logger.error(f"Failed Async, {msg}, {str(e)}")
@@ -342,16 +348,16 @@ class AsyncTask:
         """
         # 对象修改时间超过now足够时间段后才允许同步, 尽量保证对象上传完成后再同步
         neet_time = QueryHandler().get_meet_time()
-        async1 = obj['async1']
-        async2 = obj['async2']
+        sync_end1 = obj['sync_end1']
+        sync_end2 = obj['sync_end2']
         upt = obj['upt']
         backup_num = backup['backup_num']
 
         if backup_num == BackupNum.ONE:
-            if async1 is None or (async1 <= upt < neet_time):
+            if sync_end1 is None or (sync_end1 <= upt < neet_time):
                 return True
         elif backup_num == BackupNum.TWO:
-            if async2 is None or (async2 <= upt < neet_time):
+            if sync_end2 is None or (sync_end2 <= upt < neet_time):
                 return True
 
         return False

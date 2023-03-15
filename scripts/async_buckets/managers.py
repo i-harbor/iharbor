@@ -7,7 +7,7 @@ from utils.oss.pyrados import FileWrapper, HarborObject
 from utils.md5 import FileMD5Handler, EMPTY_HEX_MD5
 
 from .databases import django_settings
-from .querys import QueryHandler
+from .querys import QueryHandler, BackupNum
 
 
 def get_ceph_conf():
@@ -196,15 +196,42 @@ class IharborBucketClient:
         raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put object, {r.text}',
                          code='FailedAsyncObject')
 
+    def _get_existed_size(self, endpoint_url: str, bucket_name: str, object_key: str, bucket_token: str):
+        backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
+        url = self._build_object_metadata_base_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                                   object_key=object_key)
+        headers = {
+            'Authorization': f'BucketToken {bucket_token}'
+        }
+        try:
+            r = self._do_request(
+                method="GET", headders=headers, url=url, data=None
+            )
+        except requests.exceptions.RequestException as e:
+            raise AsyncError(
+                message=f'Failed get object ({object_key}) form backup point address ({backup_str}),'
+                        f' break point resume object, {str(e)}', code='FailedAsyncObject')
+        if r.status_code == 200:
+            return r.json().get('obj')['si']
+        else:
+            data = r.json()
+            raise AsyncError(
+                message=f'Failed get object ({object_key}) form backup point address ({backup_str}),'
+                        f' break point resume object, {str(data)}', code='FailedAsyncObject')
+
     def post_object_by_chunk(self, ho, endpoint_url: str, bucket_name: str, object_key: str,
-                             bucket_token: str, per_size: int = 32 * 1024 ** 2):
+                             bucket_token: str, per_size: int = 32 * 1024 ** 2, breakpoint_resume=None):
         """
         分片上传一个对象
-
         :raises: AsyncError
         """
         backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
         file = FileWrapper(ho=ho).open()
+        if breakpoint_resume:
+            # 续传 获取 已同步文件的大小
+            size = self._get_existed_size(endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key,
+                                          bucket_token=bucket_token)
+            file.seek(size)
         while True:
             offset = file.offset
             reset = None
@@ -217,8 +244,8 @@ class IharborBucketClient:
             if not data:
                 if offset >= file.size:
                     break
-                raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, read empty bytes from ceph, '
-                                 f'对象同步可能不完整', code='FailedAsyncObject')
+                raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, '
+                                 f'read empty bytes from ceph, 对象同步可能不完整', code='FailedAsyncObject')
 
             md5_handler = FileMD5Handler()
             md5_handler.update(offset=0, data=data)
@@ -266,7 +293,7 @@ class AsyncBucketManager:
         obj_key = f"{str(bucket['id'])}_{str(obj['id'])}"
         return build_harbor_object(using=str(obj['pool_id']), obj_id=obj_key, obj_size=obj['si'])
 
-    def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict):
+    def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict, breakpoint_resume=None):
         """
         :return:
             True        # 同步成功
@@ -293,10 +320,11 @@ class AsyncBucketManager:
                 return True
 
         client.post_object_by_chunk(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
-                                    object_key=object_key, bucket_token=bucket_token)
+                                    object_key=object_key, bucket_token=bucket_token, per_size=1 * 1024 ** 2,
+                                    breakpoint_resume=breakpoint_resume)
         return True
 
-    def async_bucket_object(self, bucket, obj, backup):
+    def async_bucket_object(self, bucket, obj, backup, breakpoint_resume=None):
         """
         :return:
             backup_num
@@ -304,21 +332,71 @@ class AsyncBucketManager:
         :raises: AsyncError, CanNotConnection
         """
         # 对象是否需要同步
-        backup_num = backup['backup_num']
+        # backup_num = backup['backup_num']
         async_time = get_utcnow()
         try:
-            ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup)
+            try:
+                # 根据条件更新sync_start为开始时间，sync_end 为空
+                res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
+                                                                                  backup_num=backup['backup_num'],
+                                                                                  async_time=async_time)
+            except Exception as e:
+                res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
+                                                                                  backup_num=backup['backup_num'],
+                                                                                  async_time=async_time)
+
+            if not res_:
+                raise AsyncError(message=f'update sync_end、async failed in backup: {backup["backup_num"]} ',
+                                 code='UpdateSyncEndFailed')
+
+            ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup,
+                                                    breakpoint_resume=breakpoint_resume)
+            async_time = get_utcnow()
             if ok:
                 try:
                     r = QueryHandler().update_object_async_time(
-                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
                 except Exception as e:
                     r = QueryHandler().update_object_async_time(
-                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
 
                 if not r:
-                    raise AsyncError(message=f'update async{backup_num} failed', code='UpdateAsyncFailed')
+                    raise AsyncError(message=f'update sync_end、async failed in backup: {backup["backup_num"]}',
+                                     code='UpdateSyncEndFailed')
         except AsyncError as e:
+            raise e
+        except Exception as e:
             raise e
 
         return backup
+
+    def async_bucket_object_time_condition(self, bucket, obj, backup):
+        """
+        上传对象前时间条件判断
+        :return:
+        """
+        backup_num = backup['backup_num']
+        breakpoint_resume = None
+        if backup_num == BackupNum.ONE:
+            if obj['sync_start1'] and obj['upt'] < obj['sync_start1']:
+                breakpoint_resume = True # 续传
+
+            # if obj['sync_start1'] and obj['upt'] > obj['sync_start1']:
+            #     重新上传
+
+            backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
+                                                     breakpoint_resume=breakpoint_resume)
+            return backup_backup
+        else:
+            if obj['sync_start2'] and obj['upt'] < obj['sync_start2']:
+                breakpoint_resume = True  # 续传
+
+            # if obj['sync_start2'] and obj['upt'] > obj['sync_start2']:
+            #     pass
+
+            backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
+                                                     breakpoint_resume=breakpoint_resume)
+            return backup_backup
+
+
+

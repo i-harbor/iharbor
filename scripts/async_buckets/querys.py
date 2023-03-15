@@ -235,8 +235,10 @@ class QueryHandler:
             tc('sds'),
             tc('md5'),
             tc('share'),
-            tc('async1'),
-            tc('async2'),
+            tc('sync_start1'),
+            tc('sync_start2'),
+            tc('sync_end1'),
+            tc('sync_end2'),
             tc('pool_id')
         ]
         fields_sql = ', '.join(fields)
@@ -256,10 +258,11 @@ class QueryHandler:
 
         num_where_items = []
         if BackupNum.ONE in backup_nums:
-            num_where_items.append(f"{tc('async1')} IS NULL OR {tc('upt')} > {tc('async1')}")
+            num_where_items.append(f"{tc('sync_start1')} IS NULL OR {tc('sync_end1')} IS NULL OR {tc('upt')} > {tc('sync_start1')}")
 
         if BackupNum.TWO in backup_nums:
-            num_where_items.append(f"{tc('async2')} IS NULL OR {tc('upt')} > {tc('async2')}")
+            num_where_items.append(f"{tc('sync_start2')} IS NULL OR {tc('upt')} > {tc('sync_start2')} "
+                                   f"OR {tc('sync_end2')} IS NULL")
 
         if num_where_items:
             num_where = ' OR '.join(num_where_items)
@@ -310,6 +313,7 @@ class QueryHandler:
             bucket_id=bucket_id, id_gt=id_gt, limit=limit, meet_time=meet_time, id_mod_div=id_mod_div,
             id_mod_equal=id_mod_equal, backup_nums=backup_nums, size_gte=size_gte
         )
+        print(f"sql = {sql}")
         return self.select_all(using=METADATA, sql=sql)
 
     def get_meet_time(self):
@@ -323,11 +327,47 @@ class QueryHandler:
 
         if backup_num == BackupNum.ONE:
             update_field = 'async1'
+            update_field_end = 'sync_end1'
         else:
             update_field = 'async2'
+            update_field_end = 'sync_end2'
 
-        fields_set = f"{tc(update_field)} = '{async_time_str}'"
+        fields_set = f"{tc(update_field)} = '{async_time_str}' , {tc(update_field_end)} = '{async_time_str}'"
         where = f"{tc('id')} = {obj_id}"
+        sql = f"UPDATE {qn(table_name)} SET {fields_set} WHERE {where}"
+        try:
+            rows = self.update(using=METADATA, sql=sql)
+        except Exception as exc:
+            rows = self.update(using=METADATA, sql=sql)
+
+        if rows == 1:
+            return True
+
+        return False
+
+    def update_sync_start_and_end_before_upload_obj(self, bucket_id, obj, backup_num, async_time):
+        async_time_str = db_datetime_str(async_time)
+        table_name = self._bucket_table_name(bucket_id)
+        tc = table_columns(table_name=table_name)
+        qn = quote_name
+        fields_set = None
+        if backup_num == BackupNum.ONE:
+            if not obj['sync_start1']:  # 为空
+                fields_set = f"{tc('sync_end1')} = NULL , {tc('sync_start1')}= '{async_time_str}'"
+            if obj['sync_start1'] and obj['upt'] > obj['sync_start1']:
+                fields_set = f"{tc('sync_end1')} = NULL"
+
+        else:
+            if not obj['sync_start2']:  # 为空
+                fields_set = f"{tc('sync_end2')} = NULL , {tc('sync_start2')}= '{async_time_str}'"
+            if obj['sync_start2'] and obj['upt'] > obj['sync_start2']:
+                fields_set = f"{tc('sync_end2')} = NULL"
+
+        if fields_set is None:
+            #? 如果前面的逻辑不对 则 sync_start1  upt < sync_start1 会使 fields_set 为None
+            raise ValueError("逻辑结构设置有误。")
+        # fields_set = f"{tc(update_field_end)} = NULL AND {tc(update_field_start)}= '{async_time_str}'"
+        where = f"{tc('id')} = {obj['id']}"
         sql = f"UPDATE {qn(table_name)} SET {fields_set} WHERE {where}"
         try:
             rows = self.update(using=METADATA, sql=sql)

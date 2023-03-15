@@ -13,7 +13,7 @@ from async_buckets import AsyncTask
 
 def config_logger(name: str = 'async-logger', level=logging.INFO):
     # 日志配置
-    log_files_dir = '/var/log/iharbor'
+    log_files_dir = '/var/log/nginx'
     if not os.path.exists(log_files_dir):
         os.makedirs(log_files_dir, exist_ok=True)
 
