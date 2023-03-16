@@ -231,9 +231,10 @@ class IharborBucketClient:
         file = FileWrapper(ho=ho).open()
         if breakpoint_resume:
             # 续传 获取 已同步文件的大小
-            size = self.get_backup_address_object_size(endpoint_url=endpoint_url, bucket_name=bucket_name,
-                                                       object_key=object_key, bucket_token=bucket_token)
-            file.seek(size)
+            incomplete_obj_size = self.get_backup_address_object_size(endpoint_url=endpoint_url, object_key=object_key,
+                                                                      bucket_name=bucket_name, bucket_token=bucket_token)
+            file.seek(incomplete_obj_size)
+
         while True:
             offset = file.offset
             reset = None
@@ -315,7 +316,7 @@ class AsyncBucketManager:
             return True
 
         ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
-        if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
+        if obj_size <= 100 * 1024**2 and hex_md5:       # 256MB
             r = client.put_one_object(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
                                       object_key=object_key, bucket_token=bucket_token, object_md5=hex_md5)
             if r is True:
@@ -326,30 +327,31 @@ class AsyncBucketManager:
                                     breakpoint_resume=breakpoint_resume)
         return True
 
-    def async_bucket_object(self, bucket, obj, backup, breakpoint_resume=None):
+    def async_bucket_object(self, bucket, obj, backup, logger):
         """
+        breakpoint_resume: 标记 是否断点续传
         :return:
             backup_num
 
         :raises: AsyncError, CanNotConnection
         """
-        # 对象是否需要同步
         backup_num = backup['backup_num']
         async_time = get_utcnow()
-        try:
+        breakpoint_resume = self.async_bucket_object_breakpoint_resume(obj=obj, backup_num=backup_num)
+        if breakpoint_resume is False:  # 不是断点续传
             try:
-                # 根据条件更新sync_start为开始时间，sync_end 为空
-                res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
-                                                                                  backup_num=backup_num,
-                                                                                  async_time=async_time)
+                # 不是续传，需要更改 sync_start sync_end 字段
+                QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj_id=obj['id'],
+                                                                           async_time=async_time, backup_num=backup_num)
             except Exception as e:
-                res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
-                                                                                  backup_num=backup_num,
-                                                                                  async_time=async_time)
-
-            if not res_:
-                raise AsyncError(message=f'update sync_end、async failed in backup: {backup_num} ',
+                raise AsyncError(message=f'update sync_start sync_end failed in backup: {backup_num}',
                                  code='UpdateSyncEndFailed')
+        if breakpoint_resume is None:
+            logger.debug(f"不同步的文件：backup num {backup_num}, [bucket(id={bucket['id']}, name={bucket['name']})], "
+                         f"[object(id={obj['id']}, key={obj['na']}, size={obj['si']})]")
+            return None
+
+        try:
 
             ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup,
                                                     breakpoint_resume=breakpoint_resume)
@@ -372,27 +374,35 @@ class AsyncBucketManager:
 
         return backup
 
-    def async_bucket_object_time_condition(self, bucket, obj, backup):
+    def async_bucket_object_breakpoint_resume(self, obj, backup_num):
         """
-        上传对象前时间条件判断
+        判断是否是对象是否断点续传
         :return:
         """
-        backup_num = backup['backup_num']
-        breakpoint_resume = None
+
+        if not obj['upt']:
+            return False
+
         if backup_num == BackupNum.ONE:
-            if obj['sync_start1'] and obj['upt'] < obj['sync_start1']:
-                breakpoint_resume = True
-
-            backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
-                                                     breakpoint_resume=breakpoint_resume)
-            return backup_backup
-        else:
-            if obj['sync_start2'] and obj['upt'] < obj['sync_start2']:
+            if not obj['sync_start1']:
+                breakpoint_resume = False
+            elif obj['upt'] > obj['sync_start1']:
+                breakpoint_resume = False
+            elif not obj['sync_end1']:
                 breakpoint_resume = True  # 续传
+            else:
+                breakpoint_resume = None
+        else:
+            if not obj['sync_start2']:
+                breakpoint_resume = False
+            elif obj['upt'] > obj['sync_start2']:
+                breakpoint_resume = False
+            elif not obj['sync_end2']:
+                breakpoint_resume = True  # 续传
+            else:
+                breakpoint_resume = None
 
-            backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
-                                                     breakpoint_resume=breakpoint_resume)
-            return backup_backup
+        return breakpoint_resume
 
 
 

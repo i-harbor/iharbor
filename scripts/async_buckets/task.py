@@ -200,7 +200,6 @@ class AsyncTask:
         try:
             self.async_one_bucket(bucket=bucket, last_object_id=last_object_id, limit=limit, backup=backup)
         except Exception as e:
-            # self._stop.set()
             self.in_exiting = True
         finally:
             self.pool_sem.release()  # 可用线程数+1
@@ -259,6 +258,7 @@ class AsyncTask:
             except CanNotConnection as exc:
                 can_not_connection += 1
                 if can_not_connection > 6:
+                    self.in_exiting = True
                     break
 
                 self.logger.error(f"Error, async Bucket(id={bucket_id}, name={bucket_name}), "
@@ -269,8 +269,8 @@ class AsyncTask:
                 if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
                     self.logger.debug(f"Skip bukcet(id={bucket_id}, name={bucket_name}), async unusual, "
                                       f"failed: {failed_count}, ok: {ok_count}.")
-                    # break
                     self.in_exiting = True
+                    break
 
                 self.logger.error(f"Error, async_bucket,{str(err)}")
                 continue
@@ -327,7 +327,7 @@ class AsyncTask:
                 self.logger.debug(f"Test async {msg}")
                 time.sleep(1)
             else:
-                AsyncBucketManager().async_bucket_object_time_condition(bucket=bucket, obj=obj, backup=backup)
+                AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup, logger=self.logger)
         except Exception as e:
             ret = e
             self.logger.error(f"Failed Async, {msg}, {str(e)}")
@@ -354,10 +354,10 @@ class AsyncTask:
         backup_num = backup['backup_num']
 
         if backup_num == BackupNum.ONE:
-            if sync_start1 is None or (sync_start1 <= upt < neet_time) or (upt < sync_start1 and not obj['sync_end1']):
+            if sync_start1 is None or obj['upt'] is None or (sync_start1 <= upt < neet_time) or not obj['sync_end1']:
                 return True
         elif backup_num == BackupNum.TWO:
-            if sync_start2 is None or (sync_start2 <= upt < neet_time) or (upt < sync_start1 and not obj['sync_end2']):
+            if sync_start2 is None or obj['upt'] is None or (sync_start2 <= upt < neet_time) or not obj['sync_end2']:
                 return True
 
         return False

@@ -258,7 +258,8 @@ class QueryHandler:
 
         num_where_items = []
         if BackupNum.ONE in backup_nums:
-            num_where_items.append(f"{tc('sync_start1')} IS NULL OR {tc('sync_end1')} IS NULL OR {tc('upt')} > {tc('sync_start1')}")
+            num_where_items.append(f"{tc('sync_start1')} IS NULL OR {tc('sync_end1')} IS NULL "
+                                   f"OR {tc('upt')} > {tc('sync_start1')}")
 
         if BackupNum.TWO in backup_nums:
             num_where_items.append(f"{tc('sync_start2')} IS NULL OR {tc('upt')} > {tc('sync_start2')} "
@@ -319,6 +320,14 @@ class QueryHandler:
         return datetime.utcnow() - timedelta(minutes=self.MEET_ASYNC_TIMEDELTA_MINUTES)
 
     def update_object_sync_end_time(self, bucket_id, obj_id, async_time, backup_num):
+        """
+        备份完成后 sync_end 字段更新
+        :param bucket_id:
+        :param obj_id:
+        :param async_time:
+        :param backup_num:
+        :return: True or False
+        """
         async_time_str = db_datetime_str(async_time)
         table_name = self._bucket_table_name(bucket_id)
         tc = table_columns(table_name=table_name)
@@ -342,31 +351,29 @@ class QueryHandler:
 
         return False
 
-    def update_sync_start_and_end_before_upload_obj(self, bucket_id, obj, backup_num, async_time):
+    def update_sync_start_and_end_before_upload_obj(self, bucket_id, obj_id, async_time, backup_num):
+        """
+        备份对象前更新数据库sync_start sync_end字段
+        :param backup_num:
+        :param bucket_id:
+        :param obj_id:
+        :param async_time:
+        :return: True or False
+        """
         async_time_str = db_datetime_str(async_time)
         table_name = self._bucket_table_name(bucket_id)
         tc = table_columns(table_name=table_name)
         qn = quote_name
-        fields_set = None
+
         if backup_num == BackupNum.ONE:
-            if not obj['sync_start1']:  # 为空
-                fields_set = f"{tc('sync_end1')} = NULL , {tc('sync_start1')}= '{async_time_str}'"
-
-            if obj['sync_start1'] and obj['upt'] > obj['sync_start1']:
-                fields_set = f"{tc('sync_end1')} = NULL, {tc('sync_start1')}= '{async_time_str}'"
-
+            update_field_end = 'sync_end1'
+            update_field_start = 'sync_start1'
         else:
-            if not obj['sync_start2']:  # 为空
-                fields_set = f"{tc('sync_end2')} = NULL , {tc('sync_start2')}= '{async_time_str}'"
+            update_field_end = 'sync_end2'
+            update_field_start = 'sync_start2'
 
-            if obj['sync_start2'] and obj['upt'] > obj['sync_start2']:
-                fields_set = f"{tc('sync_end2')} = NULL, {tc('sync_start2')}= '{async_time_str}'"
-
-        if fields_set is None:
-            # sync_start1 不为空 且 upt < sync_start1 为续传
-            return True
-        # fields_set = f"{tc(update_field_end)} = NULL AND {tc(update_field_start)}= '{async_time_str}'"
-        where = f"{tc('id')} = {obj['id']}"
+        fields_set = f"{tc(update_field_end)} = NULL , {tc(update_field_start)} = '{async_time_str}'"
+        where = f"{tc('id')} = {obj_id}"
         sql = f"UPDATE {qn(table_name)} SET {fields_set} WHERE {where}"
         try:
             rows = self.update(using=METADATA, sql=sql)
