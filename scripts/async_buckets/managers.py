@@ -196,7 +196,7 @@ class IharborBucketClient:
         raise AsyncError(message=f'Failed async object({object_key}), to backup({backup_str}), put object, {r.text}',
                          code='FailedAsyncObject')
 
-    def _get_existed_size(self, endpoint_url: str, bucket_name: str, object_key: str, bucket_token: str):
+    def get_backup_address_object_size(self, endpoint_url: str, bucket_name: str, object_key: str, bucket_token: str):
         backup_str = f"endpoint_url={endpoint_url}, bucket name={bucket_name}, token={bucket_token}"
         url = self._build_object_metadata_base_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
                                                    object_key=object_key)
@@ -209,14 +209,16 @@ class IharborBucketClient:
             )
         except requests.exceptions.RequestException as e:
             raise AsyncError(
-                message=f'Failed get object ({object_key}) form backup point address ({backup_str}),'
+                message=f'Failed get object ({object_key}) size from backup point address ({backup_str}),'
                         f' break point resume object, {str(e)}', code='FailedAsyncObject')
+
         if r.status_code == 200:
             return r.json().get('obj')['si']
+
         else:
             data = r.json()
             raise AsyncError(
-                message=f'Failed get object ({object_key}) form backup point address ({backup_str}),'
+                message=f'Failed get object ({object_key}) size from backup point address ({backup_str}),'
                         f' break point resume object, {str(data)}', code='FailedAsyncObject')
 
     def post_object_by_chunk(self, ho, endpoint_url: str, bucket_name: str, object_key: str,
@@ -229,8 +231,8 @@ class IharborBucketClient:
         file = FileWrapper(ho=ho).open()
         if breakpoint_resume:
             # 续传 获取 已同步文件的大小
-            size = self._get_existed_size(endpoint_url=endpoint_url, bucket_name=bucket_name, object_key=object_key,
-                                          bucket_token=bucket_token)
+            size = self.get_backup_address_object_size(endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                                       object_key=object_key, bucket_token=bucket_token)
             file.seek(size)
         while True:
             offset = file.offset
@@ -320,7 +322,7 @@ class AsyncBucketManager:
                 return True
 
         client.post_object_by_chunk(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
-                                    object_key=object_key, bucket_token=bucket_token, per_size=1 * 1024 ** 2,
+                                    object_key=object_key, bucket_token=bucket_token,
                                     breakpoint_resume=breakpoint_resume)
         return True
 
@@ -332,21 +334,21 @@ class AsyncBucketManager:
         :raises: AsyncError, CanNotConnection
         """
         # 对象是否需要同步
-        # backup_num = backup['backup_num']
+        backup_num = backup['backup_num']
         async_time = get_utcnow()
         try:
             try:
                 # 根据条件更新sync_start为开始时间，sync_end 为空
                 res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
-                                                                                  backup_num=backup['backup_num'],
+                                                                                  backup_num=backup_num,
                                                                                   async_time=async_time)
             except Exception as e:
                 res_ = QueryHandler().update_sync_start_and_end_before_upload_obj(bucket_id=bucket['id'], obj=obj,
-                                                                                  backup_num=backup['backup_num'],
+                                                                                  backup_num=backup_num,
                                                                                   async_time=async_time)
 
             if not res_:
-                raise AsyncError(message=f'update sync_end、async failed in backup: {backup["backup_num"]} ',
+                raise AsyncError(message=f'update sync_end、async failed in backup: {backup_num} ',
                                  code='UpdateSyncEndFailed')
 
             ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup,
@@ -354,14 +356,14 @@ class AsyncBucketManager:
             async_time = get_utcnow()
             if ok:
                 try:
-                    r = QueryHandler().update_object_async_time(
-                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
+                    r = QueryHandler().update_object_sync_end_time(
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
                 except Exception as e:
-                    r = QueryHandler().update_object_async_time(
-                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup['backup_num'])
+                    r = QueryHandler().update_object_sync_end_time(
+                        bucket_id=bucket['id'], obj_id=obj['id'], async_time=async_time, backup_num=backup_num)
 
                 if not r:
-                    raise AsyncError(message=f'update sync_end、async failed in backup: {backup["backup_num"]}',
+                    raise AsyncError(message=f'update sync_end failed in backup: {backup_num}',
                                      code='UpdateSyncEndFailed')
         except AsyncError as e:
             raise e
@@ -379,10 +381,7 @@ class AsyncBucketManager:
         breakpoint_resume = None
         if backup_num == BackupNum.ONE:
             if obj['sync_start1'] and obj['upt'] < obj['sync_start1']:
-                breakpoint_resume = True # 续传
-
-            # if obj['sync_start1'] and obj['upt'] > obj['sync_start1']:
-            #     重新上传
+                breakpoint_resume = True
 
             backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
                                                      breakpoint_resume=breakpoint_resume)
@@ -390,9 +389,6 @@ class AsyncBucketManager:
         else:
             if obj['sync_start2'] and obj['upt'] < obj['sync_start2']:
                 breakpoint_resume = True  # 续传
-
-            # if obj['sync_start2'] and obj['upt'] > obj['sync_start2']:
-            #     pass
 
             backup_backup = self.async_bucket_object(bucket=bucket, obj=obj, backup=backup,
                                                      breakpoint_resume=breakpoint_resume)

@@ -348,16 +348,16 @@ class AsyncTask:
         """
         # 对象修改时间超过now足够时间段后才允许同步, 尽量保证对象上传完成后再同步
         neet_time = QueryHandler().get_meet_time()
-        sync_end1 = obj['sync_end1']
-        sync_end2 = obj['sync_end2']
+        sync_start1 = obj['sync_start1']
+        sync_start2 = obj['sync_start2']
         upt = obj['upt']
         backup_num = backup['backup_num']
 
         if backup_num == BackupNum.ONE:
-            if sync_end1 is None or (sync_end1 <= upt < neet_time):
+            if sync_start1 is None or (sync_start1 <= upt < neet_time) or (upt < sync_start1 and not obj['sync_end1']):
                 return True
         elif backup_num == BackupNum.TWO:
-            if sync_end2 is None or (sync_end2 <= upt < neet_time):
+            if sync_start2 is None or (sync_start2 <= upt < neet_time) or (upt < sync_start1 and not obj['sync_end2']):
                 return True
 
         return False
