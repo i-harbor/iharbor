@@ -316,7 +316,7 @@ class AsyncBucketManager:
             return True
 
         ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
-        if obj_size <= 100 * 1024**2 and hex_md5:       # 256MB
+        if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
             r = client.put_one_object(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
                                       object_key=object_key, bucket_token=bucket_token, object_md5=hex_md5)
             if r is True:
