@@ -50,7 +50,8 @@ class Command(BaseCommand):
 
         buckets = self.get_buckets(**options)
 
-        if input('Check that the cep_config configuration has been manually changed') != 'yes':
+        if input('Check that the cep_config configuration has been manually changed? \n\n '
+                 + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
             raise CommandError("cancelled.")
 
         if input('Are you sure you want to do this? \n\n'

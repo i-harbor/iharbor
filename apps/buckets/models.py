@@ -669,6 +669,10 @@ class BucketFileBase(models.Model):
     async1 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第1备份点备份时间')
     async2 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第2备份点备份时间')
     pool_id = models.IntegerField(verbose_name='指定使用的存储池')
+    sync_start1 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第一备份点开始时间')
+    sync_end1 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第一备份点结束时间')
+    sync_start2 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第二备份点开始时间')
+    sync_end2 = models.DateTimeField(blank=True, null=True, default=None, verbose_name='第二备份点结束时间')
 
     class Meta:
         abstract = True
