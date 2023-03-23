@@ -119,6 +119,7 @@ class Command(BaseCommand):
 
         try:
             sql = f"ALTER TABLE {table_name} ADD pool_id INT(4) DEFAULT {pool_id};"
+            print(f"桶 { bucket.id, bucket.name } 执行命令 {sql}")
         except Exception as e:
             ret = False
             self.stdout.write(self.style.ERROR(f"error sql syntax for "

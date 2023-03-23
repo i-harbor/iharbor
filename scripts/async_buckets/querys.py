@@ -456,3 +456,46 @@ class QueryHandler:
 
         sql = f"SELECT {fields_sql} FROM {qn(table_name)}"
         return self.select_all(using=DEFAULT, sql=sql)
+
+    def insert_data_to_async_error_table(self, node_ip, bucket, obj, async_error, error_time, backup,
+                                         node_num, node_count, thread_num, bucketlist):
+        """
+        更新 错误内容到数据同步错误表中
+        :return:
+        """
+        table_name = 'async_error_bucketasyncerror'
+        qn = quote_name
+        tc = table_columns(table_name=table_name)
+        fields = [
+            # tc('id'),
+            tc('node_ip'),
+            tc('bucket_id'),
+            tc('bucket_name'),
+            tc('object_id'),
+            tc('object_name'),
+            tc('async_error'),
+            tc('error_time'),
+            tc('backup_ip'),
+            tc('backup_bucket'),
+            tc('node_num'),
+            tc('node_count'),
+            tc('thread_num'),
+            tc('bucketlist'),
+        ]
+        fields_sql = ', '.join(fields)
+        async_error = async_error.replace("'", "''").replace("\\", "''")
+
+        sql = f"INSERT INTO {qn(table_name)} ({fields_sql}) VALUES ('{node_ip}', '{bucket['id']}', " \
+              f"'{bucket['name']}', '{obj['id']}', '{obj['name']}', '{async_error}', '{error_time}', " \
+              f"'{backup['endpoint_url']}','{backup['bucket_name']}', '{node_num}', '{node_count}', '{thread_num}', " \
+              f"'{bucketlist}' ) "
+
+        try:
+            rows = self.update(using=DEFAULT, sql=sql)
+        except Exception as exc:
+            rows = self.update(using=DEFAULT, sql=sql)
+
+        if rows == 1:
+            return True
+
+        return False

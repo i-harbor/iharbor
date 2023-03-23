@@ -3,9 +3,19 @@ import time
 import threading
 import random
 
-from .managers import AsyncBucketManager
-from .querys import QueryHandler, BackupNum
+from .managers import AsyncBucketManager, get_utcnow
+from .querys import QueryHandler, BackupNum, db_datetime_str
 from .databases import CanNotConnection
+
+
+def get_hostname():
+    try:
+        f = os.popen("hostname")
+        hostname = f.readline().strip('\n')
+        f.close()
+    except Exception as e:
+        hostname = "无法获取"
+    return hostname
 
 
 class AsyncTask:
@@ -44,7 +54,7 @@ class AsyncTask:
 
         self.pool_sem = threading.Semaphore(self.max_threads)  # 定义最多同时启用多少个线程
         self.in_exiting = False         # 多线程时标记是否正在退出
-        # self._stop = threading.Event()
+        self.hostname = get_hostname()
 
     def validate_params(self):
         """
@@ -89,7 +99,6 @@ class AsyncTask:
 
         while True:
             try:
-                # self.dev_test()
                 for num in [1, 2]:
                     self.logger.debug(f"Start Backup number {num} async loop.")
                     self.loop_buckets(backup_num=num, names=self.buckets)
@@ -114,8 +123,6 @@ class AsyncTask:
                     self.logger.debug(f'You need to enter CTL + C {3 - key_ipt_count} times, will be forced to exit.')
                     if key_ipt_count >= 3:
                         break
-                # if self._stop.isSet():
-                #     break
             break
 
         self.logger.warning('Exit')
@@ -154,11 +161,15 @@ class AsyncTask:
         error_count = 0
         can_not_connection = 0
         while True:
+            if self.in_exiting:
+                break
             try:
                 buckets = QueryHandler().get_need_async_buckets(id_gt=last_bucket_id, limit=10, names=names)
                 if len(buckets) == 0:  # 所有桶循环一遍完成
                     break
                 for bucket in buckets:
+                    if self.in_exiting:
+                        break
                     bucket_id = bucket['id']
                     backup = QueryHandler().get_bucket_backup(bucket_id=bucket_id, backup_num=backup_num)
                     if backup is not None and backup['status'] == 'start':
@@ -243,7 +254,9 @@ class AsyncTask:
                 if len(objs) == 0:
                     break
 
-                ok_num, l_id, l_size, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup)
+                ok_num, l_id, l_size, err = self.handle_async_objects(bucket=bucket, objs=objs, backup=backup,
+                                                                      can_not_connection=can_not_connection,
+                                                                      failed_count=failed_count)
                 ok_count += ok_num
                 if l_id is not None:
                     last_object_id = l_id
@@ -266,11 +279,14 @@ class AsyncTask:
                 time.sleep(can_not_connection)
             except Exception as err:
                 failed_count += 1
-                if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
-                    self.logger.debug(f"Skip bukcet(id={bucket_id}, name={bucket_name}), async unusual, "
-                                      f"failed: {failed_count}, ok: {ok_count}.")
+                if failed_count > 6:
                     self.in_exiting = True
                     break
+                # if self.is_unusual_async_failed(failed_count=failed_count, ok_count=ok_count):
+                #     self.logger.debug(f"Skip bukcet(id={bucket_id}, name={bucket_name}), async unusual, "
+                #                       f"failed: {failed_count}, ok: {ok_count}.")
+                #     self.in_exiting = True
+                #     break
 
                 self.logger.error(f"Error, async_bucket,{str(err)}")
                 continue
@@ -278,7 +294,7 @@ class AsyncTask:
         self.logger.debug(f'Exit async Bucket(id={bucket_id}, name={bucket_name}), Backup number {backup_num}, '
                           f'ok {ok_count}, failed {failed_count}.')
 
-    def handle_async_objects(self, bucket, objs: list, backup: dict):
+    def handle_async_objects(self, bucket, objs: list, backup: dict, can_not_connection: int, failed_count: int):
         """
         :return:
             (
@@ -300,6 +316,8 @@ class AsyncTask:
                 if self.is_meet_async_to_backup(obj=obj, backup=backup):
                     r = self.async_one_object(bucket=bucket, obj=obj, backup=backup)
                     if r is not None:
+                        self.record_async_error(bucket=bucket, obj=obj, backup=backup, error=str(r),
+                                                can_not_connection=can_not_connection, failed_count=failed_count)
                         return ok_count, last_object_id, last_object_size, r
 
                     ok_count += 1
@@ -336,6 +354,49 @@ class AsyncTask:
             self.logger.debug(f"OK Async, Use {delta_seconds} s, {msg}")
 
         return ret
+
+    def insert_async_error_sql(self, hostname, bucket, obj, error, backup, thread_num):
+        try:
+            QueryHandler().insert_data_to_async_error_table(node_ip=hostname, bucket=bucket, obj=obj, async_error=error,
+                                                            error_time=db_datetime_str(get_utcnow()), backup=backup,
+                                                            node_num=self.node_num, node_count=self.node_count,
+                                                            thread_num=thread_num, bucketlist=self.buckets)
+        except Exception as e:
+            raise e
+
+    def insert_async_error(self, bucket, obj, backup, error):
+        """
+        向 async_error表中插入数据
+        :return:
+        """
+
+        thread_num = 0
+        if self.in_multi_thread:
+            thread_num = self.max_threads
+
+        try:
+
+            self.insert_async_error_sql(hostname=self.hostname, bucket=bucket, obj=obj, error=error, backup=backup,
+                                        thread_num=thread_num)
+            self.in_exiting = True
+        except Exception as e:
+            self.in_exiting = True
+            error = f"节点异常。"
+            self.insert_async_error_sql(hostname=self.hostname, bucket=bucket, obj=obj, error=error, backup=backup,
+                                        thread_num=thread_num)
+
+    def record_async_error(self, bucket, obj, backup, error, can_not_connection, failed_count):
+        """记录同步出现的错误条件（什么时候记录）"""
+        num = failed_count + can_not_connection
+        if num == 0:
+            return
+        elif num % 6 != 0:
+            return
+
+        try:
+            self.insert_async_error(bucket=bucket, obj=obj, backup=backup, error=error)
+        except Exception as e:
+            raise e
 
     @staticmethod
     def is_meet_async_to_backup(obj, backup):
