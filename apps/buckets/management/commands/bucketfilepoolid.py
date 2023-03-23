@@ -1,5 +1,3 @@
-import threading
-
 from django.core.management.base import BaseCommand, CommandError
 
 from buckets.utils import BucketFileManagement
@@ -7,14 +5,13 @@ from buckets.models import Bucket
 
 
 class Command(BaseCommand):
-    '''
+    """
     根据 桶 获取 ceph_uing 更新 对象的 pool_id
     只为对象文件增加字 pool_id 段
-    '''
-    pool_sem = threading.Semaphore(100)  # 定义最多同时启用多少个线程
+    """
     error_buckets = []
-    # 需手动修改
-    ceph_config = {'default': 1, 'default2': 2, 'default3': 3}
+    # 需手动修改, {'alias1': 1, 'alias2': 2}
+    ceph_pool_id_mapping = {'ceph2': 2, 'default': 1}
 
     help = """
             ** manage.py bucketfilepoolid --all [--id-gt=xxx] **
@@ -34,23 +31,16 @@ class Command(BaseCommand):
             '--id-gt', default=0, dest='id-gt', type=int,
             help='All buckets with ID greater than "id-gt".',
         )
-        parser.add_argument(
-            '--multithreading', default=None, nargs='?', dest='multithreading', const=True,
-            help='use multithreading mode.',
-        )
 
     def handle(self, *args, **options):
         print(options)
-
-        multithreading = options.get('multithreading')
-        if multithreading:
-            self.stdout.write(self.style.NOTICE('work mode in multithreading'))
-        else:
-            self.stdout.write(self.style.NOTICE('work mode in one thread'))
-
         buckets = self.get_buckets(**options)
 
-        if input('Check that the cep_config configuration has been manually changed? \n\n '
+        if not self.ceph_pool_id_mapping:
+            raise CommandError("The attribute 'ceph_pool_id_mapping' needs to be set.")
+
+        self.stdout.write(self.style.NOTICE(f'pool_id mapping: {self.ceph_pool_id_mapping}'))
+        if input('Please verify the "pool_id mapping" \n\n '
                  + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
             raise CommandError("cancelled.")
 
@@ -58,29 +48,26 @@ class Command(BaseCommand):
                  + "Type 'yes' to continue, or 'no' to cancel: ") != 'yes':
             raise CommandError("cancelled.")
 
-        if multithreading:
-            self.modify_buckets_multithreading(buckets)
-        else:
-            self.modify_buckets(buckets)
+        self.modify_buckets(buckets)
 
     def _get_buckets(self, **options):
-        '''
+        """
         获取给定的bucket或所有bucket
         :param options:
         :return:
-        '''
+        """
         bucketname = options['bucketname']
-        all = options['all']
+        all_ = options['all']
         id_gt = options['id-gt']
 
         # 指定名字的桶
         if bucketname:
-            self.stdout.write(self.style.NOTICE('Will clear all buckets named {0}'.format(bucketname)))
+            self.stdout.write(self.style.NOTICE('Buckets named {0}'.format(bucketname)))
             return Bucket.objects.filter(name=bucketname).all()
 
         # 全部的桶
-        if all is not None:
-            self.stdout.write(self.style.NOTICE('Will exec sql for all buckets.'))
+        if all_ is not None:
+            self.stdout.write(self.style.NOTICE('All buckets.'))
             qs = Bucket.objects.all()
             if id_gt > 0:
                 qs = qs.filter(id__gt=id_gt)
@@ -91,7 +78,7 @@ class Command(BaseCommand):
         if not bucketname:
             bucketname = input('Please input a bucket name:')
 
-        self.stdout.write(self.style.NOTICE('Will exec sql for bucket named {0}'.format(bucketname)))
+        self.stdout.write(self.style.NOTICE('Bucket named {0}'.format(bucketname)))
         return Bucket.objects.filter(name=bucketname).all()
 
     def get_buckets(self, **options):
@@ -99,31 +86,33 @@ class Command(BaseCommand):
         buckets = buckets.order_by('id')
         return buckets
 
-    def modify_one_bucket(self, bucket, in_thread: bool = True):
-        '''
+    def modify_one_bucket(self, bucket):
+        """
         为一个bucket执行sql
 
         :param bucket: Bucket obj
-        :param in_thread: 是否是线程
         :return:
         pool_id 存在跳过  存在检测
-        '''
-
+        """
         ret = True
         table_name = bucket.get_bucket_table_name()
         table_name = f'`{table_name}`'
-        try:
-            pool_id = self.ceph_config[bucket.ceph_using]
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"error configure ceph_config based on the cluster."))
+
+        if bucket.ceph_using not in self.ceph_pool_id_mapping:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Bucket(id={bucket.id}, name={bucket.name}), bucket's ceph_using=“{bucket.ceph_using}” not in "
+                    f"“{self.ceph_pool_id_mapping}”，Unable to know pool_id."))
+            return False
+
+        pool_id = self.ceph_pool_id_mapping[bucket.ceph_using]
 
         try:
-            sql = f"ALTER TABLE {table_name} ADD pool_id INT(4) DEFAULT {pool_id};"
-            print(f"桶 { bucket.id, bucket.name } 执行命令 {sql}")
+            sql = f"ALTER TABLE {table_name} ADD `pool_id` INT(4) DEFAULT {pool_id};"
         except Exception as e:
             ret = False
-            self.stdout.write(self.style.ERROR(f"error sql syntax for "
-                                               f"bucket'{bucket.id, bucket.name}': {str(e)}"))
+            self.stdout.write(self.style.ERROR(
+                f"Bucket(id={bucket.id}, name={bucket.name}), error when format sql: {str(e)}"))
         else:
             bfm = BucketFileManagement(collection_name=table_name)
             model_class = bfm.get_obj_model_class()
@@ -135,56 +124,32 @@ class Command(BaseCommand):
                 self.error_buckets.append(bucket.name)
                 if e.args[0] == 1060:
                     self.stdout.write(
-                        self.style.WARNING(f"warning appear {e.args[1]} for bucket '{bucket.id, bucket.name}' "
+                        self.style.WARNING(f"Bucket(id={bucket.id}, name={bucket.name}), warning appear {e.args[1]}，"
                                            f"-- sql: {sql} "))
                 else:
                     self.stdout.write(self.style.ERROR(
-                        f"error when execute sql for bucket '{bucket.id, bucket.name}':{type(e)} {str(e)} -- sql: {sql}"))
+                        f"Bucket(id={bucket.id}, name={bucket.name}), error when add field 'pool_id'"
+                        f":{type(e)} {str(e)} -- sql: {sql}"))
             else:
-                self.stdout.write(self.style.SUCCESS(f"success to execute sql for bucket '{bucket.id, bucket.name}' "
-                                                     f"-- sql: {sql} "))
-
-        if in_thread:
-            self.pool_sem.release() # 可用线程数+1
+                self.stdout.write(self.style.SUCCESS(
+                    f"Bucket(id={bucket.id}, name={bucket.name})，success to add field 'pool_id'; sql: {sql} "))
 
         return ret
 
-    def modify_buckets_multithreading(self, buckets):
-        '''
-        多线程为bucket执行sql
-        :param buckets:
-        :return: None
-        '''
-        for bucket in buckets:
-            if self.pool_sem.acquire(): # 可用线程数-1，控制线程数量，当前正在运行线程数量达到上限会阻塞等待
-                worker = threading.Thread(target=self.modify_one_bucket, kwargs={'bucket': bucket})
-                worker.start()
-
-        # 等待所有线程结束
-        while True:
-            c = threading.active_count()
-            if c <= 1:
-                break
-
-        self.stdout.write(self.style.SUCCESS(
-            'Successfully exec sql for {0} buckets'.format(buckets.count() - len(self.error_buckets))))
-        self.stdout.write(self.style.ERROR(
-            f"error when execute sql for buckets:{self.error_buckets}"))
-
     def modify_buckets(self, buckets):
-        '''
+        """
         单线程为bucket执行sql
         :param buckets:
         :return: None
-        '''
+        """
         count = 0
         for bucket in buckets:
-            ok = self.modify_one_bucket(bucket, in_thread=False)
+            ok = self.modify_one_bucket(bucket)
             if ok:
                 count += 1
             else:
                 self.stdout.write(self.style.ERROR(
-                    f"error when execute sql for bucket: name={bucket.name}, id={bucket.id}"))
+                    f"Bucket(id={bucket.id}, name={bucket.name}), error when add field 'pool_id'."))
                 break
 
         self.stdout.write(
@@ -192,4 +157,3 @@ class Command(BaseCommand):
                 'Successfully exec sql for {0} buckets'.format(count)
             )
         )
-

@@ -3,4 +3,5 @@
 * [安全&凭证](/security)
 * [搭建服务](/start_server)
 * [更新日志](/changelog)
+* [版本升级](/upgrade)
 * [关于我们](/about_us)
