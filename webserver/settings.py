@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'share',
     'ceph',
     's3',
+    'async_error',
 ]
 
 MIDDLEWARE = [
