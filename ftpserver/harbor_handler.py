@@ -5,7 +5,7 @@ from pyftpdlib.filesystems import FilesystemError
 from pyftpdlib.log import logger
 from pyftpdlib.handlers import FileProducer, SSL
 
-work_mode_in_tls = False
+work_mode_in_tls = True
 if SSL is None:
     work_mode_in_tls = False
 
