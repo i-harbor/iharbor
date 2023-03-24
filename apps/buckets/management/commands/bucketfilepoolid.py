@@ -10,8 +10,8 @@ class Command(BaseCommand):
     只为对象文件增加字 pool_id 段
     """
     error_buckets = []
-    # 需手动修改, {'alias1': 1, 'alias2': 2}
-    ceph_pool_id_mapping = {'ceph2': 2, 'default': 1}
+    # 需手动修改
+    ceph_pool_id_mapping = {}   # {'alias1': 1, 'alias2': 2}
 
     help = """
             ** manage.py bucketfilepoolid --all [--id-gt=xxx] **
