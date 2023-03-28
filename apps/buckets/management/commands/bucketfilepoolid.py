@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from buckets.utils import BucketFileManagement
-from buckets.models import Bucket
+from buckets.models import Bucket, Archive
 
 
 class Command(BaseCommand):
@@ -25,11 +25,15 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--all', default=None, nargs='?', dest='all', const=True, # 当命令行有此参数时取值const, 否则取值default
-            help='exec sql for all buckets',
+            help='Add column "pool_id" for all buckets',
         )
         parser.add_argument(
             '--id-gt', default=0, dest='id-gt', type=int,
             help='All buckets with ID greater than "id-gt".',
+        )
+        parser.add_argument(
+            '--archive', default=None, nargs='?', dest='archive', const=True,  # 当命令行有此参数时取值const, 否则取值default
+            help='Add column "pool_id" for all bucket archives',
         )
 
     def handle(self, *args, **options):
@@ -81,7 +85,21 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('Bucket named {0}'.format(bucketname)))
         return Bucket.objects.filter(name=bucketname).all()
 
+    def _get_archives(self, **options):
+        id_gt = options['id-gt']
+
+        self.stdout.write(self.style.NOTICE('All archives.'))
+        qs = Archive.objects.all()
+        if id_gt > 0:
+            qs = qs.filter(id__gt=id_gt)
+
+        return qs.order_by('id')
+
     def get_buckets(self, **options):
+        is_archive = options['archive']
+        if is_archive:
+            return self._get_archives(**options)
+
         buckets = self._get_buckets(**options)
         buckets = buckets.order_by('id')
         return buckets
@@ -108,7 +126,7 @@ class Command(BaseCommand):
         pool_id = self.ceph_pool_id_mapping[bucket.ceph_using]
 
         try:
-            sql = f"ALTER TABLE {table_name} ADD `pool_id` INT(4) DEFAULT {pool_id};"
+            sql = f"ALTER TABLE {table_name} ADD `pool_id` INT(11) DEFAULT {pool_id};"
         except Exception as e:
             ret = False
             self.stdout.write(self.style.ERROR(
