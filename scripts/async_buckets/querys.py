@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime
 from pytz import utc
 
+
 from .databases import (
     get_connection, meet_async_timedelta_minutes,
     METADATA, DEFAULT, db_readwrite_lock
@@ -106,11 +107,11 @@ class QueryHandler:
         return self.select(using=using, sql=sql, result_type='all')
 
     @db_readwrite_lock
-    def update(self, using: str, sql: str):
+    def update(self, using: str, sql: str, args=None):
         conn = get_connection(using)
         try:
             with conn.cursor() as cursor:
-                rows = cursor.execute(sql)
+                rows = cursor.execute(sql, args)
                 conn.commit()
                 return rows
         except Exception as e:
@@ -483,17 +484,18 @@ class QueryHandler:
             tc('bucketlist'),
         ]
         fields_sql = ', '.join(fields)
-        async_error = async_error.replace("'", "''").replace("\\", "''")
+        fields_values = ', '.join(['%s'] * len(fields))
 
-        sql = f"INSERT INTO {qn(table_name)} ({fields_sql}) VALUES ('{node_ip}', '{bucket['id']}', " \
-              f"'{bucket['name']}', '{obj['id']}', '{obj['name']}', '{async_error}', '{error_time}', " \
-              f"'{backup['endpoint_url']}','{backup['bucket_name']}', '{node_num}', '{node_count}', '{thread_num}', " \
-              f"'{bucketlist}' ) "
-
+        sql = f"INSERT INTO {qn(table_name)} ({fields_sql}) VALUES ({fields_values}) "
+        params = (
+            node_ip, bucket['id'], bucket['name'], obj['id'], obj['name'], async_error,
+            error_time, backup['endpoint_url'], backup['bucket_name'],
+            node_num, node_count, thread_num, bucketlist
+        )
         try:
-            rows = self.update(using=DEFAULT, sql=sql)
+            rows = self.update(using=DEFAULT, sql=sql, args=params)
         except Exception as exc:
-            rows = self.update(using=DEFAULT, sql=sql)
+            rows = self.update(using=DEFAULT, sql=sql, args=params)
 
         if rows == 1:
             return True
