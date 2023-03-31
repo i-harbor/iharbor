@@ -1,3 +1,4 @@
+import time
 import config
 import os
 import sys
@@ -26,6 +27,22 @@ def async_monitor_logger(name: str = 'async-monitor-logger', level=logging.INFO)
     logger.addHandler(std_handler)
     logger.addHandler(file_handler)
     return logger
+
+
+def delay_time(func):
+    def wrapper(*args, **kwargs):
+        delaytime = getattr(config, 'DELAYTIME', 30)
+
+        if not isinstance(delaytime, int):
+            raise ValueError("DELAYTIME 类型应该为 int 类型。")
+
+        elif delaytime < 0:
+            delaytime = 0
+
+        func(*args, **kwargs)
+        time.sleep(delaytime)
+
+    return wrapper
 
 
 class ServiceCommandHandle:
@@ -196,6 +213,7 @@ class NodeMonitor():
 
         return stdout
 
+    @delay_time
     def run_start(self, hostname, nodenum):
         """
         启动服务
@@ -215,6 +233,7 @@ class NodeMonitor():
 
         return
 
+    @delay_time
     def run_stop(self, hostname, nodenum):
         """
         停止服务
@@ -233,6 +252,7 @@ class NodeMonitor():
 
         return
 
+    @delay_time
     def run_status(self, hostname, nodenum):
         """
         查看服务状态
