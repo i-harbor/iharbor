@@ -215,6 +215,12 @@ class IharborBucketClient:
         if r.status_code == 200:
             return r.json().get('obj')['si']
 
+        if r.status_code == 404:
+            # 只是尝试获取对象，不一定存在。
+            # 因 rados read 时报错使备份节点的数据没有创建，在断点续传时 报 NoSuchKey 对象或目录不存在的问题
+            code = r.json()
+            if code['code'] in ['NoSuchKey', 'NoParentPath']:
+                return 0
         else:
             data = r.json()
             raise AsyncError(
