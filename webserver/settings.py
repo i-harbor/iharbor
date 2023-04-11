@@ -530,11 +530,8 @@ CORS_EXPOSE_HEADERS = [
 ]
 
 # rados 连接池最大数量 根据 uwsgi 配置的线程数
-RADOS_POOL_MAX_CONNECT_NUM = 1
-# # rados 连接池上限范围
-# RADOS_POOL_UPPER_LIMIT = 0.8 * RADOS_POOL_MAX_CONNECT_NUM
-# # rados 连接池下限范围
-# RADOS_POOL_LOWER_LIMIT = 0.2 * RADOS_POOL_MAX_CONNECT_NUM
+RADOS_POOL_MAX_CONNECT_NUM = 16
+
 
 # 导入安全相关的settings
 from .security_settings import *
