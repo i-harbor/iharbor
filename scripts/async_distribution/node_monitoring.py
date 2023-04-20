@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 from node_connect_cline import NodeClient
+from functools import wraps
 
 
 def async_monitor_logger(name: str = 'async-monitor-logger', level=logging.INFO):
@@ -30,17 +31,11 @@ def async_monitor_logger(name: str = 'async-monitor-logger', level=logging.INFO)
 
 
 def delay_time(func):
-    def wrapper(*args, **kwargs):
-        delaytime = getattr(config, 'DELAYTIME', 30)
-
-        if not isinstance(delaytime, int):
-            raise ValueError("DELAYTIME 类型应该为 int 类型。")
-
-        elif delaytime < 0:
-            delaytime = 0
-
-        func(*args, **kwargs)
-        time.sleep(delaytime)
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        out = func(self, *args, **kwargs)
+        time.sleep(self.delay_t)
+        return out
 
     return wrapper
 
@@ -61,7 +56,7 @@ class ServiceCommandHandle:
             ip_s = int(self.ip_start.split('.')[3])
             ip_e = int(self.ip_end.split('.')[3])
         except Exception as e:
-            raise e
+            raise ValueError(f"请查看config.py配置：error {str(e)}")
         ip_rang = ip_e - ip_s
         return ip_rang + 1, ip_s, ip_e
 
@@ -170,7 +165,8 @@ class ServiceCommandHandle:
     #     return ip_dict
     #
 
-class NodeMonitor():
+
+class NodeMonitor:
     """
     节点监控
     1. 查看服务是否正在运行、
@@ -178,16 +174,17 @@ class NodeMonitor():
     """
 
     def __init__(self):
-        self.ip_command_handle = ServiceCommandHandle()
         self.username = getattr(config, 'USERNAME', None)
         self.passwoed = getattr(config, 'PASSWARD', None)
         self.thread_num = getattr(config, 'THREAD_NUM', None)
         self.bucket_list = getattr(config, 'BUCKETLIST', None)
         self.logger = async_monitor_logger(level=logging.DEBUG)
-        self.error_list = []  # 有异常的节点列表
-        self.status_list = []  # 正在运行的节点列表
-        self.stop_list = []   # 停止运行的节点列表
+        self.error_list = {}  # 有异常的节点列表
+        self.status_list = {}  # 正在运行的节点列表
+        self.stop_list = {}  # 停止运行的节点列表
+        self.restart_list = {} # 重新启动的节点列表
         self.ip_command_handle = ServiceCommandHandle()
+        self.delay_t = 0
 
     def connect(self, hostname, command):
         """
@@ -196,6 +193,7 @@ class NodeMonitor():
         :param command:
         :return:
         """
+        hostname = "223.193.36.121"
         node_client = NodeClient()
         try:
             if self.username and self.passwoed:
@@ -213,7 +211,6 @@ class NodeMonitor():
 
         return stdout
 
-    @delay_time
     def run_start(self, hostname, nodenum):
         """
         启动服务
@@ -222,57 +219,94 @@ class NodeMonitor():
         :return:
         """
 
-        out = self.task(nodenum=nodenum, hostname=hostname,state=None, bucket=self.bucket_list, thread=self.thread_num)
-
+        out = self.task(nodenum=nodenum, hostname=hostname, state=None, bucket=self.bucket_list,
+                        thread=self.thread_num)
         if self.run_status(hostname=hostname, nodenum=nodenum) is False:
-            # 未启动成功
-            self.error_list.append({nodenum: hostname})
-            self.logger.error(f"节点：id = {nodenum}, hostname = {hostname} 未启动成功")
+            self.error_list[nodenum] = hostname
+            self.logger.error(f"节点：id = {nodenum}, hostname = {hostname} 异常未启动成功")
+        else:
+            self.status_list[nodenum] = hostname
+            self.logger.debug(f"节点：id = {nodenum}, hostname = {hostname} 启动成功")
+            return True
 
-        self.status_list.append({nodenum: hostname})
+        return False
 
-        return
-
-    @delay_time
     def run_stop(self, hostname, nodenum):
         """
         停止服务
         :param command:
         :return:
         """
-        out = self.task(nodenum=nodenum, hostname=hostname, state="stop", bucket=self.bucket_list, thread=self.thread_num)
-        if self.run_status(hostname=hostname, nodenum=nodenum) is False:
-            # 服务以关闭
-            self.stop_list.append({nodenum: hostname})
-            self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务关闭成功")
-        else:
-            # 服务未关闭成功
-            self.error_list.append({nodenum: hostname})
-            self.logger.error(f"节点：id = {nodenum} , hostname = {hostname} 服务未关闭成功")
+        count = 0
+        while True:
 
-        return
+            out = self.task(nodenum=nodenum, hostname=hostname, state="stop", bucket=self.bucket_list,
+                            thread=self.thread_num)
+            if self.run_status(hostname=hostname, nodenum=nodenum) is True and count <= 3:
+                # 服务未关闭成功
+                count += 1
+                if count > 3:
+                    self.error_list[nodenum] = hostname
+                    self.logger.error(f"节点：id = {nodenum} , hostname = {hostname} 服务未关闭成功")
+                    break
+            else:
+                # 服务正常关闭
+                self.stop_list[nodenum] = hostname
+                self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务关闭成功")
+                return True
+        return False
 
-    @delay_time
-    def run_status(self, hostname, nodenum):
+    def run_status(self, hostname, nodenum, deplay_logger=None):
         """
         查看服务状态
         :param command:
         :return:
         """
-        out = self.task(nodenum=nodenum, hostname=hostname, state="status", bucket=self.bucket_list, thread=self.thread_num)
+        out = self.task(nodenum=nodenum, hostname=hostname, state="status", bucket=self.bucket_list,
+                        thread=self.thread_num)
 
-        # out = stdout.readline()
         if out.startswith('No running commands'):
+            if deplay_logger:
             # 程序没有执行
-            self.stop_list.append({nodenum: hostname})
-            self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务处于未执行状态")
+                self.stop_list[nodenum] = hostname
+                self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务处于未执行状态")
             return False
+
         if out.startswith('Found running commands'):
             # 程序正在运行/停止时显示
-            self.status_list.append({nodenum: hostname})
-            self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务处于执行状态")
+            if deplay_logger:
+                self.status_list[nodenum] = hostname
+                self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 服务处于执行状态")
             return True
+        raise ValueError("命令返回内容有误请检查代码。")
 
+    def checkrestart(self, hostname, nodenum):
+        """检查是否有未能启动成功的节点，将服务启动"""
+
+        run_status_bool = self.run_status(hostname=hostname, nodenum=nodenum, deplay_logger=True)
+        if run_status_bool is False:
+            # 先执行下停止服务命令
+            run_stop_bool = self.run_stop(hostname=hostname, nodenum=nodenum)
+            if run_stop_bool is False:
+                self.error_list[nodenum] = hostname
+                self.logger.error(f"节点：id = {nodenum} , hostname = {hostname} 重启：停止服务异常")
+                return run_stop_bool  # False
+            # 服务没有运行 拉起服务
+            run_start_bool = self.run_start(hostname=hostname, nodenum=nodenum)
+            if run_start_bool:
+                self.restart_list[nodenum] = hostname
+                self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 重启：服务重启成功")
+                return True
+            else:
+                self.error_list[nodenum] = hostname
+                self.logger.error(f"节点：id = {nodenum} , hostname = {hostname} 重启：服务无法重启")
+                return run_start_bool  # False
+
+        else:
+            self.status_list[nodenum] = hostname
+            self.logger.debug(f"节点：id = {nodenum} , hostname = {hostname} 重启：服务正在运行")
+
+    @delay_time
     def task(self, nodenum, hostname, state, bucket=None, thread=None):
         """
         命令发送任务
@@ -306,18 +340,18 @@ class NodeMonitor():
             try:
                 if command == "start":
                     self.run_start(hostname=value[0], nodenum=num)
-                    pass
                 elif command == "stop":
                     self.run_stop(hostname=value[0], nodenum=num)
-                    pass
                 elif command == "status":
-                    self.run_status(hostname=value[0], nodenum=num)
+                    self.run_status(hostname=value[0], nodenum=num, deplay_logger=True)
+                elif command == "checkrestart":
+                    self.checkrestart(hostname=value[0], nodenum=num)
                 else:
                     self.help()
-                    return
             except Exception as e:
-                self.error_list.append({num: value[0]})
+                self.error_list[num] = value[0]
                 self.logger.error(f"节点：id = {num} , hostname = {value[0]} 执行命令错误：{str(e)}")
+
 
     def help(self):
         """
@@ -325,34 +359,62 @@ class NodeMonitor():
         :return:
         """
         print(f"""
-            python scripts/async_distribution/node_monitoring.py start/stop/status/help
+            python scripts/async_distribution/node_monitoring.py start/stop/status/checkrestart/help delay-time
+            arg1:
+                start               启动服务
+                stop                停止服务
+                status              服务运行状态
+                checkrestart        start 未启动成功,再次拉起服务
+                help                提供帮助信息
+            arg2:    
+                delay-time          延时参数
             
             执行主控制端需要先使用 python scripts/bucket_async_worker.py 脚本测试;
             没有问题请先配置 scripts/async_distribution/config.py 内容；
         """)
+
+    def arguments(self):
+        """终端输入参数"""
+
+
+        try:
+            run_status = sys.argv[1]  # start stop status
+        except Exception as e:
+            return None, 0
+
+        try:
+            run_status2 = int(sys.argv[2])  # 延时时间
+        except Exception as e:
+            return run_status, 0
+
+        if isinstance(run_status2, int):
+            return run_status, run_status2
+
+        else:
+
+            return 'help', 0
 
     def run(self):
         """
         参数： start/stop/status
         :return:
         """
-        try:
-            run_status = sys.argv[1]  # start stop status
-            if run_status not in ["start", "stop", "status", "help"]:
-                self.help()
-                return
-        except Exception as e:
+        arg1, arg2 = self.arguments()
+
+        if not arg1 or arg1 == 'help':
             self.help()
             return
 
-        if run_status == 'help':
+        if arg1 not in ["start", "stop", "status", "checkrestart"]:
             self.help()
-            return
+
+        if arg2:
+            self.delay_t = arg2
 
         self.logger.debug(f"监控程序服务启动。")
 
         try:
-            self.release_command(command=run_status)
+            self.release_command(command=arg1)
         except Exception as e:
             self.logger.error(f"监控程序服务启动失败， 错误为：{str(e)}")
 
@@ -362,6 +424,8 @@ class NodeMonitor():
             self.logger.debug(f"列出服务启动成功/正在运行的节点: {self.status_list}")
         if self.stop_list:
             self.logger.debug(f"列出服务正常关闭的节点: {self.stop_list}")
+        if self.restart_list:
+            self.logger.debug(f"列出服务重启正常的节点：{self.restart_list}")
 
 
 if __name__ == '__main__':
