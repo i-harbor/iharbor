@@ -149,3 +149,31 @@ socket配置
     }
 
 ```
+
+## 4. uwsgi 参数调试问题
+
+1. uwsgi 进程无法释放、无法接收请求、nginx报502、504错误
+```shell
+2个进程、8个线程、每个进程请求数上限5120、物理内存2GB、rados连接池设置为1
+
+processes = 2
+threads = 8
+max-requests = 5120
+reload-on-rss = 2048
+webserver/setting.py 设置连接池
+
+备份测试：
+1-36 个服务节点、 40-400 个并发请求 
+rados连接频繁的被创建
+```
+修改
+```shell
+2个进程、1个线程、每个进程请求数上限500、rados连接池设置为16
+
+processes = 2
+threads = 1
+max-requests = 500
+harakiri = 60
+webserver/setting.py 设置连接池16
+
+```
