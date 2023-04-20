@@ -16,28 +16,23 @@
 
                     {%  if version_git_change_set  %}
 
-                        {% for tag, value in version_git_change_set.items %}
-                            <P>
-                                {{ tag }}
-                                <span>
-                                    {{ value.0 }}
-                                </span>
-                                <span>
-                                    {{ value.1 }}
-                                </span>
-                                <span>
-                                    {{ value.2 }}
-                                </span>
-                              <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
+                        {% for value in version_git_change_set %}
+                            <p>
+                                <i class="fa fa-tag" aria-hidden="true" style="color: #0d6efd"></i>
+                                <span class="p-2 bd-highlight" style="color: #0d6efd">{{ value.0 }} </span>
+                                <hr/>
+                                <i class="fa fa-clock" aria-hidden="true" style="color: #0d6efd"></i>
+                                <span class="p-2 bd-highlight">{{ value.1 | date:'Y-m-d H:i:s'  }}</span>
+                                <i class="fa fa-user" aria-hidden="true" style="color: #0d6efd"></i>
+                                <span class="p-2 bd-highlight">{{ value.2 }}</span>
+                                <i class="fa fa-envelope" aria-hidden="true" style="color: #0d6efd"></i>
+                                <span class="p-2 bd-highlight">{{ value.3 }}</span>
+                              <span><a href="{% url 'docs:docs' %}#/changelog?id={{ value.0| cut:"." }}" target="view_window">
                                     {% trans '变更日志' %}</a>
                               </span>
-                            </P>
-                            <p>
-                                {% for log in value.3 %}
-                                    <span>（{{ forloop.counter }}）{{ log}}</span>&emsp;
-                                    <br/>
-                                {% endfor %}
                             </p>
+                            <pre style="white-space: pre-wrap;word-wrap: break-word">{{ value.4 }}
+                            </pre>
 
                         {% endfor %}
 
