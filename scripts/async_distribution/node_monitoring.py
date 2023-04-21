@@ -193,7 +193,6 @@ class NodeMonitor:
         :param command:
         :return:
         """
-        hostname = "223.193.36.121"
         node_client = NodeClient()
         try:
             if self.username and self.passwoed:
