@@ -56,6 +56,12 @@ class V2ObjViewSet(CustomGenericViewSet):
                 description=gettext_lazy("文件对象hex md5"),
                 required=True
             ),
+            openapi.Parameter(
+                name='contentencoding', in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy("已压缩好的数据的压缩类型"),
+                required=False
+            )
         ],
         responses={
             status.HTTP_200_OK: """
@@ -85,6 +91,7 @@ class V2ObjViewSet(CustomGenericViewSet):
                 数或参数为其他值，忽略之。
               ## 特别提醒：切记在需要时只在上传第一个分片时提交reset参数，否者在上传其他分片提交此参数会调整对象大小，
               已上传的分片数据会丢失。
+            * 支持gzip、bz2、lzma、br数据类型解压缩， lzma、br 使用时间相对较长建议块大小设置在10M以内。
 
             注意：
             分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片

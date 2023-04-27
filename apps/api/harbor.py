@@ -15,6 +15,7 @@ from utils.oss.shortcuts import build_rados_harbor_object
 from .paginations import BucketFileLimitOffsetPagination
 from utils.log.decorators import log_op_info
 from utils.md5 import FileMD5Handler
+from utils.http_compress.compress import CompressHandler
 from . import exceptions
 
 
@@ -819,7 +820,7 @@ class HarborManager:
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=chunk,
                                     reset=reset, user=user)
 
-    def write_file(self, bucket_name:str, obj_path:str, offset:int, file, reset:bool=False, user=None):
+    def write_file(self, bucket_name:str, obj_path:str, offset:int, file, contentencoding=None, reset:bool=False, user=None):
         """
         向对象写入一个文件
 
@@ -834,9 +835,9 @@ class HarborManager:
                 raise HarborError   # 写入失败
         """
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=file,
-                                    reset=reset, user=user)
+                                    reset=reset, user=user, contentencoding=contentencoding)
 
-    def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, reset:bool=False, user=None):
+    def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, contentencoding=None, reset:bool=False, user=None):
         """
         向对象写入一个数据
 
@@ -864,6 +865,8 @@ class HarborManager:
             except Exception as e:
                 pass
 
+        data = self.file_decompress_handler(contentencoding=contentencoding, file=data)
+
         try:
             if isinstance(data, bytes):
                 self._save_one_chunk(obj=obj, rados=rados, offset=offset, chunk=data)
@@ -876,6 +879,17 @@ class HarborManager:
             raise e
 
         return created
+
+    def file_decompress_handler(self, contentencoding, file):
+        """文件解压缩处理"""
+        if not contentencoding:
+            return file
+
+        try:
+            de_data = CompressHandler().decompress(data=file, decompresstype=contentencoding)
+        except Exception as e:
+            raise e
+        return de_data
 
     def create_empty_obj(self, bucket_name: str, obj_path: str, user):
         """

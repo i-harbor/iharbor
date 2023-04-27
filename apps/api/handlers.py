@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from utils import storagers
 from utils.oss.shortcuts import build_rados_harbor_object
 from utils.md5 import EMPTY_HEX_MD5
+from utils.http_compress.compress import CompressHandler
 from api.views_v1.views import check_authenticated_or_bucket_token
 from . import exceptions
 from .harbor import HarborManager
@@ -33,6 +34,7 @@ class V2ObjectHandler:
         content_length = validate_data['content_length']
         offset = validate_data['offset']
         reset = validate_data['reset']
+        contentencoding = validate_data['contentencoding']
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=view)
@@ -64,7 +66,7 @@ class V2ObjectHandler:
         hmanager = HarborManager()
         try:
             created = hmanager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
-                                          reset=reset, user=request.user)
+                                          reset=reset, user=request.user, contentencoding=contentencoding)
         except exceptions.HarborError as exc:
             storagers.try_close_file(file)
             return response_exception(exc)
@@ -116,11 +118,19 @@ class V2ObjectHandler:
         else:
             reset = False
 
+        contentencoding = request.query_params.get('contentencoding', '').lower()
+        # 判断是否是支持的压缩类型
+        try:
+            CompressHandler().checkcompresstype(contentencoding=contentencoding)
+        except Exception as e:
+            raise exceptions.BadRequest(message=str(e))
+
         return {
             'content_md5': content_md5,
             'content_length': content_length,
             'offset': offset,
-            'reset': reset
+            'reset': reset,
+            'contentencoding': contentencoding
         }
 
     @staticmethod
