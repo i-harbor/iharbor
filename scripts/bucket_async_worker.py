@@ -9,6 +9,7 @@ sys.path.insert(0, BASE_DIR)
 
 # from async_task import AsyncTask
 from async_buckets import AsyncTask
+from utils.http_compress.compress import CompressHandler
 
 
 def config_logger(name: str = 'async-logger', level=logging.INFO):
@@ -45,9 +46,10 @@ PARAM_STOP = 'stop'
 PARAM_STATUS = 'status'
 PARAM_BUCKETS = 'buckets'
 PARAM_SMALL_SIZE_FIRST = 'small-size-first'
+PARAM_COMPRESS = "compress"
 PARAM_NAME_LIST = [
     PARAM_DEBUG, PARAM_HELP, PARAM_TEST, PARAM_NODE_NUM, PARAM_NODE_COUNT, PARAM_MULTI_THREAD, PARAM_MAX_THREADS,
-    PARAM_STOP, PARAM_STATUS, PARAM_BUCKETS, PARAM_SMALL_SIZE_FIRST
+    PARAM_STOP, PARAM_STATUS, PARAM_BUCKETS, PARAM_SMALL_SIZE_FIRST, PARAM_COMPRESS
 ]
 
 
@@ -67,6 +69,7 @@ def print_help():
     {PARAM_STATUS}:         Is it running
     {PARAM_BUCKETS}:        Only bucket to async, '["name1","name2"]'
     {PARAM_SMALL_SIZE_FIRST}:Objects with small sizes are synchronized first.
+    {PARAM_COMPRESS}:       Data compression type
     
     * daemon mode run cmd:
         nohup cmd >/dev/null 2>&1 &
@@ -159,6 +162,13 @@ def validate_params(params):
 
         params[PARAM_BUCKETS] = b
 
+    if PARAM_COMPRESS in params:
+        compress_type = params[PARAM_COMPRESS]
+        try:
+            CompressHandler().checkcompresstype(contentencoding=compress_type)
+        except Exception as e:
+            raise ValueError(f'"{PARAM_COMPRESS}"({compress_type}): {str(e)}')
+        params[PARAM_COMPRESS] = compress_type
     return params
 
 
@@ -287,6 +297,9 @@ def main():
 
     if PARAM_SMALL_SIZE_FIRST in params:
         kwargs['small_size_first'] = True
+
+    if PARAM_COMPRESS in params:
+        kwargs['contentencoding'] = params[PARAM_COMPRESS]
 
     try:
         check_same_task_run()

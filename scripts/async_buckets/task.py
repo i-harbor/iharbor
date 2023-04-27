@@ -22,7 +22,7 @@ class AsyncTask:
     def __init__(self, node_num: int = None, node_count: int = 100,
                  in_multi_thread: bool = False, max_threads: int = 10,
                  test: bool = False, logger=None, buckets: list = None,
-                 small_size_first: bool = False
+                 small_size_first: bool = False, contentencoding=None
                  ):
         """
         :param node_num: 当前工作节点编号，不指定尝试从hostname获取
@@ -55,6 +55,7 @@ class AsyncTask:
         self.pool_sem = threading.Semaphore(self.max_threads)  # 定义最多同时启用多少个线程
         self.in_exiting = False         # 多线程时标记是否正在退出
         self.hostname = get_hostname()
+        self.contentencoding = contentencoding  # 压缩格式
 
     def validate_params(self):
         """
@@ -345,7 +346,8 @@ class AsyncTask:
                 self.logger.debug(f"Test async {msg}")
                 time.sleep(1)
             else:
-                AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup, logger=self.logger)
+                AsyncBucketManager().async_bucket_object(bucket=bucket, obj=obj, backup=backup, logger=self.logger,
+                                                         contentencoding=self.contentencoding)
         except Exception as e:
             ret = e
             self.logger.error(f"Failed Async, {msg}, {str(e)}")

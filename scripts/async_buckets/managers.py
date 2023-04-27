@@ -5,7 +5,7 @@ import requests
 
 from utils.oss.pyrados import FileWrapper, HarborObject
 from utils.md5 import FileMD5Handler, EMPTY_HEX_MD5
-
+from utils.http_compress.compress import CompressHandler
 from .databases import django_settings
 from .querys import QueryHandler, BackupNum
 
@@ -108,12 +108,16 @@ class IharborBucketClient:
 
         return url + '/'
 
-    def _build_post_chunk_url(self, endpoint_url: str, bucket_name: str, object_key: str, offset: int, reset=None):
+    def _build_post_chunk_url(self, endpoint_url: str, bucket_name: str, object_key: str, offset: int, reset=None,
+                              contentencoding=None):
         querys = {
             'offset': offset
         }
         if reset:
             querys['reset'] = True
+
+        if contentencoding:
+            querys['contentencoding'] = contentencoding
 
         query_str = parse.urlencode(query=querys)
         base_url = self._build_object_base_url(
@@ -227,8 +231,8 @@ class IharborBucketClient:
                 message=f'Failed get object ({object_key}) size from backup point address ({backup_str}),'
                         f' break point resume object, {str(data)}', code='FailedAsyncObject')
 
-    def post_object_by_chunk(self, ho, endpoint_url: str, bucket_name: str, object_key: str,
-                             bucket_token: str, per_size: int = 32 * 1024 ** 2, breakpoint_resume=None):
+    def post_object_by_chunk(self, ho, endpoint_url: str, bucket_name: str, object_key: str, bucket_token: str,
+                             per_size: int = 32 * 1024 ** 2, breakpoint_resume=None, contentencoding=None):
         """
         分片上传一个对象
         :raises: AsyncError
@@ -247,14 +251,19 @@ class IharborBucketClient:
             if offset == 0:
                 reset = True
 
-            api = self._build_post_chunk_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
-                                             object_key=object_key, offset=offset, reset=reset)
             data = file.read(per_size)
             if not data:
                 if offset >= file.size:
                     break
                 raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, '
                                  f'read empty bytes from ceph, 对象同步可能不完整', code='FailedAsyncObject')
+
+            # 数据压缩
+            if contentencoding and len(data) > 10485760:
+                data = CompressHandler().compress(data=data, compresstype=contentencoding)
+            else:
+                # 小于 10M 不压缩
+                contentencoding = None
 
             md5_handler = FileMD5Handler()
             md5_handler.update(offset=0, data=data)
@@ -263,6 +272,11 @@ class IharborBucketClient:
                 'Authorization': f'BucketToken {bucket_token}',
                 'Content-MD5': hex_md5
             }
+
+            api = self._build_post_chunk_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
+                                             object_key=object_key, offset=offset, reset=reset,
+                                             contentencoding=contentencoding)
+
             try:
                 r = self._do_request(method='post', url=api, data=data, headders=headers)
                 if r.status_code == 200:
@@ -302,7 +316,8 @@ class AsyncBucketManager:
         obj_key = f"{str(bucket['id'])}_{str(obj['id'])}"
         return build_harbor_object(using=str(obj['pool_id']), obj_id=obj_key, obj_size=obj['si'])
 
-    def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict, breakpoint_resume=None):
+    def async_object_to_backup_bucket(self, bucket: dict, obj: dict, backup: dict, breakpoint_resume=None,
+                                      contentencoding=None):
         """
         :return:
             True        # 同步成功
@@ -322,7 +337,7 @@ class AsyncBucketManager:
             return True
 
         ho = self.get_object_ceph_rados(bucket=bucket, obj=obj)
-        if obj_size <= 256 * 1024**2 and hex_md5:       # 256MB
+        if obj_size <= 5 * 1024**2 and hex_md5:       # 5MB
             r = client.put_one_object(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
                                       object_key=object_key, bucket_token=bucket_token, object_md5=hex_md5)
             if r is True:
@@ -330,10 +345,10 @@ class AsyncBucketManager:
 
         client.post_object_by_chunk(ho=ho, endpoint_url=endpoint_url, bucket_name=bucket_name,
                                     object_key=object_key, bucket_token=bucket_token,
-                                    breakpoint_resume=breakpoint_resume)
+                                    breakpoint_resume=breakpoint_resume, contentencoding=contentencoding)
         return True
 
-    def async_bucket_object(self, bucket, obj, backup, logger):
+    def async_bucket_object(self, bucket, obj, backup, logger, contentencoding=None):
         """
         breakpoint_resume: 标记 是否断点续传
         :return:
@@ -360,7 +375,7 @@ class AsyncBucketManager:
         try:
 
             ok = self.async_object_to_backup_bucket(bucket=bucket, obj=obj, backup=backup,
-                                                    breakpoint_resume=breakpoint_resume)
+                                                    breakpoint_resume=breakpoint_resume, contentencoding=contentencoding)
             async_time = get_utcnow()
             if ok:
                 try:
