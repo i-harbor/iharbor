@@ -5,6 +5,7 @@ import sys
 import logging
 from node_connect_cline import NodeClient
 from functools import wraps
+from utils.http_compress.compress import CompressHandler
 
 
 def async_monitor_logger(name: str = 'async-monitor-logger', level=logging.INFO):
@@ -133,7 +134,7 @@ class ServiceCommandHandle:
             # start
             return command_base
 
-    def generate_command(self, state, bucket, thread, nodenum):
+    def generate_command(self, state, bucket, thread, nodenum, compresstype=None):
         """
         生成 命令
         :param state:
@@ -145,6 +146,8 @@ class ServiceCommandHandle:
         ip_range, ip_s, ip_e = self.get_ip_range()
         command_base = self.command_template(state=state, bucket=bucket, thread=thread)
         if not state:
+            if compresstype:
+                command_base = command_base + f" compress={compresstype}"
             command = command_base + f" node-num={nodenum} node-count={ip_range}"
             command = f'nohup {command} >/dev/null 2>&1 &'  # 后端运行
             return command
@@ -185,6 +188,7 @@ class NodeMonitor:
         self.restart_list = {} # 重新启动的节点列表
         self.ip_command_handle = ServiceCommandHandle()
         self.delay_t = 0
+        self.compresstype = None
 
     def connect(self, hostname, command):
         """
@@ -319,7 +323,7 @@ class NodeMonitor:
         """
 
         command = self.ip_command_handle.generate_command(state=state, bucket=bucket, thread=thread,
-                                                          nodenum=nodenum)
+                                                          nodenum=nodenum, compresstype=self.compresstype)
         self.logger.debug(f"节点执行命令：id = {nodenum} , hostname = {hostname}, command = {command}。")
         stdout = self.connect(hostname=hostname, command=command)
         out = stdout.readline()
@@ -367,6 +371,9 @@ class NodeMonitor:
                 help                提供帮助信息
             arg2:    
                 delay-time          延时参数
+            arg3:
+                compresstype            压缩 支持 gzip、bz2、lzma、br
+            
             
             执行主控制端需要先使用 python scripts/bucket_async_worker.py 脚本测试;
             没有问题请先配置 scripts/async_distribution/config.py 内容；
@@ -374,7 +381,6 @@ class NodeMonitor:
 
     def arguments(self):
         """终端输入参数"""
-
 
         try:
             run_status = sys.argv[1]  # start stop status
@@ -388,9 +394,7 @@ class NodeMonitor:
 
         if isinstance(run_status2, int):
             return run_status, run_status2
-
         else:
-
             return 'help', 0
 
     def run(self):
@@ -401,14 +405,28 @@ class NodeMonitor:
         arg1, arg2 = self.arguments()
 
         if not arg1 or arg1 == 'help':
-            self.help()
-            return
+            return self.help()
 
         if arg1 not in ["start", "stop", "status", "checkrestart"]:
-            self.help()
+            return self.help()
 
         if arg2:
             self.delay_t = arg2
+        arg3 = None
+        try:
+            arg3 = sys.argv[3]
+        except Exception as e:
+            pass
+
+        if arg3:
+            try:
+                check_bool = CompressHandler().checkcompresstype(contentencoding=arg3)
+            except Exception as e:
+                print(f"error: {str(e)}")
+                return self.help()
+
+            if check_bool:
+                self.compresstype = arg3
 
         self.logger.debug(f"监控程序服务启动。")
 
