@@ -820,7 +820,8 @@ class HarborManager:
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=chunk,
                                     reset=reset, user=user)
 
-    def write_file(self, bucket_name:str, obj_path:str, offset:int, file, contentencoding=None, reset:bool=False, user=None):
+    def write_file(self, bucket_name:str, obj_path:str, offset:int, file, compress_type, content_source_md5,
+                   reset:bool=False, user=None):
         """
         向对象写入一个文件
 
@@ -828,6 +829,7 @@ class HarborManager:
         :param obj_path: 对象全路径
         :param offset: 写入对象偏移量
         :param file: 要写入的数据，已打开的类文件句柄
+        :param compress_type: 解压缩类型
         :param reset: 为True时，先重置对象大小为0后再写入数据；
         :param user: 用户，默认为None，如果给定用户只操作属于此用户的对象（只查找此用户的存储桶）
         :return:
@@ -835,9 +837,11 @@ class HarborManager:
                 raise HarborError   # 写入失败
         """
         return self.write_to_object(bucket_name=bucket_name, obj_path=obj_path, offset=offset, data=file,
-                                    reset=reset, user=user, contentencoding=contentencoding)
+                                    reset=reset, user=user, compress_type=compress_type,
+                                    content_source_md5=content_source_md5)
 
-    def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, contentencoding=None, reset:bool=False, user=None):
+    def write_to_object(self, bucket_name:str, obj_path:str, offset:int, data, reset:bool=False, user=None,
+                        compress_type=None, content_source_md5=None):
         """
         向对象写入一个数据
 
@@ -865,7 +869,7 @@ class HarborManager:
             except Exception as e:
                 pass
 
-        data = self.file_decompress_handler(contentencoding=contentencoding, file=data)
+        data = self.file_decompress_handler(file=data, compress_type=compress_type, content_source_md5=content_source_md5)
 
         try:
             if isinstance(data, bytes):
@@ -880,15 +884,24 @@ class HarborManager:
 
         return created
 
-    def file_decompress_handler(self, contentencoding, file):
+    def file_decompress_handler(self, file, compress_type, content_source_md5):
         """文件解压缩处理"""
-        if not contentencoding:
+        if not compress_type:
             return file
 
         try:
-            de_data = CompressHandler().decompress(data=file, decompresstype=contentencoding)
+            de_data = CompressHandler().decompress(data=file, decompresstype=compress_type)
         except Exception as e:
             raise e
+
+        md5_handler = FileMD5Handler()
+        md5_handler.update(offset=0, data=de_data)
+        hex_md5 = md5_handler.hex_md5
+
+        # 与原始数据比较
+        if content_source_md5 != hex_md5:
+            raise exceptions.HarborError.from_error(
+                exceptions.BadRequest(message='数据校验md5不通过'))
         return de_data
 
     def create_empty_obj(self, bucket_name: str, obj_path: str, user):

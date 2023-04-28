@@ -34,7 +34,8 @@ class V2ObjectHandler:
         content_length = validate_data['content_length']
         offset = validate_data['offset']
         reset = validate_data['reset']
-        contentencoding = validate_data['contentencoding']
+        compress_type = validate_data['compress_type']
+        content_source_md5 = validate_data['content_source_md5']
 
         try:
             check_authenticated_or_bucket_token(request, bucket_name=bucket_name, act='write', view=view)
@@ -66,7 +67,8 @@ class V2ObjectHandler:
         hmanager = HarborManager()
         try:
             created = hmanager.write_file(bucket_name=bucket_name, obj_path=objpath, offset=offset, file=file,
-                                          reset=reset, user=request.user, contentencoding=contentencoding)
+                                          reset=reset, user=request.user, compress_type=compress_type,
+                                          content_source_md5=content_source_md5)
         except exceptions.HarborError as exc:
             storagers.try_close_file(file)
             return response_exception(exc)
@@ -118,19 +120,26 @@ class V2ObjectHandler:
         else:
             reset = False
 
-        contentencoding = request.query_params.get('contentencoding', '').lower()
+        # api 参数
+        compress_type = request.query_params.get('compresstype', '').lower()
         # 判断是否是支持的压缩类型
         try:
-            CompressHandler().checkcompresstype(contentencoding=contentencoding)
+            check_bool = CompressHandler().checkcompresstype(compress_type=compress_type)
         except Exception as e:
             raise exceptions.BadRequest(message=str(e))
+
+        source_md5 = request.headers.get('Content-Source-MD5', '').lower()
+        if check_bool and not source_md5:
+            # compress_type 有值且为支持的压缩类型， source_md5 为未压缩前数据的md5
+            raise exceptions.BadRequest(message=' header "Content-Encoding-MD5" not value')
 
         return {
             'content_md5': content_md5,
             'content_length': content_length,
             'offset': offset,
             'reset': reset,
-            'contentencoding': contentencoding
+            'compress_type': compress_type,
+            'content_source_md5': source_md5,
         }
 
     @staticmethod
