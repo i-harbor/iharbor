@@ -315,8 +315,6 @@ class NodeMonitor:
         命令发送任务
         :param nodenum:
         :param hostname:
-        :param command:
-        :param test:
         :param bucket:
         :param thread:
         :return:
@@ -420,7 +418,7 @@ class NodeMonitor:
 
         if arg3:
             try:
-                check_bool = CompressHandler().checkcompresstype(contentencoding=arg3)
+                check_bool = CompressHandler().checkcompresstype(compress_type=arg3)
             except Exception as e:
                 print(f"error: {str(e)}")
                 return self.help()
