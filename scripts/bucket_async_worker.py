@@ -165,7 +165,7 @@ def validate_params(params):
     if PARAM_COMPRESS in params:
         compress_type = params[PARAM_COMPRESS]
         try:
-            CompressHandler().checkcompresstype(contentencoding=compress_type)
+            CompressHandler().checkcompresstype(compress_type=compress_type)
         except Exception as e:
             raise ValueError(f'"{PARAM_COMPRESS}"({compress_type}): {str(e)}')
         params[PARAM_COMPRESS] = compress_type

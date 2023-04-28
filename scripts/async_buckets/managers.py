@@ -117,7 +117,7 @@ class IharborBucketClient:
             querys['reset'] = True
 
         if contentencoding:
-            querys['contentencoding'] = contentencoding
+            querys['compresstype'] = contentencoding
 
         query_str = parse.urlencode(query=querys)
         base_url = self._build_object_base_url(
@@ -258,20 +258,21 @@ class IharborBucketClient:
                 raise AsyncError(f'Failed async object({object_key}), to backup({backup_str}), post by chunk, '
                                  f'read empty bytes from ceph, 对象同步可能不完整', code='FailedAsyncObject')
 
+            source_data_md5 = self.data_md5(data=data)
+            headers = {
+                'Authorization': f'BucketToken {bucket_token}',
+                'Content-MD5': source_data_md5,
+            }
             # 数据压缩
             if contentencoding and len(data) > 10485760:
                 data = CompressHandler().compress(data=data, compresstype=contentencoding)
+                compress_data_md5 = self.data_md5(data=data)
+                headers['Content-Source-MD5'] = source_data_md5  # 原始数据的md5
+                headers['Content-MD5'] = compress_data_md5  # 上传过程中的md5
+
             else:
                 # 小于 10M 不压缩
                 contentencoding = None
-
-            md5_handler = FileMD5Handler()
-            md5_handler.update(offset=0, data=data)
-            hex_md5 = md5_handler.hex_md5
-            headers = {
-                'Authorization': f'BucketToken {bucket_token}',
-                'Content-MD5': hex_md5
-            }
 
             api = self._build_post_chunk_url(endpoint_url=endpoint_url, bucket_name=bucket_name,
                                              object_key=object_key, offset=offset, reset=reset,
@@ -298,6 +299,14 @@ class IharborBucketClient:
 
         file.close()
         return True
+
+    def data_md5(self, data):
+        """计算数据md5"""
+        md5_handler = FileMD5Handler()
+        md5_handler.update(offset=0, data=data)
+        hex_md5 = md5_handler.hex_md5
+        return hex_md5
+
 
 
 class AsyncBucketManager:
