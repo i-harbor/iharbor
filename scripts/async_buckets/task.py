@@ -259,6 +259,10 @@ class AsyncTask:
                                                                       can_not_connection=can_not_connection,
                                                                       failed_count=failed_count)
                 ok_count += ok_num
+
+                if ok_num != 0 and failed_count != 0:
+                    # 连续出现错误退出, 如果有一次成功、则前面记录的错误置0
+                    failed_count = 0
                 if l_id is not None:
                     last_object_id = l_id
                 if l_size is not None:
