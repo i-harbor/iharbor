@@ -53,13 +53,20 @@ class V2ObjViewSet(CustomGenericViewSet):
             openapi.Parameter(
                 name='Content-MD5', in_=openapi.IN_HEADER,
                 type=openapi.TYPE_STRING,
-                description=gettext_lazy("文件对象hex md5"),
+                description=gettext_lazy("上传文件对象hex md5"),
                 required=True
             ),
             openapi.Parameter(
-                name='contentencoding', in_=openapi.IN_QUERY,
+                name='compresstype', in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
-                description=gettext_lazy("已压缩好的数据的压缩类型"),
+                description=gettext_lazy("解压缩类型，注意：Content-MD5 为压缩后分片文件对象的md5, "
+                                         "Content-Source-MD5 为未压缩前分片文件对象的md5"),
+                required=False
+            ),
+            openapi.Parameter(
+                name='Content-Source-MD5', in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description=gettext_lazy('未压缩前分片文件对象的 hex md5， 如果填写解压压缩类型参数， 此参数必填，否则校验无法通过'),
                 required=False
             )
         ],
@@ -91,7 +98,12 @@ class V2ObjViewSet(CustomGenericViewSet):
                 数或参数为其他值，忽略之。
               ## 特别提醒：切记在需要时只在上传第一个分片时提交reset参数，否者在上传其他分片提交此参数会调整对象大小，
               已上传的分片数据会丢失。
-            * 支持gzip、bz2、lzma、br数据类型解压缩， lzma、br 使用时间相对较长建议块大小设置在10M以内。
+            * 解压缩类型说明：
+                  服务端不提供完整压缩包解压
+                （1） 支持gzip、bz2、lzma、br数据类型分片解压缩， lzma、br 使用时间相对较长建议块大小设置小点。
+                （2） 如果 compresstype 参数设置， Content-Source-MD5 必填，否则不通过校验。
+                （3） 注：客户端需将分片对象提前压缩后上传，使用compresstype， Content-Source-MD5 才有意义。
+                        如果客户端上传一个完整的压缩包为一个分片上传，不需要填写 compresstype， Content-Source-MD5 参数，否则数据不可使用。
 
             注意：
             分片上传现不支持并发上传，并发上传可能造成脏数据，上传分片顺序没有要求，请一个分片上传成功后再上传另一个分片
