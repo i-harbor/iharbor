@@ -20,7 +20,7 @@ class CompressHandler:
 
     def gzipdempresshandler(self, data):
         """解压缩处理"""
-        with gzip.GzipFile(fileobj=data) as f:
+        with gzip.open(filename=data) as f:
             return f.read()
 
     def gzipdecompress(self, data):
@@ -77,7 +77,6 @@ class CompressHandler:
     def lzmadecompress(self, data):
         """
         lzma 解压
-        CHECK_CRC64: 64 位循环冗余检查 默认
         """
         try:
             # bytes_obj = lzma.decompress(data=data)
@@ -143,23 +142,23 @@ class CompressHandler:
         """压缩类型列表"""
         return ['gzip', 'bz2', 'lzma', 'br']
 
-    def checkcompresstype(self, contentencoding):
+    def checkcompresstype(self, compress_type):
         compress_type_list = self.compresstypelist()
 
-        if not contentencoding:
+        if not compress_type:
             return None
-        elif contentencoding in compress_type_list:
+        elif compress_type in compress_type_list:
             return True
         else:
-            raise ValueError(f"不支持 {contentencoding} 类型解压缩")
+            raise ValueError(f"不支持 {compress_type} 类型解压缩")
 
 
 if __name__ == '__main__':
     s_in = b"mountUnmountedrclonemount"
     c = CompressHandler()
-    try:
-        f = c.compress(data=s_in, compresstype='gzip')
-        d = c.decompress(data=f, decompresstype='gzip')
-    except Exception as e:
-        print(f"e = {str(e)}")
-
+    # gzip
+    f = c.compress(data=s_in, compresstype='gzip')
+    print(f)
+    # f = ""
+    f = c.decompress(data=f, decompresstype='gzip')
+    print(f)
