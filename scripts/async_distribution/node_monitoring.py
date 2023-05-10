@@ -5,6 +5,10 @@ import sys
 import logging
 from node_connect_cline import NodeClient
 from functools import wraps
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, BASE_DIR)
+
 from utils.http_compress.compress import CompressHandler
 
 
@@ -276,6 +280,7 @@ class NodeMonitor:
             return False
 
         if out.startswith('Found running commands'):
+            self.logger.warning(f"节点：id ={nodenum}, hostname = {hostname} 命令日志 {out}")
             # 程序正在运行/停止时显示
             if deplay_logger:
                 self.status_list[nodenum] = hostname
@@ -360,7 +365,7 @@ class NodeMonitor:
         :return:
         """
         print(f"""
-            python scripts/async_distribution/node_monitoring.py start/stop/status/checkrestart/help delay-time
+            python scripts/async_distribution/node_monitoring.py start/stop/status/checkrestart/help delay-time compresstype
             arg1:
                 start               启动服务
                 stop                停止服务
