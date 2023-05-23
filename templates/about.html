@@ -8,35 +8,45 @@
         <div class="card border-0 col-md-8 col-lg-6">
             <div class="card-body">
                 <div class="p-2">
-                    <h5 class="card-title">{% trans '关于iHarbor' %}</h5>
+                    <h5 class="card-title">{% trans '关于iHarbor' %} <a href="{% url 'docs:docs' %}#/changelog"
+                                                                      target="view_window">
+                        {% trans '版本变更' %}</a></h5>
                     <p>{% trans 'iHarbor是一个大规模分布式、百PB级别、纠删码容错的高性能对象存储系统。' %}</p>
                 </div>
                 <div class="p-2">
-                    <h5>{% trans '最新版本' %}   {{ version }}</h5>
+                    <h5>{% trans '研发团队' %}</h5>
+                    <p>{% trans '中国科学院计算机网络信息中心，科技云部。' %}</p>
+                </div>
+                <div class="p-2">
+                    {% if version_git_change_set %}
+                        <h5>{% trans '当前版本' %}</h5>
+                        <p>
+                            <span class="p-2 bd-highlight"
+                                  style="color: #0d6efd">{{ version_git_change_set.0.0 }} </span>
 
-                    {%  if version_git_change_set  %}
+                            <span class="p-2 bd-highlight">发布时间：{{ version_git_change_set.0.1 | date:'Y-m-d H:i:s' }}</span>
 
-                        {% for value in version_git_change_set %}
+                            <span class="p-2 bd-highlight">发布人：{{ version_git_change_set.0.2 }}</span>
+                        </p>
+
+                        <pre style="white-space: pre-wrap;word-wrap: break-word">{{ version_git_change_set.0.4 }}</pre>
+                        <br>
+
+                        <h5>{% trans '历史版本' %}</h5>
+                        {% for tag in version_git_change_set|slice:"1:" %}
                             <p>
-                                <i class="fa fa-tag" aria-hidden="true" style="color: #0d6efd"></i>
-                                <span class="p-2 bd-highlight" style="color: #0d6efd">{{ value.0 }} </span>
-                                <hr/>
-                                <i class="fa fa-clock" aria-hidden="true" style="color: #0d6efd"></i>
-                                <span class="p-2 bd-highlight">{{ value.1 | date:'Y-m-d H:i:s'  }}</span>
-                                <i class="fa fa-user" aria-hidden="true" style="color: #0d6efd"></i>
-                                <span class="p-2 bd-highlight">{{ value.2 }}</span>
-                                <i class="fa fa-envelope" aria-hidden="true" style="color: #0d6efd"></i>
-                                <span class="p-2 bd-highlight">{{ value.3 }}</span>
-                              <span><a href="{% url 'docs:docs' %}#/changelog?id={{ value.0| cut:"." }}" target="view_window">
-                                    {% trans '变更日志' %}</a>
-                              </span>
+                                <span class="p-2 bd-highlight" style="color: #0d6efd">{{ tag.0 }} </span>
+
+                                <span class="p-2 bd-highlight">发布时间：{{ tag.1 | date:'Y-m-d H:i:s' }}</span>
+
+                                <span class="p-2 bd-highlight">发布人：{{ tag.2 }}</span>
                             </p>
-                            <pre style="white-space: pre-wrap;word-wrap: break-word">{{ value.4 }}
-                            </pre>
+                            <pre style="white-space: pre-wrap;word-wrap: break-word">{{ tag.4 }}</pre>
+                            <br>
 
                         {% endfor %}
 
-                        {% else %}
+                    {% else %}
                         <p>
                             无法获取版本日志， 详情请查看：
                             <span><a href="{% url 'docs:docs' %}#/changelog" target="view_window">
@@ -44,13 +54,9 @@
                             </span>
                         </p>
 
-                    {%  endif %}
+                    {% endif %}
+                </div>
 
-                </div>
-                <div class="p-2">
-                    <h5>{% trans '关于我们' %}</h5>
-                    <p>{% trans '中国科学院计算机网络信息中心，科技云部。' %}</p>
-                </div>
             </div>
         </div>
     </div>

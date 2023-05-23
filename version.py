@@ -14,8 +14,7 @@ def get_git_changeset():
         return None
     repo_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # %(*refname) %(*authorname) %(*authoremail) %(*authordate) %(*subject)
-    get_tag = subprocess.run(
+    git_log = subprocess.run(
         "git for-each-ref --count=3 --sort='-taggerdate' "
         "--format='%(refname:short) || %(taggerdate:format:%s) || %(*authorname) || %(*authoremail) || %(subject)'"
         " refs/tags/*",
@@ -24,22 +23,23 @@ def get_git_changeset():
         cwd=repo_dir,
         text=True,
     )
+
     try:
-        cmd_output = get_tag.stdout
+        cmd_output = git_log.stdout
         lines = cmd_output.split('\n')[0:3]
         tz = datetime.timezone.utc
-        git_tag_info = []
+        tags = []
         for line in lines:
             tag = line.split('||')
             if len(tag) == 5:
                 tag[1] = datetime.datetime.fromtimestamp(int(tag[1]), tz=tz)
                 tag[4] = tag[4].replace('*', '\n*')
-                git_tag_info.append(tag)
+                tags.append(tag)
+
 
     except Exception:
         return None
-
-    return git_tag_info
+    return tags
 
 
 __version__ = get_version(VERSION)
